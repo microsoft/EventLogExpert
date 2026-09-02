@@ -4,6 +4,7 @@
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Common.Clipboard;
@@ -16,6 +17,7 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Scenarios.Catalog;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.FilterEditor;
 using EventLogExpert.UI.Focus;
@@ -25,6 +27,7 @@ using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
 using System.Security;
@@ -136,6 +139,8 @@ public sealed partial class FilterPane
 
     [Inject] private ILoadedLogNamesSource LoadedLogNames { get; init; } = null!;
 
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
+
     [Inject] private IMenuActionService MenuActions { get; init; } = null!;
 
     [Inject] private IMenuService MenuService { get; init; } = null!;
@@ -238,7 +243,8 @@ public sealed partial class FilterPane
     {
         if (ResolvedScenario is not { } scenario)
         {
-            AnnouncementService.Announce(FilterPaneAnnouncements.SelectedScenarioMissing);
+            AnnouncementService.Announce(FilterPaneAnnouncements.SelectedScenarioMissing(Localizer));
+
             return;
         }
 
@@ -247,10 +253,10 @@ public sealed partial class FilterPane
 
     internal IReadOnlyList<MenuItem> BuildAddFilterMenu() =>
     [
-        MenuItem.Item("Basic", AddBasicFilterFromMenu),
-        MenuItem.Item("Advanced", AddAdvancedFilterFromMenu),
+        MenuItem.Item(Localizer["FilterPane_AddMenu_Basic"], AddBasicFilterFromMenu),
+        MenuItem.Item(Localizer["FilterPane_AddMenu_Advanced"], AddAdvancedFilterFromMenu),
         MenuItem.Item(
-            "Recent",
+            Localizer["FilterPane_AddMenu_Recent"],
             AddRecentFilterFromMenu,
             isEnabled: HasRecentFilters,
             disabledReason: GetRecentDisabledReason()),
@@ -258,15 +264,18 @@ public sealed partial class FilterPane
 
     internal void EditDateFilter() => _canEditDate = true;
 
+    internal string FormatScenarioGroup(ScenarioGroup? group) =>
+        group is { } value ? ScenarioGroupLocalizer.GroupDisplay(Localizer, value) : string.Empty;
+
     internal string? GetRecentDisabledReason()
     {
         if (HasRecentFilters) { return null; }
 
-        if (LibraryLoadStatus.Current.LoadError) { return FilterPaneAnnouncements.LoadFailedRetryViaModal; }
+        if (LibraryLoadStatus.Current.LoadError) { return FilterPaneAnnouncements.LoadFailedRetryViaModal(Localizer); }
 
         return !LibraryLoadStatus.Current.IsLoaded ?
-            FilterPaneAnnouncements.LoadingTryAgain :
-            FilterPaneAnnouncements.RecentNoneAvailable;
+            FilterPaneAnnouncements.LoadingTryAgain(Localizer) :
+            FilterPaneAnnouncements.RecentNoneAvailable(Localizer);
     }
 
     internal void OnScenarioGroupChanged(ScenarioGroup? group)
@@ -281,24 +290,28 @@ public sealed partial class FilterPane
 
         if (LibraryLoadStatus.Current.LoadError)
         {
-            AnnouncementService.Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal);
+            AnnouncementService.Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal(Localizer));
+
             return;
         }
 
         if (!LibraryLoadStatus.Current.IsLoaded)
         {
-            AnnouncementService.Announce(FilterPaneAnnouncements.LoadingTryAgain);
+            AnnouncementService.Announce(FilterPaneAnnouncements.LoadingTryAgain(Localizer));
+
             return;
         }
 
         _filterSetTags.Clear();
         IsFilterSetPickerVisible = true;
-        SelectedFilterSetId = HasFilterSets
-            ? LibraryEntries.Current
-                .OfType<LibraryEntryFilterSet>()
+
+        SelectedFilterSetId = HasFilterSets ?
+            LibraryEntries.Current.OfType<LibraryEntryFilterSet>()
                 .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
-                .First().Id
-            : default;
+                .First()
+                .Id :
+            default;
+        
         _isFilterListVisible = true;
     }
 
@@ -324,7 +337,8 @@ public sealed partial class FilterPane
     {
         if (ResolvedScenario is not { } scenario)
         {
-            AnnouncementService.Announce(FilterPaneAnnouncements.SelectedScenarioMissing);
+            AnnouncementService.Announce(FilterPaneAnnouncements.SelectedScenarioMissing(Localizer));
+
             return;
         }
 
@@ -337,7 +351,7 @@ public sealed partial class FilterPane
     {
         if (LibraryLoadStatus.Current.LoadError)
         {
-            AnnouncementService.Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal);
+            AnnouncementService.Announce(FilterPaneAnnouncements.LoadFailedRetryViaModal(Localizer));
             CancelFilterSetPicker();
 
             return false;
@@ -345,7 +359,7 @@ public sealed partial class FilterPane
 
         if (!LibraryLoadStatus.Current.IsLoaded)
         {
-            AnnouncementService.Announce(FilterPaneAnnouncements.LoadingTryAgain);
+            AnnouncementService.Announce(FilterPaneAnnouncements.LoadingTryAgain(Localizer));
             CancelFilterSetPicker();
 
             return false;
@@ -358,7 +372,8 @@ public sealed partial class FilterPane
             return true;
         }
 
-        AnnouncementService.Announce(FilterPaneAnnouncements.SelectedFilterSetMissing);
+        AnnouncementService.Announce(FilterPaneAnnouncements.SelectedFilterSetMissing(Localizer));
+
         SelectedFilterSetId = filterSets
             .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault()?.Id ?? default;
@@ -416,9 +431,9 @@ public sealed partial class FilterPane
         PruneStaleRowRefs();
         PruneStaleFilterSetTags();
 
-        if (_focusTargetAfterRemove is { } targetId
-            && _rowRefs.TryGetValue(targetId, out var target)
-            && target is not null)
+        if (_focusTargetAfterRemove is { } targetId &&
+            _rowRefs.TryGetValue(targetId, out var target) &&
+            target is not null)
         {
             _focusTargetAfterRemove = null;
             await target.FocusEditAsync();
@@ -502,29 +517,18 @@ public sealed partial class FilterPane
         Settings.TimeZoneChanged += UpdateFilterDateTimeZone;
         MenuService.StateChanged += OnMenuServiceStateChanged;
 
-        _clipboardExporter = new ScenarioClipboardExporter(AnnouncementService, AlertDialogService, ClipboardService);
+        _clipboardExporter = new ScenarioClipboardExporter(
+            AnnouncementService,
+            AlertDialogService,
+            ClipboardService,
+            Localizer);
 
-        _authoringContext = ScenarioAuthoringOptions.Enabled
-            ? new ScenarioAuthoringRowContext(Enabled: true, CopyActiveRowAsync)
-            : null;
+        _authoringContext = ScenarioAuthoringOptions.Enabled ?
+            new ScenarioAuthoringRowContext(Enabled: true, CopyActiveRowAsync) :
+            null;
 
         base.OnInitialized();
     }
-
-    private static string FormatFilterSetDetail(LibraryEntryFilterSet set)
-    {
-        var detail = $"{set.Filters.Count} filter{(set.Filters.Count == 1 ? string.Empty : "s")}";
-
-        if (set.Tags.Count > 0)
-        {
-            detail = $"{detail} · {string.Join(", ", set.Tags)}";
-        }
-
-        return detail;
-    }
-
-    private static string FormatFilterSetLabel(LibraryEntryFilterSet set) =>
-        $"{set.Name} ({FormatFilterSetDetail(set)})";
 
     private void AddAdvancedFilter()
     {
@@ -627,10 +631,14 @@ public sealed partial class FilterPane
             (IsDateFilterVisible ? 1 : 0);
 
         string message = count == 1 ?
-            "Clear 1 filter? This cannot be undone." :
-            $"Clear {count} filters? This cannot be undone.";
+            Localizer["FilterPane_ClearConfirm_Message_One"] :
+            Localizer["FilterPane_ClearConfirm_Message_Many", count];
 
-        bool confirmed = await AlertDialogService.ShowAlert("Clear All Filters", message, "Clear", "Cancel");
+        bool confirmed = await AlertDialogService.ShowAlert(
+            Localizer["FilterPane_ClearConfirm_Title"],
+            message,
+            Localizer["FilterPane_Action_Clear"],
+            Localizer["Modal_Cancel"]);
 
         if (confirmed) { FilterPaneCommands.ClearAllFilters(); }
     }
@@ -638,11 +646,14 @@ public sealed partial class FilterPane
     private Task CopyActiveRowAsync(SavedFilter filter) =>
         _clipboardExporter.CopyAsync(
             ScenarioAuthoringService.ExportRows([filter], CurrentChannelNames()),
-            "Filter copied to the clipboard as scenario JSON.",
-            "this filter");
+            Localizer["FilterPane_CopyFilterSuccess"],
+            ScenarioExportSubject.SingleFilter);
 
     private Task CopyScenarioJsonAsync() =>
-        _clipboardExporter.CopyAsync(ExportCurrentRows(), "Scenario JSON copied to the clipboard.", "these filters");
+        _clipboardExporter.CopyAsync(
+            ExportCurrentRows(),
+            Localizer["FilterPane_CopyScenarioSuccess"],
+            ScenarioExportSubject.CurrentFilters);
 
     private IReadOnlyList<string> CurrentChannelNames() => EventLogQueries.GetChannelNames();
 
@@ -650,6 +661,44 @@ public sealed partial class FilterPane
         ScenarioAuthoringService.ExportRows(
             [.. ActiveFilters.Current.Where(filter => filter.IsEnabled)],
             CurrentChannelNames());
+
+    private RenderFragment FilterSetEmptyState() => builder =>
+    {
+        string template = Localizer[
+            HasSavableFilters ?
+                "FilterPane_FilterSetEmpty_WithSavableFilters" :
+                "FilterPane_FilterSetEmpty_NoSavableFilters"];
+        const string Placeholder = "{0}";
+        int placeholderIndex = template.IndexOf(Placeholder, StringComparison.Ordinal);
+
+        if (placeholderIndex < 0)
+        {
+            builder.AddContent(0, template);
+
+            return;
+        }
+
+        builder.AddContent(1, template[..placeholderIndex]);
+        builder.OpenElement(2, "strong");
+        builder.AddContent(3, Localizer["FilterPane_SaveAsFilterSet_EmphasisLabel"]);
+        builder.CloseElement();
+        builder.AddContent(4, template[(placeholderIndex + Placeholder.Length)..]);
+    };
+
+    private string FormatFilterSetDetail(LibraryEntryFilterSet set)
+    {
+        int count = set.Filters.Count;
+        string detail = Localizer[
+            count == 1 ? "FilterPane_FilterSetFilterCount_One" : "FilterPane_FilterSetFilterCount_Many",
+            count];
+
+        return set.Tags.Count > 0 ?
+            Localizer["FilterPane_FilterSetDetail_WithTags", detail, string.Join(", ", set.Tags)] :
+            detail;
+    }
+
+    private string FormatFilterSetLabel(LibraryEntryFilterSet set) =>
+        Localizer["FilterPane_FilterSetOptionTitle", set.Name, FormatFilterSetDetail(set)];
 
     private int GetActiveFilters()
     {
@@ -794,9 +843,9 @@ public sealed partial class FilterPane
     {
         var export = ExportCurrentRows();
 
-        if (_clipboardExporter.NotExportable(export, "these filters")) { return; }
+        if (_clipboardExporter.NotExportable(export, ScenarioExportSubject.CurrentFilters)) { return; }
 
-        var path = await FilePickerService.PickSaveAsync("Export scenario JSON", [".json"], "scenario.json");
+        var path = await FilePickerService.PickSaveAsync(Localizer["FilterPane_ExportScenario_Title"], [".json"], "scenario.json");
 
         if (path is null) { return; }
 
@@ -807,12 +856,15 @@ public sealed partial class FilterPane
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException or SecurityException)
         {
-            await AlertDialogService.ShowAlert("Export failed", exception.Message, "OK");
+            await AlertDialogService.ShowAlert(
+                Localizer["FilterPane_ExportFailed_Title"],
+                exception.Message,
+                Localizer["Modal_Accept"]);
 
             return;
         }
 
-        await _clipboardExporter.AnnounceAsync($"Scenario JSON saved to {path}.", export.Warnings);
+        await _clipboardExporter.AnnounceAsync(Localizer["FilterPane_ScenarioSaved", path], export.Warnings);
     }
 
     private void ToggleDateFilter() => FilterPaneCommands.ToggleFilterDate();

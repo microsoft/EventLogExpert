@@ -1,17 +1,25 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
+using Microsoft.Extensions.Localization;
+
 namespace EventLogExpert.UI.FilterPane;
 
 internal static class FilterPaneAnnouncements
 {
-    public const string LoadFailedRetryViaModal = "Filter library failed to load. Open Filter Library to retry.";
+    internal static string LoadFailedRetryViaModal(IStringLocalizer<SharedResource> localizer) =>
+        localizer["FilterPane_Announcement_LoadFailedRetryViaModal"];
 
-    public const string LoadingTryAgain = "Filter library is still loading. Please try again.";
+    internal static string LoadingTryAgain(IStringLocalizer<SharedResource> localizer) =>
+        localizer["FilterPane_Announcement_LoadingTryAgain"];
 
-    public const string RecentNoneAvailable = "No recent filters yet - apply a Basic or Advanced filter to populate.";
+    internal static string RecentNoneAvailable(IStringLocalizer<SharedResource> localizer) =>
+        localizer["FilterPane_Announcement_RecentNoneAvailable"];
 
-    public const string SelectedFilterSetMissing = "Selected filter set no longer exists.";
+    internal static string SelectedFilterSetMissing(IStringLocalizer<SharedResource> localizer) =>
+        localizer["FilterPane_Announcement_SelectedFilterSetMissing"];
 
-    public const string SelectedScenarioMissing = "Selected scenario no longer matches the loaded logs.";
+    internal static string SelectedScenarioMissing(IStringLocalizer<SharedResource> localizer) =>
+        localizer["FilterPane_Announcement_SelectedScenarioMissing"];
 }

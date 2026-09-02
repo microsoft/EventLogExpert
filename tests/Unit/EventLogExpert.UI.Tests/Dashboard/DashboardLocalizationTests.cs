@@ -34,7 +34,7 @@ public sealed class DashboardLocalizationTests : BunitContext
     {
         var localizer = Localizer;
 
-        // Cross-source drift guard: FilterPane renders ScenarioGroup.DisplayName() unlocalized while Dashboard renders Dashboard_Group_*; editing a Dashboard_Group_* value is a 3-place co-edit with ScenarioGroupDisplay.cs and ScenarioGroupDisplayTests.cs.
+        // Cross-source drift guard: scenario group displays route through Dashboard_Group_*; editing one is a co-edit with ScenarioGroupDisplay.cs and ScenarioGroupDisplayTests.cs.
         foreach (var group in Enum.GetValues<ScenarioGroup>())
         {
             var localized = localizer[$"Dashboard_Group_{group}"];

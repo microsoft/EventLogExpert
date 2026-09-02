@@ -6,6 +6,7 @@ using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.FilterEditor;
+using EventLogExpert.UI.Tests.TestUtils;
 using NSubstitute;
 using System.Collections.Immutable;
 
@@ -18,25 +19,41 @@ public sealed class ScenarioClipboardExporterTests
     private readonly IClipboardService _clipboard = Substitute.For<IClipboardService>();
 
     [Fact]
-    public async Task AnnounceAsync_WhenChannelsEmpty_AppendsChannelsGuidance()
+    public async Task AnnounceAsync_WhenChannelsEmptyAndSubstantiveWarnings_ShowsLocalizedBodyWithGuidanceAndLiteralWarningData()
+    {
+        const string Warning = "single-row color guardrail";
+
+        await CreateExporter().AnnounceAsync("Saved.", [ScenarioExporter.NoLiveChannelsWarning, Warning]);
+
+        await _alertDialog.Received(1).ShowAlert(
+            "[[ScenarioExport_WarningsTitle]]",
+            $"[[ScenarioExport_WarningsBody([[ScenarioExport_WithChannelsGuidance(Saved.|[[ScenarioExport_ChannelsGuidance]])]]|{Environment.NewLine}|{Warning})]]",
+            "[[Modal_Accept]]");
+        _announcements.DidNotReceive().Announce(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task AnnounceAsync_WhenChannelsEmpty_RoutesGuidanceThroughLocalizer()
     {
         await CreateExporter().AnnounceAsync(
             "Scenario JSON copied to the clipboard.",
             [ScenarioExporter.NoLiveChannelsWarning]);
 
         _announcements.Received(1).Announce(
-            "Scenario JSON copied to the clipboard. Fill in channels[] before adding to the catalog.");
+            "[[ScenarioExport_WithChannelsGuidance(Scenario JSON copied to the clipboard.|[[ScenarioExport_ChannelsGuidance]])]]");
     }
 
     [Fact]
-    public async Task AnnounceAsync_WhenSubstantiveWarnings_ShowsAlertNotAnnouncement()
+    public async Task AnnounceAsync_WhenSubstantiveWarnings_ShowsLocalizedAlertWithLiteralWarningData()
     {
-        await CreateExporter().AnnounceAsync("Saved.", ["single-row color guardrail"]);
+        const string Warning = "single-row color guardrail";
+
+        await CreateExporter().AnnounceAsync("Saved.", [Warning]);
 
         await _alertDialog.Received(1).ShowAlert(
-            "Scenario JSON exported with warnings",
-            Arg.Is<string>(message => message != null && message.Contains("single-row color guardrail")),
-            "OK");
+            "[[ScenarioExport_WarningsTitle]]",
+            $"[[ScenarioExport_WarningsBody(Saved.|{Environment.NewLine}|{Warning})]]",
+            "[[Modal_Accept]]");
         _announcements.DidNotReceive().Announce(Arg.Any<string>());
     }
 
@@ -45,7 +62,7 @@ public sealed class ScenarioClipboardExporterTests
     {
         var export = new ScenarioExportResult("{ }", ImmutableList<string>.Empty, EmittedRowCount: 1);
 
-        await CreateExporter().CopyAsync(export, "Copied.", "these filters");
+        await CreateExporter().CopyAsync(export, "Copied.", ScenarioExportSubject.CurrentFilters);
 
         await _clipboard.Received(1).CopyTextAsync("{ }");
         _announcements.Received(1).Announce("Copied.");
@@ -56,21 +73,25 @@ public sealed class ScenarioClipboardExporterTests
     {
         var export = new ScenarioExportResult(string.Empty, ImmutableList<string>.Empty, EmittedRowCount: 0);
 
-        await CreateExporter().CopyAsync(export, "Copied.", "this filter");
+        await CreateExporter().CopyAsync(export, "Copied.", ScenarioExportSubject.SingleFilter);
 
         await _clipboard.DidNotReceive().CopyTextAsync(Arg.Any<string>());
         _announcements.Received(1)
-            .Announce("Could not export this filter: only Basic filters can be exported as scenarios.");
+            .Announce("[[ScenarioExport_NotExportable_SingleFilter_BasicOnly]]");
     }
 
-    [Fact]
-    public void NotExportable_WhenNothingEmitted_AnnouncesAndReturnsTrue()
+    [Theory]
+    [InlineData("SingleFilter", "ScenarioExport_NotExportable_SingleFilter_BasicOnly")]
+    [InlineData("CurrentFilters", "ScenarioExport_NotExportable_CurrentFilters_BasicOnly")]
+    [InlineData("FilterSet", "ScenarioExport_NotExportable_FilterSet_BasicOnly")]
+    public void NotExportable_WhenNothingEmitted_RoutesSubjectBasicOnlyKey(
+        string subjectName,
+        string expectedKey)
     {
         var export = new ScenarioExportResult(string.Empty, ImmutableList<string>.Empty, EmittedRowCount: 0);
 
-        Assert.True(CreateExporter().NotExportable(export, "these filters"));
-        _announcements.Received(1)
-            .Announce("Could not export these filters: only Basic filters can be exported as scenarios.");
+        Assert.True(CreateExporter().NotExportable(export, Enum.Parse<ScenarioExportSubject>(subjectName)));
+        _announcements.Received(1).Announce($"[[{expectedKey}]]");
     }
 
     [Fact]
@@ -78,22 +99,24 @@ public sealed class ScenarioClipboardExporterTests
     {
         var export = new ScenarioExportResult("{}", ImmutableList<string>.Empty, EmittedRowCount: 2);
 
-        Assert.False(CreateExporter().NotExportable(export, "these filters"));
+        Assert.False(CreateExporter().NotExportable(export, ScenarioExportSubject.CurrentFilters));
         _announcements.DidNotReceive().Announce(Arg.Any<string>());
     }
 
-    [Fact]
-    public void NotExportable_WhenRowsSkipped_SurfacesSkippedCount()
+    [Theory]
+    [InlineData("SingleFilter", "ScenarioExport_NotExportable_SingleFilter_WithDetail")]
+    [InlineData("CurrentFilters", "ScenarioExport_NotExportable_CurrentFilters_WithDetail")]
+    [InlineData("FilterSet", "ScenarioExport_NotExportable_FilterSet_WithDetail")]
+    public void NotExportable_WhenRowsSkipped_RoutesSubjectDetailKeyWithLiteralWarningData(
+        string subjectName,
+        string expectedKey)
     {
-        var export = new ScenarioExportResult(
-            string.Empty,
-            ["3 row(s) skipped: not expressible as a Basic filter."],
-            EmittedRowCount: 0);
+        const string Warning = "3 row(s) skipped: not expressible as a Basic filter.";
+        var export = new ScenarioExportResult(string.Empty, [Warning], EmittedRowCount: 0);
 
-        Assert.True(CreateExporter().NotExportable(export, "these filters"));
-        _announcements.Received(1)
-            .Announce("Could not export these filters: 3 row(s) skipped: not expressible as a Basic filter.");
+        Assert.True(CreateExporter().NotExportable(export, Enum.Parse<ScenarioExportSubject>(subjectName)));
+        _announcements.Received(1).Announce($"[[{expectedKey}({Warning})]]");
     }
 
-    private ScenarioClipboardExporter CreateExporter() => new(_announcements, _alertDialog, _clipboard);
+    private ScenarioClipboardExporter CreateExporter() => new(_announcements, _alertDialog, _clipboard, new MarkerLocalizer());
 }

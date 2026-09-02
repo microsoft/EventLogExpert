@@ -1775,4 +1775,279 @@
   <data name="Histogram_BinCursor" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3}.</value></data>
   <data name="Histogram_BinCursor_Spike" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3}, spike.</value></data>
   <data name="Histogram_BinCursor_Breakdown" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3} ({4}).</value></data>
-  <data name="Histogram_BinCursor_Spike_Breakdown" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3} ({4}), spike.</value></data></root>
+  <data name="Histogram_BinCursor_Spike_Breakdown" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3} ({4}), spike.</value></data>  <!-- Filter pane localization. Counts remain raw and ungrouped for byte-identical en-US output. -->
+  <data name="FilterPane_AddBasicTitle" xml:space="preserve">
+    <value>Add Basic filter (use chevron for Advanced or Recent)</value>
+  </data>
+  <data name="FilterPane_Action_AddFilter" xml:space="preserve">
+    <value>Add Filter</value>
+  </data>
+  <data name="FilterPane_AddMenuAria" xml:space="preserve">
+    <value>Choose filter mode</value>
+  </data>
+  <data name="FilterPane_Action_AddExclusion" xml:space="preserve">
+    <value>Add Exclusion</value>
+  </data>
+  <data name="FilterPane_Action_AddDateFilter" xml:space="preserve">
+    <value>Add Date Filter</value>
+  </data>
+  <data name="FilterPane_Action_ApplyFilterSet" xml:space="preserve">
+    <value>Apply Filter Set</value>
+  </data>
+  <data name="FilterPane_Action_ApplyScenario" xml:space="preserve">
+    <value>Apply Scenario</value>
+  </data>
+  <data name="FilterPane_ActiveFilters" xml:space="preserve">
+    <value>[Active Filters: {0}]</value>
+    <comment>{0} is the raw, ungrouped active filter count.</comment>
+  </data>
+  <data name="FilterPane_SaveAsFilterSet_Aria" xml:space="preserve">
+    <value>Save as Filter Set</value>
+  </data>
+  <data name="FilterPane_SaveAsFilterSet_EmphasisLabel" xml:space="preserve">
+    <value>Save as Filter Set</value>
+  </data>
+  <data name="FilterPane_SaveAsFilterSet_TitleEnabled" xml:space="preserve">
+    <value>Save as Filter Set...</value>
+  </data>
+  <data name="FilterPane_SaveAsFilterSet_TitleDisabled" xml:space="preserve">
+    <value>No filters to save</value>
+  </data>
+  <data name="FilterPane_ClearAll_Aria" xml:space="preserve">
+    <value>Clear All Filters</value>
+  </data>
+  <data name="FilterPane_ClearAll_TitleEnabled" xml:space="preserve">
+    <value>Clear All Filters...</value>
+  </data>
+  <data name="FilterPane_ClearAll_TitleDisabled" xml:space="preserve">
+    <value>No filters to clear</value>
+  </data>
+  <data name="FilterPane_OpenLibrary_Aria" xml:space="preserve">
+    <value>Open Filter Library</value>
+  </data>
+  <data name="FilterPane_OpenLibrary_Title" xml:space="preserve">
+    <value>Open Filter Library</value>
+  </data>
+  <data name="FilterPane_CopyScenarioJson_Aria" xml:space="preserve">
+    <value>Copy scenario JSON</value>
+  </data>
+  <data name="FilterPane_CopyScenarioJson_Title" xml:space="preserve">
+    <value>Copy current filter rows as scenario-catalog JSON</value>
+  </data>
+  <data name="FilterPane_SaveScenarioJson_Aria" xml:space="preserve">
+    <value>Save scenario JSON</value>
+  </data>
+  <data name="FilterPane_SaveScenarioJson_Title" xml:space="preserve">
+    <value>Save current filter rows as scenario-catalog JSON...</value>
+  </data>
+  <data name="FilterPane_ScenarioExport_HintDisabled" xml:space="preserve">
+    <value>Enable a filter before exporting as a scenario.</value>
+  </data>
+  <data name="FilterPane_SaveFilterSet_HintDisabled" xml:space="preserve">
+    <value>Add a filter before saving as a Filter Set.</value>
+  </data>
+  <data name="FilterPane_ClearFilters_HintDisabled" xml:space="preserve">
+    <value>There are no filters to clear.</value>
+  </data>
+  <data name="FilterPane_FilterList_ExpandedAria" xml:space="preserve">
+    <value>Filters Expanded</value>
+  </data>
+  <data name="FilterPane_FilterList_CollapsedAria" xml:space="preserve">
+    <value>Filters Collapsed</value>
+  </data>
+  <data name="FilterPane_Date_AfterLabel" xml:space="preserve">
+    <value>After:</value>
+  </data>
+  <data name="FilterPane_Date_AfterAria" xml:space="preserve">
+    <value>After</value>
+  </data>
+  <data name="FilterPane_Date_BeforeLabel" xml:space="preserve">
+    <value>Before:</value>
+  </data>
+  <data name="FilterPane_Date_BeforeAria" xml:space="preserve">
+    <value>Before</value>
+  </data>
+  <data name="FilterPane_Date_QuickRangeLabel" xml:space="preserve">
+    <value>Quick range:</value>
+  </data>
+  <data name="FilterPane_Date_QuickRangeAria" xml:space="preserve">
+    <value>Quick date range</value>
+  </data>
+  <data name="FilterPane_Action_Apply" xml:space="preserve">
+    <value>Apply</value>
+  </data>
+  <data name="FilterPane_Action_Remove" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="FilterPane_Action_Edit" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="FilterPane_Action_Disable" xml:space="preserve">
+    <value>Disable</value>
+  </data>
+  <data name="FilterPane_Action_Enable" xml:space="preserve">
+    <value>Enable</value>
+  </data>
+  <data name="FilterPane_FilterSet_TagsLabel" xml:space="preserve">
+    <value>Tags:</value>
+  </data>
+  <data name="FilterPane_FilterSet_TagSelectAria" xml:space="preserve">
+    <value>Narrow filter sets by tag</value>
+  </data>
+  <data name="FilterPane_FilterSet_AllTags" xml:space="preserve">
+    <value>All tags</value>
+  </data>
+  <data name="FilterPane_FilterSet_Label" xml:space="preserve">
+    <value>Filter Set:</value>
+  </data>
+  <data name="FilterPane_FilterSet_SelectAria" xml:space="preserve">
+    <value>Filter Set</value>
+  </data>
+  <data name="FilterPane_FilterSetFilterCount_One" xml:space="preserve">
+    <value>{0} filter</value>
+    <comment>{0} is the raw, ungrouped filter count.</comment>
+  </data>
+  <data name="FilterPane_FilterSetFilterCount_Many" xml:space="preserve">
+    <value>{0} filters</value>
+    <comment>{0} is the raw, ungrouped filter count.</comment>
+  </data>
+  <data name="FilterPane_FilterSetDetail_WithTags" xml:space="preserve">
+    <value>{0} · {1}</value>
+    <comment>{0} is the localized filter count; {1} is the comma-joined tag list data.</comment>
+  </data>
+  <data name="FilterPane_FilterSetOptionTitle" xml:space="preserve">
+    <value>{0} ({1})</value>
+    <comment>{0} is the filter set name data; {1} is the localized filter-set detail.</comment>
+  </data>
+  <data name="FilterPane_FilterSetOptionMeta" xml:space="preserve">
+    <value>({0})</value>
+    <comment>{0} is the localized filter-set detail shown in the visible option row.</comment>
+  </data>
+  <data name="FilterPane_FilterSet_ReplaceAria" xml:space="preserve">
+    <value>Replace filters with selected filter set</value>
+  </data>
+  <data name="FilterPane_Action_Replace" xml:space="preserve">
+    <value>Replace</value>
+  </data>
+  <data name="FilterPane_FilterSetEmpty_WithSavableFilters" xml:space="preserve">
+    <value>No saved filter sets yet - use {0} on the right to create one from the current pane.</value>
+    <comment>{0} is the emphasized Save as Filter Set control name; translators may move it.</comment>
+  </data>
+  <data name="FilterPane_FilterSetEmpty_NoSavableFilters" xml:space="preserve">
+    <value>No saved filter sets yet. Add and apply filters first, then use {0} on the right to create one.</value>
+    <comment>{0} is the emphasized Save as Filter Set control name; translators may move it.</comment>
+  </data>
+  <data name="FilterPane_Action_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="FilterPane_Scenario_CategoryLabel" xml:space="preserve">
+    <value>Category:</value>
+  </data>
+  <data name="FilterPane_Scenario_CategoryAria" xml:space="preserve">
+    <value>Category</value>
+  </data>
+  <data name="FilterPane_Scenario_Label" xml:space="preserve">
+    <value>Scenario:</value>
+  </data>
+  <data name="FilterPane_Scenario_SelectAria" xml:space="preserve">
+    <value>Scenario</value>
+  </data>
+  <data name="FilterPane_Scenario_OptionTitle" xml:space="preserve">
+    <value>{0} - {1}</value>
+    <comment>{0} is the localized scenario category; {1} is scenario purpose data.</comment>
+  </data>
+  <data name="FilterPane_Scenario_ReplaceAria" xml:space="preserve">
+    <value>Replace filters with selected scenario</value>
+  </data>
+  <data name="FilterPane_Scenario_EmptyNoMatches" xml:space="preserve">
+    <value>No scenarios match the loaded logs.</value>
+  </data>
+  <data name="FilterPane_AddMenu_Basic" xml:space="preserve">
+    <value>Basic</value>
+  </data>
+  <data name="FilterPane_AddMenu_Advanced" xml:space="preserve">
+    <value>Advanced</value>
+  </data>
+  <data name="FilterPane_AddMenu_Recent" xml:space="preserve">
+    <value>Recent</value>
+  </data>
+  <data name="FilterPane_Announcement_LoadFailedRetryViaModal" xml:space="preserve">
+    <value>Filter library failed to load. Open Filter Library to retry.</value>
+  </data>
+  <data name="FilterPane_Announcement_LoadingTryAgain" xml:space="preserve">
+    <value>Filter library is still loading. Please try again.</value>
+  </data>
+  <data name="FilterPane_Announcement_RecentNoneAvailable" xml:space="preserve">
+    <value>No recent filters yet - apply a Basic or Advanced filter to populate.</value>
+  </data>
+  <data name="FilterPane_Announcement_SelectedFilterSetMissing" xml:space="preserve">
+    <value>Selected filter set no longer exists.</value>
+  </data>
+  <data name="FilterPane_Announcement_SelectedScenarioMissing" xml:space="preserve">
+    <value>Selected scenario no longer matches the loaded logs.</value>
+  </data>
+  <data name="FilterPane_ClearConfirm_Message_One" xml:space="preserve">
+    <value>Clear 1 filter? This cannot be undone.</value>
+  </data>
+  <data name="FilterPane_ClearConfirm_Message_Many" xml:space="preserve">
+    <value>Clear {0} filters? This cannot be undone.</value>
+    <comment>{0} is the raw, ungrouped filter count.</comment>
+  </data>
+  <data name="FilterPane_ClearConfirm_Title" xml:space="preserve">
+    <value>Clear All Filters</value>
+  </data>
+  <data name="FilterPane_Action_Clear" xml:space="preserve">
+    <value>Clear</value>
+  </data>
+  <data name="FilterPane_CopyFilterSuccess" xml:space="preserve">
+    <value>Filter copied to the clipboard as scenario JSON.</value>
+  </data>
+  <data name="FilterPane_CopyScenarioSuccess" xml:space="preserve">
+    <value>Scenario JSON copied to the clipboard.</value>
+  </data>
+  <data name="FilterPane_ExportScenario_Title" xml:space="preserve">
+    <value>Export scenario JSON</value>
+  </data>
+  <data name="FilterPane_ExportFailed_Title" xml:space="preserve">
+    <value>Export failed</value>
+  </data>
+  <data name="FilterPane_ScenarioSaved" xml:space="preserve">
+    <value>Scenario JSON saved to {0}.</value>
+    <comment>{0} is the file path data.</comment>
+  </data>
+  <!-- Scenario export wrapper localization. Warning details remain runtime-authored L12 typed-warning debt. -->
+  <data name="ScenarioExport_ChannelsGuidance" xml:space="preserve">
+    <value>Fill in channels[] before adding to the catalog.</value>
+  </data>
+  <data name="ScenarioExport_WithChannelsGuidance" xml:space="preserve">
+    <value>{0} {1}</value>
+    <comment>{0} is the success sentence; {1} is the channels guidance sentence.</comment>
+  </data>
+  <data name="ScenarioExport_WarningsTitle" xml:space="preserve">
+    <value>Scenario JSON exported with warnings</value>
+  </data>
+  <data name="ScenarioExport_WarningsBody" xml:space="preserve">
+    <value>{0}{1}{2}</value>
+    <comment>{0} is the success/guidance message; {1} is Environment.NewLine; {2} is joined warning detail data.</comment>
+  </data>
+  <data name="ScenarioExport_NotExportable_SingleFilter_WithDetail" xml:space="preserve">
+    <value>Could not export this filter: {0}</value>
+    <comment>{0} is joined warning detail data.</comment>
+  </data>
+  <data name="ScenarioExport_NotExportable_SingleFilter_BasicOnly" xml:space="preserve">
+    <value>Could not export this filter: only Basic filters can be exported as scenarios.</value>
+  </data>
+  <data name="ScenarioExport_NotExportable_CurrentFilters_WithDetail" xml:space="preserve">
+    <value>Could not export these filters: {0}</value>
+    <comment>{0} is joined warning detail data.</comment>
+  </data>
+  <data name="ScenarioExport_NotExportable_CurrentFilters_BasicOnly" xml:space="preserve">
+    <value>Could not export these filters: only Basic filters can be exported as scenarios.</value>
+  </data>
+  <data name="ScenarioExport_NotExportable_FilterSet_WithDetail" xml:space="preserve">
+    <value>Could not export this filter set: {0}</value>
+    <comment>{0} is joined warning detail data.</comment>
+  </data>
+  <data name="ScenarioExport_NotExportable_FilterSet_BasicOnly" xml:space="preserve">
+    <value>Could not export this filter set: only Basic filters can be exported as scenarios.</value>
+  </data></root>
