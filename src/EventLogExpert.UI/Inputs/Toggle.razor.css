@@ -87,3 +87,34 @@
 .toggle:has(.toggle-input:disabled) {
     cursor: not-allowed;
 }
+
+/* Windows High Contrast strips the custom track/knob colors, leaving knob position as the only
+   on/off cue. Restore an explicit filled-vs-outline state with system colors so the switch reads
+   clearly in forced-colors themes (e.g. Aquatic, Desert). */
+@media (forced-colors: active) {
+    .toggle-track {
+        background-color: Canvas;
+        border-color: CanvasText;
+    }
+
+    .toggle-knob {
+        background-color: CanvasText;
+    }
+
+    .toggle-input:checked + .toggle-track {
+        background-color: Highlight;
+        border-color: Highlight;
+    }
+
+    .toggle-input:checked + .toggle-track .toggle-knob {
+        background-color: HighlightText;
+    }
+
+    .toggle-input:disabled + .toggle-track {
+        border-color: GrayText;
+    }
+
+    .toggle-input:disabled + .toggle-track .toggle-knob {
+        background-color: GrayText;
+    }
+}
