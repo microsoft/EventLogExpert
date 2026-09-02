@@ -62,6 +62,47 @@ public sealed class ValueSelectTests : BunitContext
     }
 
     [Fact]
+    public void Keyboard_ArrowDownOnClosedSelect_OpensDropdownWithoutChangingValue()
+    {
+        string bound = "b";
+        var component = RenderSelectOnly(bound, value => bound = value);
+
+        component.Find(".dropdown-input").TriggerEvent("onkeydown", new KeyboardEventArgs { Code = "ArrowDown" });
+
+        Assert.Equal("true", component.Find("input[role='combobox']").GetAttribute("aria-expanded"));
+        Assert.Equal("b", bound);
+    }
+
+    [Fact]
+    public void Keyboard_ArrowDownWhenOpen_NavigatesToNextValue()
+    {
+        string bound = "a";
+        var component = RenderSelectOnly(bound, value => bound = value);
+
+        // First press opens the dropdown without moving the selection.
+        component.Find(".dropdown-input").TriggerEvent("onkeydown", new KeyboardEventArgs { Code = "ArrowDown" });
+        Assert.Equal("a", bound);
+
+        // Second press, now that the list is visible, navigates to the next option.
+        component.Find(".dropdown-input").TriggerEvent("onkeydown", new KeyboardEventArgs { Code = "ArrowDown" });
+        Assert.Equal("b", bound);
+    }
+
+    [Fact]
+    public void Keyboard_EnterOnClosedSelect_OpensDropdownWithoutChangingValue()
+    {
+        string bound = "b";
+        var component = RenderSelectOnly(bound, value => bound = value);
+        Assert.Equal("false", component.Find("input[role='combobox']").GetAttribute("aria-expanded"));
+
+        component.Find(".dropdown-input").TriggerEvent("onkeydown", new KeyboardEventArgs { Code = "Enter" });
+
+        // A collapsed combobox opens on Enter and must not change the selected value.
+        Assert.Equal("true", component.Find("input[role='combobox']").GetAttribute("aria-expanded"));
+        Assert.Equal("b", bound);
+    }
+
+    [Fact]
     public void Render_AriaDescribedBy_AppliedToCombobox()
     {
         var component = Render<ValueSelect<string>>(parameters => parameters
@@ -82,16 +123,6 @@ public sealed class ValueSelectTests : BunitContext
     }
 
     [Fact]
-    public void Render_AriaLabelledBy_AppliedToCombobox()
-    {
-        var component = Render<ValueSelect<string>>(parameters => parameters
-            .Add(p => p.AriaLabelledBy, "external-label-id"));
-
-        var combobox = component.Find("input[role='combobox']");
-        Assert.Equal("external-label-id", combobox.GetAttribute("aria-labelledby"));
-    }
-
-    [Fact]
     public void Render_AriaLabelledByAndAriaLabel_SuppressesAriaLabelPerWaiAriaPrecedence()
     {
         var component = Render<ValueSelect<string>>(parameters => parameters
@@ -102,4 +133,30 @@ public sealed class ValueSelectTests : BunitContext
         Assert.False(combobox.HasAttribute("aria-label"));
         Assert.Equal("external-label-id", combobox.GetAttribute("aria-labelledby"));
     }
+
+    [Fact]
+    public void Render_AriaLabelledBy_AppliedToCombobox()
+    {
+        var component = Render<ValueSelect<string>>(parameters => parameters
+            .Add(p => p.AriaLabelledBy, "external-label-id"));
+
+        var combobox = component.Find("input[role='combobox']");
+        Assert.Equal("external-label-id", combobox.GetAttribute("aria-labelledby"));
+    }
+
+    private IRenderedComponent<ValueSelect<string>> RenderSelectOnly(string value, Action<string> onChanged) =>
+        Render<ValueSelect<string>>(parameters => parameters
+            .Add(p => p.Value, value)
+            .Add(p => p.ValueChanged, onChanged)
+            .Add(p => p.ChildContent, builder =>
+            {
+                var seq = 0;
+
+                foreach (var option in new[] { "a", "b", "c" })
+                {
+                    builder.OpenComponent<ValueSelectItem<string>>(seq++);
+                    builder.AddAttribute(seq++, nameof(ValueSelectItem<string>.Value), option);
+                    builder.CloseComponent();
+                }
+            }));
 }

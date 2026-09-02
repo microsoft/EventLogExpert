@@ -33,7 +33,6 @@
 
     &.disabled {
         color: var(--text-secondary);
-        opacity: 0.6;
     }
 
     &.danger {

@@ -12,6 +12,10 @@
             type="button">
             @Localizer["Stats_ResolutionCoverage"]
         </button>
+        @if (IsSeverityStale)
+        {
+            <span class="stats-updating">@Localizer["Stats_Updating"]</span>
+        }
     </div>
 
     @if (_scanFailed)
