@@ -43,11 +43,12 @@
 }
 
 .color-box[data-filter-excluded="true"] {
-    opacity: 0.5;
+    border-style: dashed;
+    border-color: var(--text-secondary);
 }
 
 @media (forced-colors: active) {
     .color-box[data-filter-excluded="true"] {
-        opacity: 1;
+        border-color: GrayText;
     }
 }
