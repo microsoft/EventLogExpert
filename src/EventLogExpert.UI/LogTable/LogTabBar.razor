@@ -40,6 +40,7 @@
                             aria-label="@(group.Group.IsCollapsed ? "Expand group" : "Collapse group")"
                             class="chevron"
                             @onclick="() => ToggleCollapse(group.Group)"
+                            title="@(group.Group.IsCollapsed ? "Expand group" : "Collapse group")"
                             type="button">
                             <i class="bi bi-chevron-@(group.Group.IsCollapsed ? "down" : "right")"></i>
                         </button>
@@ -54,7 +55,8 @@
                             @onclick="() => CloseGroup(group.Group)"
                             @onkeydown="e => OnCloseGroupKeyDown(e, group.Group)"
                             role="button"
-                            tabindex="0">
+                            tabindex="0"
+                            title="Close group">
                         </i>
                     </div>
                     @foreach (var member in VisibleMembers(presentation, group))
@@ -80,7 +82,8 @@
                                 @onkeydown="e => OnCloseLogKeyDown(e, member)"
                                 @onmousedown="e => OnCloseLogMouseDown(e, member)"
                                 role="button"
-                                tabindex="0">
+                                tabindex="0"
+                                title="Close log">
                             </i>
                         </div>
                     }
@@ -109,7 +112,8 @@
                         @onkeydown="e => OnCloseLogKeyDown(e, standalone.Tab)"
                         @onmousedown="e => OnCloseLogMouseDown(e, standalone.Tab)"
                         role="button"
-                        tabindex="0">
+                        tabindex="0"
+                        title="Close log">
                     </i>
                 </div>
             }
