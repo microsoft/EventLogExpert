@@ -75,6 +75,12 @@ dialog[data-body-layout="content"] .dialog-body {
     overflow: hidden auto;
 }
 
+/* The body region only receives tabindex=-1 as a fallback focus target for text-only modals;
+   it is never in the tab sequence, so it shows no focus ring. */
+.dialog-body:focus {
+    outline: none;
+}
+
 .inline-alert-overlay {
     position: absolute;
     inset: 0;

@@ -46,8 +46,7 @@
             @switch (Footer)
             {
                 case FooterPreset.CloseOnly:
-                    <Button autofocus
-                        Disabled="@(HasInlineAlert || FooterDisabled)"
+                    <Button Disabled="@(HasInlineAlert || FooterDisabled)"
                         OnClick="HandleCloseButtonAsync">
                         @EffectiveCloseLabel
                     </Button>
@@ -79,8 +78,7 @@
                         </Button>
                     </div>
 
-                    <Button autofocus
-                        Disabled="@(HasInlineAlert || FooterDisabled)"
+                    <Button Disabled="@(HasInlineAlert || FooterDisabled)"
                         OnClick="HandleCloseButtonAsync">
                         @EffectiveCloseLabel
                     </Button>
