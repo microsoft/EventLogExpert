@@ -1,6 +1,7 @@
 .release-notes-content {
     padding: 0 1rem;
     line-height: 1.4;
+    overflow-wrap: anywhere;
 }
 
 .release-notes-content h1 {

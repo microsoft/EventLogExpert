@@ -1,7 +1,8 @@
 dialog {
     height: var(--modal-height, fit-content);
-    min-width: var(--modal-min-width, auto);
-    max-width: var(--modal-max-width, none);
+    min-width: min(var(--modal-min-width, 0px), calc(100vw - 2rem));
+    max-width: min(var(--modal-max-width, 100vw), calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
     overflow: hidden;
 
     color: var(--text-primary);
