@@ -209,22 +209,16 @@ html, body {
     color: var(--text-primary);
 }
 
+/* Reflow (WCAG 1.4.10): the fixed pane minima (histogram, table, details, plus filter/header chrome)
+   can exceed the available height at high zoom, short/narrow windows, or when the filter pane is
+   expanded. Let the content column scroll vertically whenever it overflows so lower panes stay
+   reachable; overflow-x stays hidden because each pane manages its own horizontal scroll. */
 .page-content {
     display: flex;
     flex-direction: column;
     flex: 1 1 0;
     min-height: 0;
-    overflow: hidden;
-}
-
-/* Reflow (WCAG 1.4.10): when the viewport is too short OR too narrow for the fixed pane stack
-   (e.g. 400% zoom, the 320px reflow width, or a short window where wrapping makes the stack taller
-   than the viewport), let the content column scroll vertically so the lower panes stay reachable
-   instead of being clipped by overflow: hidden with no page scrollbar. */
-@media (max-height: 500px), (max-width: 34rem) {
-    .page-content {
-        overflow-y: auto;
-    }
+    overflow: hidden auto;
 }
 
 .footer-group {
