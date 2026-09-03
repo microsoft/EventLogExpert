@@ -168,8 +168,6 @@
 
     .db-tabs-container ::deep .sidebar-tabs-list {
         flex: 0 0 auto;
-        flex-direction: row;
-        flex-wrap: wrap;
         padding: 0 0 4px;
     }
 }

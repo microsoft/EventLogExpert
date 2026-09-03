@@ -14,3 +14,22 @@
 .tz-row { margin-bottom: .5rem; }
 
 .fixed-width { width: 50px; }
+
+/* Narrow reflow (WCAG 1.4.10): the timezone select is a fixed 420px control in a non-wrapping row,
+   wider than the ~288px dialog at a 320px viewport, and the body hides horizontal overflow. Wrap the
+   setting rows and let that select take the available width so it stays reachable instead of clipped. */
+@media (max-width: 34rem) {
+    .settings-form .flex-center-aligned-row {
+        flex-wrap: wrap;
+    }
+
+    .settings-form .tz-row ::deep .dropdown-input {
+        display: block;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .settings-form .tz-row ::deep .timezone-dropdown {
+        width: 100%;
+    }
+}
