@@ -69,7 +69,7 @@ export function registerDropdown(root, dotNetRef) {
         // this keystroke just opened. Editable (IsInput) controls keep Space so they can type it.
         // Blazor's @onkeydown:preventDefault can't: it reads a field captured at the prior render, so it
         // suppressed the following keystroke instead of this one.
-        if (e.code === "ArrowUp" || e.code === "ArrowDown" || e.code === "Enter" || (e.code === "Space" && input.readOnly)) {
+        if (e.code === "ArrowUp" || e.code === "ArrowDown" || e.key === "Enter" || (e.code === "Space" && input.readOnly)) {
             e.preventDefault();
         }
     }, { signal: controller.signal });

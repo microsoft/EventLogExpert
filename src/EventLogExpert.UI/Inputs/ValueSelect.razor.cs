@@ -226,12 +226,16 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
     private async Task HandleKeyDown(KeyboardEventArgs args)
     {
+        // Match Enter by its semantic Key so keypad Enter (physical Code "NumpadEnter") behaves the
+        // same; other keys keep matching by Code (Space's Key is " ").
+        var key = args.Key == "Enter" ? "Enter" : args.Code;
+
         // A collapsed combobox opens on the first Enter / Space / Arrow press; item navigation and
         // value changes only happen once the listbox is visible, so arrows never move the selection
         // while the dropdown is closed.
         if (!_isOpen)
         {
-            switch (args.Code)
+            switch (key)
             {
                 case "Enter":
                 case "ArrowUp":
@@ -243,7 +247,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
             }
         }
 
-        switch (args.Code)
+        switch (key)
         {
             case "Space":
                 if (!IsInput) { await ToggleDropDownVisibility(); }
