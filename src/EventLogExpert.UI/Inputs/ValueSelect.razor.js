@@ -64,10 +64,12 @@ export function registerDropdown(root, dotNetRef) {
     input.addEventListener("keydown", (e) => {
         // Arrow keys drive dropdown navigation and Enter opens/commits the dropdown, so suppress the
         // browser defaults here: caret-move/scroll for arrows, and Enter submitting an enclosing form
-        // (e.g. a select nested in an EditForm). Space is left alone so editable inputs still type it.
+        // (e.g. a select nested in an EditForm). Space opens a select-only (readonly) list, so cancel
+        // its native page scroll too; otherwise the captured scroll handler below would close the list
+        // this keystroke just opened. Editable (IsInput) controls keep Space so they can type it.
         // Blazor's @onkeydown:preventDefault can't: it reads a field captured at the prior render, so it
         // suppressed the following keystroke instead of this one.
-        if (e.code === "ArrowUp" || e.code === "ArrowDown" || e.code === "Enter") {
+        if (e.code === "ArrowUp" || e.code === "ArrowDown" || e.code === "Enter" || (e.code === "Space" && input.readOnly)) {
             e.preventDefault();
         }
     }, { signal: controller.signal });
