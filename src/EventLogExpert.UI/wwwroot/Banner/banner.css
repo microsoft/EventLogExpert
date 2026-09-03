@@ -141,13 +141,13 @@
     border-radius: .25rem;
 }
 
-/* Banner buttons carry the base .button class, whose opaque light/dark hover tint assumes a normal
-   text color; on a banner currentColor is the banner foreground, so that tint can render invisible
-   (e.g. white-on-white on a red/attention banner). Use a transparent tint of the inherited
-   foreground, out-specifying .button:hover:not(:disabled) via the .banner ancestor so these controls
-   stay visible on every banner variant. */
+/* Banner buttons carry the base .button class, whose opaque hover tint fills the button; on a banner
+   fill that drops the text contrast below 4.5:1, and currentColor is not always the banner foreground
+   (e.g. CriticalBanner's plain buttons keep the accent color). Keep the fill transparent so the
+   banner's own fill/text contrast is retained, and use a non-filling inset ring as the hover cue. */
 .banner .button:hover:not(:disabled) {
-    background-color: color-mix(in srgb, currentColor 15%, transparent);
+    background: transparent;
+    box-shadow: inset 0 0 0 1px currentColor;
 }
 
 .banner-dismiss {
