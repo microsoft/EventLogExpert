@@ -93,6 +93,7 @@
    clearly in forced-colors themes (e.g. Aquatic, Desert). */
 @media (forced-colors: active) {
     .toggle-track {
+        forced-color-adjust: none;
         background-color: Canvas;
         border-color: CanvasText;
     }
@@ -116,5 +117,11 @@
 
     .toggle-input:disabled + .toggle-track .toggle-knob {
         background-color: GrayText;
+    }
+
+    /* forced-color-adjust: none also opts the focus ring out of automatic system coloring, so set an
+       explicit system color to keep it visible in forced-colors themes. */
+    .toggle-input:focus-visible + .toggle-track {
+        outline-color: Highlight;
     }
 }

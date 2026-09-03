@@ -92,6 +92,20 @@ export function registerDropdown(root, dotNetRef) {
         }
     }, { signal: controller.signal });
 
+    // The open list is position: fixed and only repositions when it opens, so if a scrollable
+    // ancestor (e.g. .page-content) scrolls or the viewport resizes, the combobox can move while the
+    // list stays put and detaches. Close the list on those shifts; ignore scrolls that originate
+    // inside the list itself so its own options stay scrollable.
+    const closeOnViewportShift = (e) => {
+        if (!dropdown.hasAttribute("data-toggle")) { return; }
+        if (e?.type === "scroll" && dropdown.contains(e.target)) { return; }
+
+        closeDropdown({ currentTarget: input }, true);
+    };
+
+    window.addEventListener("scroll", closeOnViewportShift, { capture: true, signal: controller.signal });
+    window.addEventListener("resize", closeOnViewportShift, { signal: controller.signal });
+
     root._dropdownController = controller;
 }
 
