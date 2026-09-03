@@ -141,10 +141,16 @@
     border-radius: .25rem;
 }
 
-/* Banner buttons carry the base .button class, whose opaque hover tint fills the button; on a banner
-   fill that drops the text contrast below 4.5:1, and currentColor is not always the banner foreground
-   (e.g. CriticalBanner's plain buttons keep the accent color). Keep the fill transparent so the
-   banner's own fill/text contrast is retained, and use a non-filling inset ring as the hover cue. */
+/* Banner buttons (including CriticalBanner's plain .button controls) must read against the banner
+   fill, so inherit the banner's contrast-safe foreground - the same token the focus rings use -
+   instead of the app accent, so both the label and the currentColor hover ring stay legible. */
+.banner .button {
+    color: inherit;
+}
+
+/* The base .button opaque hover tint fills the button; on a banner fill that drops the text contrast
+   below 4.5:1. Keep the fill transparent so the banner's own fill/text contrast is retained, and use
+   a non-filling inset ring (in the inherited banner foreground) as the hover cue. */
 .banner .button:hover:not(:disabled) {
     background: transparent;
     box-shadow: inset 0 0 0 1px currentColor;

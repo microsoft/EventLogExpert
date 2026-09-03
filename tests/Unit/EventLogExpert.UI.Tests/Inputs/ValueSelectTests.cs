@@ -103,6 +103,19 @@ public sealed class ValueSelectTests : BunitContext
     }
 
     [Fact]
+    public void Keyboard_NumpadEnterOnClosedSelect_OpensDropdownWithoutChangingValue()
+    {
+        string bound = "b";
+        var component = RenderSelectOnly(bound, value => bound = value);
+
+        // Keypad Enter arrives as Code "NumpadEnter" but Key "Enter"; it must behave like the main Enter.
+        component.Find(".dropdown-input").TriggerEvent("onkeydown", new KeyboardEventArgs { Code = "NumpadEnter", Key = "Enter" });
+
+        Assert.Equal("true", component.Find("input[role='combobox']").GetAttribute("aria-expanded"));
+        Assert.Equal("b", bound);
+    }
+
+    [Fact]
     public void Keyboard_SpaceOnClosedInput_DoesNotOpenDropdown()
     {
         int? bound = 7;
