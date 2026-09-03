@@ -319,6 +319,16 @@ a { color: var(--clr-lightblue); }
     overflow-x: hidden;
 }
 
+/* Text-only modals programmatically focus this scroll region (see ModalChrome showModal) so it can be
+   scrolled with Arrow/PageDown; keyboard users need a visible focus ring like other modal regions.
+   :focus-visible keeps the ring keyboard-only. */
+.flex-column-scroll:focus { outline: none; }
+
+.flex-column-scroll:focus-visible {
+    outline: 2px solid var(--clr-lightblue);
+    outline-offset: -2px;
+}
+
 .indent { margin-left: 1rem; }
 
 .input {

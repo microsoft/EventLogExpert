@@ -76,10 +76,16 @@ dialog[data-body-layout="content"] .dialog-body {
     overflow: hidden auto;
 }
 
-/* The body region only receives tabindex=-1 as a fallback focus target for text-only modals;
-   it is never in the tab sequence, so it shows no focus ring. */
+/* The body region receives tabindex=-1 only as a fallback scroll-focus target for text-only modals
+   (see ModalChrome showModal). It is never tabbed to, but when it is focused for keyboard scrolling
+   it needs a visible ring like other modal regions; :focus-visible keeps the ring keyboard-only. */
 .dialog-body:focus {
     outline: none;
+}
+
+.dialog-body:focus-visible {
+    outline: 2px solid var(--clr-lightblue);
+    outline-offset: -2px;
 }
 
 .inline-alert-overlay {
