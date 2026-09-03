@@ -286,14 +286,16 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void TryBuildSavedFilter_AdvancedMode_CompileFailure_ReturnsCompileError()
     {
+        const string expectedDiagnostic = "Unterminated string literal. (position 10).";
         FilterDraft draft = new()
-            { Mode = FilterMode.Advanced, ComparisonText = "Id ===== ###" };
+            { Mode = FilterMode.Advanced, ComparisonText = "Source == \"unterminated" };
 
-        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out FilterDraftBuildFailure? failure);
 
         Assert.False(ok);
         Assert.Null(saved);
-        Assert.False(string.IsNullOrEmpty(error));
+        var diagnostic = Assert.IsType<FilterDraftBuildFailure.CompilerDiagnostic>(failure);
+        Assert.Equal(expectedDiagnostic, diagnostic.Message);
     }
 
     [Fact]
@@ -304,10 +306,11 @@ public sealed class FilterDraftModeTests
         FilterDraft draft = new()
             { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
-        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out FilterDraftBuildFailure? failure);
 
-        Assert.True(ok, error);
+        Assert.True(ok, failure?.ToString());
         Assert.NotNull(saved);
+        Assert.Null(failure);
         Assert.Equal(FilterMode.Advanced, saved.Mode);
         Assert.Null(saved.BasicFilter);
     }
@@ -318,11 +321,11 @@ public sealed class FilterDraftModeTests
         FilterDraft draft = new()
             { Mode = FilterMode.Advanced, ComparisonText = string.Empty };
 
-        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out FilterDraftBuildFailure? failure);
 
         Assert.False(ok);
         Assert.Null(saved);
-        Assert.False(string.IsNullOrEmpty(error));
+        Assert.IsType<FilterDraftBuildFailure.EmptyFilter>(failure);
     }
 
     [Fact]
@@ -330,11 +333,11 @@ public sealed class FilterDraftModeTests
     {
         FilterDraft draft = new() { Mode = FilterMode.Basic };
 
-        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out FilterDraftBuildFailure? failure);
 
         Assert.False(ok);
         Assert.Null(saved);
-        Assert.False(string.IsNullOrEmpty(error));
+        Assert.IsType<FilterDraftBuildFailure.EmptyFilter>(failure);
     }
 
     [Fact]
@@ -366,11 +369,11 @@ public sealed class FilterDraftModeTests
             JoinWithAny = false
         });
 
-        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out FilterDraftBuildFailure? failure);
 
         Assert.False(ok);
         Assert.Null(saved);
-        Assert.False(string.IsNullOrEmpty(error));
+        Assert.IsType<FilterDraftBuildFailure.InvalidBasicStructure>(failure);
     }
 
     [Fact]
@@ -388,10 +391,11 @@ public sealed class FilterDraftModeTests
             }
         };
 
-        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out FilterDraftBuildFailure? failure);
 
-        Assert.True(ok, error);
+        Assert.True(ok, failure?.ToString());
         Assert.NotNull(saved);
+        Assert.Null(failure);
         Assert.Equal(FilterMode.Basic, saved.Mode);
         Assert.NotNull(saved.BasicFilter);
         Assert.Equal("Id == 100", saved.ComparisonText);
@@ -403,11 +407,11 @@ public sealed class FilterDraftModeTests
         FilterDraft draft = new()
             { Mode = FilterMode.Cached, ComparisonText = string.Empty };
 
-        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out FilterDraftBuildFailure? failure);
 
         Assert.False(ok);
         Assert.Null(saved);
-        Assert.False(string.IsNullOrEmpty(error));
+        Assert.IsType<FilterDraftBuildFailure.EmptyFilter>(failure);
     }
 
     [Fact]
@@ -416,10 +420,11 @@ public sealed class FilterDraftModeTests
         FilterDraft draft = new()
             { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
-        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out string error);
+        bool ok = draft.TryBuildSavedFilter(out SavedFilter? saved, out FilterDraftBuildFailure? failure);
 
-        Assert.True(ok, error);
+        Assert.True(ok, failure?.ToString());
         Assert.NotNull(saved);
+        Assert.Null(failure);
         Assert.Equal(FilterMode.Cached, saved.Mode);
         Assert.Null(saved.BasicFilter);
     }

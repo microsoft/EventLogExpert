@@ -5,12 +5,15 @@ using Bunit;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.UI.FilterLibrary;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.FilterLibrary;
@@ -24,6 +27,7 @@ public sealed class LibraryFilterRowTests : BunitContext
     {
         Services.AddSingleton(_alerts);
         Services.AddSingleton(_announcements);
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }

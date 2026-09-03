@@ -1,49 +1,49 @@
 @if (IsEditing)
 {
     <div class="filter-predicate-editing">
-        <ChromelessButton aria-label="@(Value.JoinWithAny ? "Joining with OR; click to switch to AND" : "Joining with AND; click to switch to OR")"
-            CssClass="filter-predicate-and-or"
-            data-mode="@(Value.JoinWithAny ? "or" : "and")"
+        <ChromelessButton CssClass="filter-predicate-and-or"
             OnClick="OnAndOrClick"
+            aria-label="@JoinerAriaLabel"
+            data-mode="@(Value.JoinWithAny ? "or" : "and")"
             @ref="_editorFirstInput"
-            title="@(Value.JoinWithAny ? "OR" : "AND")">
-            @(Value.JoinWithAny ? "OR" : "AND")
+            title="@JoinerTitle">
+            @JoinerLabel
         </ChromelessButton>
 
         <FilterComparisonEditor Comparison="Value.Comparison"
             Id="@ComponentId.For(Value.Id, ComponentIdScope.Predicate).Value"
             OnChanged="OnComparisonChanged" />
 
-        <Button aria-label="Done editing predicate"
-            Disabled="@(!Value.IsComplete)"
+        <Button Disabled="@(!Value.IsComplete)"
             IconClass="bi bi-check-circle"
             IconOnly
             OnClick="OnDoneClick"
-            title="@(Value.IsComplete ? "Done" : "Complete the predicate before continuing")" />
+            aria-label="@Localizer["FilterEditor_Predicate_DoneAria"]"
+            title="@(Value.IsComplete ? Localizer["FilterEditor_Predicate_DoneTitle"] : Localizer["FilterEditor_Predicate_DoneDisabledTitle"])" />
 
-        <DangerButton aria-label="@($"Remove predicate: {SummaryText}")"
-            IconClass="bi bi-x-circle"
+        <DangerButton IconClass="bi bi-x-circle"
             IconOnly
             OnClick="OnRemoveChip"
-            title="Remove predicate" />
+            aria-label="@Localizer["FilterEditor_Predicate_RemoveAria", SummaryText]"
+            title="@Localizer["FilterEditor_Predicate_RemoveTitle"]" />
     </div>
 }
 else
 {
     <div class="filter-predicate">
-        <ChromelessButton aria-label="@($"Edit predicate: {SummaryText}")"
-            CssClass="filter-predicate-edit"
+        <ChromelessButton CssClass="filter-predicate-edit"
             OnClick="OnEditChip"
+            aria-label="@Localizer["FilterEditor_Predicate_EditAria", SummaryText]"
             @ref="_chipEditButton"
-            title="Edit predicate">
+            title="@Localizer["FilterEditor_Predicate_EditTitle"]">
             <span class="filter-predicate-joiner">@JoinerLabel</span>
             <span class="filter-predicate-summary">@SummaryText</span>
         </ChromelessButton>
 
-        <ChromelessButton aria-label="@($"Remove predicate: {SummaryText}")"
-            CssClass="filter-predicate-remove"
+        <ChromelessButton CssClass="filter-predicate-remove"
             IconClass="bi bi-x-circle"
             OnClick="OnRemoveChip"
-            title="Remove predicate" />
+            aria-label="@Localizer["FilterEditor_Predicate_RemoveAria", SummaryText]"
+            title="@Localizer["FilterEditor_Predicate_RemoveTitle"]" />
     </div>
 }

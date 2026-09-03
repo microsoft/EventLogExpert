@@ -4,12 +4,15 @@
 using Bunit;
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Drafts;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.FilterEditor.Comparison;
 using EventLogExpert.UI.FilterEditor.Editing;
+using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
 
@@ -28,7 +31,7 @@ public sealed class FilterPredicateEditorAccessibilityTests : BunitContext
         Services.AddSingleton(eventLogQueries);
 
         Services.AddFluxor(options => options.ScanAssemblies(typeof(FilterComparisonEditor).Assembly));
-        Services.AddEventLogLocalization();
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
@@ -69,7 +72,7 @@ public sealed class FilterPredicateEditorAccessibilityTests : BunitContext
 
         var options = component.FindAll("[role=option]").Select(option => option.TextContent.Trim()).ToList();
 
-        Assert.Contains("User ID", options);
+        Assert.Contains("[[FilterLens_Property_UserId]]", options);
     }
 
     [Fact]
@@ -83,7 +86,7 @@ public sealed class FilterPredicateEditorAccessibilityTests : BunitContext
 
         var options = component.FindAll("[role=option]").Select(option => option.TextContent.Trim()).ToList();
 
-        Assert.Contains("User", options);
-        Assert.DoesNotContain("User ID", options);
+        Assert.Contains("[[FilterLens_Property_UserDisplayName]]", options);
+        Assert.DoesNotContain("[[FilterLens_Property_UserId]]", options);
     }
 }

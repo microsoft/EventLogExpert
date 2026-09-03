@@ -3,13 +3,22 @@
 
 using Bunit;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.UI.FilterEditor.Rows;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.Tests.FilterEditor.Rows;
 
 public sealed class FilterRowShellTests : BunitContext
 {
+    public FilterRowShellTests()
+    {
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
+    }
+
     [Fact]
     public void SavedFilter_AllButtons_HaveTypeButton()
     {
@@ -74,6 +83,7 @@ public sealed class FilterRowShellTests : BunitContext
         var referencedTexts = labelIds!.Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Select(id => component.Find($"#{id}").TextContent);
         Assert.Contains(referencedTexts, text => text.Contains(savedFilter.ComparisonText));
+        Assert.Contains(referencedTexts, text => text == "[[FilterEditor_RowAction_EnableToggleLabel]]");
     }
 
     [Fact]

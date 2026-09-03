@@ -2,7 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.FilterEditor.Rows;
 
@@ -18,4 +20,6 @@ public sealed partial class FilterRowHeader : ComponentBase
     [Parameter] public EventCallback<bool> OnExclusionChanged { get; set; }
 
     [Parameter] public SavedFilter? Value { get; set; }
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 }

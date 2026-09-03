@@ -1398,6 +1398,337 @@
   <data name="FilterLens_RemoveAria" xml:space="preserve">
     <value>Remove lens: {0}</value>
   </data>
+  <!-- Filter editor chrome, dialogs, actions, and predicate summaries. -->
+  <data name="FilterEditor_ModeLabel" xml:space="preserve">
+    <value>Filter mode</value>
+  </data>
+  <data name="FilterEditor_Mode_Advanced" xml:space="preserve">
+    <value>Advanced</value>
+  </data>
+  <data name="FilterEditor_Mode_Basic" xml:space="preserve">
+    <value>Basic</value>
+  </data>
+  <data name="FilterEditor_Mode_Recent" xml:space="preserve">
+    <value>Recent</value>
+  </data>
+  <data name="FilterEditor_AdvancedExpression_ExcludeAria" xml:space="preserve">
+    <value>Exclude Expression</value>
+  </data>
+  <data name="FilterEditor_AdvancedExpression_IncludeAria" xml:space="preserve">
+    <value>Expression</value>
+  </data>
+  <data name="FilterEditor_Recent_TagFilterAria" xml:space="preserve">
+    <value>Filter recent options by tag</value>
+  </data>
+  <data name="FilterEditor_Recent_AllTags" xml:space="preserve">
+    <value>All tags</value>
+  </data>
+  <data name="FilterEditor_Recent_SelectAria" xml:space="preserve">
+    <value>Recent Filter</value>
+  </data>
+  <data name="FilterEditor_Recent_FavoriteAria" xml:space="preserve">
+    <value>Favorite</value>
+  </data>
+  <data name="FilterEditor_Recent_ReadOnlyAria" xml:space="preserve">
+    <value>Recent filter (read-only)</value>
+  </data>
+  <data name="FilterEditor_Recent_EmptyNoMatches" xml:space="preserve">
+    <value>No recent filters match the selected tags - clear tags to see all</value>
+  </data>
+  <data name="FilterEditor_Recent_EmptyNoneAvailable" xml:space="preserve">
+    <value>No recent options available here</value>
+  </data>
+  <data name="FilterEditor_Announcement_FilterDiscarded" xml:space="preserve">
+    <value>Filter discarded</value>
+  </data>
+  <data name="FilterEditor_Announcement_EditCancelled" xml:space="preserve">
+    <value>Edit cancelled</value>
+  </data>
+  <data name="FilterEditor_Announcement_EditingFilter" xml:space="preserve">
+    <value>Editing filter</value>
+  </data>
+  <data name="FilterEditor_Announcement_SetToExclude" xml:space="preserve">
+    <value>Filter set to Exclude</value>
+  </data>
+  <data name="FilterEditor_Announcement_SetToInclude" xml:space="preserve">
+    <value>Filter set to Include</value>
+  </data>
+  <data name="FilterEditor_Announcement_FilterRemoved" xml:space="preserve">
+    <value>Filter removed</value>
+  </data>
+  <data name="FilterEditor_Announcement_FilterSaved" xml:space="preserve">
+    <value>Filter saved</value>
+  </data>
+  <data name="FilterEditor_Announcement_FilterDisabled" xml:space="preserve">
+    <value>Filter disabled</value>
+  </data>
+  <data name="FilterEditor_Announcement_FilterEnabled" xml:space="preserve">
+    <value>Filter enabled</value>
+  </data>
+  <data name="FilterEditor_Announcement_SwitchedToAdvanced" xml:space="preserve">
+    <value>Switched to Advanced filter mode</value>
+  </data>
+  <data name="FilterEditor_Announcement_SwitchedToBasic" xml:space="preserve">
+    <value>Switched to Basic filter mode</value>
+  </data>
+  <data name="FilterEditor_Announcement_SwitchedToRecent" xml:space="preserve">
+    <value>Switched to Recent filter mode</value>
+  </data>
+  <data name="FilterEditor_ModeSwitch_Title" xml:space="preserve">
+    <value>Switch Filter Mode</value>
+  </data>
+  <data name="FilterEditor_ModeSwitch_Message_ToRecent" xml:space="preserve">
+    <value>Switching to Recent will discard the current filter contents. Continue?</value>
+  </data>
+  <data name="FilterEditor_ModeSwitch_Message_ToBasic" xml:space="preserve">
+    <value>Switching to Basic will discard the current expression because it cannot be represented in the Basic editor. Continue?</value>
+  </data>
+  <data name="FilterEditor_ModeSwitch_Message_ToAdvanced" xml:space="preserve">
+    <value>Switching to Advanced will drop incomplete predicates from the Basic editor. Continue?</value>
+  </data>
+  <data name="FilterEditor_ModeSwitch_Message_Generic" xml:space="preserve">
+    <value>Switching modes will discard the current filter contents. Continue?</value>
+  </data>
+  <data name="FilterEditor_Action_Continue" xml:space="preserve">
+    <value>Continue</value>
+  </data>
+  <data name="FilterEditor_RowHeader_ExcludedAria" xml:space="preserve">
+    <value>Filter '{0}' is excluded; activate to include</value>
+    <comment>{0} is the filter expression text authored by the user or loaded from the library.</comment>
+  </data>
+  <data name="FilterEditor_RowHeader_IncludedAria" xml:space="preserve">
+    <value>Filter '{0}' is included; activate to exclude</value>
+    <comment>{0} is the filter expression text authored by the user or loaded from the library.</comment>
+  </data>
+  <data name="FilterEditor_ExcludeToggle_TitleExcluded" xml:space="preserve">
+    <value>Excluded — click to include</value>
+  </data>
+  <data name="FilterEditor_ExcludeToggle_TitleIncluded" xml:space="preserve">
+    <value>Included — click to exclude</value>
+  </data>
+  <data name="FilterEditor_RowHeader_NoFilterSpecified" xml:space="preserve">
+    <value>No Filter Specified</value>
+  </data>
+  <data name="FilterEditor_RowAction_CopyScenarioAria_Unnamed" xml:space="preserve">
+    <value>Copy filter as scenario JSON</value>
+  </data>
+  <data name="FilterEditor_RowAction_CopyScenarioAria_Named" xml:space="preserve">
+    <value>Copy filter '{0}' as scenario JSON</value>
+    <comment>{0} is the filter expression text authored by the user or loaded from the library.</comment>
+  </data>
+  <data name="FilterEditor_RowAction_CopyScenarioTitle" xml:space="preserve">
+    <value>Copy as scenario JSON</value>
+  </data>
+  <data name="FilterEditor_RowAction_EditAria_Unnamed" xml:space="preserve">
+    <value>Edit filter</value>
+  </data>
+  <data name="FilterEditor_RowAction_EditAria_Named" xml:space="preserve">
+    <value>Edit filter '{0}'</value>
+    <comment>{0} is the filter expression text authored by the user or loaded from the library.</comment>
+  </data>
+  <data name="FilterEditor_RowAction_EditTitle" xml:space="preserve">
+    <value>Edit filter</value>
+  </data>
+  <data name="FilterEditor_RowAction_RemoveAria_Unnamed" xml:space="preserve">
+    <value>Remove filter</value>
+  </data>
+  <data name="FilterEditor_RowAction_RemoveAria_Named" xml:space="preserve">
+    <value>Remove filter '{0}'</value>
+    <comment>{0} is the filter expression text authored by the user or loaded from the library.</comment>
+  </data>
+  <data name="FilterEditor_RowAction_RemoveTitle" xml:space="preserve">
+    <value>Remove filter</value>
+  </data>
+  <data name="FilterEditor_RowAction_EnableToggleLabel" xml:space="preserve">
+    <value>Enable filter</value>
+  </data>
+  <data name="FilterEditor_EditPanel_ExcludedAria" xml:space="preserve">
+    <value>Filter is excluded; activate to include</value>
+  </data>
+  <data name="FilterEditor_EditPanel_IncludedAria" xml:space="preserve">
+    <value>Filter is included; activate to exclude</value>
+  </data>
+  <data name="FilterEditor_HighlightColor_Aria" xml:space="preserve">
+    <value>Highlight Color</value>
+  </data>
+  <data name="FilterEditor_HighlightColor_IncludeOnlyDescription" xml:space="preserve">
+    <value>Color applies in Include mode only.</value>
+  </data>
+  <data name="FilterEditor_Action_Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="FilterEditor_Action_CancelEdit_Aria" xml:space="preserve">
+    <value>Cancel edit</value>
+  </data>
+  <data name="FilterEditor_Action_CancelEdit_Title" xml:space="preserve">
+    <value>Cancel edit</value>
+  </data>
+  <data name="FilterEditor_Action_RemoveFilter_Aria" xml:space="preserve">
+    <value>Remove filter</value>
+  </data>
+  <data name="FilterEditor_Action_RemoveFilter_Title" xml:space="preserve">
+    <value>Remove filter</value>
+  </data>
+  <data name="FilterEditor_PredicateJoin_OrAria" xml:space="preserve">
+    <value>Joining with OR; click to switch to AND</value>
+  </data>
+  <data name="FilterEditor_PredicateJoin_AndAria" xml:space="preserve">
+    <value>Joining with AND; click to switch to OR</value>
+  </data>
+  <data name="FilterEditor_PredicateJoin_OrTitle" xml:space="preserve">
+    <value>OR</value>
+  </data>
+  <data name="FilterEditor_PredicateJoin_AndTitle" xml:space="preserve">
+    <value>AND</value>
+  </data>
+  <data name="FilterEditor_PredicateJoin_OrLabel" xml:space="preserve">
+    <value>OR</value>
+  </data>
+  <data name="FilterEditor_PredicateJoin_AndLabel" xml:space="preserve">
+    <value>AND</value>
+  </data>
+  <data name="FilterEditor_Predicate_DoneAria" xml:space="preserve">
+    <value>Done editing predicate</value>
+  </data>
+  <data name="FilterEditor_Predicate_DoneTitle" xml:space="preserve">
+    <value>Done</value>
+  </data>
+  <data name="FilterEditor_Predicate_DoneDisabledTitle" xml:space="preserve">
+    <value>Complete the predicate before continuing</value>
+  </data>
+  <data name="FilterEditor_Predicate_RemoveAria" xml:space="preserve">
+    <value>Remove predicate: {0}</value>
+    <comment>{0} is the localized predicate summary shown in the predicate chip.</comment>
+  </data>
+  <data name="FilterEditor_Predicate_RemoveTitle" xml:space="preserve">
+    <value>Remove predicate</value>
+  </data>
+  <data name="FilterEditor_Predicate_EditAria" xml:space="preserve">
+    <value>Edit predicate: {0}</value>
+    <comment>{0} is the localized predicate summary shown in the predicate chip.</comment>
+  </data>
+  <data name="FilterEditor_Predicate_EditTitle" xml:space="preserve">
+    <value>Edit predicate</value>
+  </data>
+  <data name="FilterEditor_PredicateSummary_Operator_In" xml:space="preserve">
+    <value>in</value>
+  </data>
+  <data name="FilterEditor_PredicateSummary_Operator_Contains" xml:space="preserve">
+    <value>contains</value>
+  </data>
+  <data name="FilterEditor_PredicateSummary_Operator_NotContains" xml:space="preserve">
+    <value>doesn't contain</value>
+  </data>
+  <data name="FilterEditor_PredicateSummary_ValueCount_Many" xml:space="preserve">
+    <value>{0} values</value>
+    <comment>{0} is the raw count of selected values; do not add number grouping.</comment>
+  </data>
+  <data name="FilterEditor_PredicateSummary" xml:space="preserve">
+    <value>{0} {1} {2}</value>
+    <comment>{0} is the filter property token, {1} is the localized operator, and {2} is the value text or raw value count.</comment>
+  </data>
+  <data name="FilterEditor_PredicateList_AddAria" xml:space="preserve">
+    <value>Add predicate</value>
+  </data>
+  <data name="FilterEditor_PredicateList_AddTitle" xml:space="preserve">
+    <value>Add predicate</value>
+  </data>
+  <data name="FilterEditor_PredicateList_AddDisabledAria" xml:space="preserve">
+    <value>Complete the current predicate before adding another</value>
+  </data>
+  <data name="FilterEditor_PredicateList_AddDisabledTitle" xml:space="preserve">
+    <value>Complete the current predicate before adding another</value>
+  </data>
+  <data name="FilterEditor_SaveError_EmptyFilter" xml:space="preserve">
+    <value>Cannot save an empty filter</value>
+  </data>
+  <data name="FilterEditor_SaveError_IncompletePredicates" xml:space="preserve">
+    <value>All predicates must be complete before saving.</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_None" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_LightRed" xml:space="preserve">
+    <value>LightRed</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_Red" xml:space="preserve">
+    <value>Red</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_DarkRed" xml:space="preserve">
+    <value>DarkRed</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_LightOrange" xml:space="preserve">
+    <value>LightOrange</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_Orange" xml:space="preserve">
+    <value>Orange</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_DarkOrange" xml:space="preserve">
+    <value>DarkOrange</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_LightYellow" xml:space="preserve">
+    <value>LightYellow</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_Yellow" xml:space="preserve">
+    <value>Yellow</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_DarkYellow" xml:space="preserve">
+    <value>DarkYellow</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_LightGreen" xml:space="preserve">
+    <value>LightGreen</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_Green" xml:space="preserve">
+    <value>Green</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_DarkGreen" xml:space="preserve">
+    <value>DarkGreen</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_LightTeal" xml:space="preserve">
+    <value>LightTeal</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_Teal" xml:space="preserve">
+    <value>Teal</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_DarkTeal" xml:space="preserve">
+    <value>DarkTeal</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_LightBlue" xml:space="preserve">
+    <value>LightBlue</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_Blue" xml:space="preserve">
+    <value>Blue</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_DarkBlue" xml:space="preserve">
+    <value>DarkBlue</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_LightPurple" xml:space="preserve">
+    <value>LightPurple</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_Purple" xml:space="preserve">
+    <value>Purple</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_DarkPurple" xml:space="preserve">
+    <value>DarkPurple</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_LightMagenta" xml:space="preserve">
+    <value>LightMagenta</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_Magenta" xml:space="preserve">
+    <value>Magenta</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_DarkMagenta" xml:space="preserve">
+    <value>DarkMagenta</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_LightPink" xml:space="preserve">
+    <value>LightPink</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_Pink" xml:space="preserve">
+    <value>Pink</value>
+  </data>
+  <data name="FilterEditor_HighlightColorOption_DarkPink" xml:space="preserve">
+    <value>DarkPink</value>
+  </data>
   <!-- Filter comparison editor: operator dropdown (FilterEditor_Comparison_* map to ComparisonOperatorSelect.ComparisonKind) + value-picker visually-hidden labels and placeholders. -->
   <data name="FilterEditor_Comparison_Equals" xml:space="preserve">
     <value>Equals</value>

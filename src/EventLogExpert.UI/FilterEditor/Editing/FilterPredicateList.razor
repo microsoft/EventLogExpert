@@ -3,22 +3,22 @@
         @foreach (var predicate in Predicates)
         {
             <FilterPredicateEditor IsEditing="@(_editingPredicateId == predicate.Id)"
-                @key="predicate.Id"
                 OnChanged="StateHasChanged"
                 OnDone="CollapseEditor"
                 OnEdit="@(() => StartEditing(predicate.Id))"
                 OnRemove="@(() => RemovePredicate(predicate.Id))"
-                @ref="_editorRefs[predicate.Id]"
-                Value="predicate" />
+                Value="predicate"
+                @key="predicate.Id"
+                @ref="_editorRefs[predicate.Id]" />
         }
 
-        <Button aria-label="@(CanAddPredicate ? "Add predicate" : "Complete the current predicate before adding another")"
-            CssClass="add-filter-predicate-button"
+        <Button CssClass="add-filter-predicate-button"
             Disabled="@(!CanAddPredicate)"
             IconClass="bi bi-plus-circle"
             IconOnly
             OnClick="AddPredicate"
+            aria-label="@AddPredicateAriaLabel"
             @ref="_addButton"
-            title="@(CanAddPredicate ? "Add predicate" : "Complete the current predicate before adding another")" />
+            title="@AddPredicateTitle" />
     </span>
 </div>

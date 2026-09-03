@@ -5,10 +5,13 @@ using Bunit;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.UI.FilterEditor;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Reflection;
 
@@ -23,6 +26,7 @@ public sealed class FilterEditorCoreTests : BunitContext
     {
         Services.AddSingleton(_alerts);
         Services.AddSingleton(_announcements);
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
@@ -67,7 +71,7 @@ public sealed class FilterEditorCoreTests : BunitContext
         Assert.Equal("Level == 4", readOnlyInput.GetAttribute("value"));
 
         var hint = component.Find(".filter-row-hint");
-        Assert.Contains("No recent options", hint.TextContent);
+        Assert.Contains("[[FilterEditor_Recent_EmptyNoneAvailable]]", hint.TextContent);
     }
 
     [Fact]
@@ -80,7 +84,7 @@ public sealed class FilterEditorCoreTests : BunitContext
             .Add(p => p.PendingDraft, draft)
             .Add(p => p.CachedOptions, options));
 
-        Assert.Empty(component.FindAll("[aria-label='Filter recent options by tag']"));
+        Assert.Empty(component.FindAll("[aria-label='[[FilterEditor_Recent_TagFilterAria]]']"));
     }
 
     [Fact]
@@ -93,7 +97,7 @@ public sealed class FilterEditorCoreTests : BunitContext
             .Add(p => p.PendingDraft, draft)
             .Add(p => p.CachedOptions, options));
 
-        Assert.NotNull(component.Find("[aria-label='Filter recent options by tag']"));
+        Assert.NotNull(component.Find("[aria-label='[[FilterEditor_Recent_TagFilterAria]]']"));
     }
 
     [Fact]
@@ -107,15 +111,15 @@ public sealed class FilterEditorCoreTests : BunitContext
 
         Assert.False(component.Instance.IsEditing);
 
-        component.Find("button[title='Edit filter']").Click();
+        component.Find("button[title='[[FilterEditor_RowAction_EditTitle]]']").Click();
 
         Assert.True(component.Instance.IsEditing);
-        _announcements.Received(1).Announce("Editing filter");
+        _announcements.Received(1).Announce("[[FilterEditor_Announcement_EditingFilter]]");
 
-        component.Find("button[aria-label='Cancel edit']").Click();
+        component.Find("button[aria-label='[[FilterEditor_Action_CancelEdit_Aria]]']").Click();
 
         Assert.False(component.Instance.IsEditing);
-        _announcements.Received(1).Announce("Edit cancelled");
+        _announcements.Received(1).Announce("[[FilterEditor_Announcement_EditCancelled]]");
     }
 
     [Fact]
@@ -180,14 +184,14 @@ public sealed class FilterEditorCoreTests : BunitContext
             .Add(p => p.CachedOptions, new List<CachedFilterOption>()));
 
         var initialItems = component.Find(".filter-row-mode .dropdown-list").QuerySelectorAll("[role='option']");
-        Assert.DoesNotContain(initialItems, item => item.TextContent.Contains("Recent"));
+        Assert.DoesNotContain(initialItems, item => item.TextContent.Contains("[[FilterEditor_Mode_Recent]]"));
 
         component.Render(parameters => parameters
             .Add(p => p.PendingDraft, draft)
             .Add(p => p.CachedOptions, new List<CachedFilterOption> { new("Level == 4", IsFavorite: true, Tags: []) }));
 
         var updatedItems = component.Find(".filter-row-mode .dropdown-list").QuerySelectorAll("[role='option']");
-        Assert.Contains(updatedItems, item => item.TextContent.Contains("Recent"));
+        Assert.Contains(updatedItems, item => item.TextContent.Contains("[[FilterEditor_Mode_Recent]]"));
     }
 
     [Fact]
@@ -202,7 +206,7 @@ public sealed class FilterEditorCoreTests : BunitContext
         var modeListbox = component.Find(".filter-row-mode .dropdown-list");
         var items = modeListbox.QuerySelectorAll("[role='option']");
 
-        Assert.Contains(items, item => item.TextContent.Contains("Recent"));
+        Assert.Contains(items, item => item.TextContent.Contains("[[FilterEditor_Mode_Recent]]"));
     }
 
     [Fact]
@@ -217,7 +221,7 @@ public sealed class FilterEditorCoreTests : BunitContext
         var modeListbox = component.Find(".filter-row-mode .dropdown-list");
         var items = modeListbox.QuerySelectorAll("[role='option']");
 
-        Assert.DoesNotContain(items, item => item.TextContent.Contains("Recent"));
+        Assert.DoesNotContain(items, item => item.TextContent.Contains("[[FilterEditor_Mode_Recent]]"));
     }
 
     [Fact]
@@ -236,9 +240,9 @@ public sealed class FilterEditorCoreTests : BunitContext
         var modeListbox = component.Find(".filter-row-mode .dropdown-list");
         var items = modeListbox.QuerySelectorAll("[role='option']");
 
-        Assert.Contains(items, item => item.TextContent.Contains("Basic"));
-        Assert.Contains(items, item => item.TextContent.Contains("Advanced"));
-        Assert.Contains(items, item => item.TextContent.Contains("Recent"));
+        Assert.Contains(items, item => item.TextContent.Contains("[[FilterEditor_Mode_Basic]]"));
+        Assert.Contains(items, item => item.TextContent.Contains("[[FilterEditor_Mode_Advanced]]"));
+        Assert.Contains(items, item => item.TextContent.Contains("[[FilterEditor_Mode_Recent]]"));
     }
 
     [Fact]
@@ -253,7 +257,7 @@ public sealed class FilterEditorCoreTests : BunitContext
         var modeListbox = component.Find(".filter-row-mode .dropdown-list");
         var items = modeListbox.QuerySelectorAll("[role='option']");
 
-        Assert.Contains(items, item => item.TextContent.Contains("Recent"));
+        Assert.Contains(items, item => item.TextContent.Contains("[[FilterEditor_Mode_Recent]]"));
     }
 
     [Fact]
@@ -268,7 +272,7 @@ public sealed class FilterEditorCoreTests : BunitContext
         var modeListbox = component.Find(".filter-row-mode .dropdown-list");
         var items = modeListbox.QuerySelectorAll("[role='option']");
 
-        Assert.DoesNotContain(items, item => item.TextContent.Contains("Recent"));
+        Assert.DoesNotContain(items, item => item.TextContent.Contains("[[FilterEditor_Mode_Recent]]"));
     }
 
     [Fact]
@@ -294,6 +298,19 @@ public sealed class FilterEditorCoreTests : BunitContext
     }
 
     [Fact]
+    public void OnParametersSet_BothValueAndPendingDraftNull_ThrowsInvalidOperationException()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            Render<FilterEditorCore>(parameters => parameters
+                .Add(p => p.Value, null)
+                .Add(p => p.PendingDraft, null)));
+
+        Assert.Contains("requires either", ex.Message);
+        Assert.Contains("Value", ex.Message);
+        Assert.Contains("PendingDraft", ex.Message);
+    }
+
+    [Fact]
     public void OnParametersSet_BothValueAndPendingDraft_DropsDraftPendingToSavedTransition()
     {
         var draft = new FilterDraft { Mode = FilterMode.Advanced, ComparisonText = "Id == 1" };
@@ -309,19 +326,6 @@ public sealed class FilterEditorCoreTests : BunitContext
             .Add(p => p.PendingDraft, draft));
 
         Assert.False(component.Instance.IsEditing);
-    }
-
-    [Fact]
-    public void OnParametersSet_BothValueAndPendingDraftNull_ThrowsInvalidOperationException()
-    {
-        var ex = Assert.Throws<InvalidOperationException>(() =>
-            Render<FilterEditorCore>(parameters => parameters
-                .Add(p => p.Value, null)
-                .Add(p => p.PendingDraft, null)));
-
-        Assert.Contains("requires either", ex.Message);
-        Assert.Contains("Value", ex.Message);
-        Assert.Contains("PendingDraft", ex.Message);
     }
 
     [Fact]

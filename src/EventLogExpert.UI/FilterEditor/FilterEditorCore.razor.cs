@@ -4,11 +4,13 @@
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.FilterEditor.Rows;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.FilterEditor;
 
@@ -49,14 +51,16 @@ public sealed partial class FilterEditorCore : ComponentBase
 
     private string CachedEmptyHint =>
         _selectedTags.Count > 0 ?
-            "No recent filters match the selected tags - clear tags to see all" :
-            "No recent options available here";
+            Localizer["FilterEditor_Recent_EmptyNoMatches"] :
+            Localizer["FilterEditor_Recent_EmptyNoneAvailable"];
 
     private string ErrorMessage { get; set; } = string.Empty;
 
     private FilterDraft? Filter { get; set; }
 
     private bool IsPending => Value is null && PendingDraft is not null;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     private IReadOnlyList<CachedFilterOption> VisibleCachedOptions =>
         FilterCachedByTags(CachedOptions ?? [], _selectedTags, Filter?.ComparisonText);
@@ -111,12 +115,6 @@ public sealed partial class FilterEditorCore : ComponentBase
         base.OnParametersSet();
     }
 
-    private static string GetFilterModeDisplayLabel(FilterMode mode) => mode switch
-    {
-        FilterMode.Cached => "Recent",
-        _ => mode.ToString(),
-    };
-
     private async Task CancelHandler()
     {
         ErrorMessage = string.Empty;
@@ -124,13 +122,13 @@ public sealed partial class FilterEditorCore : ComponentBase
 
         if (IsPending)
         {
-            AnnouncementService.Announce("Filter discarded");
+            AnnouncementService.Announce(FilterEditorAnnouncements.FilterDiscarded(Localizer));
             await OnPendingDiscard.InvokeAsync();
 
             return;
         }
 
-        AnnouncementService.Announce("Edit cancelled");
+        AnnouncementService.Announce(FilterEditorAnnouncements.EditCancelled(Localizer));
     }
 
     // Local edit transition: never add OnEdit/OnCancel host callbacks (WebView2 render bug).
@@ -141,18 +139,16 @@ public sealed partial class FilterEditorCore : ComponentBase
         ErrorMessage = string.Empty;
         Filter = FilterDraft.FromSavedFilter(savedFilter);
 
-        AnnouncementService.Announce("Editing filter");
+        AnnouncementService.Announce(FilterEditorAnnouncements.EditingFilter(Localizer));
 
         return Task.CompletedTask;
     }
 
     private async Task ExclusionHandler(bool isExcluded)
     {
-        string label = isExcluded ? "Exclude" : "Include";
-
         if (Filter is not null)
         {
-            AnnouncementService.Announce($"Filter set to {label}");
+            AnnouncementService.Announce(FilterEditorAnnouncements.FilterSetTo(Localizer, isExcluded));
             Filter.IsExcluded = isExcluded;
             await InvokeAsync(StateHasChanged);
 
@@ -161,7 +157,7 @@ public sealed partial class FilterEditorCore : ComponentBase
 
         if (Value is not null)
         {
-            AnnouncementService.Announce($"Filter set to {label}");
+            AnnouncementService.Announce(FilterEditorAnnouncements.FilterSetTo(Localizer, isExcluded));
             await OnExclusionChanged.InvokeAsync(isExcluded);
         }
     }
@@ -207,7 +203,7 @@ public sealed partial class FilterEditorCore : ComponentBase
     {
         if (IsPending)
         {
-            AnnouncementService.Announce("Filter discarded");
+            AnnouncementService.Announce(FilterEditorAnnouncements.FilterDiscarded(Localizer));
             await OnPendingDiscard.InvokeAsync();
 
             return;
@@ -215,7 +211,7 @@ public sealed partial class FilterEditorCore : ComponentBase
 
         if (Value is null) { return; }
 
-        AnnouncementService.Announce("Filter removed");
+        AnnouncementService.Announce(FilterEditorAnnouncements.FilterRemoved(Localizer));
         await OnRemove.InvokeAsync();
     }
 
@@ -223,9 +219,15 @@ public sealed partial class FilterEditorCore : ComponentBase
     {
         if (Filter is null) { return; }
 
-        if (!Filter.TryBuildSavedFilter(out var saved, out string error))
+        if (!Filter.TryBuildSavedFilter(out var saved, out var failure))
         {
-            ErrorMessage = error;
+            ErrorMessage = failure switch
+            {
+                FilterDraftBuildFailure.EmptyFilter => Localizer["FilterEditor_SaveError_EmptyFilter"],
+                FilterDraftBuildFailure.InvalidBasicStructure => Localizer["FilterEditor_SaveError_IncompletePredicates"],
+                FilterDraftBuildFailure.CompilerDiagnostic diagnostic => diagnostic.Message,
+                _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null)
+            };
 
             return;
         }
@@ -233,7 +235,7 @@ public sealed partial class FilterEditorCore : ComponentBase
         Filter = null;
         ErrorMessage = string.Empty;
 
-        AnnouncementService.Announce("Filter saved");
+        AnnouncementService.Announce(FilterEditorAnnouncements.FilterSaved(Localizer));
 
         if (IsPending)
         {
@@ -249,8 +251,7 @@ public sealed partial class FilterEditorCore : ComponentBase
     {
         if (Value is not { } savedFilter) { return; }
 
-        string newState = savedFilter.IsEnabled ? "disabled" : "enabled";
-        AnnouncementService.Announce($"Filter {newState}");
+        AnnouncementService.Announce(FilterEditorAnnouncements.FilterEnabledState(Localizer, !savedFilter.IsEnabled));
         await OnToggleEnabled.InvokeAsync();
     }
 
@@ -262,22 +263,13 @@ public sealed partial class FilterEditorCore : ComponentBase
 
         if (Filter.WouldLoseDataSwitchingTo(target))
         {
-            string message = (Filter.Mode, target) switch
-            {
-                (_, FilterMode.Cached) =>
-                    "Switching to Recent will discard the current filter contents. Continue?",
-                (FilterMode.Advanced, FilterMode.Basic) or (FilterMode.Cached, FilterMode.Basic) =>
-                    "Switching to Basic will discard the current expression because it cannot be represented in the Basic editor. Continue?",
-                (FilterMode.Basic, FilterMode.Advanced) =>
-                    "Switching to Advanced will drop incomplete predicates from the Basic editor. Continue?",
-                _ => "Switching modes will discard the current filter contents. Continue?",
-            };
+            string message = FilterEditorModeSwitchLocalizer.ConfirmationMessage(Localizer, Filter.Mode, target);
 
             bool accepted = await AlertDialogService.ShowAlert(
-                "Switch Filter Mode",
+                Localizer["FilterEditor_ModeSwitch_Title"],
                 message,
-                "Continue",
-                "Cancel");
+                Localizer["FilterEditor_Action_Continue"],
+                Localizer["Modal_Cancel"]);
 
             if (!accepted)
             {
@@ -287,7 +279,7 @@ public sealed partial class FilterEditorCore : ComponentBase
             }
         }
 
-        AnnouncementService.Announce($"Switched to {GetFilterModeDisplayLabel(target)} filter mode");
+        AnnouncementService.Announce(FilterEditorAnnouncements.SwitchedToMode(Localizer, target));
         Filter.ApplyModeSwitch(target);
         ErrorMessage = string.Empty;
     }
