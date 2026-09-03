@@ -35,7 +35,9 @@
         color: var(--text-secondary);
     }
 
-    &.danger {
+    /* Only tint enabled danger items red. This rule follows .disabled, so without :not(.disabled) it
+       would override the disabled secondary color and make disabled danger items look enabled. */
+    &.danger:not(.disabled) {
         color: var(--clr-red);
     }
 }
