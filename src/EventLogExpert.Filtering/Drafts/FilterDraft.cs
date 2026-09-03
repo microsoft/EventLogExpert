@@ -140,14 +140,15 @@ public sealed class FilterDraft
 
     /// <summary>
     ///     Builds a <see cref="SavedFilter" /> from this draft per <see cref="Mode" />. Returns <see langword="false" />
-    ///     with a populated <paramref name="error" /> when the draft cannot be saved (empty input, incomplete Basic predicate,
-    ///     or compile failure on the resulting text). Pure (does not mutate the draft) so the caller can surface the error
-    ///     inline and let the user repair.
+    ///     with a populated <paramref name="failure" /> when the draft cannot be saved. Pure (does not mutate the draft) so
+    ///     the caller can surface the error inline and let the user repair.
     /// </summary>
-    public bool TryBuildSavedFilter([NotNullWhen(true)] out SavedFilter? saved, out string error)
+    public bool TryBuildSavedFilter(
+        [NotNullWhen(true)] out SavedFilter? saved,
+        [NotNullWhen(false)] out FilterDraftBuildFailure? failure)
     {
         saved = null;
-        error = string.Empty;
+        failure = null;
 
         string text;
         BasicFilter? basicFilter;
@@ -156,7 +157,7 @@ public sealed class FilterDraft
         {
             if (!HasMeaningfulStructure)
             {
-                error = "Cannot save an empty filter";
+                failure = new FilterDraftBuildFailure.EmptyFilter();
                 return false;
             }
 
@@ -164,7 +165,7 @@ public sealed class FilterDraft
 
             if (!BasicFilterFormatter.TryFormat(draftBasic, true, out var formatted))
             {
-                error = "All predicates must be complete before saving.";
+                failure = new FilterDraftBuildFailure.InvalidBasicStructure();
 
                 return false;
             }
@@ -180,14 +181,14 @@ public sealed class FilterDraft
 
         if (string.IsNullOrWhiteSpace(text))
         {
-            error = "Cannot save an empty filter";
+            failure = new FilterDraftBuildFailure.EmptyFilter();
 
             return false;
         }
 
         if (!FilterCompiler.TryCompile(text, out var compiled, out var compileError))
         {
-            error = compileError;
+            failure = new FilterDraftBuildFailure.CompilerDiagnostic(compileError);
 
             return false;
         }

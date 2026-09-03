@@ -3,22 +3,23 @@
     <div class="filter-edit-panel @CssClass">
         <div class="filter-edit-panel-row">
             <div class="filter-edit-panel-content">
-                <Button aria-label="@(filter.IsExcluded ? "Filter is excluded; activate to include" : "Filter is included; activate to exclude")"
-                    aria-pressed="@(filter.IsExcluded ? "true" : "false")"
-                    CssClass="filter-exclude-toggle"
-                    data-excluded="@(filter.IsExcluded ? "true" : "false")"
+                <Button CssClass="filter-exclude-toggle"
                     IconClass="@(filter.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"
                     IconOnly
                     OnClick="@(() => OnExclusionChanged.InvokeAsync(!filter.IsExcluded))"
-                    title="@(filter.IsExcluded ? "Excluded \u2014 click to include" : "Included \u2014 click to exclude")" />
+                    aria-label="@(filter.IsExcluded ? Localizer["FilterEditor_EditPanel_ExcludedAria"] : Localizer["FilterEditor_EditPanel_IncludedAria"])"
+                    aria-pressed="@(filter.IsExcluded ? "true" : "false")"
+                    data-excluded="@(filter.IsExcluded ? "true" : "false")"
+                    title="@(filter.IsExcluded ? Localizer["FilterEditor_ExcludeToggle_TitleExcluded"] : Localizer["FilterEditor_ExcludeToggle_TitleIncluded"])" />
 
                 <div class="color-picker-wrapper" data-filter-excluded="@(filter.IsExcluded ? "true" : "false")">
                     <ValueSelect AriaDescribedBy="@(filter.IsExcluded ? _colorDescriptionId : null)"
-                        AriaLabel="Highlight Color"
-                        @bind-Value="filter.Color"
+                        AriaLabel="@Localizer["FilterEditor_HighlightColor_Aria"]"
                         CssClass="input color-dropdown"
                         DataHighlight="@filter.Color.ToCssName()"
-                        T="HighlightColor">
+                        T="HighlightColor"
+                        ToStringFunc="@(color => color is { } value ? FilterEditorHighlightColorLocalizer.Label(Localizer, value) : string.Empty)"
+                        @bind-Value="filter.Color">
                         @foreach (var item in Enum.GetValues<HighlightColor>())
                         {
                             <ValueSelectItem CssClass="color-dropdown-item"
@@ -29,7 +30,7 @@
                     </ValueSelect>
                     @if (filter.IsExcluded)
                     {
-                        <span class="visually-hidden" id="@_colorDescriptionId">Color applies in Include mode only.</span>
+                        <span class="visually-hidden" id="@_colorDescriptionId">@Localizer["FilterEditor_HighlightColor_IncludeOnlyDescription"]</span>
                     }
                 </div>
 
@@ -39,21 +40,21 @@
             </div>
 
             <div class="filter-edit-panel-actions">
-                <PrimaryButton IconClass="bi bi-check-circle" OnClick="OnSave">Save</PrimaryButton>
+                <PrimaryButton IconClass="bi bi-check-circle" OnClick="OnSave">@Localizer["FilterEditor_Action_Save"]</PrimaryButton>
 
-                <Button aria-label="Cancel edit"
-                    IconClass="bi bi-x-circle"
+                <Button IconClass="bi bi-x-circle"
                     IconOnly
                     OnClick="OnCancel"
-                    title="Cancel edit" />
+                    aria-label="@Localizer["FilterEditor_Action_CancelEdit_Aria"]"
+                    title="@Localizer["FilterEditor_Action_CancelEdit_Title"]" />
 
                 @if (!IsPending)
                 {
-                    <DangerButton aria-label="Remove filter"
-                        IconClass="bi bi-dash-circle"
+                    <DangerButton IconClass="bi bi-dash-circle"
                         IconOnly
                         OnClick="OnRemove"
-                        title="Remove filter" />
+                        aria-label="@Localizer["FilterEditor_Action_RemoveFilter_Aria"]"
+                        title="@Localizer["FilterEditor_Action_RemoveFilter_Title"]" />
                 }
             </div>
         </div>

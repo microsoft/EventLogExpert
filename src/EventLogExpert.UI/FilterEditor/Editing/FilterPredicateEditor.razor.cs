@@ -3,9 +3,11 @@
 
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Drafts;
+using EventLogExpert.Localization;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.FilterEditor.Editing;
 
@@ -31,7 +33,22 @@ public sealed partial class FilterPredicateEditor : ComponentBase
 
     [Parameter][EditorRequired] public FilterPredicateDraft Value { get; set; } = null!;
 
-    private string JoinerLabel => Value.JoinWithAny ? "OR" : "AND";
+    private string JoinerAriaLabel =>
+        Value.JoinWithAny ?
+            Localizer["FilterEditor_PredicateJoin_OrAria"] :
+            Localizer["FilterEditor_PredicateJoin_AndAria"];
+
+    private string JoinerLabel =>
+        Value.JoinWithAny ?
+            Localizer["FilterEditor_PredicateJoin_OrLabel"] :
+            Localizer["FilterEditor_PredicateJoin_AndLabel"];
+
+    private string JoinerTitle =>
+        Value.JoinWithAny ?
+            Localizer["FilterEditor_PredicateJoin_OrTitle"] :
+            Localizer["FilterEditor_PredicateJoin_AndTitle"];
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     private string SummaryText
     {
@@ -41,24 +58,24 @@ public sealed partial class FilterPredicateEditor : ComponentBase
 
             string opLabel = (cmp.Operator, cmp.MatchMode) switch
             {
-                (ComparisonOperator.Equals, MatchMode.Many) => "in",
+                (ComparisonOperator.Equals, MatchMode.Many) => Localizer["FilterEditor_PredicateSummary_Operator_In"],
                 (ComparisonOperator.Equals, _) => "==",
-                (ComparisonOperator.Contains, _) => "contains",
+                (ComparisonOperator.Contains, _) => Localizer["FilterEditor_PredicateSummary_Operator_Contains"],
                 (ComparisonOperator.NotEqual, _) => "!=",
-                (ComparisonOperator.NotContains, _) => "doesn't contain",
+                (ComparisonOperator.NotContains, _) => Localizer["FilterEditor_PredicateSummary_Operator_NotContains"],
                 _ => "?"
             };
 
-            string valueLabel = cmp.MatchMode == MatchMode.Many
-                ? cmp.Values.Count switch
+            string valueLabel = cmp.MatchMode == MatchMode.Many ?
+                cmp.Values.Count switch
                 {
                     0 => "?",
                     1 => cmp.Values[0],
-                    var count => $"{count} values"
-                }
-                : string.IsNullOrEmpty(cmp.Value) ? "?" : cmp.Value;
+                    var count => Localizer["FilterEditor_PredicateSummary_ValueCount_Many", count]
+                } :
+                string.IsNullOrEmpty(cmp.Value) ? "?" : cmp.Value;
 
-            return $"{cmp.Property} {opLabel} {valueLabel}";
+            return Localizer["FilterEditor_PredicateSummary", cmp.Property.ToString(), opLabel, valueLabel];
         }
     }
 

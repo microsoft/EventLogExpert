@@ -3,13 +3,16 @@
 
 using Bunit;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.UI.FilterEditor;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
 
@@ -27,6 +30,7 @@ public sealed class FilterRowOrderingTests : BunitContext
         Services.AddSingleton(Substitute.For<IAlertDialogService>());
         Services.AddSingleton(Substitute.For<IAnnouncementService>());
         Services.AddSingleton(Substitute.For<IEventLogQueries>());
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
         JSInterop.Mode = JSRuntimeMode.Loose;
 
         var cut = Render<FilterRow>(parameters => parameters.Add(p => p.Value, SavedFilter.TryCreate("Level == 4")!));

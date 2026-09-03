@@ -2,8 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Drafts;
+using EventLogExpert.Localization;
 using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.FilterEditor.Editing;
 
@@ -33,4 +35,6 @@ public sealed partial class FilterEditPanel : ComponentBase
     [Parameter] public EventCallback OnRemove { get; set; }
 
     [Parameter] public EventCallback OnSave { get; set; }
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 }

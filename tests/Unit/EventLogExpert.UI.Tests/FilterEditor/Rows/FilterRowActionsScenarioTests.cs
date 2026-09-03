@@ -4,14 +4,23 @@
 using AngleSharp.Dom;
 using Bunit;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.UI.FilterEditor;
 using EventLogExpert.UI.FilterEditor.Rows;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.Tests.FilterEditor.Rows;
 
 public sealed class FilterRowActionsScenarioTests : BunitContext
 {
+    public FilterRowActionsScenarioTests()
+    {
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
+    }
+
     [Fact]
     public void AuthoringDisabled_RendersNoCopyButton()
     {
@@ -59,7 +68,7 @@ public sealed class FilterRowActionsScenarioTests : BunitContext
 
     private static IElement? FindScenarioButton(IRenderedComponent<FilterRowActions> component) =>
         component.FindAll("button")
-            .FirstOrDefault(button => button.GetAttribute("aria-label")?.Contains("scenario JSON") == true);
+            .FirstOrDefault(button => button.GetAttribute("aria-label")?.Contains("FilterEditor_RowAction_CopyScenarioAria") == true);
 
     private static SavedFilter MakeSavedFilter() =>
         new()

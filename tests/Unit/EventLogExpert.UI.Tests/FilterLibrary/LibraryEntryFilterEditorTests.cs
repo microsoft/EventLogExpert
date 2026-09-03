@@ -4,11 +4,14 @@
 using Bunit;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.UI.FilterLibrary;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
 
@@ -25,6 +28,7 @@ public sealed class LibraryEntryFilterEditorTests : BunitContext
         Services.AddSingleton(_alerts);
         Services.AddSingleton(_announcements);
         Services.AddSingleton(_commands);
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }

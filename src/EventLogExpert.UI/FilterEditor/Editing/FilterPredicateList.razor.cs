@@ -3,9 +3,11 @@
 
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.FilterEditor.Editing;
 
@@ -21,6 +23,16 @@ public sealed partial class FilterPredicateList : ComponentBase
 
     [Parameter][EditorRequired] public List<FilterPredicateDraft> Predicates { get; set; } = null!;
 
+    private string AddPredicateAriaLabel =>
+        CanAddPredicate ?
+            Localizer["FilterEditor_PredicateList_AddAria"] :
+            Localizer["FilterEditor_PredicateList_AddDisabledAria"];
+
+    private string AddPredicateTitle =>
+        CanAddPredicate ?
+            Localizer["FilterEditor_PredicateList_AddTitle"] :
+            Localizer["FilterEditor_PredicateList_AddDisabledTitle"];
+
     /// <summary>
     ///     The Add (+) button is gated when ANY existing predicate is incomplete, so the user must finish (or remove)
     ///     in-flight predicates before introducing another. Mirrors the per-row Done gate in
@@ -28,6 +40,8 @@ public sealed partial class FilterPredicateList : ComponentBase
     ///     <see cref="FilterPredicateDraft.IsComplete" /> / the formatter's strict-mode save guard.
     /// </summary>
     private bool CanAddPredicate => Predicates.TrueForAll(p => p.IsComplete);
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     /// <summary>
     ///     Post-render focus restoration: after the chip&lt;-&gt;editor swap unmounts the previously focused button, move
@@ -39,16 +53,16 @@ public sealed partial class FilterPredicateList : ComponentBase
     {
         PruneStaleEditorRefs();
 
-        if (_focusEditorAfterRender is { } editingId
-            && _editorRefs.TryGetValue(editingId, out var editor)
-            && editor is not null)
+        if (_focusEditorAfterRender is { } editingId &&
+            _editorRefs.TryGetValue(editingId, out var editor) &&
+            editor is not null)
         {
             _focusEditorAfterRender = null;
             await editor.FocusEditorFirstInputAsync();
         }
-        else if (_focusChipAfterRender is { } chipId
-            && _editorRefs.TryGetValue(chipId, out var chipEditor)
-            && chipEditor is not null)
+        else if (_focusChipAfterRender is { } chipId &&
+            _editorRefs.TryGetValue(chipId, out var chipEditor) &&
+            chipEditor is not null)
         {
             _focusChipAfterRender = null;
             await chipEditor.FocusChipEditButtonAsync();

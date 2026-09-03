@@ -7,22 +7,22 @@
     OnRemove="RemoveHandler"
     OnSave="SaveHandler"
     OnToggleEnabled="ToggleEnabledHandler"
-    @ref="_shellRef"
-    Value="Value">
+    Value="Value"
+    @ref="_shellRef">
     <ModeSelector>
         @if (Filter is { } filter)
         {
             <span class="filter-row-mode">
-                <label class="visually-hidden" id="@($"{Id}_Mode")">Filter mode</label>
+                <label class="visually-hidden" id="@($"{Id}_Mode")">@Localizer["FilterEditor_ModeLabel"]</label>
                 <ValueSelect AriaLabelledBy="@($"{Id}_Mode")"
                     CssClass="input filter-dropdown filter-mode-dropdown"
                     T="FilterMode"
-                    ToStringFunc="@(GetFilterModeDisplayLabel)"
+                    ToStringFunc="@(mode => mode is { } value ? FilterEditorModeLocalizer.Display(Localizer, value) : string.Empty)"
                     Value="filter.Mode"
                     ValueChanged="TryChangeModeAsync">
                     @foreach (var mode in GetAvailableModes(filter))
                     {
-                        <ValueSelectItem T="FilterMode" Value="mode">@GetFilterModeDisplayLabel(mode)</ValueSelectItem>
+                        <ValueSelectItem T="FilterMode" Value="mode">@FilterEditorModeLocalizer.Display(Localizer, mode)</ValueSelectItem>
                     }
                 </ValueSelect>
             </span>
@@ -41,7 +41,7 @@
                     break;
                 case FilterMode.Advanced:
                     <span class="filter-row-text">
-                        <input aria-label="@(filter.IsExcluded ? "Exclude Expression" : "Expression")"
+                        <input aria-label="@(filter.IsExcluded ? Localizer["FilterEditor_AdvancedExpression_ExcludeAria"] : Localizer["FilterEditor_AdvancedExpression_IncludeAria"])"
                             class="advanced-filter input"
                             id="@Id"
                             @oninput="OnAdvancedTextInput"
@@ -54,14 +54,14 @@
                     <span class="filter-row-cached">
                         @if (AvailableCachedTags is { Count: > 0 } cachedTags)
                         {
-                            <ValueSelect AriaLabel="Filter recent options by tag"
+                            <ValueSelect AriaLabel="@Localizer["FilterEditor_Recent_TagFilterAria"]"
                                 CssClass="input filter-multiselect-dropdown"
-                                EmptyText="All tags"
+                                EmptyText="@Localizer["FilterEditor_Recent_AllTags"]"
                                 IsMultiSelect="true"
                                 T="string"
                                 Values="_selectedTags"
                                 ValuesChanged="OnSelectedTagsChanged">
-                                <ValueSelectItem ClearItem T="string">All tags</ValueSelectItem>
+                                <ValueSelectItem ClearItem T="string">@Localizer["FilterEditor_Recent_AllTags"]</ValueSelectItem>
                                 @foreach (var tag in cachedTags)
                                 {
                                     <ValueSelectItem T="string" Value="@tag">@tag</ValueSelectItem>
@@ -71,7 +71,7 @@
 
                         @if (VisibleCachedOptions is { Count: > 0 } options)
                         {
-                            <ValueSelect AriaLabel="Recent Filter"
+                            <ValueSelect AriaLabel="@Localizer["FilterEditor_Recent_SelectAria"]"
                                 CssClass="input cache-dropdown"
                                 T="string"
                                 Value="filter.ComparisonText"
@@ -81,7 +81,7 @@
                                     <ValueSelectItem T="string" Value="option.Value">
                                         @if (option.IsFavorite)
                                         {
-                                            <i aria-label="Favorite" class="bi bi-star-fill cached-favorite-icon"></i>
+                                            <i aria-label="@Localizer["FilterEditor_Recent_FavoriteAria"]" class="bi bi-star-fill cached-favorite-icon"></i>
                                         }
                                         else
                                         {
@@ -94,7 +94,7 @@
                         }
                         else
                         {
-                            <input aria-label="Recent filter (read-only)"
+                            <input aria-label="@Localizer["FilterEditor_Recent_ReadOnlyAria"]"
                                 class="advanced-filter input"
                                 readonly
                                 type="text"

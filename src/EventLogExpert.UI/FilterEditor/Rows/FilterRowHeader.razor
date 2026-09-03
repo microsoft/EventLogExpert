@@ -1,14 +1,14 @@
 @if (Value is { } savedFilter)
 {
     <div class="filter-row-header">
-        <Button aria-label="@(savedFilter.IsExcluded ? $"Filter '{savedFilter.ComparisonText}' is excluded; activate to include" : $"Filter '{savedFilter.ComparisonText}' is included; activate to exclude")"
-            aria-pressed="@(savedFilter.IsExcluded ? "true" : "false")"
-            CssClass="filter-exclude-toggle"
-            data-excluded="@(savedFilter.IsExcluded ? "true" : "false")"
+        <Button CssClass="filter-exclude-toggle"
             IconClass="@(savedFilter.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"
             IconOnly
             OnClick="@(() => OnExclusionChanged.InvokeAsync(!savedFilter.IsExcluded))"
-            title="@(savedFilter.IsExcluded ? "Excluded \u2014 click to include" : "Included \u2014 click to exclude")" />
+            aria-label="@(savedFilter.IsExcluded ? Localizer["FilterEditor_RowHeader_ExcludedAria", savedFilter.ComparisonText] : Localizer["FilterEditor_RowHeader_IncludedAria", savedFilter.ComparisonText])"
+            aria-pressed="@(savedFilter.IsExcluded ? "true" : "false")"
+            data-excluded="@(savedFilter.IsExcluded ? "true" : "false")"
+            title="@(savedFilter.IsExcluded ? Localizer["FilterEditor_ExcludeToggle_TitleExcluded"] : Localizer["FilterEditor_ExcludeToggle_TitleIncluded"])" />
 
         <div aria-hidden="true"
             class="color-box"
@@ -18,7 +18,7 @@
 
         @if (string.IsNullOrWhiteSpace(savedFilter.ComparisonText))
         {
-            <span class="filter-row-header-text" id="@FilterLabelId">No Filter Specified</span>
+            <span class="filter-row-header-text" id="@FilterLabelId">@Localizer["FilterEditor_RowHeader_NoFilterSpecified"]</span>
         }
         else
         {

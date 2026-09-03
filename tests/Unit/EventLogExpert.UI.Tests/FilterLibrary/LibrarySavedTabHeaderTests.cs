@@ -3,13 +3,16 @@
 
 using Bunit;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.UI.FilterLibrary;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.FilterLibrary;
@@ -25,6 +28,7 @@ public sealed class LibrarySavedTabHeaderTests : BunitContext
         Services.AddSingleton(_announcements);
         Services.AddSingleton(_commands);
         Services.AddSingleton(Substitute.For<IAlertDialogService>());
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 
         var libraryEntries = Substitute.For<ILibraryEntriesSource>();
         libraryEntries.Current.Returns(_ => _libraryState.Entries);

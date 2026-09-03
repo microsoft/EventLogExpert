@@ -279,7 +279,8 @@ public sealed class FilterDraftModelTests
             }
         };
 
-        Assert.True(draft.TryBuildSavedFilter(out var saved, out _));
+        Assert.True(draft.TryBuildSavedFilter(out var saved, out var failure), failure?.ToString());
+        Assert.Null(failure);
 
         // Both the compiled text AND the stored Basic model must be free of the degenerate empty value (no drift).
         Assert.DoesNotContain("\"\"", saved.ComparisonText);

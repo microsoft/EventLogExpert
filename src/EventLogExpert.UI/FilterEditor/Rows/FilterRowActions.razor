@@ -3,26 +3,26 @@
     <div class="filter-row-actions">
         @if (ShowScenarioCopy)
         {
-            <Button aria-label="@($"Copy {DescribeFilter(savedFilter)} as scenario JSON")"
-                IconClass="bi bi-filetype-json"
+            <Button IconClass="bi bi-filetype-json"
                 IconOnly
                 OnClick="@(() => CopyScenarioJsonAsync(savedFilter))"
-                title="Copy as scenario JSON" />
+                aria-label="@CopyScenarioAriaLabel(savedFilter)"
+                title="@Localizer["FilterEditor_RowAction_CopyScenarioTitle"]" />
         }
-        <Button aria-label="@($"Edit {DescribeFilter(savedFilter)}")"
-            IconClass="bi bi-funnel"
+        <Button IconClass="bi bi-funnel"
             IconOnly
             OnClick="OnEdit"
+            aria-label="@EditAriaLabel(savedFilter)"
             @ref="_editButton"
-            title="Edit filter" />
+            title="@Localizer["FilterEditor_RowAction_EditTitle"]" />
 
-        <DangerButton aria-label="@($"Remove {DescribeFilter(savedFilter)}")"
-            IconClass="bi bi-dash-circle"
+        <DangerButton IconClass="bi bi-dash-circle"
             IconOnly
             OnClick="OnRemove"
-            title="Remove filter" />
+            aria-label="@RemoveAriaLabel(savedFilter)"
+            title="@Localizer["FilterEditor_RowAction_RemoveTitle"]" />
 
-        <span class="visually-hidden" id="@_enableToggleLabelId">Enable filter</span>
+        <span class="visually-hidden" id="@_enableToggleLabelId">@Localizer["FilterEditor_RowAction_EnableToggleLabel"]</span>
 
         <Toggle AriaLabelledBy="@EnableToggleAriaLabelledBy"
             Value="savedFilter.IsEnabled"
