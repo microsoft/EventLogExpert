@@ -22,7 +22,7 @@
 
 /* A disabled filter stays visible (and its enable toggle stays clickable) but its
    summary text is muted to show it is inactive; the operable controls keep full contrast. */
-.debug-log-filter-chip[data-disabled="true"] {
+.debug-log-filter-chip[data-disabled="true"] .debug-log-filter-summary {
     color: var(--text-secondary);
 }
 

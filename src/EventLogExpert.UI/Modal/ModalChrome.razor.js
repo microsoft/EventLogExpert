@@ -12,7 +12,7 @@ const focusableInBody =
     'select:not([disabled]):not([tabindex="-1"]),' +
     'textarea:not([disabled]):not([tabindex="-1"]),' +
     'details > summary:not([tabindex="-1"]),' +
-    '[tabindex]:not([tabindex="-1"])';
+    '[tabindex]:not([tabindex="-1"]):not([disabled])';
 
 export function showModal(ref) {
     if (ref == null || ref.open) { return; }
