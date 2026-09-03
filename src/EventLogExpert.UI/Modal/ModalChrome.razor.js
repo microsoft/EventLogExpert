@@ -20,9 +20,8 @@ export function showModal(ref) {
     // Stash on the dialog element so close can restore even if the host component is torn down
     // before close runs (e.g. async disposal racing with native cancel).
     const previouslyFocused = document.activeElement;
-    ref._returnFocusElement = (previouslyFocused instanceof HTMLElement && previouslyFocused !== document.body)
-        ? previouslyFocused
-        : null;
+    ref._returnFocusElement = (previouslyFocused instanceof HTMLElement && previouslyFocused !== document.body) ?
+        previouslyFocused : null;
 
     ref.showModal();
 
@@ -38,8 +37,12 @@ export function showModal(ref) {
         if (firstControl instanceof HTMLElement) {
             firstControl.focus();
         } else {
-            body.tabIndex = -1;
-            body.focus();
+            // Text-only modals: focus the actual scrolling region so Arrow/PageDown scroll the content.
+            // Flex-layout bodies set overflow: hidden and place the scroll on an inner .flex-column-scroll,
+            // so focusing the body itself would leave keyboard scrolling on a non-scrollable ancestor.
+            const scrollTarget = body.querySelector(".flex-column-scroll") ?? body;
+            scrollTarget.tabIndex = -1;
+            scrollTarget.focus();
         }
     }
 }
