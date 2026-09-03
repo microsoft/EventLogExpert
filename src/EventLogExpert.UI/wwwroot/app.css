@@ -217,6 +217,15 @@ html, body {
     overflow: hidden;
 }
 
+/* Reflow (WCAG 1.4.10): when the viewport is too short for the fixed pane stack (e.g. 400% zoom
+   or a short window), let the content column scroll vertically so the lower panes stay reachable
+   instead of being clipped by overflow: hidden with no page scrollbar. */
+@media (max-height: 500px) {
+    .page-content {
+        overflow-y: auto;
+    }
+}
+
 .footer-group {
     display: flex;
     flex-wrap: wrap;
