@@ -27,9 +27,11 @@
         display: block;
         width: 100%;
         min-width: 0;
+        margin: 0;
     }
 
     .settings-form .tz-row ::deep .timezone-dropdown {
         width: 100%;
+        margin: 0;
     }
 }
