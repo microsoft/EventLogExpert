@@ -41,6 +41,12 @@ public sealed class DateRangeQuickPickTests : BunitContext
             .Add(p => p.OnRangeSelected, EventCallback.Factory.Create<DateFilter>(this, captured.Add)));
 
         var dropdown = component.Find(".dropdown-input");
+
+        // A collapsed combobox opens on the first ArrowDown without committing a preset;
+        // each subsequent press then advances to the next preset.
+        await dropdown.KeyDownAsync(new KeyboardEventArgs { Code = "ArrowDown" });
+        Assert.Empty(captured);
+
         await dropdown.KeyDownAsync(new KeyboardEventArgs { Code = "ArrowDown" });
         await dropdown.KeyDownAsync(new KeyboardEventArgs { Code = "ArrowDown" });
 

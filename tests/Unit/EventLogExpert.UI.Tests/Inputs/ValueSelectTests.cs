@@ -103,6 +103,34 @@ public sealed class ValueSelectTests : BunitContext
     }
 
     [Fact]
+    public void Keyboard_SpaceOnClosedInput_DoesNotOpenDropdown()
+    {
+        int? bound = 7;
+        var component = Render<ValueSelect<int?>>(parameters => parameters
+            .Add(p => p.IsInput, true)
+            .Add(p => p.Value, bound)
+            .Add(p => p.ValueChanged, value => bound = value));
+
+        component.Find(".dropdown-input").TriggerEvent("onkeydown", new KeyboardEventArgs { Code = "Space" });
+
+        // Space types into an editable (IsInput) combobox rather than opening it.
+        Assert.Equal("false", component.Find("input[role='combobox']").GetAttribute("aria-expanded"));
+    }
+
+    [Fact]
+    public void Keyboard_SpaceOnClosedSelect_OpensDropdownWithoutChangingValue()
+    {
+        string bound = "b";
+        var component = RenderSelectOnly(bound, value => bound = value);
+
+        component.Find(".dropdown-input").TriggerEvent("onkeydown", new KeyboardEventArgs { Code = "Space" });
+
+        // A collapsed select-only combobox opens on Space without changing the selected value.
+        Assert.Equal("true", component.Find("input[role='combobox']").GetAttribute("aria-expanded"));
+        Assert.Equal("b", bound);
+    }
+
+    [Fact]
     public void Render_AriaDescribedBy_AppliedToCombobox()
     {
         var component = Render<ValueSelect<string>>(parameters => parameters

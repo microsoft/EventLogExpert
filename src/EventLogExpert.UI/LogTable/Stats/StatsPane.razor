@@ -4,7 +4,7 @@
 <div aria-label="@Localizer["Stats_AriaLabel"]" class="stats-pane" @ref="_paneElement" role="region">
     <div class="stats-header">
         <span class="stats-title">@Localizer["Stats_Title"]</span>
-        <span class="stats-headline@(IsSeverityStale ? " stats-stale" : "")">@HeadlineText()</span>
+        <span class="stats-headline">@HeadlineText()</span>
         <button aria-label="@Localizer["Stats_ResolutionCoverageAria"]"
             class="stats-coverage-link"
             @onclick="OpenCoverage"
@@ -24,7 +24,7 @@
     }
     else if (_severity is { Total: > 0 })
     {
-        <div class="stats-severity@(IsSeverityStale ? " stats-stale" : "")">
+        <div class="stats-severity">
             <div aria-label="@Localizer["Stats_SeverityBarLabel"]" class="stats-severity-bar" role="img">
                 @foreach (var segment in SeveritySegments())
                 {
@@ -49,7 +49,7 @@
         <div class="stats-sections">
             @foreach (var section in _sections)
             {
-                <section class="stats-section@(IsSectionStale(section) ? " stats-stale" : "")">
+                <section class="stats-section">
                     <div class="stats-section-header">
                         <span class="stats-section-title">@StatsDimensionLocalizer.Label(Localizer, section.Dimension)</span>
                         @if (section.Stats is { } headerStats)
