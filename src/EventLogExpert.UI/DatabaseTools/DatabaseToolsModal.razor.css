@@ -156,3 +156,20 @@
         grid-column: 1;
     }
 }
+
+/* Narrow reflow (WCAG 1.4.10): below the width where the 200px sidebar and the tab panel can both
+   fit (e.g. the 320px reflow viewport), stack the tab list above the panel so the panel spans the
+   full dialog width and its form fields and Browse buttons stay reachable instead of clipped. */
+@media (max-width: 34rem) {
+    .db-tabs-container ::deep .sidebar-tabs {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .db-tabs-container ::deep .sidebar-tabs-list {
+        flex: 0 0 auto;
+        flex-direction: row;
+        flex-wrap: wrap;
+        padding: 0 0 4px;
+    }
+}

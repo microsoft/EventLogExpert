@@ -12,10 +12,7 @@
             type="button">
             @Localizer["Stats_ResolutionCoverage"]
         </button>
-        @if (IsSeverityStale)
-        {
-            <span class="stats-updating">@Localizer["Stats_Updating"]</span>
-        }
+        <span class="stats-updating" role="status">@(IsSeverityStale ? Localizer["Stats_Updating"].Value : string.Empty)</span>
     </div>
 
     @if (_scanFailed)

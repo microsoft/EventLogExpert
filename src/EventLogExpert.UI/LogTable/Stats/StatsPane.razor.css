@@ -170,6 +170,12 @@
     color: var(--text-secondary);
 }
 
+/* The header live region is always present so screen readers announce staleness; when empty it
+   must not consume the header's auto-margin space and shift the coverage link. */
+.stats-updating:empty {
+    margin-inline-start: 0;
+}
+
 .stats-rows {
     flex: 1 1 auto;
     min-height: 0;
