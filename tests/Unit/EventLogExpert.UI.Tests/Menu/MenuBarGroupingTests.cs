@@ -165,6 +165,20 @@ public sealed class MenuBarGroupingTests : BunitContext
     }
 
     [Fact]
+    public async Task MenuBarItem_KeyboardActivation_OpensMenuWithKeyboardFocusFlag()
+    {
+        var cut = Render<MenuBar>();
+
+        await cut.FindAll("button.menu-bar-item")
+            .Single(button => button.TextContent.Trim() == Localizer["Menu_File"].Value)
+            .ClickAsync(new MouseEventArgs { Detail = 0 });
+
+        _menuService.Received(1).OpenAt(
+            Arg.Any<double>(), Arg.Any<double>(), Arg.Any<IReadOnlyList<MenuItem>>(),
+            Arg.Any<bool>(), Arg.Any<bool>(), true);
+    }
+
+    [Fact]
     public void Render_DoesNotRequireFluxorServices()
     {
         var cut = Render<MenuBar>();
@@ -199,12 +213,12 @@ public sealed class MenuBarGroupingTests : BunitContext
         var cut = Render<MenuBar>();
 
         await cut.FindAll("button.menu-bar-item").Single(button => button.TextContent.Trim() == Localizer["Menu_View"].Value)
-            .ClickAsync(new MouseEventArgs());
+            .ClickAsync(new MouseEventArgs { Detail = 1 });
         Assert.False(Item(items!, Localizer["Menu_View_ContinuouslyUpdate"].Value).IsChecked);
 
         _eventLogQueries.IsContinuouslyUpdating().Returns(true);
         await cut.FindAll("button.menu-bar-item").Single(button => button.TextContent.Trim() == Localizer["Menu_View"].Value)
-            .ClickAsync(new MouseEventArgs());
+            .ClickAsync(new MouseEventArgs { Detail = 1 });
 
         Assert.True(Item(items!, Localizer["Menu_View_ContinuouslyUpdate"].Value).IsChecked);
     }
@@ -300,7 +314,7 @@ public sealed class MenuBarGroupingTests : BunitContext
         var cut = Render<MenuBar>();
         await cut.FindAll("button.menu-bar-item")
             .Single(button => button.TextContent.Trim() == barLabel)
-            .ClickAsync(new MouseEventArgs());
+            .ClickAsync(new MouseEventArgs { Detail = 1 });
 
         Assert.NotNull(items);
 

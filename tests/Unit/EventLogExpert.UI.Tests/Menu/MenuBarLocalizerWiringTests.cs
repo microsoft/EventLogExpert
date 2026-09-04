@@ -159,7 +159,7 @@ public sealed class MenuBarLocalizerWiringTests : BunitContext
         var cut = Render<MenuBar>();
         await cut.FindAll("button.menu-bar-item")
             .Single(button => button.TextContent.Trim() == barLabel)
-            .ClickAsync(new MouseEventArgs());
+            .ClickAsync(new MouseEventArgs { Detail = 1 });
 
         Assert.NotNull(items);
 

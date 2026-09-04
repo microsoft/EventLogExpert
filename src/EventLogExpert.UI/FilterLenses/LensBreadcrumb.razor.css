@@ -60,5 +60,5 @@
 .lens-chip-keep:focus-visible,
 .lens-chip-remove:focus-visible,
 .lens-clear:focus-visible {
-    outline: 2px solid var(--toggle-accent);
+    outline: 1px solid var(--toggle-accent);
 }

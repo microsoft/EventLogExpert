@@ -28,6 +28,6 @@
 .menu-bar ::deep .menu-bar-item:focus-visible {
     background-color: var(--menu-hover-overlay);
     color: var(--text-on-statusbar);
-    outline: 2px solid var(--focus-on-statusbar);
-    outline-offset: -2px;
+    outline: 1px solid var(--focus-on-statusbar);
+    outline-offset: -1px;
 }

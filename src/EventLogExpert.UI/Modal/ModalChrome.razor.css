@@ -84,8 +84,8 @@ dialog[data-body-layout="content"] .dialog-body {
 }
 
 .dialog-body:focus-visible {
-    outline: 2px solid var(--clr-lightblue);
-    outline-offset: -2px;
+    outline: 1px solid var(--clr-lightblue);
+    outline-offset: -1px;
 }
 
 .inline-alert-overlay {

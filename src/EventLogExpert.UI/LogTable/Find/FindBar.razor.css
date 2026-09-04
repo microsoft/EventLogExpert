@@ -34,7 +34,7 @@
 }
 
 .find-inputbox:focus-within {
-    outline: 2px solid var(--text-primary);
+    outline: 1px solid var(--text-primary);
     outline-offset: 1px;
 }
 

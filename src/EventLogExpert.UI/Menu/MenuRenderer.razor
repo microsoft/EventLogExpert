@@ -30,6 +30,8 @@
 
                 if (item.IsDanger) { itemClass += " danger"; }
 
+                if (isFocused && _focusFromKeyboard) { itemClass += " keyboard-focused"; }
+
                 bool hasReason = !item.IsEnabled && !string.IsNullOrEmpty(item.DisabledReason);
                 string? reasonId = hasReason ? $"menu-item-reason-{_rendererId}-{capturedIndex}" : null;
 
@@ -40,7 +42,7 @@
                     aria-haspopup="@(hasChildren ? "menu" : null)"
                     class="@itemClass"
                     @key="capturedIndex"
-                    @onclick="async () => await OnItemActivate(item, capturedIndex)"
+                    @onclick="async () => await OnItemActivate(item, capturedIndex, false)"
                     @onclick:stopPropagation
                     @onmouseenter="() => OnItemHover(item, capturedIndex)"
                     @ref="_itemElements[capturedIndex]"
@@ -100,6 +102,7 @@
                                     OnActivated="OnChildActivated"
                                     OnCloseSubmenu="OnSubmenuRequestedClose"
                                     OnNavigateBar="OnNavigateBar"
+                                    OpenedByKeyboard="@_openSubmenuOpenedByKeyboard"
                                     SuppressInitialFocus="@(!_openSubmenuFocusesFirstChild)" />
                             }
                         </div>

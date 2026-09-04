@@ -41,6 +41,22 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
+    public async Task CheckboxChange_InSelectionMode_InvokesOnSelectionToggle()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+        int invocationCount = 0;
+        var component = Render<DatabaseEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.IsSelectionModeActive, true)
+            .Add(p => p.OnSelectionToggle, () => invocationCount++));
+
+        await component.Find(".db-entry-row input[type='checkbox']")
+            .ChangeAsync(new ChangeEventArgs { Value = true });
+
+        Assert.Equal(1, invocationCount);
+    }
+
+    [Fact]
     public void Checkbox_InNormalMode_IsCollapsedAndAriaHidden()
     {
         var entry = MakeEntry(DatabaseStatus.Ready);
@@ -89,22 +105,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public async Task CheckboxChange_InSelectionMode_InvokesOnSelectionToggle()
-    {
-        var entry = MakeEntry(DatabaseStatus.Ready);
-        int invocationCount = 0;
-        var component = Render<DatabaseEntryRow>(parameters => parameters
-            .Add(p => p.Entry, entry)
-            .Add(p => p.IsSelectionModeActive, true)
-            .Add(p => p.OnSelectionToggle, () => invocationCount++));
-
-        await component.Find(".db-entry-row input[type='checkbox']")
-            .ChangeAsync(new ChangeEventArgs { Value = true });
-
-        Assert.Equal(1, invocationCount);
-    }
-
-    [Fact]
     public async Task ContextMenu_InNormalMode_OpensMenuWithRemoveItem()
     {
         var entry = MakeEntry(DatabaseStatus.Ready);
@@ -112,7 +112,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry);
 
         await component.Find(".db-entry-row").TriggerEventAsync("oncontextmenu",
-            new MouseEventArgs { ClientX = 100, ClientY = 200 });
+            new MouseEventArgs { Button = 2, ClientX = 100, ClientY = 200 });
 
         _menuService.Received(1).OpenAt(100, 200, Arg.Is<IReadOnlyList<MenuItem>>(items => items != null && items.Count == 1));
     }
@@ -127,12 +127,13 @@ public sealed class DatabaseEntryRowTests : BunitContext
             .Add(p => p.IsSelectionModeActive, true));
 
         await component.Find(".db-entry-row").TriggerEventAsync("oncontextmenu",
-            new MouseEventArgs { ClientX = 50, ClientY = 50 });
+            new MouseEventArgs { Button = 2, ClientX = 50, ClientY = 50 });
 
         _menuService.DidNotReceive().OpenAt(
             Arg.Any<double>(),
             Arg.Any<double>(),
             Arg.Any<IReadOnlyList<MenuItem>>(),
+            Arg.Any<bool>(),
             Arg.Any<bool>(),
             Arg.Any<bool>());
     }
@@ -146,7 +147,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
             .Do(call => capturedItems = call.ArgAt<IReadOnlyList<MenuItem>>(2));
 
         var component = RenderRow(entry);
-        await component.Find(".db-entry-row").TriggerEventAsync("oncontextmenu", new MouseEventArgs());
+        await component.Find(".db-entry-row").TriggerEventAsync("oncontextmenu", new MouseEventArgs { Button = 2 });
 
         Assert.NotNull(capturedItems);
         var item = Assert.Single(capturedItems!);
@@ -254,19 +255,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_BackupExists_AND_BackgroundUpgrade_StillShowsBadge()
-    {
-        var entry = MakeEntry(DatabaseStatus.UpgradeRequired, backupExists: true);
-        var progress = MakeProgress(currentEntryName: "a.db", scope: UpgradeProgressScope.Background);
-
-        var component = RenderRow(entry, upgradeProgress: progress);
-
-        Assert.Single(component.FindAll(".db-entry-badge"));
-        Assert.Single(component.FindAll(".db-entry-restore-btn"));
-        Assert.Empty(component.FindAll(".db-entry-spinner"));
-    }
-
-    [Fact]
     public void Render_BackupExistsAndIsUpgrading_StillShowsRecoveryBadge()
     {
         var entry = MakeEntry(DatabaseStatus.Ready, backupExists: true);
@@ -335,6 +323,19 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var restoreBtn = component.Find(".db-entry-restore-btn");
         Assert.Equal("Restore database a.db from backup", restoreBtn.GetAttribute("aria-label"));
         Assert.Contains("Restore", restoreBtn.TextContent);
+    }
+
+    [Fact]
+    public void Render_BackupExists_AND_BackgroundUpgrade_StillShowsBadge()
+    {
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired, backupExists: true);
+        var progress = MakeProgress(currentEntryName: "a.db", scope: UpgradeProgressScope.Background);
+
+        var component = RenderRow(entry, upgradeProgress: progress);
+
+        Assert.Single(component.FindAll(".db-entry-badge"));
+        Assert.Single(component.FindAll(".db-entry-restore-btn"));
+        Assert.Empty(component.FindAll(".db-entry-spinner"));
     }
 
     [Fact]
@@ -471,6 +472,22 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
+    public void Render_PendingToggleOnDisabledToggle_DoesNotShowIndicator()
+    {
+        var entry = MakeEntry(DatabaseStatus.NotClassified, "provider-z.db");
+
+        var component = RenderRow(entry, isTogglePending: true);
+
+        var actions = component.Find(".db-entry-actions");
+        Assert.DoesNotContain("db-entry-actions--pending", actions.GetAttribute("class") ?? string.Empty);
+
+        var radiogroup = component.Find(".db-entry-actions [role='radiogroup']");
+        Assert.True(string.IsNullOrEmpty(radiogroup.GetAttribute("aria-describedby")),
+            "Disabled toggle should NOT carry the pending-status description.");
+        Assert.Empty(component.FindAll("span.visually-hidden"));
+    }
+
+    [Fact]
     public void Render_PendingToggle_AnnouncesPendingViaAriaDescribedBy()
     {
         var entry = MakeEntry(DatabaseStatus.Ready, "provider-y.db");
@@ -499,22 +516,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_PendingToggleOnDisabledToggle_DoesNotShowIndicator()
-    {
-        var entry = MakeEntry(DatabaseStatus.NotClassified, "provider-z.db");
-
-        var component = RenderRow(entry, isTogglePending: true);
-
-        var actions = component.Find(".db-entry-actions");
-        Assert.DoesNotContain("db-entry-actions--pending", actions.GetAttribute("class") ?? string.Empty);
-
-        var radiogroup = component.Find(".db-entry-actions [role='radiogroup']");
-        Assert.True(string.IsNullOrEmpty(radiogroup.GetAttribute("aria-describedby")),
-            "Disabled toggle should NOT carry the pending-status description.");
-        Assert.Empty(component.FindAll("span.visually-hidden"));
-    }
-
-    [Fact]
     public void Render_ReadyEnabledEntry_NoTrashButton()
     {
         var entry = MakeEntry(DatabaseStatus.Ready, isEnabled: true);
@@ -535,6 +536,18 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
+    public void Render_ReadyEntryWithClassificationPending_ShowsDisabledToggle()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+
+        var component = RenderRow(entry, true);
+
+        var radios = component.FindAll(".option-select input[type='radio']");
+        Assert.NotEmpty(radios);
+        Assert.All(radios, r => Assert.True(r.HasAttribute("disabled")));
+    }
+
+    [Fact]
     public void Render_ReadyEntry_ShowsToggle_AndNoBadge()
     {
         var entry = MakeEntry(DatabaseStatus.Ready);
@@ -545,18 +558,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.Empty(component.FindAll(".db-entry-badge"));
         Assert.Empty(component.FindAll(".db-entry-upgrade-btn"));
         Assert.Empty(component.FindAll(".db-entry-upgrading"));
-    }
-
-    [Fact]
-    public void Render_ReadyEntryWithClassificationPending_ShowsDisabledToggle()
-    {
-        var entry = MakeEntry(DatabaseStatus.Ready);
-
-        var component = RenderRow(entry, true);
-
-        var radios = component.FindAll(".option-select input[type='radio']");
-        Assert.NotEmpty(radios);
-        Assert.All(radios, r => Assert.True(r.HasAttribute("disabled")));
     }
 
     [Theory]

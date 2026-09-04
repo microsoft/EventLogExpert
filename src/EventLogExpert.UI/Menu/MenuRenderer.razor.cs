@@ -19,12 +19,14 @@ public sealed partial class MenuRenderer : IAsyncDisposable
 
     private readonly long _rendererId = Interlocked.Increment(ref s_rendererIdCounter);
 
+    private bool _focusFromKeyboard;
     private bool _focusOnNextRender;
     private int _focusedIndex = -1;
     private ElementReference[] _itemElements = [];
     private IJSObjectReference? _menuOverlayModule;
     private MenuItem? _openItem;
     private bool _openSubmenuFocusesFirstChild;
+    private bool _openSubmenuOpenedByKeyboard;
     private IReadOnlyList<MenuItem>? _previousItems;
     private bool _previousSuppressInitialFocus;
     private IJSObjectReference? _rendererModule;
@@ -44,6 +46,8 @@ public sealed partial class MenuRenderer : IAsyncDisposable
     [Parameter] public EventCallback OnCloseSubmenu { get; set; }
 
     [Parameter] public EventCallback<int> OnNavigateBar { get; set; }
+
+    [Parameter] public bool OpenedByKeyboard { get; set; }
 
     [Parameter] public bool SuppressInitialFocus { get; set; }
 
@@ -73,6 +77,7 @@ public sealed partial class MenuRenderer : IAsyncDisposable
         if (index < 0) { return Task.CompletedTask; }
 
         _focusedIndex = index;
+        _focusFromKeyboard = OpenedByKeyboard;
         _focusOnNextRender = true;
         StateHasChanged();
         return Task.CompletedTask;
@@ -122,18 +127,23 @@ public sealed partial class MenuRenderer : IAsyncDisposable
             }
             else
             {
-                _focusedIndex = InitialFocusIndex == 0
-                    ? FindEnabledIndex(0, +1)
-                    : FindEnabledIndex(Items.Count - 1, -1);
+                _focusedIndex = InitialFocusIndex == 0 ?
+                    FindEnabledIndex(0, +1) :
+                    FindEnabledIndex(Items.Count - 1, -1);
+                _focusFromKeyboard = OpenedByKeyboard;
             }
         }
         else if (_previousSuppressInitialFocus && !SuppressInitialFocus && _focusedIndex < 0 && Items is not null)
         {
-            _focusedIndex = InitialFocusIndex == 0
-                ? FindEnabledIndex(0, +1)
-                : FindEnabledIndex(Items.Count - 1, -1);
+            _focusedIndex = InitialFocusIndex == 0 ?
+                FindEnabledIndex(0, +1) :
+                FindEnabledIndex(Items.Count - 1, -1);
 
-            if (_focusedIndex >= 0) { _focusOnNextRender = true; }
+            if (_focusedIndex >= 0)
+            {
+                _focusFromKeyboard = OpenedByKeyboard;
+                _focusOnNextRender = true;
+            }
         }
 
         _previousSuppressInitialFocus = SuppressInitialFocus;
@@ -169,7 +179,7 @@ public sealed partial class MenuRenderer : IAsyncDisposable
 
         if (item.Children is not null || item.ChildrenLoader is not null)
         {
-            await OpenSubmenu(item, true);
+            await OpenSubmenu(item, true, openedByKeyboard: true);
 
             return;
         }
@@ -205,7 +215,7 @@ public sealed partial class MenuRenderer : IAsyncDisposable
             case " ":
                 if (args.Repeat) { return; }
 
-                if (_focusedIndex >= 0) { await OnItemActivate(Items[_focusedIndex], _focusedIndex); }
+                if (_focusedIndex >= 0) { await OnItemActivate(Items[_focusedIndex], _focusedIndex, fromKeyboard: true); }
 
                 return;
             case "Escape":
@@ -298,7 +308,10 @@ public sealed partial class MenuRenderer : IAsyncDisposable
     {
         if (index < 0 || Items is null || index >= Items.Count) { return; }
 
+        // Every caller (Arrow/Home/End via MoveFocus, and type-ahead) is keyboard-driven, so keyboard
+        // navigation re-asserts the ring even in a pointer-opened menu or after a hover cleared it.
         _focusedIndex = index;
+        _focusFromKeyboard = true;
         _focusOnNextRender = true;
 
         StateHasChanged();
@@ -312,15 +325,27 @@ public sealed partial class MenuRenderer : IAsyncDisposable
         await OnActivated.InvokeAsync();
     }
 
-    private async Task OnItemActivate(MenuItem item, int index)
+    private async Task OnItemActivate(MenuItem item, int index, bool fromKeyboard)
     {
-        if (!item.IsEnabled) { return; }
+        if (!item.IsEnabled)
+        {
+            // A disabled item performs no action, but Enter/Space is still a keyboard interaction, so
+            // re-assert the keyboard ring on the (already focused) disabled item when a prior hover
+            // cleared it. Mouse activation (fromKeyboard: false) must not force the ring on.
+            if (fromKeyboard && !_focusFromKeyboard)
+            {
+                _focusFromKeyboard = true;
+                StateHasChanged();
+            }
+
+            return;
+        }
 
         _focusedIndex = index;
 
         if (item.Children is not null || item.ChildrenLoader is not null)
         {
-            await OpenSubmenu(item, true);
+            await OpenSubmenu(item, true, openedByKeyboard: fromKeyboard);
 
             return;
         }
@@ -338,6 +363,12 @@ public sealed partial class MenuRenderer : IAsyncDisposable
 
     private void OnItemHover(MenuItem item, int index)
     {
+        // Hover is a pointer interaction, so the keyboard ring must clear even when focus does not move
+        // (e.g. hovering the item the arrow keys just focused, or a non-focusable disabled item). Blazor
+        // re-renders after this @onmouseenter handler returns (IHandleEvent), so simply clearing the flag
+        // is enough to repaint without the ring on the paths that only clear it.
+        _focusFromKeyboard = false;
+
         if (!item.IsFocusable) { return; }
 
         if (!item.IsEnabled)
@@ -380,7 +411,7 @@ public sealed partial class MenuRenderer : IAsyncDisposable
 
         _focusedIndex = index;
         _focusOnNextRender = true;
-        _ = OpenSubmenu(item, false);
+        _ = OpenSubmenu(item, false, openedByKeyboard: false);
     }
 
     private async Task OnSubmenuRequestedClose()
@@ -389,6 +420,7 @@ public sealed partial class MenuRenderer : IAsyncDisposable
 
         _openItem = null;
         _resolvedChildren = null;
+        _focusFromKeyboard = true;
         _focusOnNextRender = true;
 
         StateHasChanged();
@@ -396,11 +428,12 @@ public sealed partial class MenuRenderer : IAsyncDisposable
         await Task.CompletedTask;
     }
 
-    private async Task OpenSubmenu(MenuItem item, bool focusFirstChild)
+    private async Task OpenSubmenu(MenuItem item, bool focusFirstChild, bool openedByKeyboard)
     {
         _openItem = item;
         _resolvedChildren = item.Children;
         _openSubmenuFocusesFirstChild = focusFirstChild;
+        _openSubmenuOpenedByKeyboard = openedByKeyboard;
 
         if (item.Children is null && item.ChildrenLoader is not null)
         {

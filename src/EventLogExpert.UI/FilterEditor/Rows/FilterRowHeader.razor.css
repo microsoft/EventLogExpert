@@ -27,7 +27,7 @@
 }
 
 .filter-row-header ::deep .filter-exclude-toggle:focus-visible {
-    outline: 2px solid var(--toggle-accent);
+    outline: 1px solid var(--toggle-accent);
     outline-offset: 2px;
 }
 

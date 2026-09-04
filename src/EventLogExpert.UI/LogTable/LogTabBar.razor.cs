@@ -356,16 +356,16 @@ public sealed partial class LogTabBar
     }
 
     private void OpenAllLogsMenu(MouseEventArgs args) =>
-        MenuService.OpenAt(args.ClientX, args.ClientY, BuildAllLogsMenu());
+        MenuService.OpenAt(args.ClientX, args.ClientY, BuildAllLogsMenu(), openedByKeyboard: ContextMenuInvocation.WasKeyboardTriggered(args));
 
     private void OpenGroupHeaderMenu(MouseEventArgs args, LogTabGroup group) =>
-        MenuService.OpenAt(args.ClientX, args.ClientY, BuildGroupHeaderMenu(group));
+        MenuService.OpenAt(args.ClientX, args.ClientY, BuildGroupHeaderMenu(group), openedByKeyboard: ContextMenuInvocation.WasKeyboardTriggered(args));
 
     private void OpenMemberMenu(MouseEventArgs args, LogView member, LogTabGroup group) =>
-        MenuService.OpenAt(args.ClientX, args.ClientY, BuildMemberMenu(member, group));
+        MenuService.OpenAt(args.ClientX, args.ClientY, BuildMemberMenu(member, group), openedByKeyboard: ContextMenuInvocation.WasKeyboardTriggered(args));
 
     private void OpenStandaloneMenu(MouseEventArgs args, LogView tab) =>
-        MenuService.OpenAt(args.ClientX, args.ClientY, BuildStandaloneMenu(tab));
+        MenuService.OpenAt(args.ClientX, args.ClientY, BuildStandaloneMenu(tab), openedByKeyboard: ContextMenuInvocation.WasKeyboardTriggered(args));
 
     private async Task PromptNewGroupAsync(LogView tab)
     {

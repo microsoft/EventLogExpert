@@ -11,7 +11,7 @@
     var tabRows = _tabRows;
 }
 
-<div class="log-tab-bar" hidden="@(!presentation.HasMultipleTabs)" @ref="_logTabBarRootRef">
+<div class="log-tab-bar" data-pane="table" hidden="@(!presentation.HasMultipleTabs)" @ref="_logTabBarRootRef">
     <div class="tab-row">
         @foreach (var row in tabRows)
         {

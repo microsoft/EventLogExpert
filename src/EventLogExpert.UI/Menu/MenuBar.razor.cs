@@ -385,7 +385,7 @@ public sealed partial class MenuBar
 
         if (openIfMenuActive && MenuService.ActiveItems is not null)
         {
-            await OpenBarAsync(_bars[index], index, captureOpener: false);
+            await OpenBarAsync(_bars[index], index, captureOpener: false, openedByKeyboard: true);
 
             return;
         }
@@ -398,7 +398,7 @@ public sealed partial class MenuBar
         catch { /* element may not be in the DOM yet */ }
     }
 
-    private async Task OnBarClick(TopLevel bar, int index)
+    private async Task OnBarClick(TopLevel bar, int index, MouseEventArgs args)
     {
         if (IsActive(bar))
         {
@@ -408,7 +408,7 @@ public sealed partial class MenuBar
             return;
         }
 
-        await OpenBarAsync(bar, index);
+        await OpenBarAsync(bar, index, openedByKeyboard: MenuButtonActivation.WasKeyboardTriggered(args));
     }
 
     private async Task OnBarHover(TopLevel bar, int index)
@@ -437,10 +437,10 @@ public sealed partial class MenuBar
                 await MoveBarFocusTo(_bars.Count - 1, true);
                 return;
             case "ArrowDown":
-                await OpenBarAsync(_bars[index], index);
+                await OpenBarAsync(_bars[index], index, openedByKeyboard: true);
                 return;
             case "ArrowUp":
-                await OpenBarAsync(_bars[index], index, false);
+                await OpenBarAsync(_bars[index], index, false, openedByKeyboard: true);
                 return;
             case "Escape":
                 if (MenuService.ActiveItems is not null) { MenuService.Close(); }
@@ -466,7 +466,7 @@ public sealed partial class MenuBar
 
     private void OnSettingsChanged() => _ = InvokeAsync(StateHasChanged);
 
-    private async Task OpenBarAsync(TopLevel bar, int index, bool focusFirst = true, bool captureOpener = true)
+    private async Task OpenBarAsync(TopLevel bar, int index, bool focusFirst = true, bool captureOpener = true, bool openedByKeyboard = false)
     {
         var requestId = Interlocked.Increment(ref _openRequestId);
 
@@ -484,7 +484,7 @@ public sealed partial class MenuBar
 
         ActiveBar = bar;
         _focusedBarIndex = index;
-        MenuService.OpenAt(rect.Left, rect.Bottom, bar.BuildItems(), focusFirst, captureOpener);
+        MenuService.OpenAt(rect.Left, rect.Bottom, bar.BuildItems(), focusFirst, captureOpener, openedByKeyboard);
     }
 
     private async Task PrewarmOtherLogNamesAsync()

@@ -17,6 +17,8 @@ public interface IMenuService
 
     long ActiveMenuId { get; }
 
+    bool ActiveOpenedByKeyboard { get; }
+
     double PositionX { get; }
 
     double PositionY { get; }
@@ -25,5 +27,5 @@ public interface IMenuService
 
     void NavigateBar(int direction);
 
-    void OpenAt(double x, double y, IReadOnlyList<MenuItem> items, bool focusFirst = true, bool captureOpener = true);
+    void OpenAt(double x, double y, IReadOnlyList<MenuItem> items, bool focusFirst = true, bool captureOpener = true, bool openedByKeyboard = false);
 }

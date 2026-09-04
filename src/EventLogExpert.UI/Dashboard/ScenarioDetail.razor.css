@@ -193,7 +193,7 @@
 }
 
 .scenario-detail__actions ::deep .scenario-detail__star:focus-visible {
-    outline: 2px solid var(--clr-lightblue);
+    outline: 1px solid var(--clr-lightblue);
     outline-offset: 2px;
 }
 
@@ -220,7 +220,7 @@
 }
 
 .scenario-detail__actions ::deep .scenario-detail__launch:focus-visible {
-    outline: 2px solid var(--clr-lightblue);
+    outline: 1px solid var(--clr-lightblue);
     outline-offset: 2px;
 }
 
@@ -257,7 +257,7 @@
 }
 
 .scenario-detail__actions ::deep .scenario-detail__open-folder:focus-visible {
-    outline: 2px solid var(--clr-lightblue);
+    outline: 1px solid var(--clr-lightblue);
     outline-offset: 2px;
 }
 

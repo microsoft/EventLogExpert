@@ -36,7 +36,7 @@
 }
 
 .checkbox-input:focus-visible + .checkbox-icon {
-    outline: 2px solid var(--clr-lightblue);
+    outline: 1px solid var(--clr-lightblue);
     outline-offset: 2px;
     border-radius: 2px;
 }

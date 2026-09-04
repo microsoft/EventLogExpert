@@ -234,7 +234,7 @@ public sealed class LogTablePaneGroupingTests : CultureSensitiveBunitContext
             .Do(call => items = call.ArgAt<IReadOnlyList<MenuItem>>(2));
 
         var cut = RenderGrouped(Collapsed(), Event(1, "Alpha"));
-        cut.Find("tr.group-header-row").TriggerEvent("oncontextmenu", new MouseEventArgs());
+        cut.Find("tr.group-header-row").TriggerEvent("oncontextmenu", new MouseEventArgs { Button = 2 });
 
         await items!.First(m => m.Label == "Collapse All Groups").OnClickAsync!();
 
@@ -252,7 +252,7 @@ public sealed class LogTablePaneGroupingTests : CultureSensitiveBunitContext
             .Do(call => items = call.ArgAt<IReadOnlyList<MenuItem>>(2));
 
         var cut = RenderGrouped(Collapsed(), Event(1, "Alpha"), Event(2, "Alpha"), Event(3, "Beta"));
-        cut.Find("tr.group-header-row").TriggerEvent("oncontextmenu", new MouseEventArgs());
+        cut.Find("tr.group-header-row").TriggerEvent("oncontextmenu", new MouseEventArgs { Button = 2 });
 
         await items!.First(item => item.Label == "Select Group").OnClickAsync!();
 
@@ -328,7 +328,7 @@ public sealed class LogTablePaneGroupingTests : CultureSensitiveBunitContext
     {
         var cut = RenderGrouped(Collapsed(), Event(1, "Alpha"), Event(2, "Alpha"));
 
-        cut.Find("tr.group-header-row").TriggerEvent("oncontextmenu", new MouseEventArgs());
+        cut.Find("tr.group-header-row").TriggerEvent("oncontextmenu", new MouseEventArgs { Button = 2 });
 
         _eventLogCommands.DidNotReceive()
             .SetSelectedEvents(Arg.Any<IReadOnlyCollection<SelectionEntry>>(), Arg.Any<SelectionEntry?>());
@@ -506,7 +506,7 @@ public sealed class LogTablePaneGroupingTests : CultureSensitiveBunitContext
             .Do(call => items = call.ArgAt<IReadOnlyList<MenuItem>>(2));
 
         var cut = RenderGrouped(Collapsed(), Event(1, "Alpha"), Event(2, "Alpha"));
-        cut.Find("tr.group-header-row").TriggerEvent("oncontextmenu", new MouseEventArgs());
+        cut.Find("tr.group-header-row").TriggerEvent("oncontextmenu", new MouseEventArgs { Button = 2 });
 
         Assert.NotNull(items);
         Assert.Contains(items!, m => m.Label == "Expand All Groups");

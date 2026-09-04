@@ -10,7 +10,7 @@
     text-overflow: ellipsis;
 
     &:hover,
-    &[highlighted] { background-color: var(--background-darkgray); }
+    &[highlighted] { background-color: var(--menu-item-highlight-bg); }
 
     &[aria-selected="true"] {
         color: var(--accent-on-fill);

@@ -21,6 +21,7 @@ using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.FilterEditor;
 using EventLogExpert.UI.FilterPane;
+using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
@@ -145,6 +146,48 @@ public sealed class FilterPaneTests : BunitContext
         _eventLogQueries.Received(1).GetEventDateRange(Arg.Any<DateTime>());
         Assert.Equal(TimeZoneInfo.ConvertTimeFromUtc(after, timeZone), model.After!.Value);
         Assert.Equal(TimeZoneInfo.ConvertTimeFromUtc(before, timeZone), model.Before!.Value);
+    }
+
+    [Fact]
+    public async Task AddFilterChevron_ArrowDown_OpensMenuWithKeyboardFocusFlag()
+    {
+        SetupMenuAnchor();
+        var menuService = Services.GetRequiredService<IMenuService>();
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        await component.Find(".split-button-chevron").KeyDownAsync(new KeyboardEventArgs { Key = "ArrowDown" });
+
+        menuService.Received(1).OpenAt(
+            Arg.Any<double>(), Arg.Any<double>(), Arg.Any<IReadOnlyList<MenuItem>>(),
+            Arg.Any<bool>(), Arg.Any<bool>(), true);
+    }
+
+    [Fact]
+    public async Task AddFilterChevron_KeyboardActivation_OpensMenuWithKeyboardFocusFlag()
+    {
+        SetupMenuAnchor();
+        var menuService = Services.GetRequiredService<IMenuService>();
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        await component.Find(".split-button-chevron").ClickAsync(new MouseEventArgs { Detail = 0 });
+
+        menuService.Received(1).OpenAt(
+            Arg.Any<double>(), Arg.Any<double>(), Arg.Any<IReadOnlyList<MenuItem>>(),
+            Arg.Any<bool>(), Arg.Any<bool>(), true);
+    }
+
+    [Fact]
+    public async Task AddFilterChevron_MouseClick_OpensMenuWithoutKeyboardFocusFlag()
+    {
+        SetupMenuAnchor();
+        var menuService = Services.GetRequiredService<IMenuService>();
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        await component.Find(".split-button-chevron").ClickAsync(new MouseEventArgs { Detail = 1 });
+
+        menuService.Received(1).OpenAt(
+            Arg.Any<double>(), Arg.Any<double>(), Arg.Any<IReadOnlyList<MenuItem>>(),
+            Arg.Any<bool>(), Arg.Any<bool>());
     }
 
     [Fact]
@@ -1180,4 +1223,9 @@ public sealed class FilterPaneTests : BunitContext
     private void SetOpenLogCount(int count) => _openLogCount.Value.Returns(count);
 
     private void SetPaneState(FilterPaneState state) => _paneStateMock.Value.Returns(state);
+
+    private void SetupMenuAnchor() =>
+        JSInterop.SetupModule("./_content/EventLogExpert.UI/Menu/MenuAnchor.js")
+            .Setup<MenuAnchorRect>("getMenuElementRect", _ => true)
+            .SetResult(new MenuAnchorRect(0, 0, 0, 0, 0, 0));
 }

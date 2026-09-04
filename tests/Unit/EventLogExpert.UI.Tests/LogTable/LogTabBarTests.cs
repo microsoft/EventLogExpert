@@ -767,7 +767,7 @@ public sealed class LogTabBarTests : BunitContext
     private IReadOnlyList<MenuItem> OpenContextMenu(IRenderedComponent<LogTabBar> cut, string selector)
     {
         _capturedMenu = null;
-        cut.Find(selector).ContextMenu();
+        cut.Find(selector).ContextMenu(new MouseEventArgs { Button = 2 });
         Assert.NotNull(_capturedMenu);
         return _capturedMenu!;
     }
@@ -775,7 +775,7 @@ public sealed class LogTabBarTests : BunitContext
     private IReadOnlyList<MenuItem> OpenContextMenuByIndex(IRenderedComponent<LogTabBar> cut, int index)
     {
         _capturedMenu = null;
-        cut.FindAll(".tab")[index].ContextMenu();
+        cut.FindAll(".tab")[index].ContextMenu(new MouseEventArgs { Button = 2 });
         Assert.NotNull(_capturedMenu);
         return _capturedMenu!;
     }

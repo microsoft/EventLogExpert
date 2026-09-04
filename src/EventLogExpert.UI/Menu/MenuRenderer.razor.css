@@ -18,17 +18,17 @@
     outline: none;
 
     &:hover:not(.disabled),
-    &.open:not(.disabled) {
-        background-color: var(--background-darkgray);
+    &.open:not(.disabled),
+    &:focus:not(.disabled) {
+        background-color: var(--menu-item-highlight-bg);
     }
 
-    /* Items are focused programmatically via roving tabindex in a render cycle, and
-       focusable-but-disabled items (those carrying a DisabledReason) must still show
-       focus - :focus-visible skips both cases, so the ring goes on :focus. */
-    &:focus {
-        background-color: var(--background-darkgray);
-        outline: 2px solid var(--clr-lightblue);
-        outline-offset: -2px;
+    /* Ring only when focus arrived via keyboard (MenuRenderer adds .keyboard-focused). ANDed with
+       :focus so a stale class never paints a ring on an unfocused item. Hovering moves DOM focus but
+       clears the class, so pointer use shows the background highlight only - no ring, no flicker. */
+    &.keyboard-focused:focus {
+        outline: var(--focus-ring-width) solid var(--focus-ring-color);
+        outline-offset: var(--focus-ring-offset);
     }
 
     &.disabled {

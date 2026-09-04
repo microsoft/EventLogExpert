@@ -43,6 +43,9 @@
 }
 
 .database-tools-log-toolbar .entry-count {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
     padding-left: 6px;
     font-size: 0.85em;
     color: var(--text-secondary);

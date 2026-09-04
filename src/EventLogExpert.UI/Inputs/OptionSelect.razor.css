@@ -83,7 +83,7 @@
 .option-select input:focus-visible + label {
     position: relative;
     z-index: 2;
-    outline: 2px solid var(--toggle-accent);
+    outline: 1px solid var(--toggle-accent);
     outline-offset: 1px;
     box-shadow: 0 0 0 3px var(--background-dark);
 }

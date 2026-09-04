@@ -1,7 +1,7 @@
 @using EventLogExpert.Runtime.Histogram
 @inherits PresentationViewComponentBase
 
-<div class="histogram-pane">
+<div class="histogram-pane" data-pane="histogram">
     <div class="histogram-toolbar">
         <div class="histogram-toolbar-controls">
             <div class="histogram-groupby">
@@ -88,6 +88,7 @@
         aria-label="@RegionAria()"
         aria-roledescription="@Localizer["Histogram_TimelineRoleDescription"]"
         class="histogram-scroll"
+        data-pane-entry
         @onkeydown="HandleKeyDown"
         role="region"
         tabindex="0">

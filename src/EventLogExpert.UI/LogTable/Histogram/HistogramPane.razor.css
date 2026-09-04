@@ -76,7 +76,7 @@
 .histogram-legend-item:hover { border-color: var(--background-darkgray); }
 
 .histogram-legend-item:focus-visible {
-    outline: 2px solid var(--toggle-accent);
+    outline: 1px solid var(--toggle-accent);
     outline-offset: 1px;
 }
 
@@ -123,7 +123,7 @@
 }
 
 .histogram-button:focus-visible {
-    outline: 2px solid var(--toggle-accent);
+    outline: 1px solid var(--toggle-accent);
     outline-offset: 1px;
 }
 
@@ -153,8 +153,8 @@
 }
 
 .histogram-scroll:focus-visible {
-    outline: 2px solid var(--toggle-accent);
-    outline-offset: -2px;
+    outline: 1px solid var(--toggle-accent);
+    outline-offset: -1px;
 }
 
 .histogram-scroll::-webkit-scrollbar { height: 6px; }
