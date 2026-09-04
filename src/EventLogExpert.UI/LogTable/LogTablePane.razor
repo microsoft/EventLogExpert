@@ -96,7 +96,7 @@
             </div>
         }
         <table aria-busy="@(IsGridBusy() ? "true" : null)"
-            aria-label="Event Log Table"
+            aria-label="@Localizer["Table_Aria"]"
             aria-multiselectable="true"
             aria-rowcount="@GetAriaRowCount()"
             id="eventTable"
@@ -130,7 +130,7 @@
                                 IconClass="bi bi-caret-up"
                                 OnClick="ToggleSorting"
                                 StopKeyDownPropagation="true"
-                                aria-label="Toggle sort direction"
+                                aria-label="@Localizer["Table_ToggleSortAria"]"
                                 data-rotate="@Presentation.Ordering.IsDescending.ToString().ToLower()" />
                         }
                     </th>
@@ -139,7 +139,7 @@
                 <th aria-colindex="@(_enabledColumns.Length + 1)"
                     class="description"
                     role="columnheader">
-                    @EventTableColumnFormatter.DescriptionColumnHeader
+                    @Localizer["Table_ColumnHeader_Description"]
                 </th>
             </tr>
             </thead>

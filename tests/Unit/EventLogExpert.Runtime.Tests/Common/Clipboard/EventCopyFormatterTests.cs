@@ -34,7 +34,7 @@ public sealed class EventCopyFormatterTests
         detailResolver.TryResolve(locator, out Arg.Any<ResolvedEvent?>())
             .Returns(call => { call[1] = Event(1, 4000, "ProviderA", "Alpha"); return true; });
 
-        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>());
+        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>(), CopyText());
 
         string result = await formatter.FormatAsync(
             Request([Entry(locator)], focus: null, EventCopyFormat.Default),
@@ -57,7 +57,7 @@ public sealed class EventCopyFormatterTests
         detailResolver.TryResolve(locatorA, out Arg.Any<ResolvedEvent?>())
             .Returns(call => { call[1] = eventA; return true; });
 
-        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>());
+        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>(), CopyText());
 
         string result = await formatter.FormatAsync(
             Request([Entry(locatorA), Entry(locatorB)], focus: null, EventCopyFormat.Simple),
@@ -74,7 +74,8 @@ public sealed class EventCopyFormatterTests
     {
         var formatter = new EventCopyFormatter(
             Substitute.For<IEventDetailResolver>(),
-            Substitute.For<IEventXmlResolver>());
+            Substitute.For<IEventXmlResolver>(),
+            CopyText());
 
         string result = await formatter.FormatAsync(
             Request([], focus: null, EventCopyFormat.Full),
@@ -92,7 +93,7 @@ public sealed class EventCopyFormatterTests
         detailResolver.TryResolve(focusLocator, out Arg.Any<ResolvedEvent?>())
             .Returns(call => { call[1] = Event(7, 6000, "FocusProvider", "FocusedDescription"); return true; });
 
-        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>());
+        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>(), CopyText());
 
         string result = await formatter.FormatAsync(
             Request([], Entry(focusLocator), EventCopyFormat.Simple),
@@ -122,20 +123,19 @@ public sealed class EventCopyFormatterTests
         detailResolver.TryResolve(locator, out Arg.Any<ResolvedEvent?>())
             .Returns(call => { call[1] = @event; return true; });
 
-        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>());
+        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>(), CopyText());
 
         string result = await formatter.FormatAsync(
             Request([Entry(locator)], focus: null, EventCopyFormat.Full),
             TestContext.Current.CancellationToken);
 
-        Assert.Contains(@"User: NT AUTHORITY\SYSTEM", result);
-        Assert.Contains("User SID: S-1-5-18", result);
+        Assert.Contains(@"[[User(NT AUTHORITY\SYSTEM)]]", result);
+        Assert.Contains("[[UserSid(S-1-5-18)]]", result);
     }
 
     [Fact]
     public async Task FormatAsync_FullFormat_OmitsUserSidWhenResolvedNameIsTheRawSid()
     {
-        // Raw-SID fallback: the resolved name already IS the SID, so a separate "User SID" line would just duplicate it.
         var locator = new EventLocator(s_logId, 0, 0);
         var @event = new ResolvedEvent("Application", LogPathType.Channel)
         {
@@ -153,14 +153,14 @@ public sealed class EventCopyFormatterTests
         detailResolver.TryResolve(locator, out Arg.Any<ResolvedEvent?>())
             .Returns(call => { call[1] = @event; return true; });
 
-        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>());
+        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>(), CopyText());
 
         string result = await formatter.FormatAsync(
             Request([Entry(locator)], focus: null, EventCopyFormat.Full),
             TestContext.Current.CancellationToken);
 
-        Assert.Contains("User: S-1-5-21-1-2-3-4", result);
-        Assert.DoesNotContain("User SID:", result);
+        Assert.Contains("[[User(S-1-5-21-1-2-3-4)]]", result);
+        Assert.DoesNotContain("[[UserSid(", result);
     }
 
     [Fact]
@@ -172,14 +172,14 @@ public sealed class EventCopyFormatterTests
         detailResolver.TryResolve(locator, out Arg.Any<ResolvedEvent?>())
             .Returns(call => { call[1] = Event(1, 4000, "ProviderA", "Alpha"); return true; });
 
-        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>());
+        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>(), CopyText());
 
         string result = await formatter.FormatAsync(
             Request([Entry(locator)], focus: null, EventCopyFormat.Markdown),
             TestContext.Current.CancellationToken);
 
         Assert.StartsWith("|", result);
-        Assert.Contains("Description", result);
+        Assert.Contains("[[MarkdownDescriptionHeader]]", result);
         Assert.Contains("---", result);
         Assert.Contains("ProviderA", result);
     }
@@ -200,7 +200,7 @@ public sealed class EventCopyFormatterTests
         xmlResolver.GetXmlAsync(eventA, Arg.Any<CancellationToken>()).Returns(new ValueTask<string>("<Event>AAA</Event>"));
         xmlResolver.GetXmlAsync(eventB, Arg.Any<CancellationToken>()).Returns(new ValueTask<string>("<Event>BBB</Event>"));
 
-        var formatter = new EventCopyFormatter(detailResolver, xmlResolver);
+        var formatter = new EventCopyFormatter(detailResolver, xmlResolver, CopyText());
 
         string result = await formatter.FormatAsync(
             Request([Entry(locatorA), Entry(locatorB)], focus: null, EventCopyFormat.Full),
@@ -228,7 +228,7 @@ public sealed class EventCopyFormatterTests
         detailResolver.TryResolve(locatorB, out Arg.Any<ResolvedEvent?>())
             .Returns(call => { call[1] = Event(2, 5000, "ProviderB", "Beta"); return true; });
 
-        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>());
+        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>(), CopyText());
 
         string result = await formatter.FormatAsync(
             Request([Entry(locatorA), Entry(locatorB)], focus: null, EventCopyFormat.Simple),
@@ -252,7 +252,7 @@ public sealed class EventCopyFormatterTests
         xmlResolver.GetXmlAsync(Arg.Any<ResolvedEvent>(), Arg.Any<CancellationToken>())
             .Returns(new ValueTask<string>("<Event><Data>payload</Data></Event>"));
 
-        var formatter = new EventCopyFormatter(detailResolver, xmlResolver);
+        var formatter = new EventCopyFormatter(detailResolver, xmlResolver, CopyText());
 
         string result = await formatter.FormatAsync(
             Request([Entry(locator)], focus: null, EventCopyFormat.Xml),
@@ -260,6 +260,8 @@ public sealed class EventCopyFormatterTests
 
         Assert.Contains("payload", result);
     }
+
+    private static IEventCopyText CopyText() => new MarkerEventCopyText();
 
     private static SelectionEntry Entry(EventLocator locator) => new(locator, locator, null);
 
@@ -279,4 +281,16 @@ public sealed class EventCopyFormatterTests
         SelectionEntry? focus,
         EventCopyFormat format) =>
         new(selection, focus, s_columns, s_order, format, TimeZoneInfo.Utc);
+
+    private sealed class MarkerEventCopyText : IEventCopyText
+    {
+        public string MarkdownDescriptionHeader => "[[MarkdownDescriptionHeader]]";
+
+        public string FieldLine(EventCopyFullField field, string value) => field switch
+        {
+            EventCopyFullField.DescriptionHeader => "[[DescriptionHeader]]",
+            EventCopyFullField.EventXmlHeader => "[[EventXmlHeader]]",
+            _ => $"[[{field}({value})]]"
+        };
+    }
 }
