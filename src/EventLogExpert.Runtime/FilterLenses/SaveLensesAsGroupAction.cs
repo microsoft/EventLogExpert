@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.Runtime.FilterLenses;
 
-public sealed record FilterLensSummary(FilterLensId Id, FilterLensLabel Label, LensKind Kind = LensKind.Property);
+internal sealed record SaveLensesAsGroupAction(string Name);

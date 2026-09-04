@@ -5,6 +5,8 @@ using Bunit;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Localization;
+using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.UI.FilterLenses;
 using EventLogExpert.UI.Tests.TestUtils;
@@ -32,6 +34,8 @@ public sealed class LensBreadcrumbLocalizerWiringTests : BunitContext
         _source.Lenses.Returns(ImmutableList<FilterLensSummary>.Empty);
         Services.AddSingleton(_commands);
         Services.AddSingleton(_source);
+        Services.AddSingleton(Substitute.For<IAlertDialogService>());
+        Services.AddSingleton(Substitute.For<IAnnouncementService>());
         Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
     }
 
@@ -52,7 +56,7 @@ public sealed class LensBreadcrumbLocalizerWiringTests : BunitContext
         Assert.Contains("[[FilterLens_Property_ActivityId]] = abc", cut.Find(".lens-chip-label").TextContent);
 
         Assert.Equal(
-            "[[FilterLens_KeepAria([[FilterLens_Property_ActivityId]] = abc)]]",
+            "[[FilterLens_SaveAria([[FilterLens_Property_ActivityId]] = abc)]]",
             cut.Find(".lens-chip-keep").GetAttribute("aria-label"));
         Assert.Equal(
             "[[FilterLens_RemoveAria([[FilterLens_Property_ActivityId]] = abc)]]",

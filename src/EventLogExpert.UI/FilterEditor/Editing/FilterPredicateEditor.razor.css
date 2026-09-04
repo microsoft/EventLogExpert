@@ -158,11 +158,15 @@
     }
 }
 
-/* Compact dropdowns inside the editing chip. */
-.filter-predicate-editing ::deep .input.filter-dropdown {
-    width: 100px;
+/* Done/Remove icon buttons share the same neutral background-shift hover as the other filter
+   icon buttons; the icon color (accent/red) still carries state. :not(:disabled) leaves the
+   Done button inert while the predicate is incomplete. */
+.filter-predicate-editing ::deep .button.icon-button:hover:not(:disabled) {
+    background: var(--menu-hover-overlay);
 }
 
+/* Compact dropdowns inside the editing chip. The property/operator selects size to their
+   longest option globally (app.css); only the value select needs a context-tuned width here. */
 .filter-predicate-editing ::deep .input.filter-value-dropdown,
 .filter-predicate-editing ::deep .input.filter-description {
     width: 240px;

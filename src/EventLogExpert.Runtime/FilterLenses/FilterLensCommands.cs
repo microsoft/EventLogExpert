@@ -25,9 +25,13 @@ internal sealed class FilterLensCommands(IDispatcher dispatcher) : IFilterLensCo
     public void IncludeValue(EventProperty property, string value, string? originLog = null) =>
         PushLens(FilterLensFactory.ForIncludedValue(property, value, originLog));
 
+    public void PromoteAllLenses() => _dispatcher.Dispatch(new PromoteAllFilterLensesAction());
+
     public void PromoteLens(FilterLensId id) => _dispatcher.Dispatch(new PromoteFilterLensAction(id));
 
     public void RemoveLens(FilterLensId id) => _dispatcher.Dispatch(new RemoveFilterLensAction(id));
+
+    public void SaveLensesAsGroup(string name) => _dispatcher.Dispatch(new SaveLensesAsGroupAction(name));
 
     public void ShowEventsNearTime(DateTime timeCreated, TimeSpan radius, TimeZoneInfo displayZone, string? originLog = null) =>
         PushLens(FilterLensFactory.ForTimeWindow(timeCreated, radius, displayZone, originLog));

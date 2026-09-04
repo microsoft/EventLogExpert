@@ -83,6 +83,16 @@ public sealed class FilterLensCommandsTests
     }
 
     [Fact]
+    public void PromoteAllLenses_DispatchesPromoteAll()
+    {
+        var dispatcher = Substitute.For<IDispatcher>();
+
+        new FilterLensCommands(dispatcher).PromoteAllLenses();
+
+        dispatcher.Received(1).Dispatch(Arg.Any<PromoteAllFilterLensesAction>());
+    }
+
+    [Fact]
     public void RemoveLens_DispatchesRemove()
     {
         var dispatcher = Substitute.For<IDispatcher>();
@@ -92,6 +102,17 @@ public sealed class FilterLensCommandsTests
 
         dispatcher.Received(1).Dispatch(Arg.Is<RemoveFilterLensAction>(action =>
             action != null && action.Id == id));
+    }
+
+    [Fact]
+    public void SaveLensesAsGroup_DispatchesSaveAsGroupWithName()
+    {
+        var dispatcher = Substitute.For<IDispatcher>();
+
+        new FilterLensCommands(dispatcher).SaveLensesAsGroup("My Group");
+
+        dispatcher.Received(1).Dispatch(Arg.Is<SaveLensesAsGroupAction>(action =>
+            action != null && action.Name == "My Group"));
     }
 
     [Theory]

@@ -1395,11 +1395,35 @@
   <data name="FilterLens_ActiveLensesAria" xml:space="preserve">
     <value>Active filter lenses</value>
   </data>
-  <data name="FilterLens_KeepAria" xml:space="preserve">
-    <value>Keep lens as filter: {0}</value>
+  <data name="FilterLens_SaveAria" xml:space="preserve">
+    <value>Save lens as filter: {0}</value>
   </data>
   <data name="FilterLens_RemoveAria" xml:space="preserve">
     <value>Remove lens: {0}</value>
+  </data>
+  <data name="FilterLens_SaveAll" xml:space="preserve">
+    <value>Save all</value>
+  </data>
+  <data name="FilterLens_SaveAsGroup" xml:space="preserve">
+    <value>Save as group</value>
+  </data>
+  <data name="FilterLens_SaveAsGroup_DisabledTitle" xml:space="preserve">
+    <value>Add a value lens to save as a group (time-window lenses can't be grouped)</value>
+  </data>
+  <data name="FilterLens_SaveAsGroup_PromptTitle" xml:space="preserve">
+    <value>Save as group</value>
+  </data>
+  <data name="FilterLens_SaveAsGroup_PromptMessage" xml:space="preserve">
+    <value>What would you like to name this group?</value>
+  </data>
+  <data name="FilterLens_SaveAsGroup_DefaultName" xml:space="preserve">
+    <value>New Group</value>
+  </data>
+  <data name="FilterLens_SavedAllAnnouncement" xml:space="preserve">
+    <value>Saved all lenses as filters</value>
+  </data>
+  <data name="FilterLens_SavedAsGroupAnnouncement" xml:space="preserve">
+    <value>Saved lenses as group: {0}</value>
   </data>
   <!-- Filter editor chrome, dialogs, actions, and predicate summaries. -->
   <data name="FilterEditor_ModeLabel" xml:space="preserve">

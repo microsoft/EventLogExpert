@@ -68,7 +68,13 @@
    muted gray = included. Uses aria-pressed for SR + visible color cue. */
 .filter-edit-panel-content ::deep .filter-exclude-toggle {
     color: var(--text-secondary);
-    transition: color 0.1s ease-in-out;
+    transition: color 0.1s ease-in-out, background-color 0.1s ease-in-out;
+}
+
+/* Neutral background-shift on hover so the affordance is visible in the muted "include" (gray)
+   state, not only the red "exclude" state where a color-tinted hover happened to show. */
+.filter-edit-panel-content ::deep .filter-exclude-toggle:hover:not(:disabled) {
+    background: var(--menu-hover-overlay);
 }
 
 .filter-edit-panel-content ::deep .filter-exclude-toggle[data-excluded="true"] {

@@ -6,6 +6,7 @@ using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
+using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
 using NSubstitute;
@@ -57,6 +58,56 @@ public sealed class FilterLensEffectsTests
         await effects.HandleLogClosedByUser(new LogClosedByUserAction(EventLogId.Create(), "LogB"), dispatcher);
 
         dispatcher.DidNotReceive().Dispatch(Arg.Any<RemoveLensesForLogAction>());
+    }
+
+    [Fact]
+    public async Task HandlePromoteAll_CommitsEveryPromotableLens_WithoutAnnouncing()
+    {
+        var keep = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
+        var time = FilterLensFactory.ForTimeWindow(DateTime.UtcNow, TimeSpan.FromMinutes(5), TimeZoneInfo.Utc);
+        var (effects, dispatcher, announcer) =
+            CreateEffectsWithAnnouncer(new FilterLensState { Lenses = [keep, time] }, new FilterPaneState());
+
+        await effects.HandlePromoteAll(dispatcher);
+
+        // One commit per lens; the breadcrumb announces once at the UI layer, so the effect itself stays silent.
+        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action => action != null && action.Id == keep.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action => action != null && action.Id == time.Id));
+        announcer.DidNotReceive().AnnounceLensKept(Arg.Any<FilterLensLabel>());
+    }
+
+    [Fact]
+    public async Task HandlePromoteAll_CommitsExcludeCriteria_NotPositiveIncludes()
+    {
+        // A keep lens must promote via its AND-narrowing exclude-of-complement (which intersects with sibling lenses),
+        // not its positive PromoteForm include (which would OR into a union across multiple promoted lenses).
+        var keep = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
+        var (effects, dispatcher) = CreateEffects(new FilterLensState { Lenses = [keep] }, new FilterPaneState());
+
+        await effects.HandlePromoteAll(dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action =>
+            action != null && action.Id == keep.Id &&
+            action.Filters.Count == keep.ExcludeFilters.Count && action.Filters.All(filter => filter.IsExcluded)));
+    }
+
+    [Fact]
+    public async Task HandlePromoteAll_SkipsNonPromotableLens()
+    {
+        var real = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
+        var degenerate = new FilterLens
+        {
+            Label = new FilterLensLabel.PropertyComparison(EventProperty.Source, IsEqual: true, "empty"),
+            Kind = LensKind.Property,
+            ExcludeFilters = []
+        };
+        var (effects, dispatcher) =
+            CreateEffects(new FilterLensState { Lenses = [real, degenerate] }, new FilterPaneState());
+
+        await effects.HandlePromoteAll(dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action => action != null && action.Id == real.Id));
+        dispatcher.DidNotReceive().Dispatch(Arg.Is<CommitPromotedLensAction>(action => action != null && action.Id == degenerate.Id));
     }
 
     [Fact]
@@ -163,6 +214,69 @@ public sealed class FilterLensEffectsTests
         dispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterAction>());
         Assert.Single(paneState.Filters);
         Assert.False(paneState.Filters[0].IsExcluded);
+    }
+
+    [Fact]
+    public async Task HandleSaveLensesAsGroup_BlankName_DoesNothing()
+    {
+        var keep = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
+        var (effects, dispatcher) = CreateEffects(new FilterLensState { Lenses = [keep] }, new FilterPaneState());
+
+        await effects.HandleSaveLensesAsGroup(new SaveLensesAsGroupAction("   "), dispatcher);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<SaveFilterSetAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<RemoveFilterLensAction>());
+    }
+
+    [Fact]
+    public async Task HandleSaveLensesAsGroup_MixedStack_SavesOnlyValueLensAndLeavesAllLensesActive()
+    {
+        var keep = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
+        var time = FilterLensFactory.ForTimeWindow(DateTime.UtcNow, TimeSpan.FromMinutes(5), TimeZoneInfo.Utc);
+        var (effects, dispatcher) =
+            CreateEffects(new FilterLensState { Lenses = [keep, time] }, new FilterPaneState());
+
+        await effects.HandleSaveLensesAsGroup(new SaveLensesAsGroupAction("My Group"), dispatcher);
+
+        // Only the value lens contributes to the saved set (the time-window lens carries no SavedFilters). All lenses
+        // are left active so the user keeps the current view.
+        dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetAction>(action => action != null && action.Filters.Count == 1));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<RemoveFilterLensAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<ClearFilterLensesAction>());
+    }
+
+    [Fact]
+    public async Task HandleSaveLensesAsGroup_OnlyTimeWindowLenses_DoesNothing()
+    {
+        var time = FilterLensFactory.ForTimeWindow(DateTime.UtcNow, TimeSpan.FromMinutes(5), TimeZoneInfo.Utc);
+        var (effects, dispatcher) = CreateEffects(new FilterLensState { Lenses = [time] }, new FilterPaneState());
+
+        await effects.HandleSaveLensesAsGroup(new SaveLensesAsGroupAction("My Group"), dispatcher);
+
+        // A time-window lens carries no SavedFilters, so there is nothing to persist and it stays active.
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<SaveFilterSetAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<RemoveFilterLensAction>());
+    }
+
+    [Fact]
+    public async Task HandleSaveLensesAsGroup_ValueLenses_SavesIntersectionAndLeavesLensesActive()
+    {
+        var keep = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
+        var hide = FilterLensFactory.ForExcludedValue(EventProperty.Source, "Contoso")!;
+        var (effects, dispatcher) =
+            CreateEffects(new FilterLensState { Lenses = [keep, hide] }, new FilterPaneState());
+
+        await effects.HandleSaveLensesAsGroup(new SaveLensesAsGroupAction("My Group"), dispatcher);
+
+        // Both lenses contribute their AND-narrowing EXCLUDE criteria - NOT positive includes, which would OR into a
+        // union broader than the intersected lens stack the user sees.
+        dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetAction>(action =>
+            action != null && action.Name == "My Group" &&
+            action.Filters.Count == 2 && action.Filters.All(filter => filter.IsExcluded)));
+
+        // The lenses stay active after saving (matching the other save-to-filter-set flows); nothing is cleared.
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<RemoveFilterLensAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<ClearFilterLensesAction>());
     }
 
     private static SavedFilter Compile(string text) =>

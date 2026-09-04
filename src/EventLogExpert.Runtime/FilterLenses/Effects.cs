@@ -1,10 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.FilterLenses;
 
@@ -57,22 +60,26 @@ internal sealed class Effects(
     {
         var lens = _lensState.Value.Lenses.FirstOrDefault(candidate => candidate.Id == action.Id);
 
-        if (lens is null) { return Task.CompletedTask; }
-
-        // Persist the lens's natural promote form (a positive include for keep-only lenses), falling back to the
-        // transient exclude-of-complement for hide lenses, whose exclude form is already the natural one.
-        var filters = lens.PromoteFilters.IsEmpty ? lens.ExcludeFilters : lens.PromoteFilters;
-
         // An absent (already removed) or degenerate (nothing to keep) lens neither announces nor commits. The factory
         // never produces a degenerate lens; this is a defensive gate.
-        if (filters.IsEmpty && lens.Window is not { IsEnabled: true })
-        {
-            return Task.CompletedTask;
-        }
+        if (lens is null || !IsPromotable(lens)) { return Task.CompletedTask; }
 
         _announcementService.AnnounceLensKept(lens.Label);
 
-        dispatcher.Dispatch(new CommitPromotedLensAction(lens.Id, filters, lens.Window));
+        dispatcher.Dispatch(new CommitPromotedLensAction(lens.Id, PromoteForm(lens), lens.Window));
+
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod(typeof(PromoteAllFilterLensesAction))]
+    public Task HandlePromoteAll(IDispatcher dispatcher)
+    {
+        foreach (var lens in _lensState.Value.Lenses)
+        {
+            if (lens.ExcludeFilters.IsEmpty && lens.Window is not { IsEnabled: true }) { continue; }
+
+            dispatcher.Dispatch(new CommitPromotedLensAction(lens.Id, lens.ExcludeFilters, lens.Window));
+        }
 
         return Task.CompletedTask;
     }
@@ -85,6 +92,26 @@ internal sealed class Effects(
 
     [EffectMethod]
     public Task HandleRemoveForLog(RemoveLensesForLogAction action, IDispatcher dispatcher) => Reapply(dispatcher);
+
+    [EffectMethod]
+    public Task HandleSaveLensesAsGroup(SaveLensesAsGroupAction action, IDispatcher dispatcher)
+    {
+        if (string.IsNullOrWhiteSpace(action.Name)) { return Task.CompletedTask; }
+
+        var filters = _lensState.Value.Lenses.SelectMany(lens => lens.ExcludeFilters).ToImmutableList();
+
+        if (filters.IsEmpty) { return Task.CompletedTask; }
+
+        dispatcher.Dispatch(new SaveFilterSetAction(action.Name, filters));
+
+        return Task.CompletedTask;
+    }
+
+    private static bool IsPromotable(FilterLens lens) =>
+        !PromoteForm(lens).IsEmpty || lens.Window is { IsEnabled: true };
+
+    private static ImmutableList<SavedFilter> PromoteForm(FilterLens lens) =>
+        lens.PromoteFilters.IsEmpty ? lens.ExcludeFilters : lens.PromoteFilters;
 
     private Task Reapply(IDispatcher dispatcher)
     {

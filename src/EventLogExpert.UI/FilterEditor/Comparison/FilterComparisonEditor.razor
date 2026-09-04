@@ -1,6 +1,6 @@
 <ValueSelect AriaLabel="@(PropertyAriaLabelledBy is null ? Localizer["FilterEditor_PropertyLabel"].Value : null)"
     AriaLabelledBy="@PropertyAriaLabelledBy"
-    CssClass="input filter-dropdown"
+    CssClass="input filter-property-select"
     T="EventProperty"
     ToStringFunc="@(x => FilterLensLabelFormatter.PropertyName(Localizer, x))"
     @bind-Value="PropertyBinding">

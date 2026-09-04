@@ -21,11 +21,11 @@
             var label = FilterLensLabelFormatter.Format(Localizer, lens.Label);
             <span class="lens-chip">
                 <span class="lens-chip-label" title="@label">@label</span>
-                <button aria-label="@Localizer["FilterLens_KeepAria", label].Value"
+                <button aria-label="@Localizer["FilterLens_SaveAria", label].Value"
                     class="lens-chip-keep"
                     @onclick="@(() => Commands.PromoteLens(lensId))"
                     type="button">
-                    <i aria-hidden="true" class="bi bi-pin-angle"></i>
+                    <i aria-hidden="true" class="bi bi-floppy"></i>
                 </button>
                 <button aria-label="@Localizer["FilterLens_RemoveAria", label].Value"
                     class="lens-chip-remove"
@@ -36,6 +36,14 @@
             </span>
         }
 
+        <button class="lens-action" @onclick="SaveAll" type="button">@Localizer["FilterLens_SaveAll"]</button>
+        <button class="lens-action"
+            disabled="@(!CanSaveAsGroup)"
+            @onclick="SaveAsGroupAsync"
+            title="@(CanSaveAsGroup ? null : Localizer["FilterLens_SaveAsGroup_DisabledTitle"].Value)"
+            type="button">
+            @Localizer["FilterLens_SaveAsGroup"]
+        </button>
         <button class="lens-clear" @onclick="Commands.ClearLenses" type="button">@Localizer["FilterLens_ClearAll"]</button>
     </div>
 }

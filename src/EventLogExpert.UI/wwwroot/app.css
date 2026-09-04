@@ -339,6 +339,16 @@ a { color: var(--clr-lightblue); }
 
 .indent { margin-left: 1rem; }
 
+/* Vertically center reduced-font-size (sub-1em) single-line text that shares a flex/grid row with
+   taller controls (buttons/icons/inputs). inline-flex + align-items:center centers the glyph box,
+   and line-height:1 removes the asymmetric leading that otherwise makes small text sit visibly low
+   (the same fix DatabaseToolsLogView applies to its log rows). Use only on single-line labels. */
+.vcenter-text {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+}
+
 .input {
     background: none;
     border: none;
@@ -366,6 +376,14 @@ input[type="text"].input.dialog-input { padding: .25rem 0; }
 .input.filter-dropdown { width: 160px; }
 
 .input.filter-mode-dropdown { width: 90px; }
+
+/* Property/operator selects size to their longest option (property: "Related Activity ID";
+   operator: "Contains None") so no option is clipped and the width never shifts when the
+   selection changes. text-align:center (from .input) leaves symmetric whitespace on shorter
+   values. The value select (the last control) keeps its own wider, context-tuned width. */
+.input.filter-property-select { width: 21ch; }
+
+.input.filter-operator-select { width: 15ch; }
 
 .input.timezone-dropdown { width: 420px; }
 

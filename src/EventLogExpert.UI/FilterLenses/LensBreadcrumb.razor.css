@@ -33,7 +33,8 @@
 
 .lens-chip-keep,
 .lens-chip-remove,
-.lens-clear {
+.lens-clear,
+.lens-action {
     background: transparent;
     border: none;
     cursor: pointer;
@@ -45,6 +46,24 @@
 .lens-clear {
     color: var(--clr-lightblue);
     font-size: 0.85em;
+}
+
+.lens-action {
+    color: var(--clr-lightblue);
+    font-size: 0.85em;
+}
+
+/* Non-destructive actions use the shared neutral background-shift on hover (not the red that Clear
+   all / chip-remove use), matching the app's standardized icon-button hover. */
+.lens-action:hover:not(:disabled) {
+    background: var(--menu-hover-overlay);
+    border-radius: 3px;
+}
+
+.lens-action:disabled {
+    color: var(--text-secondary);
+    cursor: default;
+    opacity: 0.6;
 }
 
 .lens-chip-keep:hover {
@@ -59,6 +78,7 @@
 .lens-breadcrumb:focus-visible,
 .lens-chip-keep:focus-visible,
 .lens-chip-remove:focus-visible,
-.lens-clear:focus-visible {
+.lens-clear:focus-visible,
+.lens-action:focus-visible {
     outline: 1px solid var(--toggle-accent);
 }

@@ -32,7 +32,7 @@ public sealed partial class ComparisonOperatorSelect
 
     [Parameter] public string? AriaLabelledBy { get; set; }
 
-    [Parameter] public string CssClass { get; set; } = "input filter-dropdown";
+    [Parameter] public string CssClass { get; set; } = "input filter-operator-select";
 
     [Parameter] public MatchMode MatchMode { get; set; }
 
