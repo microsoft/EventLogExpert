@@ -1732,6 +1732,259 @@
   <data name="FilterEditor_HighlightColorOption_DarkPink" xml:space="preserve">
     <value>DarkPink</value>
   </data>
+  <!-- Log table, context menu, event-copy, and tab-bar localization. -->
+  <data name="Table_Aria" xml:space="preserve">
+    <value>Event Log Table</value>
+  </data>
+  <data name="Table_ToggleSortAria" xml:space="preserve">
+    <value>Toggle sort direction</value>
+  </data>
+  <data name="Table_ColumnHeader_Description" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="Table_ColumnHeader_DateAndTime" xml:space="preserve">
+    <value>Date and Time</value>
+  </data>
+  <data name="Table_ColumnHeader_DateAndTimeWithZone" xml:space="preserve">
+    <value>Date and Time {0}</value>
+    <comment>{0} is the abbreviated time-zone display token shown by Windows.</comment>
+  </data>
+  <data name="Table_LoadingEvents" xml:space="preserve">
+    <value>Loading events…</value>
+  </data>
+  <data name="Table_ReorderingEvents" xml:space="preserve">
+    <value>Reordering events…</value>
+  </data>
+  <data name="Table_FaultPrefix" xml:space="preserve">
+    <value>These events could not be prepared.</value>
+  </data>
+  <data name="Table_FaultPrefixWithCause" xml:space="preserve">
+    <value>These events could not be prepared. {0}</value>
+    <comment>{0} is a technical fault cause and should remain verbatim.</comment>
+  </data>
+  <data name="LogTable_GroupValueNone" xml:space="preserve">
+    <value>(none)</value>
+  </data>
+  <data name="LogTable_GroupByNone" xml:space="preserve">
+    <value>(none)</value>
+  </data>
+  <data name="LogTable_ExcludeEventsBefore" xml:space="preserve">
+    <value>Exclude Events Before</value>
+  </data>
+  <data name="LogTable_ExcludeEventsAfter" xml:space="preserve">
+    <value>Exclude Events After</value>
+  </data>
+  <data name="LogTable_ShowRelatedByActivityId" xml:space="preserve">
+    <value>Show Related by Activity ID</value>
+  </data>
+  <data name="LogTable_ShowSharingRelatedActivityId" xml:space="preserve">
+    <value>Show Events Sharing Related Activity ID</value>
+  </data>
+  <data name="LogTable_ShowParentActivity" xml:space="preserve">
+    <value>Show Parent Activity</value>
+  </data>
+  <data name="LogTable_NoActivityIdReason" xml:space="preserve">
+    <value>This event has no Activity ID.</value>
+  </data>
+  <data name="LogTable_NoRelatedActivityIdReason" xml:space="preserve">
+    <value>This event has no Related Activity ID.</value>
+  </data>
+  <data name="LogTable_ShowEventsNearTime" xml:space="preserve">
+    <value>Show Events Near This Time</value>
+  </data>
+  <data name="LogTable_NearTime_30Seconds" xml:space="preserve">
+    <value>±30 Seconds</value>
+  </data>
+  <data name="LogTable_NearTime_1Minute" xml:space="preserve">
+    <value>±1 Minute</value>
+  </data>
+  <data name="LogTable_NearTime_5Minutes" xml:space="preserve">
+    <value>±5 Minutes</value>
+  </data>
+  <data name="LogTable_NearTime_15Minutes" xml:space="preserve">
+    <value>±15 Minutes</value>
+  </data>
+  <data name="LogTable_NearTime_1Hour" xml:space="preserve">
+    <value>±1 Hour</value>
+  </data>
+  <data name="LogTable_MoreFields" xml:space="preserve">
+    <value>More Fields</value>
+  </data>
+  <data name="LogTable_Include" xml:space="preserve">
+    <value>Include</value>
+  </data>
+  <data name="LogTable_Exclude" xml:space="preserve">
+    <value>Exclude</value>
+  </data>
+  <data name="LogTable_ExpandGroup" xml:space="preserve">
+    <value>Expand Group</value>
+  </data>
+  <data name="LogTable_CollapseGroup" xml:space="preserve">
+    <value>Collapse Group</value>
+  </data>
+  <data name="LogTable_SelectGroup" xml:space="preserve">
+    <value>Select Group</value>
+  </data>
+  <data name="LogTable_OrderBy" xml:space="preserve">
+    <value>Order By</value>
+  </data>
+  <data name="LogTable_GroupBy" xml:space="preserve">
+    <value>Group By</value>
+  </data>
+  <data name="LogTable_ResetColumnDefaults" xml:space="preserve">
+    <value>Reset Column Defaults</value>
+  </data>
+  <data name="LogTable_NoCellValue" xml:space="preserve">
+    <value>No value in this cell to filter on</value>
+  </data>
+  <data name="CellFilter_IncludeWhereEquals" xml:space="preserve">
+    <value>Include only where {0} = '{1}'</value>
+    <comment>{0} is the event-table column label; {1} is the cell value.</comment>
+  </data>
+  <data name="CellFilter_IncludeWhereHas" xml:space="preserve">
+    <value>Include only where {0} has '{1}'</value>
+    <comment>{0} is the event-table column label; {1} is the cell value.</comment>
+  </data>
+  <data name="CellFilter_ExcludeWhereEquals" xml:space="preserve">
+    <value>Exclude where {0} = '{1}'</value>
+    <comment>{0} is the event-table column label; {1} is the cell value.</comment>
+  </data>
+  <data name="CellFilter_ExcludeWhereHas" xml:space="preserve">
+    <value>Exclude where {0} has '{1}'</value>
+    <comment>{0} is the event-table column label; {1} is the cell value.</comment>
+  </data>
+  <data name="CellFilter_IncludeWhereNoValue" xml:space="preserve">
+    <value>Include only where {0}</value>
+    <comment>{0} is the event-table column label.</comment>
+  </data>
+  <data name="CellFilter_ExcludeWhereNoValue" xml:space="preserve">
+    <value>Exclude where {0}</value>
+    <comment>{0} is the event-table column label.</comment>
+  </data>
+  <data name="Copy_Full_LogName" xml:space="preserve">
+    <value>Log Name: {0}</value>
+  </data>
+  <data name="Copy_Full_Source" xml:space="preserve">
+    <value>Source: {0}</value>
+  </data>
+  <data name="Copy_Full_Date" xml:space="preserve">
+    <value>Date: {0}</value>
+  </data>
+  <data name="Copy_Full_EventId" xml:space="preserve">
+    <value>Event ID: {0}</value>
+  </data>
+  <data name="Copy_Full_TaskCategory" xml:space="preserve">
+    <value>Task Category: {0}</value>
+  </data>
+  <data name="Copy_Full_Level" xml:space="preserve">
+    <value>Level: {0}</value>
+  </data>
+  <data name="Copy_Full_Keywords" xml:space="preserve">
+    <value>Keywords: {0}</value>
+  </data>
+  <data name="Copy_Full_User" xml:space="preserve">
+    <value>User: {0}</value>
+  </data>
+  <data name="Copy_Full_UserSid" xml:space="preserve">
+    <value>User SID: {0}</value>
+  </data>
+  <data name="Copy_Full_Computer" xml:space="preserve">
+    <value>Computer: {0}</value>
+  </data>
+  <data name="Copy_Full_DescriptionHeader" xml:space="preserve">
+    <value>Description:</value>
+  </data>
+  <data name="Copy_Full_EventXmlHeader" xml:space="preserve">
+    <value>Event Xml:</value>
+  </data>
+  <data name="Copy_Markdown_DescriptionHeader" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="TabBar_ExpandGroupAria" xml:space="preserve">
+    <value>Expand group</value>
+  </data>
+  <data name="TabBar_CollapseGroupAria" xml:space="preserve">
+    <value>Collapse group</value>
+  </data>
+  <data name="TabBar_CloseGroup" xml:space="preserve">
+    <value>Close group</value>
+  </data>
+  <data name="TabBar_CloseLogAria" xml:space="preserve">
+    <value>Close log</value>
+  </data>
+  <data name="TabBar_LoadingAria" xml:space="preserve">
+    <value>Loading</value>
+  </data>
+  <data name="TabBar_Tooltip_File" xml:space="preserve">
+    <value>Log File: {0}&#xA;Log Name: {1}&#xA;Computer Name: {2}</value>
+    <comment>{0} is the log file path; {1} is the log name; {2} is the computer name.</comment>
+  </data>
+  <data name="TabBar_Tooltip_Live" xml:space="preserve">
+    <value>Live Log: {0}&#xA;Computer Name: {1}</value>
+    <comment>{0} is the log name; {1} is the computer name.</comment>
+  </data>
+  <data name="TabBar_Menu_CloseAllLogs" xml:space="preserve">
+    <value>Close all logs</value>
+  </data>
+  <data name="TabBar_Menu_Rename" xml:space="preserve">
+    <value>Rename…</value>
+  </data>
+  <data name="TabBar_Menu_Expand" xml:space="preserve">
+    <value>Expand</value>
+  </data>
+  <data name="TabBar_Menu_Collapse" xml:space="preserve">
+    <value>Collapse</value>
+  </data>
+  <data name="TabBar_Menu_MoveToGroup" xml:space="preserve">
+    <value>Move to group</value>
+  </data>
+  <data name="TabBar_Menu_RemoveFromGroup" xml:space="preserve">
+    <value>Remove from group</value>
+  </data>
+  <data name="TabBar_Menu_Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="TabBar_Menu_CloseOthersInGroup" xml:space="preserve">
+    <value>Close others in group</value>
+  </data>
+  <data name="TabBar_Menu_NoOtherTabsInGroupReason" xml:space="preserve">
+    <value>No other tabs in this group</value>
+  </data>
+  <data name="TabBar_Menu_NewGroup" xml:space="preserve">
+    <value>New group…</value>
+  </data>
+  <data name="TabBar_Menu_NewGroupFromTab" xml:space="preserve">
+    <value>New group from tab…</value>
+  </data>
+  <data name="TabBar_Menu_CloseOtherTabs" xml:space="preserve">
+    <value>Close other tabs</value>
+  </data>
+  <data name="TabBar_Menu_NoOtherTabsToCloseReason" xml:space="preserve">
+    <value>No other tabs to close</value>
+  </data>
+  <data name="TabBar_TabName_Combined" xml:space="preserve">
+    <value>Combined</value>
+  </data>
+  <data name="TabBar_TabName_Empty" xml:space="preserve">
+    <value>(Empty) {0}</value>
+    <comment>{0} is the tab name.</comment>
+  </data>
+  <data name="TabBar_TabName_Live" xml:space="preserve">
+    <value>{0} - {1}</value>
+    <comment>{0} is the log name; {1} is the computer name.</comment>
+  </data>
+  <data name="TabBar_Prompt_NewGroupTitle" xml:space="preserve">
+    <value>New group</value>
+  </data>
+  <data name="TabBar_Prompt_RenameGroupTitle" xml:space="preserve">
+    <value>Rename group</value>
+  </data>
+  <data name="TabBar_Prompt_GroupNameLabel" xml:space="preserve">
+    <value>Group name:</value>
+  </data>
+  <data name="TabBar_Prompt_GroupNameRequired" xml:space="preserve">
+    <value>Group name is required.</value>
+  </data>
   <!-- Filter comparison editor: operator dropdown (FilterEditor_Comparison_* map to ComparisonOperatorSelect.ComparisonKind) + value-picker visually-hidden labels and placeholders. -->
   <data name="FilterEditor_Comparison_Equals" xml:space="preserve">
     <value>Equals</value>

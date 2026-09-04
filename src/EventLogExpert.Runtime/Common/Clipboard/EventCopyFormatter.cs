@@ -13,9 +13,12 @@ using System.Xml.Linq;
 
 namespace EventLogExpert.Runtime.Common.Clipboard;
 
-internal sealed class EventCopyFormatter(IEventDetailResolver detailResolver, IEventXmlResolver xmlResolver)
-    : IEventCopyFormatter
+internal sealed class EventCopyFormatter(
+    IEventDetailResolver detailResolver,
+    IEventXmlResolver xmlResolver,
+    IEventCopyText copyText) : IEventCopyFormatter
 {
+    private readonly IEventCopyText _copyText = copyText;
     private readonly IEventDetailResolver _detailResolver = detailResolver;
     private readonly IEventXmlResolver _xmlResolver = xmlResolver;
 
@@ -90,7 +93,29 @@ internal sealed class EventCopyFormatter(IEventDetailResolver detailResolver, IE
         return stringToCopy.ToString();
     }
 
-    private static void AppendFormattedEvent(
+    private static string EscapeMarkdownCell(string? value) =>
+        (value ?? string.Empty)
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal)
+            .Replace("|", "\\|", StringComparison.Ordinal);
+
+    private static string FormatXmlForCopy(string xml)
+    {
+        try
+        {
+            return XElement.Parse(xml).ToString();
+        }
+        catch (XmlException)
+        {
+            return xml;
+        }
+    }
+
+    private static string GetColumnText(ColumnName column, ResolvedEvent @event, TimeZoneInfo timeZone) =>
+        EventTableColumnFormatter.GetCellText(@event, column, timeZone);
+
+    private void AppendFormattedEvent(
         StringBuilder builder,
         EventCopyFormat format,
         ResolvedEvent @event,
@@ -121,24 +146,24 @@ internal sealed class EventCopyFormatter(IEventDetailResolver detailResolver, IE
                 break;
             case EventCopyFormat.Full:
             default:
-                builder.AppendLine($"Log Name: {@event.LogName}");
-                builder.AppendLine($"Source: {@event.Source}");
-                builder.AppendLine($"Date: {@event.TimeCreated.ConvertTimeZone(request.TimeZone)}");
-                builder.AppendLine($"Event ID: {@event.Id}");
-                builder.AppendLine($"Task Category: {@event.TaskCategory}");
-                builder.AppendLine($"Level: {@event.Level}");
-                builder.AppendLine($"Keywords: {@event.KeywordsDisplayName}");
-                builder.AppendLine($"User: {@event.UserDisplayName}");
+                builder.AppendLine(_copyText.FieldLine(EventCopyFullField.LogName, @event.LogName));
+                builder.AppendLine(_copyText.FieldLine(EventCopyFullField.Source, @event.Source));
+                builder.AppendLine(_copyText.FieldLine(EventCopyFullField.Date, @event.TimeCreated.ConvertTimeZone(request.TimeZone).ToString()));
+                builder.AppendLine(_copyText.FieldLine(EventCopyFullField.EventId, @event.Id.ToString()));
+                builder.AppendLine(_copyText.FieldLine(EventCopyFullField.TaskCategory, @event.TaskCategory));
+                builder.AppendLine(_copyText.FieldLine(EventCopyFullField.Level, @event.Level));
+                builder.AppendLine(_copyText.FieldLine(EventCopyFullField.Keywords, @event.KeywordsDisplayName));
+                builder.AppendLine(_copyText.FieldLine(EventCopyFullField.User, @event.UserDisplayName));
 
                 if (@event.UserId is { } userId && !string.Equals(userId.Value, @event.UserDisplayName, StringComparison.Ordinal))
                 {
-                    builder.AppendLine($"User SID: {userId.Value}");
+                    builder.AppendLine(_copyText.FieldLine(EventCopyFullField.UserSid, userId.Value));
                 }
 
-                builder.AppendLine($"Computer: {@event.ComputerName}");
-                builder.AppendLine("Description:");
+                builder.AppendLine(_copyText.FieldLine(EventCopyFullField.Computer, @event.ComputerName));
+                builder.AppendLine(_copyText.FieldLine(EventCopyFullField.DescriptionHeader, string.Empty));
                 builder.AppendLine(@event.Description);
-                builder.AppendLine("Event Xml:");
+                builder.AppendLine(_copyText.FieldLine(EventCopyFullField.EventXmlHeader, string.Empty));
 
                 if (!string.IsNullOrEmpty(xml))
                 {
@@ -149,21 +174,22 @@ internal sealed class EventCopyFormatter(IEventDetailResolver detailResolver, IE
         }
     }
 
-    private static string BuildMarkdownTable(IReadOnlyList<ResolvedEvent> events, EventCopyRequest request)
+    private string BuildMarkdownTable(IReadOnlyList<ResolvedEvent> events, EventCopyRequest request)
     {
         var enabled = request.EnabledColumns;
         var order = request.ColumnOrder;
-        var columns = (order.IsEmpty
-                ? enabled.Where(column => column.Value).Select(column => column.Key).OrderBy(column => column)
-                : order.Where(column => enabled.TryGetValue(column, out bool isEnabled) && isEnabled))
-            .ToList();
+
+        var columns =
+            (order.IsEmpty ?
+                enabled.Where(column => column.Value).Select(column => column.Key).OrderBy(column => column) :
+                order.Where(column => enabled.TryGetValue(column, out bool isEnabled) && isEnabled)).ToList();
 
         StringBuilder builder = new();
 
         builder.Append("| ");
         foreach (var column in columns) { builder.Append(EscapeMarkdownCell(column.ToFullString())).Append(" | "); }
 
-        builder.AppendLine("Description |");
+        builder.Append(EscapeMarkdownCell(_copyText.MarkdownDescriptionHeader)).AppendLine(" |");
 
         builder.Append('|');
         for (int separator = 0; separator <= columns.Count; separator++) { builder.Append(" --- |"); }
@@ -181,14 +207,7 @@ internal sealed class EventCopyFormatter(IEventDetailResolver detailResolver, IE
         return builder.ToString().TrimEnd();
     }
 
-    private static string EscapeMarkdownCell(string? value) =>
-        (value ?? string.Empty)
-            .Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\r", " ", StringComparison.Ordinal)
-            .Replace("\n", " ", StringComparison.Ordinal)
-            .Replace("|", "\\|", StringComparison.Ordinal);
-
-    private static string FormatEventForCopy(EventCopyFormat format, ResolvedEvent @event, string xml, EventCopyRequest request)
+    private string FormatEventForCopy(EventCopyFormat format, ResolvedEvent @event, string xml, EventCopyRequest request)
     {
         if (format == EventCopyFormat.Xml)
         {
@@ -201,21 +220,6 @@ internal sealed class EventCopyFormatter(IEventDetailResolver detailResolver, IE
 
         return builder.ToString();
     }
-
-    private static string FormatXmlForCopy(string xml)
-    {
-        try
-        {
-            return XElement.Parse(xml).ToString();
-        }
-        catch (XmlException)
-        {
-            return xml;
-        }
-    }
-
-    private static string GetColumnText(ColumnName column, ResolvedEvent @event, TimeZoneInfo timeZone) =>
-        EventTableColumnFormatter.GetCellText(@event, column, timeZone);
 
     private ResolvedEvent? ResolveEntry(SelectionEntry? entry)
     {

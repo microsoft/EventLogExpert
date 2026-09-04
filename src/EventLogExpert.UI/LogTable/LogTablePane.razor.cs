@@ -7,6 +7,7 @@ using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Display;
@@ -23,6 +24,7 @@ using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.Web.Virtualization;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
 
@@ -33,7 +35,6 @@ public sealed partial class LogTablePane
     private const int DefaultPageSize = 20;
     private const float EventRowHeightPixels = 22f;
     private const int MenuValueMaxLength = 40;
-    private const string NoCellValueReason = "No value in this cell to filter on";
 
     private static readonly IEventColumnView s_emptyView = LogTableState.EmptyView;
     private static readonly HashSet<int> s_warnedUnknownColors = [];
@@ -103,6 +104,8 @@ public sealed partial class LogTablePane
     [Inject] private DisplayIndicatorGate IndicatorGate { get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private ILogTableCommands LogTableCommands { get; init; } = null!;
 
@@ -489,27 +492,27 @@ public sealed partial class LogTablePane
         if (CellFilterBuilder.TryGetDisplayValue(@event, property, out var value))
         {
             string shown = TruncateForMenu(value);
-            string verb = property is EventProperty.Keywords ? "has" : "=";
+            bool isKeywords = property is EventProperty.Keywords;
 
             items.Add(MenuItem.Item(
-                $"Include only where {columnLabel} {verb} '{shown}'",
+                LogTableCellFilterLocalizer.Describe(Localizer, exclude: false, isKeywords, hasValue: true, columnLabel, shown),
                 () => ApplySelectedFilter(@event, property, exclude: false)));
             items.Add(MenuItem.Item(
-                $"Exclude where {columnLabel} {verb} '{shown}'",
+                LogTableCellFilterLocalizer.Describe(Localizer, exclude: true, isKeywords, hasValue: true, columnLabel, shown),
                 () => ApplySelectedFilter(@event, property, exclude: true)));
         }
         else
         {
             items.Add(MenuItem.Item(
-                $"Include only where {columnLabel}",
+                LogTableCellFilterLocalizer.Describe(Localizer, exclude: false, isKeywords: false, hasValue: false, columnLabel, string.Empty),
                 () => { },
                 isEnabled: false,
-                disabledReason: NoCellValueReason));
+                disabledReason: Localizer["LogTable_NoCellValue"].Value));
             items.Add(MenuItem.Item(
-                $"Exclude where {columnLabel}",
+                LogTableCellFilterLocalizer.Describe(Localizer, exclude: true, isKeywords: false, hasValue: false, columnLabel, string.Empty),
                 () => { },
                 isEnabled: false,
-                disabledReason: NoCellValueReason));
+                disabledReason: Localizer["LogTable_NoCellValue"].Value));
         }
 
         items.Add(MenuItem.Separator());
@@ -658,14 +661,20 @@ public sealed partial class LogTablePane
         return count > 0 ? 0 : -1;
     }
 
-    private string GetDateColumnHeader() =>
-        EventTableColumnFormatter.GetColumnHeader(ColumnName.DateAndTime, Settings.TimeZoneInfo);
+    private string GetDateColumnHeader()
+    {
+        TimeZoneInfo timeZone = Settings.TimeZoneInfo;
+
+        return timeZone.Equals(TimeZoneInfo.Local) ?
+            Localizer["Table_ColumnHeader_DateAndTime"].Value :
+            Localizer["Table_ColumnHeader_DateAndTimeWithZone", timeZone.DisplayName.Split(' ').First()].Value;
+    }
 
     private string GetGroupName() => Presentation.Ordering.GroupBy?.ToFullString() ?? string.Empty;
 
     private string GetGroupValueText(EventGroup group)
     {
-        if (group.EventCount == 0) { return "(none)"; }
+        if (group.EventCount == 0) { return Localizer["LogTable_GroupValueNone"].Value; }
 
         var representative = _activeDisplayedEvents.GetDetailLean(_activeDisplayedEvents.LocatorAt(group.StartIndex));
 
@@ -673,7 +682,7 @@ public sealed partial class LogTablePane
             ColumnDescriptors.GetGroupText(representative, groupBy, new ColumnFormatContext(_timeZoneSettings)) :
             string.Empty;
 
-        return string.IsNullOrEmpty(value) ? "(none)" : value;
+        return string.IsNullOrEmpty(value) ? Localizer["LogTable_GroupValueNone"].Value : value;
     }
 
     private string? GetHighlight(DisplayRow row)
@@ -919,11 +928,11 @@ public sealed partial class LogTablePane
     private string? IndicatorSentence() =>
         _indicator.Sentence switch
         {
-            DisplayIndicatorKind.EmptyPending => "Loading events\u2026",
-            DisplayIndicatorKind.ReorderPending => "Reordering events\u2026",
+            DisplayIndicatorKind.EmptyPending => Localizer["Table_LoadingEvents"].Value,
+            DisplayIndicatorKind.ReorderPending => Localizer["Table_ReorderingEvents"].Value,
             DisplayIndicatorKind.Fault => Presentation.FaultCause is { Length: > 0 } cause ?
-                $"These events could not be prepared. {cause}" :
-                "These events could not be prepared.",
+                Localizer["Table_FaultPrefixWithCause", cause].Value :
+                Localizer["Table_FaultPrefix"].Value,
             _ => null
         };
 
@@ -1407,12 +1416,12 @@ public sealed partial class LogTablePane
                 isChecked: ordering.OrderBy.Equals(capturedColumn)));
         }
 
-        items.Add(MenuItem.SubMenu("Order By", orderItems));
+        items.Add(MenuItem.SubMenu(Localizer["LogTable_OrderBy"].Value, orderItems));
 
         var groupItems = new List<MenuItem>
         {
             MenuItem.Item(
-                "(none)",
+                Localizer["LogTable_GroupByNone"].Value,
                 () => { if (ordering.GroupBy is not null) { LogTableCommands.SetGroupBy(null); } },
                 isChecked: ordering.GroupBy is null)
         };
@@ -1426,11 +1435,11 @@ public sealed partial class LogTablePane
                 isChecked: ordering.GroupBy.Equals(capturedColumn)));
         }
 
-        items.Add(MenuItem.SubMenu("Group By", groupItems));
+        items.Add(MenuItem.SubMenu(Localizer["LogTable_GroupBy"].Value, groupItems));
 
         items.Add(MenuItem.Separator());
         items.Add(MenuItem.Item(
-            "Reset Column Defaults",
+            Localizer["LogTable_ResetColumnDefaults"].Value,
             () => LogTableCommands.ResetColumnDefaults()));
 
         return items;
@@ -1440,63 +1449,63 @@ public sealed partial class LogTablePane
     {
         return
         [
-            MenuItem.Item("Copy Selected", () => ClipboardService.CopySelectedEvent(EventCopyFormat.Default)),
-            MenuItem.Item("Copy Selected (Simple)", () => ClipboardService.CopySelectedEvent(EventCopyFormat.Simple)),
-            MenuItem.Item("Copy Selected (XML)", () => ClipboardService.CopySelectedEvent(EventCopyFormat.Xml)),
-            MenuItem.Item("Copy Selected (Full)", () => ClipboardService.CopySelectedEvent(EventCopyFormat.Full)),
+            MenuItem.Item(Localizer["Menu_Edit_CopySelected"].Value, () => ClipboardService.CopySelectedEvent(EventCopyFormat.Default)),
+            MenuItem.Item(Localizer["Menu_Edit_CopySelectedSimple"].Value, () => ClipboardService.CopySelectedEvent(EventCopyFormat.Simple)),
+            MenuItem.Item(Localizer["Menu_Edit_CopySelectedXml"].Value, () => ClipboardService.CopySelectedEvent(EventCopyFormat.Xml)),
+            MenuItem.Item(Localizer["Menu_Edit_CopySelectedFull"].Value, () => ClipboardService.CopySelectedEvent(EventCopyFormat.Full)),
             MenuItem.Separator(),
-            MenuItem.Item("Exclude Events Before", () =>
+            MenuItem.Item(Localizer["LogTable_ExcludeEventsBefore"].Value, () =>
                 FilterPaneCommands.SetFilterDateRange(
                     new DateFilter { Before = selectedEvent.TimeCreated })),
-            MenuItem.Item("Exclude Events After", () =>
+            MenuItem.Item(Localizer["LogTable_ExcludeEventsAfter"].Value, () =>
                 FilterPaneCommands.SetFilterDateRange(
                     new DateFilter { After = selectedEvent.TimeCreated })),
             MenuItem.Separator(),
             MenuItem.Item(
-                "Show Related by Activity ID",
+                Localizer["LogTable_ShowRelatedByActivityId"].Value,
                 () => FilterLensCommands.ShowRelatedByActivityId(selectedEvent.ActivityId, selectedEvent.OwningLog),
                 isEnabled: selectedEvent.ActivityId.HasValue,
-                disabledReason: selectedEvent.ActivityId.HasValue ? null : "This event has no Activity ID."),
+                disabledReason: selectedEvent.ActivityId.HasValue ? null : Localizer["LogTable_NoActivityIdReason"].Value),
             MenuItem.Item(
-                "Show Events Sharing Related Activity ID",
+                Localizer["LogTable_ShowSharingRelatedActivityId"].Value,
                 () => FilterLensCommands.ShowRelatedByRelatedActivityId(selectedEvent.RelatedActivityId, selectedEvent.OwningLog),
                 isEnabled: selectedEvent.RelatedActivityId.HasValue,
-                disabledReason: selectedEvent.RelatedActivityId.HasValue ? null : "This event has no Related Activity ID."),
+                disabledReason: selectedEvent.RelatedActivityId.HasValue ? null : Localizer["LogTable_NoRelatedActivityIdReason"].Value),
             MenuItem.Item(
-                "Show Parent Activity",
+                Localizer["LogTable_ShowParentActivity"].Value,
                 () => FilterLensCommands.ShowParentActivity(selectedEvent.RelatedActivityId, selectedEvent.OwningLog),
                 isEnabled: selectedEvent.RelatedActivityId.HasValue,
-                disabledReason: selectedEvent.RelatedActivityId.HasValue ? null : "This event has no Related Activity ID."),
+                disabledReason: selectedEvent.RelatedActivityId.HasValue ? null : Localizer["LogTable_NoRelatedActivityIdReason"].Value),
             MenuItem.SubMenu(
-                "Show Events Near This Time",
+                Localizer["LogTable_ShowEventsNearTime"].Value,
                 [
                     MenuItem.Item(
-                        "\u00b130 Seconds",
+                        Localizer["LogTable_NearTime_30Seconds"].Value,
                         () => FilterLensCommands.ShowEventsNearTime(
                             selectedEvent.TimeCreated, TimeSpan.FromSeconds(30), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
                     MenuItem.Item(
-                        "\u00b11 Minute",
+                        Localizer["LogTable_NearTime_1Minute"].Value,
                         () => FilterLensCommands.ShowEventsNearTime(
                             selectedEvent.TimeCreated, TimeSpan.FromMinutes(1), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
                     MenuItem.Item(
-                        "\u00b15 Minutes",
+                        Localizer["LogTable_NearTime_5Minutes"].Value,
                         () => FilterLensCommands.ShowEventsNearTime(
                             selectedEvent.TimeCreated, TimeSpan.FromMinutes(5), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
                     MenuItem.Item(
-                        "\u00b115 Minutes",
+                        Localizer["LogTable_NearTime_15Minutes"].Value,
                         () => FilterLensCommands.ShowEventsNearTime(
                             selectedEvent.TimeCreated, TimeSpan.FromMinutes(15), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
                     MenuItem.Item(
-                        "\u00b11 Hour",
+                        Localizer["LogTable_NearTime_1Hour"].Value,
                         () => FilterLensCommands.ShowEventsNearTime(
                             selectedEvent.TimeCreated, TimeSpan.FromHours(1), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
                 ]),
             MenuItem.Separator(),
             MenuItem.SubMenu(
-                "More Fields",
+                Localizer["LogTable_MoreFields"].Value,
                 [
-                    MenuItem.SubMenu("Include", ShowEventFieldItems(selectedEvent, false)),
-                    MenuItem.SubMenu("Exclude", ShowEventFieldItems(selectedEvent, true)),
+                    MenuItem.SubMenu(Localizer["LogTable_Include"].Value, ShowEventFieldItems(selectedEvent, false)),
+                    MenuItem.SubMenu(Localizer["LogTable_Exclude"].Value, ShowEventFieldItems(selectedEvent, true)),
                 ]),
         ];
     }
@@ -1516,7 +1525,7 @@ public sealed partial class LogTablePane
                 property.ToFullString(),
                 () => ApplySelectedFilter(selectedEvent, capturedProperty, exclude),
                 isEnabled: hasValue,
-                disabledReason: hasValue ? null : NoCellValueReason));
+                disabledReason: hasValue ? null : Localizer["LogTable_NoCellValue"].Value));
         }
 
         return items;
@@ -1529,17 +1538,17 @@ public sealed partial class LogTablePane
         return
         [
             MenuItem.Item(
-                collapsedNow ? "Expand Group" : "Collapse Group",
+                collapsedNow ? Localizer["LogTable_ExpandGroup"].Value : Localizer["LogTable_CollapseGroup"].Value,
                 () => UserSetGroupCollapsed(group.Key, !collapsedNow)),
-            MenuItem.Item("Expand All Groups", () => LogTableCommands.SetAllGroupsCollapsed(false)),
-            MenuItem.Item("Collapse All Groups", () => LogTableCommands.SetAllGroupsCollapsed(true)),
+            MenuItem.Item(Localizer["Menu_View_ExpandAllGroups"].Value, () => LogTableCommands.SetAllGroupsCollapsed(false)),
+            MenuItem.Item(Localizer["Menu_View_CollapseAllGroups"].Value, () => LogTableCommands.SetAllGroupsCollapsed(true)),
             MenuItem.Separator(),
             MenuItem.Item(
-                "Group Descending",
+                Localizer["Menu_View_GroupDescending"].Value,
                 () => LogTableCommands.ToggleGroupSortDirection(),
                 isChecked: Presentation.Ordering.IsGroupDescending),
             MenuItem.Separator(),
-            MenuItem.Item("Select Group", () => SelectGroupByKey(group.Key)),
+            MenuItem.Item(Localizer["LogTable_SelectGroup"].Value, () => SelectGroupByKey(group.Key)),
         ];
     }
 

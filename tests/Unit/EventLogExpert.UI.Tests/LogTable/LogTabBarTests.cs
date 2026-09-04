@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
@@ -10,6 +11,7 @@ using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Menu;
+using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -83,7 +85,7 @@ public sealed class LogTabBarTests : BunitContext
         Services.AddSingleton(_queries);
         Services.AddSingleton(_source);
         Services.AddSingleton(_traceLogger);
-        Services.AddEventLogLocalization();
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
     }
 
     private IStringLocalizer<SharedResource> Localizer =>
@@ -136,6 +138,28 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
+    public void AriaLabelsAndTitles_RouteThroughMarkerLocalizer()
+    {
+        var (collapsedState, _, _, _, _) = GroupedState(collapsed: true, activeIsMember1: false);
+        _logTableState.Value.Returns(collapsedState);
+        var collapsedCut = Render<LogTabBar>();
+
+        Assert.Equal(Localizer["TabBar_ExpandGroupAria"].Value, collapsedCut.Find("button.chevron").GetAttribute("aria-label"));
+        Assert.Equal(Localizer["TabBar_ExpandGroupAria"].Value, collapsedCut.Find("button.chevron").GetAttribute("title"));
+
+        var (expandedState, _, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
+        _logTableState.Value.Returns(expandedState);
+        var expandedCut = Render<LogTabBar>();
+
+        Assert.Equal(Localizer["TabBar_CollapseGroupAria"].Value, expandedCut.Find("button.chevron").GetAttribute("aria-label"));
+        Assert.Equal(Localizer["TabBar_CollapseGroupAria"].Value, expandedCut.Find("button.chevron").GetAttribute("title"));
+        Assert.Equal(Localizer["TabBar_CloseGroup"].Value, expandedCut.Find(".group-header > i.bi-x").GetAttribute("aria-label"));
+        Assert.Equal(Localizer["TabBar_CloseGroup"].Value, expandedCut.Find(".group-header > i.bi-x").GetAttribute("title"));
+        Assert.Equal(Localizer["TabBar_CloseLogAria"].Value, expandedCut.Find(".tab.member > i.bi-x").GetAttribute("aria-label"));
+        Assert.Equal(Localizer["TabBar_CloseLogAria"].Value, expandedCut.Find(".tab.member > i.bi-x").GetAttribute("title"));
+    }
+
+    [Fact]
     public void ChevronClick_DispatchesSetTabGroupCollapsed()
     {
         var (state, groupId, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
@@ -174,7 +198,7 @@ public sealed class LogTabBarTests : BunitContext
 
         var item = FindItem(menu, "Close other tabs");
         Assert.False(item.IsEnabled);
-        Assert.Equal("No other tabs to close", item.DisabledReason);
+        Assert.Equal(Localizer["TabBar_Menu_NoOtherTabsToCloseReason"].Value, item.DisabledReason);
     }
 
     [Fact]
@@ -187,7 +211,7 @@ public sealed class LogTabBarTests : BunitContext
 
         var item = FindItem(menu, "Close others in group");
         Assert.False(item.IsEnabled);
-        Assert.Equal("No other tabs in this group", item.DisabledReason);
+        Assert.Equal(Localizer["TabBar_Menu_NoOtherTabsInGroupReason"].Value, item.DisabledReason);
     }
 
     [Fact]
@@ -246,7 +270,7 @@ public sealed class LogTabBarTests : BunitContext
 
         var cut = Render<LogTabBar>();
 
-        Assert.Contains("Combined", cut.Markup);
+        Assert.Contains(Localizer["TabBar_TabName_Combined"].Value, cut.Markup);
     }
 
     [Fact]
@@ -345,12 +369,31 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
+    public async Task GroupHeader_Expand_DispatchesSetTabGroupCollapsed()
+    {
+        var (state, groupId, _, _, _) = GroupedState(collapsed: true, activeIsMember1: false);
+        _logTableState.Value.Returns(state);
+        var cut = Render<LogTabBar>();
+        var menu = OpenContextMenu(cut, ".group-header");
+
+        Assert.Contains(menu, item => item.Label == Localizer["TabBar_Menu_Expand"].Value);
+        await InvokeMenuItemAsync(cut, FindItem(menu, "Expand"));
+
+        _logTableCommands.Received(1).SetTabGroupCollapsed(groupId, false);
+    }
+
+    [Fact]
     public async Task GroupHeader_Rename_PromptThenDispatches()
     {
         var (state, groupId, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
         _logTableState.Value.Returns(state);
+        Func<string, string?>? validator = null;
         _alertDialogService
-            .DisplayPrompt("Rename group", Arg.Any<string>(), "MyGroup", Arg.Any<Func<string, string?>?>())
+            .DisplayPrompt(
+                Localizer["TabBar_Prompt_RenameGroupTitle"].Value,
+                Localizer["TabBar_Prompt_GroupNameLabel"].Value,
+                "MyGroup",
+                Arg.Do<Func<string, string?>?>(callback => validator = callback))
             .Returns("Renamed");
         var cut = Render<LogTabBar>();
         var menu = OpenContextMenu(cut, ".group-header");
@@ -358,6 +401,9 @@ public sealed class LogTabBarTests : BunitContext
         await InvokeMenuItemAsync(cut, FindItem(menu, "Rename\u2026"));
 
         _logTableCommands.Received(1).RenameGroup(groupId, "Renamed");
+        Assert.NotNull(validator);
+        Assert.Equal(Localizer["TabBar_Prompt_GroupNameRequired"].Value, validator(" "));
+        Assert.Null(validator("Renamed"));
     }
 
     [Fact]
@@ -366,7 +412,7 @@ public sealed class LogTabBarTests : BunitContext
         var (state, _, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
         _logTableState.Value.Returns(state);
         _alertDialogService
-            .DisplayPrompt("Rename group", Arg.Any<string>(), "MyGroup", Arg.Any<Func<string, string?>?>())
+            .DisplayPrompt(Localizer["TabBar_Prompt_RenameGroupTitle"].Value, Localizer["TabBar_Prompt_GroupNameLabel"].Value, "MyGroup", Arg.Any<Func<string, string?>?>())
             .Returns("Renamed");
         var cut = Render<LogTabBar>();
         var menu = OpenContextMenu(cut, ".group-header");
@@ -388,7 +434,7 @@ public sealed class LogTabBarTests : BunitContext
         var menu = OpenContextMenu(cut, ".group-header");
 
         var labels = menu.Select(item => item.Label).ToList();
-        Assert.Equal(["Rename\u2026", "Collapse", string.Empty, "Close group"], labels);
+        Assert.Equal([Localizer["TabBar_Menu_Rename"].Value, Localizer["TabBar_Menu_Collapse"].Value, string.Empty, Localizer["TabBar_CloseGroup"].Value], labels);
     }
 
     [Fact]
@@ -401,8 +447,26 @@ public sealed class LogTabBarTests : BunitContext
 
         var cut = Render<LogTabBar>();
 
-        Assert.Contains("(Empty) Alpha", cut.Markup);
-        Assert.DoesNotContain("(Empty) Beta", cut.Markup);
+        Assert.Contains("[[TabBar_TabName_Empty(", cut.Markup);
+        Assert.DoesNotContain("Beta)]]", cut.Markup);
+    }
+
+    [Fact]
+    public void LoadingSpinner_RoutesAriaLabelThroughMarkerLocalizer()
+    {
+        var alpha = EventLogId.Create();
+        var beta = EventLogId.Create();
+        _logTableState.Value.Returns(new LogTableState
+        {
+            ActiveEventLogId = alpha,
+            EventTables = ImmutableList.Create(
+                new LogView(alpha) { LogName = "Alpha", IsLoading = true },
+                new LogView(beta) { LogName = "Beta" })
+        });
+
+        var cut = Render<LogTabBar>();
+
+        Assert.Equal(Localizer["TabBar_LoadingAria"].Value, cut.Find("i.loader-spin").GetAttribute("aria-label"));
     }
 
     [Fact]
@@ -436,14 +500,14 @@ public sealed class LogTabBarTests : BunitContext
         var (state, _, _, member1, _) = GroupedState(collapsed: false, activeIsMember1: false);
         _logTableState.Value.Returns(state);
         _alertDialogService
-            .DisplayPrompt("New group", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Func<string, string?>?>())
+            .DisplayPrompt(Localizer["TabBar_Prompt_NewGroupTitle"].Value, Localizer["TabBar_Prompt_GroupNameLabel"].Value, Arg.Any<string>(), Arg.Any<Func<string, string?>?>())
             .Returns("Split");
         var cut = Render<LogTabBar>();
         var menu = OpenContextMenu(cut, ".tab.member");
 
         var moveTo = FindItem(menu, "Move to group");
         Assert.NotNull(moveTo.Children);
-        Assert.Equal(["New group\u2026"], moveTo.Children!.Select(item => item.Label).ToList());
+        Assert.Equal([Localizer["TabBar_Menu_NewGroup"].Value], moveTo.Children!.Select(item => item.Label).ToList());
 
         await InvokeMenuItemAsync(cut, FindItem(moveTo.Children!, "New group\u2026"));
 
@@ -474,7 +538,7 @@ public sealed class LogTabBarTests : BunitContext
 
         var labels = menu.Select(item => item.Label).ToList();
         Assert.Equal(
-            ["Move to group", "Remove from group", string.Empty, "Close", "Close others in group", "Close other tabs"],
+            [Localizer["TabBar_Menu_MoveToGroup"].Value, Localizer["TabBar_Menu_RemoveFromGroup"].Value, string.Empty, Localizer["TabBar_Menu_Close"].Value, Localizer["TabBar_Menu_CloseOthersInGroup"].Value, Localizer["TabBar_Menu_CloseOtherTabs"].Value],
             labels);
     }
 
@@ -488,7 +552,7 @@ public sealed class LogTabBarTests : BunitContext
 
         var cut = Render<LogTabBar>();
 
-        Assert.DoesNotContain("(Empty)", cut.Markup);
+        Assert.DoesNotContain("[[TabBar_TabName_Empty", cut.Markup);
     }
 
     [Fact]
@@ -498,11 +562,11 @@ public sealed class LogTabBarTests : BunitContext
         var beta = EventLogId.Create();
         _logTableState.Value.Returns(TwoTabState(alpha, beta));
         var cut = Render<LogTabBar>();
-        Assert.DoesNotContain("(Empty) Alpha", cut.Markup);
+        Assert.DoesNotContain(Localizer["TabBar_TabName_Empty", "Alpha"].Value, cut.Markup);
 
         await RaisePresenceChange(cut, Presence((alpha, false), (beta, true)));
 
-        Assert.Contains("(Empty) Alpha", cut.Markup);
+        Assert.Contains("[[TabBar_TabName_Empty(", cut.Markup);
     }
 
     [Fact]
@@ -538,7 +602,7 @@ public sealed class LogTabBarTests : BunitContext
         var beta = EventLogId.Create();
         _logTableState.Value.Returns(TwoTabState(alpha, beta));
         _alertDialogService
-            .DisplayPrompt("New group", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Func<string, string?>?>())
+            .DisplayPrompt(Localizer["TabBar_Prompt_NewGroupTitle"].Value, Localizer["TabBar_Prompt_GroupNameLabel"].Value, Arg.Any<string>(), Arg.Any<Func<string, string?>?>())
             .Returns("   ");
         var cut = Render<LogTabBar>();
         var menu = OpenContextMenu(cut, ".tab");
@@ -597,8 +661,13 @@ public sealed class LogTabBarTests : BunitContext
         var alpha = EventLogId.Create();
         var beta = EventLogId.Create();
         _logTableState.Value.Returns(TwoTabState(alpha, beta));
+        Func<string, string?>? validator = null;
         _alertDialogService
-            .DisplayPrompt("New group", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Func<string, string?>?>())
+            .DisplayPrompt(
+                Localizer["TabBar_Prompt_NewGroupTitle"].Value,
+                Localizer["TabBar_Prompt_GroupNameLabel"].Value,
+                Arg.Any<string>(),
+                Arg.Do<Func<string, string?>?>(callback => validator = callback))
             .Returns("Diagnostics");
         var cut = Render<LogTabBar>();
         var menu = OpenContextMenu(cut, ".tab");
@@ -606,6 +675,9 @@ public sealed class LogTabBarTests : BunitContext
         await InvokeMenuItemAsync(cut, FindItem(menu, "New group from tab\u2026"));
 
         _logTableCommands.Received(1).NewGroupFromTab(alpha, "Diagnostics");
+        Assert.NotNull(validator);
+        Assert.Equal(Localizer["TabBar_Prompt_GroupNameRequired"].Value, validator(" "));
+        Assert.Null(validator("Diagnostics"));
     }
 
     [Fact]
@@ -615,7 +687,7 @@ public sealed class LogTabBarTests : BunitContext
         var beta = EventLogId.Create();
         _logTableState.Value.Returns(TwoTabState(alpha, beta));
         _alertDialogService
-            .DisplayPrompt("New group", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Func<string, string?>?>())
+            .DisplayPrompt(Localizer["TabBar_Prompt_NewGroupTitle"].Value, Localizer["TabBar_Prompt_GroupNameLabel"].Value, Arg.Any<string>(), Arg.Any<Func<string, string?>?>())
             .Returns("Diagnostics");
         var cut = Render<LogTabBar>();
         var menu = OpenContextMenu(cut, ".tab");
@@ -638,7 +710,39 @@ public sealed class LogTabBarTests : BunitContext
         var menu = OpenContextMenu(cut, ".tab");
 
         var labels = menu.Select(item => item.Label).ToList();
-        Assert.Equal(["New group from tab\u2026", "Move to group", string.Empty, "Close", "Close other tabs"], labels);
+        Assert.Equal([Localizer["TabBar_Menu_NewGroupFromTab"].Value, Localizer["TabBar_Menu_MoveToGroup"].Value, string.Empty, Localizer["TabBar_Menu_Close"].Value, Localizer["TabBar_Menu_CloseOtherTabs"].Value], labels);
+    }
+
+    [Fact]
+    public void TabTitlesAndLiveNames_RouteArgumentsThroughMarkerLocalizer()
+    {
+        var fileId = EventLogId.Create();
+        var liveId = EventLogId.Create();
+        _logTableState.Value.Returns(new LogTableState
+        {
+            ActiveEventLogId = fileId,
+            EventTables = ImmutableList.Create(
+                new LogView(fileId)
+                {
+                    FileName = @"C:\logs\Application.evtx",
+                    LogName = "Application",
+                    ComputerName = "FILEHOST",
+                    LogPathType = LogPathType.File
+                },
+                new LogView(liveId)
+                {
+                    LogName = "System",
+                    ComputerName = "LIVEHOST",
+                    LogPathType = LogPathType.Channel
+                })
+        });
+
+        var cut = Render<LogTabBar>();
+        var tabs = cut.FindAll(".tab");
+
+        Assert.Equal(Localizer["TabBar_Tooltip_File", @"C:\logs\Application.evtx", "Application", "FILEHOST"].Value, tabs[0].GetAttribute("title"));
+        Assert.Equal(Localizer["TabBar_Tooltip_Live", "System", "LIVEHOST"].Value, tabs[1].GetAttribute("title"));
+        Assert.Contains(Localizer["TabBar_TabName_Live", "System", "LIVEHOST"].Value, tabs[1].TextContent);
     }
 
     private static LogTableState AllLogsState(EventLogId allLogsId, EventLogId logId, string logName) =>
@@ -649,9 +753,6 @@ public sealed class LogTabBarTests : BunitContext
                 new LogView(allLogsId) { GroupId = LogTabGroupId.AllLogs },
                 new LogView(logId) { LogName = logName })
         };
-
-    private static MenuItem FindItem(IEnumerable<MenuItem> items, string label) =>
-        items.First(item => item.Label == label);
 
     private static (LogTableState State, LogTabGroupId GroupId, EventLogId Standalone) GroupPlusStandaloneState()
     {
@@ -761,8 +862,27 @@ public sealed class LogTabBarTests : BunitContext
                 new LogView(beta) { LogName = "Beta" })
         };
 
+    private MenuItem FindItem(IEnumerable<MenuItem> items, string label) =>
+        items.First(item => item.Label == LocalizedMenuLabel(label));
+
     private async Task InvokeMenuItemAsync(IRenderedComponent<LogTabBar> cut, MenuItem item) =>
         await cut.InvokeAsync(() => item.OnClickAsync!());
+
+    private string LocalizedMenuLabel(string label) => label switch
+    {
+        "Close all logs" => Localizer["TabBar_Menu_CloseAllLogs"].Value,
+        "Close" => Localizer["TabBar_Menu_Close"].Value,
+        "Close other tabs" => Localizer["TabBar_Menu_CloseOtherTabs"].Value,
+        "Close others in group" => Localizer["TabBar_Menu_CloseOthersInGroup"].Value,
+        "Expand" => Localizer["TabBar_Menu_Expand"].Value,
+        "Collapse" => Localizer["TabBar_Menu_Collapse"].Value,
+        "Move to group" => Localizer["TabBar_Menu_MoveToGroup"].Value,
+        "New group from tab\u2026" => Localizer["TabBar_Menu_NewGroupFromTab"].Value,
+        "New group\u2026" => Localizer["TabBar_Menu_NewGroup"].Value,
+        "Remove from group" => Localizer["TabBar_Menu_RemoveFromGroup"].Value,
+        "Rename\u2026" => Localizer["TabBar_Menu_Rename"].Value,
+        _ => label
+    };
 
     private IReadOnlyList<MenuItem> OpenContextMenu(IRenderedComponent<LogTabBar> cut, string selector)
     {

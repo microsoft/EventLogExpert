@@ -37,10 +37,10 @@
                         @oncontextmenu:stopPropagation="true"
                         title="@GetTabTooltip(group.Header)">
                         <button aria-expanded="@(group.Group.IsCollapsed ? "false" : "true")"
-                            aria-label="@(group.Group.IsCollapsed ? "Expand group" : "Collapse group")"
+                            aria-label="@(group.Group.IsCollapsed ? Localizer["TabBar_ExpandGroupAria"] : Localizer["TabBar_CollapseGroupAria"])"
                             class="chevron"
                             @onclick="() => ToggleCollapse(group.Group)"
-                            title="@(group.Group.IsCollapsed ? "Expand group" : "Collapse group")"
+                            title="@(group.Group.IsCollapsed ? Localizer["TabBar_ExpandGroupAria"] : Localizer["TabBar_CollapseGroupAria"])"
                             type="button">
                             <i class="bi bi-chevron-@(group.Group.IsCollapsed ? "down" : "right")"></i>
                         </button>
@@ -50,13 +50,13 @@
                             tabindex="0">
                             @GetTabName(presentation, group.Header)
                         </span>
-                        <i aria-label="Close group"
+                        <i aria-label="@Localizer["TabBar_CloseGroup"]"
                             class="bi bi-x"
                             @onclick="() => CloseGroup(group.Group)"
                             @onkeydown="e => OnCloseGroupKeyDown(e, group.Group)"
                             role="button"
                             tabindex="0"
-                            title="Close group">
+                            title="@Localizer["TabBar_CloseGroup"]">
                         </i>
                     </div>
                     @foreach (var member in VisibleMembers(presentation, group))
@@ -72,18 +72,18 @@
                                 tabindex="@(member.IsLoading ? -1 : 0)">
                                 @if (member.IsLoading)
                                 {
-                                    <i aria-label="Loading" class="loader-spin spinner-border" role="status"></i>
+                                    <i aria-label="@Localizer["TabBar_LoadingAria"]" class="loader-spin spinner-border" role="status"></i>
                                     @:&nbsp;
                                 }
                                 @GetTabName(presentation, member)
                             </span>
-                            <i aria-label="Close log"
+                            <i aria-label="@Localizer["TabBar_CloseLogAria"]"
                                 class="bi bi-x"
                                 @onkeydown="e => OnCloseLogKeyDown(e, member)"
                                 @onmousedown="e => OnCloseLogMouseDown(e, member)"
                                 role="button"
                                 tabindex="0"
-                                title="Close log">
+                                title="@Localizer["TabBar_CloseLogAria"]">
                             </i>
                         </div>
                     }
@@ -102,18 +102,18 @@
                         tabindex="@(standalone.Tab.IsLoading ? -1 : 0)">
                         @if (standalone.Tab.IsLoading)
                         {
-                            <i aria-label="Loading" class="loader-spin spinner-border" role="status"></i>
+                            <i aria-label="@Localizer["TabBar_LoadingAria"]" class="loader-spin spinner-border" role="status"></i>
                             @:&nbsp;
                         }
                         @GetTabName(presentation, standalone.Tab)
                     </span>
-                    <i aria-label="Close log"
+                    <i aria-label="@Localizer["TabBar_CloseLogAria"]"
                         class="bi bi-x"
                         @onkeydown="e => OnCloseLogKeyDown(e, standalone.Tab)"
                         @onmousedown="e => OnCloseLogMouseDown(e, standalone.Tab)"
                         role="button"
                         tabindex="0"
-                        title="Close log">
+                        title="@Localizer["TabBar_CloseLogAria"]">
                     </i>
                 </div>
             }
