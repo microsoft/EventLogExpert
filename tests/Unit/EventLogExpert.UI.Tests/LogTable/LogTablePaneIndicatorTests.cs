@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
@@ -15,6 +16,7 @@ using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
 using System.Globalization;
@@ -55,6 +57,7 @@ public sealed class LogTablePaneIndicatorTests : CultureSensitiveBunitContext
         _selectedEvents.Current.Returns(ImmutableList<SelectionEntry>.Empty);
 
         Services.AddLogTablePaneDependencies();
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
         Services.AddImmediateCpuWorkScheduler();
         Services.AddSingleton(_columnDefaults);
         Services.AddSingleton(_eventLogCommands);
@@ -74,6 +77,20 @@ public sealed class LogTablePaneIndicatorTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void AFailedViewWithoutCause_RoutesNoCauseFaultPrefixThroughLocalizer()
+    {
+        SetCommittedState();
+
+        _viewSource.Current.Returns(Presentation(PresentationState.Faulted, rows: 0, revision: 1, faultCause: null));
+
+        var cut = Render<LogTablePane>();
+
+        _delay.Elapse();
+
+        cut.WaitForAssertion(() => Assert.Contains("[[Table_FaultPrefix]]", cut.Markup));
+    }
+
+    [Fact]
     public void AFailedView_SaysSo_AndSaysWhy()
     {
         SetCommittedState();
@@ -86,9 +103,22 @@ public sealed class LogTablePaneIndicatorTests : CultureSensitiveBunitContext
 
         cut.WaitForAssertion(() =>
         {
-            Assert.Contains("could not be prepared", cut.Markup);
-            Assert.Contains("bad predicate", cut.Markup);
+            Assert.Contains("[[Table_FaultPrefixWithCause(InvalidOperationException: bad predicate)]]", cut.Markup);
         });
+    }
+
+    [Fact]
+    public void AStaleReorderingView_RoutesReorderingTextThroughLocalizer()
+    {
+        SetCommittedState();
+
+        _viewSource.Current.Returns(Presentation(PresentationState.Updating, rows: 1, revision: 1, orderingIsStale: true));
+
+        var cut = Render<LogTablePane>();
+
+        _delay.Elapse();
+
+        cut.WaitForAssertion(() => Assert.Contains("[[Table_ReorderingEvents]]", cut.Markup));
     }
 
     [Fact]
@@ -102,7 +132,7 @@ public sealed class LogTablePaneIndicatorTests : CultureSensitiveBunitContext
 
         _delay.Elapse();
 
-        cut.WaitForAssertion(() => Assert.Contains("Loading events", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("[[Table_LoadingEvents]]", cut.Markup));
     }
 
     [Fact]
@@ -114,7 +144,7 @@ public sealed class LogTablePaneIndicatorTests : CultureSensitiveBunitContext
 
         var cut = Render<LogTablePane>();
 
-        Assert.DoesNotContain("could not be prepared", cut.Markup);
+        Assert.DoesNotContain("[[Table_FaultPrefixWithCause", cut.Markup);
     }
 
     [Fact]
@@ -140,14 +170,20 @@ public sealed class LogTablePaneIndicatorTests : CultureSensitiveBunitContext
             LogName = LogName
         };
 
-    private OrderedViewPresentation Presentation(PresentationState state, int rows, long revision) =>
+    private OrderedViewPresentation Presentation(
+        PresentationState state,
+        int rows,
+        long revision,
+        string? faultCause = "InvalidOperationException: bad predicate",
+        bool orderingIsStale = false) =>
         new(
             DisplayViewTestFactory.Identity([.. Enumerable.Range(1, rows).Select(index => Event(index))]),
             _logId,
             default,
             state,
             revision,
-            FaultCause: state == PresentationState.Faulted ? "InvalidOperationException: bad predicate" : null);
+            FaultCause: state == PresentationState.Faulted ? faultCause : null,
+            OrderingIsStale: orderingIsStale);
 
     private void SetCommittedState() =>
         _logTableState.Value.Returns(new LogTableState

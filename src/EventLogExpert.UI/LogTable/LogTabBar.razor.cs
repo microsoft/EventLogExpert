@@ -184,36 +184,24 @@ public sealed partial class LogTabBar
         string? disabledReason = null) =>
         MenuItem.Item(label, onClickAsync, isEnabled: isEnabled, isDanger: true, disabledReason: disabledReason);
 
-    private static string GetTabTooltip(LogView table)
-    {
-        if (table.IsCombined) { return string.Empty; }
-
-        return table.LogPathType == LogPathType.File
-            ? $"Log File: {table.FileName}\n" +
-                $"Log Name: {table.LogName}\n" +
-                $"Computer Name: {table.ComputerName}"
-            : $"Live Log: {table.LogName}\n" +
-                $"Computer Name: {table.ComputerName}";
-    }
-
     private static IReadOnlyList<LogView> VisibleMembers(LogTabBarPresentation presentation, GroupRow row) =>
-        row.Group.IsCollapsed
-            ? [.. row.Members.Where(member => member.Id == presentation.ActiveTabId)]
-            : row.Members;
+        row.Group.IsCollapsed ?
+            [.. row.Members.Where(member => member.Id == presentation.ActiveTabId)] :
+            row.Members;
 
     private IReadOnlyList<MenuItem> BuildAllLogsMenu() =>
     [
-        DangerItem("Close all logs", ConfirmCloseAllLogsAsync),
+        DangerItem(Localizer["TabBar_Menu_CloseAllLogs"].Value, ConfirmCloseAllLogsAsync),
     ];
 
     private IReadOnlyList<MenuItem> BuildGroupHeaderMenu(LogTabGroup group) =>
     [
-        MenuItem.Item("Rename\u2026", () => PromptRenameAsync(group)),
+        MenuItem.Item(Localizer["TabBar_Menu_Rename"].Value, () => PromptRenameAsync(group)),
         MenuItem.Item(
-            group.IsCollapsed ? "Expand" : "Collapse",
+            group.IsCollapsed ? Localizer["TabBar_Menu_Expand"].Value : Localizer["TabBar_Menu_Collapse"].Value,
             () => LogTableCommands.SetTabGroupCollapsed(group.Id, !group.IsCollapsed)),
         MenuItem.Separator(),
-        DangerItem("Close group", () => LogTableCommands.CloseGroup(group.Id)),
+        DangerItem(Localizer["TabBar_CloseGroup"].Value, () => LogTableCommands.CloseGroup(group.Id)),
     ];
 
     private IReadOnlyList<MenuItem> BuildMemberMenu(LogView member, LogTabGroup group)
@@ -222,15 +210,15 @@ public sealed partial class LogTabBar
 
         return
         [
-            MenuItem.SubMenu("Move to group", BuildMoveTargets(member, group.Id)),
-            MenuItem.Item("Remove from group", () => LogTableCommands.RemoveTabFromGroup(member.Id)),
+            MenuItem.SubMenu(Localizer["TabBar_Menu_MoveToGroup"].Value, BuildMoveTargets(member, group.Id)),
+            MenuItem.Item(Localizer["TabBar_Menu_RemoveFromGroup"].Value, () => LogTableCommands.RemoveTabFromGroup(member.Id)),
             MenuItem.Separator(),
-            DangerItem("Close", () => CloseLog(member)),
+            DangerItem(Localizer["TabBar_Menu_Close"].Value, () => CloseLog(member)),
             DangerItem(
-                "Close others in group",
+                Localizer["TabBar_Menu_CloseOthersInGroup"].Value,
                 () => LogTableCommands.CloseOthersInGroup(group.Id, member.Id),
                 isEnabled: canCloseOthersInGroup,
-                disabledReason: canCloseOthersInGroup ? null : "No other tabs in this group"),
+                disabledReason: canCloseOthersInGroup ? null : Localizer["TabBar_Menu_NoOtherTabsInGroupReason"].Value),
             CloseOtherTabsItem(member.Id),
         ];
     }
@@ -248,17 +236,17 @@ public sealed partial class LogTabBar
 
         if (items.Count > 0) { items.Add(MenuItem.Separator()); }
 
-        items.Add(MenuItem.Item("New group\u2026", () => PromptNewGroupAsync(tab)));
+        items.Add(MenuItem.Item(Localizer["TabBar_Menu_NewGroup"].Value, () => PromptNewGroupAsync(tab)));
 
         return items;
     }
 
     private IReadOnlyList<MenuItem> BuildStandaloneMenu(LogView tab) =>
     [
-        MenuItem.Item("New group from tab\u2026", () => PromptNewGroupAsync(tab)),
-        MenuItem.SubMenu("Move to group", BuildMoveTargets(tab, excludeGroupId: null)),
+        MenuItem.Item(Localizer["TabBar_Menu_NewGroupFromTab"].Value, () => PromptNewGroupAsync(tab)),
+        MenuItem.SubMenu(Localizer["TabBar_Menu_MoveToGroup"].Value, BuildMoveTargets(tab, excludeGroupId: null)),
         MenuItem.Separator(),
-        DangerItem("Close", () => CloseLog(tab)),
+        DangerItem(Localizer["TabBar_Menu_Close"].Value, () => CloseLog(tab)),
         CloseOtherTabsItem(tab.Id),
     ];
 
@@ -281,10 +269,10 @@ public sealed partial class LogTabBar
         bool canClose = CanCloseOtherTabs();
 
         return DangerItem(
-            "Close other tabs",
+            Localizer["TabBar_Menu_CloseOtherTabs"].Value,
             () => LogTableCommands.CloseAllButThis(tabId),
             isEnabled: canClose,
-            disabledReason: canClose ? null : "No other tabs to close");
+            disabledReason: canClose ? null : Localizer["TabBar_Menu_NoOtherTabsToCloseReason"].Value);
     }
 
     private async Task ConfirmCloseAllLogsAsync()
@@ -307,17 +295,26 @@ public sealed partial class LogTabBar
 
     private string GetTabName(LogTabBarPresentation presentation, LogView table)
     {
-        if (table.GroupId?.IsAll == true) { return "Combined"; }
+        if (table.GroupId?.IsAll == true) { return Localizer["TabBar_TabName_Combined"].Value; }
 
         if (table.IsCombined) { return table.LogName; }
 
         string tabName = table.LogPathType is LogPathType.File ?
             Path.GetFileNameWithoutExtension(table.FileName)!.Split("\\").Last() :
-            $"{table.LogName} - {table.ComputerName}";
+            Localizer["TabBar_TabName_Live", table.LogName, table.ComputerName].Value;
 
         if (table.IsLoading) { return tabName; }
 
-        return presentation.IsKnownEmpty(table.Id) ? $"(Empty) {tabName}" : tabName;
+        return presentation.IsKnownEmpty(table.Id) ? Localizer["TabBar_TabName_Empty", tabName].Value : tabName;
+    }
+
+    private string GetTabTooltip(LogView table)
+    {
+        if (table.IsCombined) { return string.Empty; }
+
+        return table.LogPathType == LogPathType.File ?
+            Localizer["TabBar_Tooltip_File", table.FileName ?? string.Empty, table.LogName, table.ComputerName].Value :
+            Localizer["TabBar_Tooltip_Live", table.LogName, table.ComputerName].Value;
     }
 
     private void OnCloseGroupKeyDown(KeyboardEventArgs e, LogTabGroup group)
@@ -370,10 +367,10 @@ public sealed partial class LogTabBar
     private async Task PromptNewGroupAsync(LogView tab)
     {
         string name = await AlertDialogService.DisplayPrompt(
-            "New group",
-            "Group name:",
+            Localizer["TabBar_Prompt_NewGroupTitle"].Value,
+            Localizer["TabBar_Prompt_GroupNameLabel"].Value,
             string.Empty,
-            candidate => string.IsNullOrWhiteSpace(candidate) ? "Group name is required." : null);
+            candidate => string.IsNullOrWhiteSpace(candidate) ? Localizer["TabBar_Prompt_GroupNameRequired"].Value : null);
 
         if (string.IsNullOrWhiteSpace(name)) { return; }
 
@@ -389,10 +386,10 @@ public sealed partial class LogTabBar
     private async Task PromptRenameAsync(LogTabGroup group)
     {
         string name = await AlertDialogService.DisplayPrompt(
-            "Rename group",
-            "Group name:",
+            Localizer["TabBar_Prompt_RenameGroupTitle"].Value,
+            Localizer["TabBar_Prompt_GroupNameLabel"].Value,
             group.Name,
-            candidate => string.IsNullOrWhiteSpace(candidate) ? "Group name is required." : null);
+            candidate => string.IsNullOrWhiteSpace(candidate) ? Localizer["TabBar_Prompt_GroupNameRequired"].Value : null);
 
         if (string.IsNullOrWhiteSpace(name)) { return; }
 

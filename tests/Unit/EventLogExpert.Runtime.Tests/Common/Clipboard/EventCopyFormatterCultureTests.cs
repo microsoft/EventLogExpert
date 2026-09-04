@@ -15,14 +15,6 @@ using System.Globalization;
 
 namespace EventLogExpert.Runtime.Tests.Common.Clipboard;
 
-/// <summary>
-///     Pins the log-table copy path (<see cref="EventCopyFormatter" />, the highest-volume copy surface) as
-///     regional-culture-independent for its structural English: the Full-format <c>"Date: "</c> label and the Markdown
-///     <c>"Description"</c> header stay present under a foreign <see cref="CultureInfo.CurrentCulture" />. The Date VALUE
-///     is CurrentCulture-formatted by design (documented, deferred - <c>loc-copyexport-value-invariance</c>); only the
-///     label is pinned. UICulture localizer-independence is deferred to the copy-localization increment. Contrast culture
-///     fi-FI per <c>EventTableExporterCultureTests</c>.
-/// </summary>
 [Collection(CultureSensitiveCollection.Name)]
 public sealed class EventCopyFormatterCultureTests
 {
@@ -35,20 +27,19 @@ public sealed class EventCopyFormatterCultureTests
         ImmutableList.Create(ColumnName.Level, ColumnName.Source, ColumnName.EventId);
 
     [Fact]
-    public async Task FormatAsync_FullFormat_EmitsEnglishDateLabel_UnderForeignCulture() =>
-        Assert.Contains("Date: ", await FormatUnderContrastCultureAsync(EventCopyFormat.Full), StringComparison.Ordinal);
+    public async Task FormatAsync_FullFormat_RoutesCultureSensitiveDateThroughCopyText() =>
+        Assert.Contains("[[Date(26.8.2026 17.57.05)]]", await FormatUnderContrastCultureAsync(EventCopyFormat.Full), StringComparison.Ordinal);
 
     [Fact]
-    public async Task FormatAsync_MarkdownFormat_EmitsEnglishHeaderRow_UnderForeignCulture()
+    public async Task FormatAsync_MarkdownFormat_RoutesDescriptionHeaderThroughCopyText()
     {
         string result = await FormatUnderContrastCultureAsync(EventCopyFormat.Markdown);
 
-        // Markdown-specific: the pipe-table header with the hardcoded English "Description" column (EventCopyFormatter.cs:166).
-        // Asserting the full "| ... | Description |" row (not a bare "Description") ensures this cannot pass by matching the
-        // Full/line format, which emits no pipe table.
         Assert.StartsWith("|", result, StringComparison.Ordinal);
-        Assert.Contains("| Level | Source | Event ID | Description |", result, StringComparison.Ordinal);
+        Assert.Contains("| Level | Source | Event ID | [[MarkdownDescriptionHeader]] |", result, StringComparison.Ordinal);
     }
+
+    private static IEventCopyText CopyText() => new MarkerEventCopyText();
 
     private static SelectionEntry Entry(EventLocator locator) => new(locator, locator, null);
 
@@ -68,7 +59,7 @@ public sealed class EventCopyFormatterCultureTests
         detailResolver.TryResolve(locator, out Arg.Any<ResolvedEvent?>())
             .Returns(call => { call[1] = @event; return true; });
 
-        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>());
+        var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>(), CopyText());
 
         return await RunUnderCultureAsync(
             CultureInfo.GetCultureInfo("fi-FI"),
@@ -93,5 +84,17 @@ public sealed class EventCopyFormatterCultureTests
             CultureInfo.CurrentCulture = priorCulture;
             CultureInfo.CurrentUICulture = priorUiCulture;
         }
+    }
+
+    private sealed class MarkerEventCopyText : IEventCopyText
+    {
+        public string MarkdownDescriptionHeader => "[[MarkdownDescriptionHeader]]";
+
+        public string FieldLine(EventCopyFullField field, string value) => field switch
+        {
+            EventCopyFullField.DescriptionHeader => "[[DescriptionHeader]]",
+            EventCopyFullField.EventXmlHeader => "[[EventXmlHeader]]",
+            _ => $"[[{field}({value})]]"
+        };
     }
 }

@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
@@ -18,6 +19,7 @@ using Fluxor;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.Web.Virtualization;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
 using System.Globalization;
@@ -62,6 +64,7 @@ public sealed class LogTablePaneGroupingTests : CultureSensitiveBunitContext
         _selectedEvents.Current.Returns(ImmutableList<SelectionEntry>.Empty);
 
         Services.AddLogTablePaneDependencies();
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
         Services.AddImmediateCpuWorkScheduler();
         Services.AddSingleton(_columnDefaults);
         Services.AddSingleton(_eventLogCommands);
@@ -236,7 +239,7 @@ public sealed class LogTablePaneGroupingTests : CultureSensitiveBunitContext
         var cut = RenderGrouped(Collapsed(), Event(1, "Alpha"));
         cut.Find("tr.group-header-row").TriggerEvent("oncontextmenu", new MouseEventArgs { Button = 2 });
 
-        await items!.First(m => m.Label == "Collapse All Groups").OnClickAsync!();
+        await items!.First(m => m.Label == "[[Menu_View_CollapseAllGroups]]").OnClickAsync!();
 
         _logTableCommands.Received(1).SetAllGroupsCollapsed(true);
     }
@@ -254,7 +257,7 @@ public sealed class LogTablePaneGroupingTests : CultureSensitiveBunitContext
         var cut = RenderGrouped(Collapsed(), Event(1, "Alpha"), Event(2, "Alpha"), Event(3, "Beta"));
         cut.Find("tr.group-header-row").TriggerEvent("oncontextmenu", new MouseEventArgs { Button = 2 });
 
-        await items!.First(item => item.Label == "Select Group").OnClickAsync!();
+        await items!.First(item => item.Label == "[[LogTable_SelectGroup]]").OnClickAsync!();
 
         _eventLogCommands.Received(1).SetSelectedEvents(
             Arg.Is<IReadOnlyCollection<SelectionEntry>>(c => c != null && c.Count == 2),
@@ -509,10 +512,10 @@ public sealed class LogTablePaneGroupingTests : CultureSensitiveBunitContext
         cut.Find("tr.group-header-row").TriggerEvent("oncontextmenu", new MouseEventArgs { Button = 2 });
 
         Assert.NotNull(items);
-        Assert.Contains(items!, m => m.Label == "Expand All Groups");
-        Assert.Contains(items!, m => m.Label == "Collapse All Groups");
-        Assert.Contains(items!, m => m.Label == "Group Descending");
-        Assert.Contains(items!, m => m.Label == "Select Group");
+        Assert.Contains(items!, m => m.Label == "[[Menu_View_ExpandAllGroups]]");
+        Assert.Contains(items!, m => m.Label == "[[Menu_View_CollapseAllGroups]]");
+        Assert.Contains(items!, m => m.Label == "[[Menu_View_GroupDescending]]");
+        Assert.Contains(items!, m => m.Label == "[[LogTable_SelectGroup]]");
     }
 
     [Fact]
