@@ -1,13 +1,13 @@
 <aside class="banner banner-attention" role="alert">
-    <span class="banner-message">@AttentionCount @DatabasesLabel @NeedsLabel attention. Open Databases to enable or remove them.</span>
+    <span class="banner-message">@LocalizedCount.OneOrManyRaw(Localizer, AttentionCount, "Banner_Attention_One", "Banner_Attention_Many")</span>
 
     @CycleNav
 
     <Button CssClass="banner-action" OnClick="OnOpenDatabasesClickedAsync">
-        Open Databases
+        @Localizer["Banner_Attention_OpenDatabases"]
     </Button>
 
-    <Button aria-label="Dismiss attention banner"
+    <Button aria-label='@Localizer["Banner_Attention_DismissAria"]'
         CssClass="banner-dismiss"
         IconClass="bi bi-x"
         OnClick="OnDismissAttention" />

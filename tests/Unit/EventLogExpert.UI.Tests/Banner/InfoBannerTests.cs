@@ -2,10 +2,13 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.UI.Banner;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Banner;
@@ -17,6 +20,7 @@ public sealed class InfoBannerTests : BunitContext
     public InfoBannerTests()
     {
         Services.AddSingleton(_infoBannerService);
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }

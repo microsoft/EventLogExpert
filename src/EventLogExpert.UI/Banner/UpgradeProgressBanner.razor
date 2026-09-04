@@ -3,22 +3,22 @@
 
     @if (string.IsNullOrEmpty(Progress.CurrentEntryName))
     {
-        <span class="banner-message">Preparing upgrade of @Progress.CurrentBatchSize @(Progress.CurrentBatchSize == 1 ? "database" : "databases")&hellip;</span>
+        <span class="banner-message">@LocalizedCount.OneOrManyRaw(Localizer, Progress.CurrentBatchSize, "Banner_Upgrade_Preparing_One", "Banner_Upgrade_Preparing_Many")</span>
     }
     else
     {
-        <span class="banner-message">Upgrading database @Progress.CurrentBatchPosition of @Progress.CurrentBatchSize: @Progress.CurrentEntryName &mdash; @Progress.CurrentPhase</span>
+        <span class="banner-message">@Localizer["Banner_Upgrade_InProgress", Progress.CurrentBatchPosition, Progress.CurrentBatchSize, Progress.CurrentEntryName, Progress.CurrentPhase]</span>
     }
 
     @if (Progress.QueuedBatchesAfter > 0)
     {
-        <span class="banner-subtitle">(+@Progress.QueuedBatchesAfter @(Progress.QueuedBatchesAfter == 1 ? "batch" : "batches") queued)</span>
+        <span class="banner-subtitle">@LocalizedCount.OneOrManyRaw(Localizer, Progress.QueuedBatchesAfter, "Banner_Upgrade_QueuedBatches_One", "Banner_Upgrade_QueuedBatches_Many")</span>
     }
 
     @CycleNav
 
     <Button CssClass="banner-action"
         OnClick="() => OnCancelUpgradeClickedAsync(Progress)">
-        Cancel
+        @Localizer["Modal_Cancel"]
     </Button>
 </aside>

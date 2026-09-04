@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Clipboard;
@@ -8,6 +9,7 @@ using EventLogExpert.Runtime.Common.Restart;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.Banner;
 
@@ -16,8 +18,10 @@ public sealed partial class CriticalBanner : ComponentBase, IDisposable
     private static readonly TimeSpan s_copiedFeedbackDuration = TimeSpan.FromSeconds(2);
 
     private CancellationTokenSource? _copiedFeedbackCts;
+    private bool _recoveryFailed;
     private string? _recoveryFailureMessage;
     private Button? _reloadButton;
+    private bool _restartFailed;
     private string? _restartFailureMessage;
     private bool _showCopiedFeedback;
 
@@ -28,6 +32,8 @@ public sealed partial class CriticalBanner : ComponentBase, IDisposable
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
     [Inject] private ICriticalErrorService CriticalErrorService { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
@@ -81,21 +87,26 @@ public sealed partial class CriticalBanner : ComponentBase, IDisposable
 
     private async Task OnRelaunchClickedAsync()
     {
+        _recoveryFailed = false;
         _recoveryFailureMessage = null;
+        _restartFailed = false;
         _restartFailureMessage = null;
 
         bool success = await ApplicationRestartService.TryRestartAsync();
 
         if (!success)
         {
-            _restartFailureMessage = "Restart failed; please close and reopen manually.";
+            _restartFailed = true;
+            _restartFailureMessage = Localizer["Banner_Critical_RestartFailed"];
             StateHasChanged();
         }
     }
 
     private async Task OnReloadClickedAsync()
     {
+        _recoveryFailed = false;
         _recoveryFailureMessage = null;
+        _restartFailed = false;
         _restartFailureMessage = null;
 
         try
@@ -104,7 +115,8 @@ public sealed partial class CriticalBanner : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
-            _recoveryFailureMessage = $"Recovery failed: {ex.Message}";
+            _recoveryFailed = true;
+            _recoveryFailureMessage = Localizer["Banner_Critical_RecoveryFailed", ex.Message];
 
             TraceLogger.Error($"{nameof(CriticalBanner)}.{nameof(OnReloadClickedAsync)}: recovery threw: {ex}");
 
