@@ -1,7 +1,7 @@
 @using EventLogExpert.Runtime.Stats
 @inherits PresentationViewComponentBase
 
-<div aria-label="@Localizer["Stats_AriaLabel"]" class="stats-pane" @ref="_paneElement" role="region">
+<div aria-label="@Localizer["Stats_AriaLabel"]" class="stats-pane" data-pane="stats" @ref="_paneElement" role="region">
     <div class="stats-header">
         <span class="stats-title">@Localizer["Stats_Title"]</span>
         <span class="stats-headline">@HeadlineText()</span>

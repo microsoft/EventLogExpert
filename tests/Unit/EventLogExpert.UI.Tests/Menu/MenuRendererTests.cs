@@ -5,6 +5,7 @@ using Bunit;
 using EventLogExpert.Localization;
 using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 
@@ -38,6 +39,46 @@ public sealed class MenuRendererTests : BunitContext
 
         gate.SetResult([]);
         await activateTask;
+    }
+
+    [Fact]
+    public async Task KeyboardFocusRing_AppearsOnKeyboardNav_AndClearsOnHover()
+    {
+        var items = new[]
+        {
+            MenuItem.Item("First", () => { }),
+            MenuItem.Item("Second", () => { }),
+        };
+
+        // Mouse-opened (OpenedByKeyboard defaults false): the first item is focused but shows no ring.
+        var component = Render<MenuRenderer>(parameters => parameters.Add(p => p.Items, items));
+        Assert.Empty(component.FindAll(".menu-item.keyboard-focused"));
+
+        // Keyboard navigation re-asserts the ring (guards the MoveFocusTo fix).
+        await component.Find("ul.menu-list").KeyDownAsync(new KeyboardEventArgs { Key = "ArrowDown" });
+        Assert.Single(component.FindAll(".menu-item.keyboard-focused"));
+
+        // Hover is a pointer interaction, so it clears the ring even on the already-focused item.
+        await component.FindAll("li.menu-item")[1].MouseEnterAsync(new MouseEventArgs());
+        Assert.Empty(component.FindAll(".menu-item.keyboard-focused"));
+    }
+
+    [Fact]
+    public void KeyboardOpenedMenu_ShowsKeyboardFocusRingOnFirstItem()
+    {
+        var items = new[]
+        {
+            MenuItem.Item("First", () => { }),
+            MenuItem.Item("Second", () => { }),
+        };
+
+        var component = Render<MenuRenderer>(parameters => parameters
+            .Add(p => p.Items, items)
+            .Add(p => p.OpenedByKeyboard, true));
+
+        var focused = component.FindAll(".menu-item.keyboard-focused");
+        Assert.Single(focused);
+        Assert.Equal("First", focused[0].QuerySelector(".menu-label")!.TextContent);
     }
 
     [Fact]

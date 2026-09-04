@@ -1,7 +1,7 @@
 @using EventLogExpert.Scenarios.Catalog
 @inherits AppStateComponentBase
 
-<div class="filter-pane" @ref="_filterPaneRootRef">
+<div aria-label="@Localizer["FilterPane_RegionAria"]" class="filter-pane" data-pane="filters" @ref="_filterPaneRootRef" role="region">
 <div class="filter-header">
     <div class="filter-header-actions">
         <div class="split-button">

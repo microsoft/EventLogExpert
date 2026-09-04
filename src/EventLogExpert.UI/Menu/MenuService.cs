@@ -21,6 +21,8 @@ internal sealed class MenuService : IMenuService
 
     public long ActiveMenuId { get; private set; }
 
+    public bool ActiveOpenedByKeyboard { get; private set; }
+
     public double PositionX { get; private set; }
 
     public double PositionY { get; private set; }
@@ -38,6 +40,7 @@ internal sealed class MenuService : IMenuService
             PositionY = 0;
             ActiveFocusFirst = true;
             ActiveCaptureOpener = true;
+            ActiveOpenedByKeyboard = false;
         }
 
         if (changed) { StateChanged?.Invoke(); }
@@ -45,7 +48,7 @@ internal sealed class MenuService : IMenuService
 
     public void NavigateBar(int direction) => NavigateBarRequested?.Invoke(direction);
 
-    public void OpenAt(double x, double y, IReadOnlyList<MenuItem> items, bool focusFirst = true, bool captureOpener = true)
+    public void OpenAt(double x, double y, IReadOnlyList<MenuItem> items, bool focusFirst = true, bool captureOpener = true, bool openedByKeyboard = false)
     {
         ArgumentNullException.ThrowIfNull(items);
 
@@ -58,6 +61,7 @@ internal sealed class MenuService : IMenuService
             PositionY = y;
             ActiveFocusFirst = focusFirst;
             ActiveCaptureOpener = captureOpener;
+            ActiveOpenedByKeyboard = openedByKeyboard;
         }
 
         StateChanged?.Invoke();

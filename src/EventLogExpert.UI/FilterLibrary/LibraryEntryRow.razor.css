@@ -133,7 +133,7 @@
 
 .library-entry-tag-chip ::deep .library-entry-tag-chip-remove:focus-visible {
     opacity: 1;
-    outline: 2px solid var(--clr-statusbar);
+    outline: 1px solid var(--clr-statusbar);
     outline-offset: 1px;
 }
 
@@ -181,7 +181,7 @@
 }
 
 .library-entry ::deep .library-entry-tag-add-inline:focus-visible {
-    outline: 2px solid var(--clr-statusbar);
+    outline: 1px solid var(--clr-statusbar);
     outline-offset: 1px;
 }
 

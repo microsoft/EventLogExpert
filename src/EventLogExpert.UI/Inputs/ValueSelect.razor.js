@@ -1,10 +1,45 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+// A <label for="..."> click focuses the associated input WITHOUT dispatching mousedown on the input,
+// so the per-input pointer marker below would miss it and the combobox would wrongly show its
+// keyboard ring on a mouse click. One document-level pointerdown listener (registered once) marks the
+// ValueSelect input a label points at, so label clicks are correctly treated as pointer focus.
+let labelPointerListenerRegistered = false;
+
+function ensureLabelPointerListener() {
+    if (labelPointerListenerRegistered) { return; }
+    labelPointerListenerRegistered = true;
+
+    document.addEventListener("pointerdown", (e) => {
+        const label = e.target && e.target.closest ? e.target.closest("label[for]") : null;
+        if (!label) { return; }
+
+        const target = document.getElementById(label.getAttribute("for"));
+        // Skip disabled targets: they cannot take focus, so the input's own focus/keydown/blur would
+        // never clear the marker, and it would wrongly suppress the keyboard ring once re-enabled.
+        if (target && !target.disabled && target.closest(".dropdown-input")) {
+            target.setAttribute("data-pointer-focus", "");
+        }
+    }, true);
+
+    // A pointerdown marker only holds meaning if that pointer interaction actually delivers focus to the
+    // input. If it does not (press then drag off the label), the marker would go stale and suppress the
+    // ring on a later Tab arrival. Any keydown means the user switched to the keyboard, so clear every
+    // lingering marker; the focused input then matches the keyboard-only :focus ring again.
+    document.addEventListener("keydown", () => {
+        document.querySelectorAll(".dropdown-input [data-pointer-focus]").forEach((el) => {
+            el.removeAttribute("data-pointer-focus");
+        });
+    }, true);
+}
+
 export function registerDropdown(root, dotNetRef) {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
     const input = root.getElementsByTagName("input")[0];
     const controller = new AbortController();
+
+    ensureLabelPointerListener();
 
     const closeDropdown = (e, force = false) => {
         const target = e.currentTarget.parentNode;
@@ -56,12 +91,20 @@ export function registerDropdown(root, dotNetRef) {
     };
 
     input.addEventListener("mousedown", (e) => {
+        // Mark pointer-originated focus so the keyboard-only ring (ValueSelect.razor.css) stays off on
+        // click. mousedown fires before focus, so the marker is set before :focus matches; it is
+        // cleared on keydown/blur.
+        input.setAttribute("data-pointer-focus", "");
+
         e.stopPropagation();
 
         toggle(e);
     }, { signal: controller.signal });
 
     input.addEventListener("keydown", (e) => {
+        // Keyboard use: allow the keyboard-only focus ring to appear.
+        input.removeAttribute("data-pointer-focus");
+
         // Arrow keys drive dropdown navigation and Enter opens/commits the dropdown, so suppress the
         // browser defaults here: caret-move/scroll for arrows, and Enter submitting an enclosing form
         // (e.g. a select nested in an EditForm). Space opens a select-only (readonly) list, so cancel
@@ -74,7 +117,10 @@ export function registerDropdown(root, dotNetRef) {
         }
     }, { signal: controller.signal });
 
-    input.addEventListener("blur", (e) => closeDropdown(e), { signal: controller.signal });
+    input.addEventListener("blur", (e) => {
+        input.removeAttribute("data-pointer-focus");
+        closeDropdown(e);
+    }, { signal: controller.signal });
     dropdown.addEventListener("blur", (e) => closeDropdown(e), { signal: controller.signal });
 
     // Native title tooltip, only when the text is actually clipped (scrollWidth > clientWidth): recovers a long

@@ -275,12 +275,29 @@ public sealed class LibraryEntryRowTests : BunitContext
         var entry = BuildSavedFilter("X");
         var component = RenderRow(entry);
 
-        await component.Find("button[aria-label^='More actions for']").ClickAsync(new MouseEventArgs());
+        await component.Find("button[aria-label^='More actions for']").ClickAsync(new MouseEventArgs { Detail = 1 });
 
         _menuService.Received(1).OpenAt(
             Arg.Any<double>(),
             Arg.Any<double>(),
             Arg.Any<IReadOnlyList<MenuItem>>());
+    }
+
+    [Fact]
+    public async Task MoreButtonKeyboardActivation_OpensMenuWithKeyboardFocusFlag()
+    {
+        var entry = BuildSavedFilter("X");
+        var component = RenderRow(entry);
+
+        await component.Find("button[aria-label^='More actions for']").ClickAsync(new MouseEventArgs { Detail = 0 });
+
+        _menuService.Received(1).OpenAt(
+            Arg.Any<double>(),
+            Arg.Any<double>(),
+            Arg.Any<IReadOnlyList<MenuItem>>(),
+            Arg.Any<bool>(),
+            Arg.Any<bool>(),
+            true);
     }
 
     [Fact]
@@ -526,7 +543,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         IReadOnlyList<MenuItem>? captured = null;
         _menuService.WhenForAnyArgs(s => s.OpenAt(0, 0, null!, false, false))
             .Do(call => captured = call.ArgAt<IReadOnlyList<MenuItem>>(2));
-        await component.Find("button[aria-label^='More actions for']").ClickAsync(new MouseEventArgs());
+        await component.Find("button[aria-label^='More actions for']").ClickAsync(new MouseEventArgs { Detail = 1 });
         Assert.NotNull(captured);
         return captured;
     }

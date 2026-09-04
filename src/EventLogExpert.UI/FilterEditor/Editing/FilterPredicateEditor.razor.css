@@ -80,8 +80,8 @@
 
 .filter-predicate ::deep .filter-predicate-edit:focus-visible,
 .filter-predicate ::deep .filter-predicate-remove:focus-visible {
-    outline: 2px solid var(--toggle-accent);
-    outline-offset: -2px;
+    outline: 1px solid var(--toggle-accent);
+    outline-offset: -1px;
 }
 
 @media (forced-colors: active) {
@@ -147,7 +147,7 @@
 }
 
 .filter-predicate-editing ::deep .filter-predicate-and-or:focus-visible {
-    outline: 2px solid var(--toggle-accent);
+    outline: 1px solid var(--toggle-accent);
     outline-offset: 2px;
 }
 

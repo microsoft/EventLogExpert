@@ -728,11 +728,11 @@ public sealed partial class FilterPane
     {
         if (e.Key is "ArrowDown")
         {
-            await OpenAddFilterMenuAtAsync(true);
+            await OpenAddFilterMenuAtAsync(true, openedByKeyboard: true);
         }
         else if (e.Key is "ArrowUp")
         {
-            await OpenAddFilterMenuAtAsync(false);
+            await OpenAddFilterMenuAtAsync(false, openedByKeyboard: true);
         }
     }
 
@@ -780,9 +780,10 @@ public sealed partial class FilterPane
 
     private void OnRowDisposed(FilterId id) => _rowRefs.Remove(id);
 
-    private async Task OpenAddFilterMenuAsync() => await OpenAddFilterMenuAtAsync(true);
+    private async Task OpenAddFilterMenuAsync(MouseEventArgs args) =>
+        await OpenAddFilterMenuAtAsync(true, MenuButtonActivation.WasKeyboardTriggered(args));
 
-    private async Task OpenAddFilterMenuAtAsync(bool focusFirst)
+    private async Task OpenAddFilterMenuAtAsync(bool focusFirst, bool openedByKeyboard = false)
     {
         if (_addFilterChevron is not { } chevronButton) { return; }
 
@@ -790,7 +791,7 @@ public sealed partial class FilterPane
             "import", "./_content/EventLogExpert.UI/Menu/MenuAnchor.js");
 
         var rect = await _menuAnchorModule.InvokeAsync<MenuAnchorRect>("getMenuElementRect", chevronButton.Element);
-        MenuService.OpenAt(rect.Left, rect.Bottom, BuildAddFilterMenu(), focusFirst);
+        MenuService.OpenAt(rect.Left, rect.Bottom, BuildAddFilterMenu(), focusFirst, openedByKeyboard: openedByKeyboard);
         _addFilterMenuId = MenuService.ActiveMenuId;
         StateHasChanged();
     }

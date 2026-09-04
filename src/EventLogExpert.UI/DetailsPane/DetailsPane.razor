@@ -4,7 +4,7 @@
     bool showsLiveModel = _model is not null && _selectedHandle == EventFocus.Current?.CurrentHandle;
 }
 
-<div class="details-pane" data-toggle="@IsExpanded" hidden="@(_selectedEvent is null)">
+<div aria-label="@Localizer["Details_RegionAria"]" class="details-pane" data-pane="details" data-toggle="@IsExpanded" hidden="@(_selectedEvent is null)" role="region">
     <div class="details-resizer"></div>
 
     <div class="details-headerbar">

@@ -199,7 +199,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
             MenuItem.Item("Remove", () => OnRemove.InvokeAsync()),
         };
 
-        MenuService.OpenAt(args.ClientX, args.ClientY, items);
+        MenuService.OpenAt(args.ClientX, args.ClientY, items, openedByKeyboard: ContextMenuInvocation.WasKeyboardTriggered(args));
     }
 
     private void OnCancelClick()

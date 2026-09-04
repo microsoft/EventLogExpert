@@ -948,7 +948,7 @@ public sealed partial class LogTablePane
         AppendCellFilterItems(items, detail, column);
         items.AddRange(ShowContextMenuItems(detail));
 
-        MenuService.OpenAt(args.ClientX, args.ClientY, items);
+        MenuService.OpenAt(args.ClientX, args.ClientY, items, openedByKeyboard: ContextMenuInvocation.WasKeyboardTriggered(args));
     }
 
     private void InvokeContextMenu(MouseEventArgs args)
@@ -957,17 +957,17 @@ public sealed partial class LogTablePane
 
         if (!_activeDisplayedEvents.TryGetDetail(handle, out var clicked)) { return; }
 
-        MenuService.OpenAt(args.ClientX, args.ClientY, ShowContextMenuItems(clicked));
+        MenuService.OpenAt(args.ClientX, args.ClientY, ShowContextMenuItems(clicked), openedByKeyboard: ContextMenuInvocation.WasKeyboardTriggered(args));
     }
 
     private void InvokeGroupContextMenu(MouseEventArgs args, EventGroup group)
     {
         SetCursorHeader(group.Key);
-        MenuService.OpenAt(args.ClientX, args.ClientY, ShowGroupContextMenuItems(group));
+        MenuService.OpenAt(args.ClientX, args.ClientY, ShowGroupContextMenuItems(group), openedByKeyboard: ContextMenuInvocation.WasKeyboardTriggered(args));
     }
 
     private void InvokeTableColumnMenu(MouseEventArgs args) =>
-        MenuService.OpenAt(args.ClientX, args.ClientY, ShowColumnMenuItems());
+        MenuService.OpenAt(args.ClientX, args.ClientY, ShowColumnMenuItems(), openedByKeyboard: ContextMenuInvocation.WasKeyboardTriggered(args));
 
     private bool IsGridBusy() =>
         Presentation.IndicatorKind == DisplayIndicatorKind.EmptyPending || _busyHeldForRefresh;

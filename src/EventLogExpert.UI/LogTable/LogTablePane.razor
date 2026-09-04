@@ -66,7 +66,7 @@
         </tr>;
 }
 
-<div class="table-find-host">
+<div class="table-find-host" data-pane="table">
     @if (_findOpen)
     {
         <FindBar CaseSensitive="_findCaseSensitive"
@@ -84,7 +84,7 @@
             WholeWordChanged="OnFindWholeWordChanged"
             WrapAnnouncement="@_findWrapAnnouncement" />
     }
-    <div aria-labelledby="eventTable" class="table-container" @onkeydown="HandleKeyDown" role="region" tabindex="0">
+    <div aria-labelledby="eventTable" class="table-container" data-pane="table" data-pane-entry @onkeydown="HandleKeyDown" role="region" tabindex="0">
         @if (_indicator.Spinner)
         {
             <div aria-hidden="true" class="table-indicator">
@@ -95,8 +95,8 @@
                 }
             </div>
         }
-        <table aria-label="Event Log Table"
-            aria-busy="@(IsGridBusy() ? "true" : null)"
+        <table aria-busy="@(IsGridBusy() ? "true" : null)"
+            aria-label="Event Log Table"
             aria-multiselectable="true"
             aria-rowcount="@GetAriaRowCount()"
             id="eventTable"

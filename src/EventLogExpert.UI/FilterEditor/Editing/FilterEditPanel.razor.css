@@ -60,7 +60,7 @@
 }
 
 .filter-edit-panel-actions ::deep button.button-green:focus-visible {
-    outline: 2px solid var(--clr-green);
+    outline: 1px solid var(--clr-green);
     outline-offset: 2px;
 }
 
@@ -76,7 +76,7 @@
 }
 
 .filter-edit-panel-content ::deep .filter-exclude-toggle:focus-visible {
-    outline: 2px solid var(--toggle-accent);
+    outline: 1px solid var(--toggle-accent);
     outline-offset: 2px;
 }
 
@@ -95,8 +95,8 @@
     border-color: var(--text-secondary);
 }
 
-.color-picker-wrapper[data-filter-excluded="true"] ::deep input.color-dropdown:focus-visible {
-    outline: 2px solid var(--toggle-accent);
+.color-picker-wrapper[data-filter-excluded="true"] ::deep input.color-dropdown:focus:not([data-pointer-focus]) {
+    outline: 1px solid var(--toggle-accent);
     outline-offset: 2px;
 }
 

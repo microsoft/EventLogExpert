@@ -11,6 +11,7 @@ using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
 
@@ -410,7 +411,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     private void ToggleExpand() => _isExpanded = !_isExpanded;
 
-    private async Task ToggleMoreMenuAsync()
+    private async Task ToggleMoreMenuAsync(MouseEventArgs args)
     {
         if (IsMoreMenuOpen) { MenuService.Close(); return; }
 
@@ -422,7 +423,8 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
                 "import", "./_content/EventLogExpert.UI/Menu/MenuAnchor.js");
 
             var rect = await _menuAnchorModule.InvokeAsync<MenuAnchorRect>("getMenuElementRect", moreMenuButton.Element);
-            MenuService.OpenAt(rect.Left, rect.Bottom, BuildMoreMenu(), focusFirst: true);
+            MenuService.OpenAt(rect.Left, rect.Bottom, BuildMoreMenu(), focusFirst: true,
+                openedByKeyboard: MenuButtonActivation.WasKeyboardTriggered(args));
             _moreMenuId = MenuService.ActiveMenuId;
             StateHasChanged();
         }

@@ -134,6 +134,8 @@ public sealed class MenuHostHandoffTests : BunitContext
 
         public long ActiveMenuId { get; private set; }
 
+        public bool ActiveOpenedByKeyboard { get; private set; }
+
         public double PositionX { get; private set; }
 
         public double PositionY { get; private set; }
@@ -148,6 +150,7 @@ public sealed class MenuHostHandoffTests : BunitContext
             PositionY = 0;
             ActiveCaptureOpener = true;
             ActiveFocusFirst = true;
+            ActiveOpenedByKeyboard = false;
             StateChanged?.Invoke();
         }
 
@@ -161,7 +164,8 @@ public sealed class MenuHostHandoffTests : BunitContext
             double y,
             IReadOnlyList<MenuItem> items,
             bool focusFirst = true,
-            bool captureOpener = true)
+            bool captureOpener = true,
+            bool openedByKeyboard = false)
         {
             ArgumentNullException.ThrowIfNull(items);
 
@@ -172,6 +176,7 @@ public sealed class MenuHostHandoffTests : BunitContext
             PositionY = y;
             ActiveFocusFirst = focusFirst;
             ActiveCaptureOpener = captureOpener;
+            ActiveOpenedByKeyboard = openedByKeyboard;
             StateChanged?.Invoke();
         }
     }

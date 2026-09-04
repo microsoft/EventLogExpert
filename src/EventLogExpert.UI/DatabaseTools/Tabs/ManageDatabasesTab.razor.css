@@ -60,7 +60,7 @@
 }
 
 .manage-databases-tab ::deep .manage-databases-master-btn:focus-visible {
-    outline: 2px solid var(--clr-lightblue);
+    outline: 1px solid var(--clr-lightblue);
     outline-offset: 2px;
     border-radius: 2px;
 }

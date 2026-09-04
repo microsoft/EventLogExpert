@@ -86,6 +86,10 @@
     --border-divider:      light-dark(rgba(0, 0, 0, 0.2),      rgba(255, 255, 255, 0.18));
     --menu-hover-overlay:  light-dark(rgba(0, 0, 0, 0.12),     rgba(255, 255, 255, 0.18));
 
+    /* Shared highlight background for menu items (menu-bar dropdowns + right-click menus) and
+       value-select dropdown options, so their hover/focus highlight is defined in one place. */
+    --menu-item-highlight-bg: var(--background-darkgray);
+
     /* Z-index layers. Keep all stacking decisions in one place so
        components compose predictably. Spaced by 20 to leave room for new
        layers without renumbering existing ones. */
@@ -171,9 +175,19 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* One 1px focus ring, defined once. Ordinary controls use the browser's native :focus-visible,
+   which is keyboard-only and immune to mouse movement; components override only --focus-ring-color
+   for their contextual color. Menus and the value-select input opt out and gate the ring on input
+   origin themselves (they move focus on hover / match :focus-visible on click). */
+:root {
+    --focus-ring-width: 1px;
+    --focus-ring-color: var(--clr-lightblue);
+    --focus-ring-offset: -1px;
+}
+
 :focus-visible {
-    outline: 2px solid var(--clr-lightblue);
-    outline-offset: 2px;
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -319,8 +333,8 @@ a { color: var(--clr-lightblue); }
 .flex-column-scroll:focus { outline: none; }
 
 .flex-column-scroll:focus-visible {
-    outline: 2px solid var(--clr-lightblue);
-    outline-offset: -2px;
+    outline: 1px solid var(--clr-lightblue);
+    outline-offset: -1px;
 }
 
 .indent { margin-left: 1rem; }
@@ -349,7 +363,7 @@ input[type="text"].input { padding: 0; }
 
 input[type="text"].input.dialog-input { padding: .25rem 0; }
 
-.input.filter-dropdown { width: 120px; }
+.input.filter-dropdown { width: 160px; }
 
 .input.filter-mode-dropdown { width: 90px; }
 

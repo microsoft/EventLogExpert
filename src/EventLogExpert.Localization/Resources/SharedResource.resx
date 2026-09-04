@@ -827,6 +827,9 @@
   <data name="Details_TabLabel" xml:space="preserve">
     <value>Details</value>
   </data>
+  <data name="Details_RegionAria" xml:space="preserve">
+    <value>Event details</value>
+  </data>
   <data name="Details_XmlTabLabel" xml:space="preserve">
     <value>XML</value>
     <comment>XML is a format proper noun.</comment>
@@ -2115,6 +2118,9 @@
   </data>
   <data name="FilterPane_AddMenuAria" xml:space="preserve">
     <value>Choose filter mode</value>
+  </data>
+  <data name="FilterPane_RegionAria" xml:space="preserve">
+    <value>Filters</value>
   </data>
   <data name="FilterPane_Action_AddExclusion" xml:space="preserve">
     <value>Add Exclusion</value>
