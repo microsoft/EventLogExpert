@@ -1,9 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.Banner;
 
@@ -14,6 +16,8 @@ public sealed partial class ErrorBanner : ComponentBase
     [Parameter] public ErrorBannerEntry Entry { get; set; } = null!;
 
     [Inject] private IErrorBannerService ErrorBannerService { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 

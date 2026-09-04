@@ -225,6 +225,103 @@
     <value>Alert</value>
     <comment>Accessible name for a titleless inline alert.</comment>
   </data>
+  <!-- Banner components: chrome, fallback errors, and progress text. -->
+  <data name="Banner_Attention_DismissAria" xml:space="preserve">
+    <value>Dismiss attention banner</value>
+    <comment>Accessible label for the attention banner dismiss button.</comment>
+  </data>
+  <data name="Banner_Attention_ErrorTitle" xml:space="preserve">
+    <value>Databases</value>
+    <comment>Title used when the attention banner posts a fallback database error.</comment>
+  </data>
+  <data name="Banner_Attention_Many" xml:space="preserve">
+    <value>{0} databases need attention. Open Databases to enable or remove them.</value>
+    <comment>Attention banner message for multiple databases. {0} is a raw database count.</comment>
+  </data>
+  <data name="Banner_Attention_One" xml:space="preserve">
+    <value>{0} database needs attention. Open Databases to enable or remove them.</value>
+    <comment>Attention banner message for one database. {0} is the raw database count.</comment>
+  </data>
+  <data name="Banner_Attention_OpenDatabases" xml:space="preserve">
+    <value>Open Databases</value>
+    <comment>Button text that opens the database tools from the attention banner.</comment>
+  </data>
+  <data name="Banner_Attention_OpenFailed" xml:space="preserve">
+    <value>Failed to open databases; try again from the menu.</value>
+    <comment>Fallback error message when the database tools action returns unsuccessful with no detail.</comment>
+  </data>
+  <data name="Banner_Attention_OpenFailedDetail" xml:space="preserve">
+    <value>Failed to open databases: {0}</value>
+    <comment>Fallback error message when opening database tools throws. {0} is the exception message.</comment>
+  </data>
+  <data name="Banner_Critical_Copied" xml:space="preserve">
+    <value>Copied</value>
+    <comment>Temporary status chip shown after copying critical-error details.</comment>
+  </data>
+  <data name="Banner_Critical_CopyDetails" xml:space="preserve">
+    <value>Copy details</value>
+    <comment>Button text for copying critical-error details.</comment>
+  </data>
+  <data name="Banner_Critical_RecoveryFailed" xml:space="preserve">
+    <value>Recovery failed: {0}</value>
+    <comment>Critical banner recovery failure subtitle. {0} is the exception message.</comment>
+  </data>
+  <data name="Banner_Critical_Relaunch" xml:space="preserve">
+    <value>Relaunch</value>
+    <comment>Button text for restarting the app after a critical error.</comment>
+  </data>
+  <data name="Banner_Critical_Reload" xml:space="preserve">
+    <value>Reload</value>
+    <comment>Button text for retrying recovery after a critical error.</comment>
+  </data>
+  <data name="Banner_Critical_RestartFailed" xml:space="preserve">
+    <value>Restart failed; please close and reopen manually.</value>
+    <comment>Critical banner subtitle shown when app relaunch fails.</comment>
+  </data>
+  <data name="Banner_Critical_Unexpected" xml:space="preserve">
+    <value>An unexpected error occurred: {0}: {1}</value>
+    <comment>Critical banner headline. {0} is the exception type name; {1} is the exception message.</comment>
+  </data>
+  <data name="Banner_Error_DismissAria" xml:space="preserve">
+    <value>Dismiss error banner</value>
+    <comment>Accessible label for the error banner dismiss button.</comment>
+  </data>
+  <data name="Banner_Info_DismissAria" xml:space="preserve">
+    <value>Dismiss banner</value>
+    <comment>Accessible label for the info or warning banner dismiss button.</comment>
+  </data>
+  <data name="Banner_Nav_NextAria" xml:space="preserve">
+    <value>Next banner</value>
+    <comment>Accessible label for the banner carousel next button.</comment>
+  </data>
+  <data name="Banner_Nav_PreviousAria" xml:space="preserve">
+    <value>Previous banner</value>
+    <comment>Accessible label for the banner carousel previous button.</comment>
+  </data>
+  <data name="Banner_Pagination" xml:space="preserve">
+    <value>{0} of {1}</value>
+    <comment>Banner carousel page count. {0} is the displayed banner index; {1} is the total banner count.</comment>
+  </data>
+  <data name="Banner_Upgrade_InProgress" xml:space="preserve">
+    <value>Upgrading database {0} of {1}: {2} - {3}</value>
+    <comment>Upgrade progress banner message. {0} is current batch position; {1} is batch size; {2} is database name; {3} is the raw upgrade phase.</comment>
+  </data>
+  <data name="Banner_Upgrade_Preparing_Many" xml:space="preserve">
+    <value>Preparing upgrade of {0} databases…</value>
+    <comment>Upgrade progress preparing message for multiple databases. {0} is the raw database count.</comment>
+  </data>
+  <data name="Banner_Upgrade_Preparing_One" xml:space="preserve">
+    <value>Preparing upgrade of {0} database…</value>
+    <comment>Upgrade progress preparing message for one database. {0} is the raw database count.</comment>
+  </data>
+  <data name="Banner_Upgrade_QueuedBatches_Many" xml:space="preserve">
+    <value>(+{0} batches queued)</value>
+    <comment>Upgrade progress subtitle for multiple queued batches. {0} is the raw queued-batch count.</comment>
+  </data>
+  <data name="Banner_Upgrade_QueuedBatches_One" xml:space="preserve">
+    <value>(+{0} batch queued)</value>
+    <comment>Upgrade progress subtitle for one queued batch. {0} is the raw queued-batch count.</comment>
+  </data>
   <!-- Dashboard (empty-state welcome screen): masthead + Quick Launch. -->
   <data name="Dashboard_Lead" xml:space="preserve">
     <value>Open a log to get started, or jump straight into a common investigation.</value>
@@ -1504,10 +1601,10 @@
     <comment>{0} is the filter expression text authored by the user or loaded from the library.</comment>
   </data>
   <data name="FilterEditor_ExcludeToggle_TitleExcluded" xml:space="preserve">
-    <value>Excluded — click to include</value>
+    <value>Excluded - click to include</value>
   </data>
   <data name="FilterEditor_ExcludeToggle_TitleIncluded" xml:space="preserve">
-    <value>Included — click to exclude</value>
+    <value>Included - click to exclude</value>
   </data>
   <data name="FilterEditor_RowHeader_NoFilterSpecified" xml:space="preserve">
     <value>No Filter Specified</value>

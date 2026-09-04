@@ -1,8 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Banner;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.Banner;
 
@@ -21,6 +23,8 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
     [Inject] private IExportProgressBannerService ExportProgressBannerService { get; init; } = null!;
 
     [Inject] private IInfoBannerService InfoBannerService { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private IProgressBannerService ProgressBannerService { get; init; } = null!;
 

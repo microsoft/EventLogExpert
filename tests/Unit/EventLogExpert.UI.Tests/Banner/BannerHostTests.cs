@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Clipboard;
@@ -14,6 +15,7 @@ using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Banner;
@@ -52,6 +54,7 @@ public sealed class BannerHostTests : BunitContext
         Services.AddSingleton(_menuActionService);
         Services.AddSingleton(_modalCoordinator);
         Services.AddSingleton(_traceLogger);
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
@@ -113,7 +116,7 @@ public sealed class BannerHostTests : BunitContext
 
         var banner = component.Find("aside.banner-error");
         var pagination = component.Find("aside.banner-error .banner-pagination");
-        Assert.Equal("1 of 2", pagination.TextContent.Trim());
+        Assert.Equal("[[Banner_Pagination(1|2)]]", pagination.TextContent.Trim());
         Assert.Contains("Err: msg", banner.TextContent);
     }
 
@@ -128,31 +131,31 @@ public sealed class BannerHostTests : BunitContext
         var component = Render<BannerHost>();
 
         Assert.Contains("First: first message", component.Find("aside.banner-info").TextContent);
-        Assert.Equal("1 of 3", component.Find(".banner-pagination").TextContent.Trim());
+        Assert.Equal("[[Banner_Pagination(1|3)]]", component.Find(".banner-pagination").TextContent.Trim());
 
         await component.Find("button.banner-cycle-next").ClickAsync(new MouseEventArgs());
 
         Assert.Contains("Second: second message", component.Find("aside.banner-info").TextContent);
         Assert.DoesNotContain("First", component.Find("aside.banner-info").TextContent);
-        Assert.Equal("2 of 3", component.Find(".banner-pagination").TextContent.Trim());
+        Assert.Equal("[[Banner_Pagination(2|3)]]", component.Find(".banner-pagination").TextContent.Trim());
 
         await component.Find("button.banner-cycle-next").ClickAsync(new MouseEventArgs());
 
         Assert.Contains("Third: third message", component.Find("aside.banner-info").TextContent);
         Assert.DoesNotContain("Second", component.Find("aside.banner-info").TextContent);
-        Assert.Equal("3 of 3", component.Find(".banner-pagination").TextContent.Trim());
+        Assert.Equal("[[Banner_Pagination(3|3)]]", component.Find(".banner-pagination").TextContent.Trim());
 
         await component.Find("button.banner-cycle-prev").ClickAsync(new MouseEventArgs());
 
         Assert.Contains("Second: second message", component.Find("aside.banner-info").TextContent);
         Assert.DoesNotContain("Third", component.Find("aside.banner-info").TextContent);
-        Assert.Equal("2 of 3", component.Find(".banner-pagination").TextContent.Trim());
+        Assert.Equal("[[Banner_Pagination(2|3)]]", component.Find(".banner-pagination").TextContent.Trim());
 
         await component.Find("button.banner-cycle-prev").ClickAsync(new MouseEventArgs());
 
         Assert.Contains("First: first message", component.Find("aside.banner-info").TextContent);
         Assert.DoesNotContain("Second", component.Find("aside.banner-info").TextContent);
-        Assert.Equal("1 of 3", component.Find(".banner-pagination").TextContent.Trim());
+        Assert.Equal("[[Banner_Pagination(1|3)]]", component.Find(".banner-pagination").TextContent.Trim());
     }
 
     [Fact]
@@ -170,7 +173,7 @@ public sealed class BannerHostTests : BunitContext
 
         await next.ClickAsync(new MouseEventArgs());
 
-        Assert.Equal("2 of 2", component.Find(".banner-pagination").TextContent.Trim());
+        Assert.Equal("[[Banner_Pagination(2|2)]]", component.Find(".banner-pagination").TextContent.Trim());
         Assert.Single(component.FindAll("aside.banner-attention"));
     }
 
@@ -185,7 +188,7 @@ public sealed class BannerHostTests : BunitContext
         await component.Find("button.banner-cycle-next").ClickAsync(new MouseEventArgs());
 
         var pagination = component.Find(".banner-pagination");
-        Assert.Equal("2 of 2", pagination.TextContent.Trim());
+        Assert.Equal("[[Banner_Pagination(2|2)]]", pagination.TextContent.Trim());
         Assert.Single(component.FindAll("aside.banner-attention"));
         Assert.Empty(component.FindAll("aside.banner-error"));
     }
@@ -203,7 +206,7 @@ public sealed class BannerHostTests : BunitContext
 
         await prev.ClickAsync(new MouseEventArgs());
 
-        Assert.Equal("1 of 2", component.Find(".banner-pagination").TextContent.Trim());
+        Assert.Equal("[[Banner_Pagination(1|2)]]", component.Find(".banner-pagination").TextContent.Trim());
         Assert.Single(component.FindAll("aside.banner-error"));
     }
 
@@ -218,7 +221,7 @@ public sealed class BannerHostTests : BunitContext
         var component = Render<BannerHost>();
         await component.Find("button.banner-cycle-next").ClickAsync(new MouseEventArgs());
         Assert.Contains("Second: second message", component.Find("aside.banner-error").TextContent);
-        Assert.Equal("2 of 3", component.Find(".banner-pagination").TextContent.Trim());
+        Assert.Equal("[[Banner_Pagination(2|3)]]", component.Find(".banner-pagination").TextContent.Trim());
 
         _errorBannerService.ErrorBanners.Returns([e1, e2]);
         _errorBannerService.StateChanged += Raise.Event<Action>();
@@ -226,7 +229,7 @@ public sealed class BannerHostTests : BunitContext
         component.WaitForState(() =>
         {
             var pages = component.FindAll(".banner-pagination");
-            return pages.Count > 0 && pages[0].TextContent.Trim() == "1 of 2";
+            return pages.Count > 0 && pages[0].TextContent.Trim() == "[[Banner_Pagination(1|2)]]";
         });
 
         Assert.Contains("Second: second message", component.Find("aside.banner-error").TextContent);
@@ -273,7 +276,7 @@ public sealed class BannerHostTests : BunitContext
         Assert.DoesNotContain("Second", banner.TextContent);
 
         var pagination = component.Find("aside.banner-error .banner-pagination");
-        Assert.Equal("1 of 2", pagination.TextContent.Trim());
+        Assert.Equal("[[Banner_Pagination(1|2)]]", pagination.TextContent.Trim());
     }
 
     [Fact]
@@ -291,15 +294,15 @@ public sealed class BannerHostTests : BunitContext
         var newErrorId = BannerId.Create();
         var newError = new ErrorBannerEntry(
             newErrorId,
-            "Databases",
-            "Failed to open databases; try again from the menu.",
+            "[[Banner_Attention_ErrorTitle]]",
+            "[[Banner_Attention_OpenFailed]]",
             null,
             null,
             DateTime.UtcNow);
 
         _attentionBannerService.AttentionEntries.Returns([attention]);
         _menuActionService.OpenDatabaseToolsAsync().Returns(Task.FromResult(false));
-        _errorBannerService.ReportError("Databases", Arg.Any<string>())
+        _errorBannerService.ReportError("[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailed]]")
             .Returns(_ =>
             {
                 _errorBannerService.ErrorBanners.Returns([newError]);
@@ -315,7 +318,7 @@ public sealed class BannerHostTests : BunitContext
         component.WaitForState(() => component.FindAll("aside.banner-error").Count > 0);
 
         var errorBanner = component.Find("aside.banner-error");
-        Assert.Contains("Failed to open databases; try again from the menu.", errorBanner.TextContent);
+        Assert.Contains("[[Banner_Attention_OpenFailed]]", errorBanner.TextContent);
         Assert.Empty(component.FindAll("aside.banner-attention"));
     }
 
@@ -350,6 +353,18 @@ public sealed class BannerHostTests : BunitContext
     }
 
     [Fact]
+    public void Render_AsInsideModalLocation_WithNoModalActive_RendersNothing()
+    {
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _modalCoordinator.ActiveSession.Returns((ModalSession?)null);
+
+        var component = Render<BannerHost>(parameters => parameters
+            .Add(p => p.Location, BannerHostLocation.InsideModal));
+
+        Assert.Empty(component.FindAll("aside.banner-attention"));
+    }
+
+    [Fact]
     public void Render_AsInsideModal_WithDatabaseToolsModalActive_OmitsAttentionBanner_RendersOtherBanners()
     {
         var errorEntry = new ErrorBannerEntry(
@@ -381,18 +396,6 @@ public sealed class BannerHostTests : BunitContext
             .Add(p => p.Location, BannerHostLocation.InsideModal));
 
         Assert.Single(component.FindAll("aside.banner-attention"));
-    }
-
-    [Fact]
-    public void Render_AsInsideModalLocation_WithNoModalActive_RendersNothing()
-    {
-        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
-        _modalCoordinator.ActiveSession.Returns((ModalSession?)null);
-
-        var component = Render<BannerHost>(parameters => parameters
-            .Add(p => p.Location, BannerHostLocation.InsideModal));
-
-        Assert.Empty(component.FindAll("aside.banner-attention"));
     }
 
     [Fact]

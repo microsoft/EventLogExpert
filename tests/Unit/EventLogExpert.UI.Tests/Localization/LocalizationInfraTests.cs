@@ -112,7 +112,7 @@ public sealed class LocalizationInfraTests
             RegexOptions.Compiled);
         var keyLiteralPattern = new Regex(@"""([A-Za-z0-9_]+)""", RegexOptions.Compiled);
         var oneOrManyPattern = new Regex(
-            @"OneOrMany\([^;{}]*?""([A-Za-z0-9_]+)""\s*,\s*""([A-Za-z0-9_]+)""\s*\)",
+            @"OneOrMany(?:Raw)?\([^;{}]*?""([A-Za-z0-9_]+)""\s*,\s*""([A-Za-z0-9_]+)""\s*\)",
             RegexOptions.Compiled);
 
         var sources = LocalizationSourceScan.EnumerateProductionSource()
@@ -176,6 +176,49 @@ public sealed class LocalizationInfraTests
 
         Assert.True(result.ResourceNotFound);
         Assert.Equal("FindBar_ThisKeyDoesNotExist", result.Value);
+    }
+
+    [Fact]
+    public void NeutralBannerValues_HaveExpectedPlaceholderArity()
+    {
+        var neutralValues = ResxValues();
+        (string Key, int Arity)[] expected =
+        [
+            ("Banner_Attention_DismissAria", 0),
+            ("Banner_Attention_ErrorTitle", 0),
+            ("Banner_Attention_Many", 1),
+            ("Banner_Attention_One", 1),
+            ("Banner_Attention_OpenDatabases", 0),
+            ("Banner_Attention_OpenFailed", 0),
+            ("Banner_Attention_OpenFailedDetail", 1),
+            ("Banner_Critical_Copied", 0),
+            ("Banner_Critical_CopyDetails", 0),
+            ("Banner_Critical_RecoveryFailed", 1),
+            ("Banner_Critical_Relaunch", 0),
+            ("Banner_Critical_Reload", 0),
+            ("Banner_Critical_RestartFailed", 0),
+            ("Banner_Critical_Unexpected", 2),
+            ("Banner_Error_DismissAria", 0),
+            ("Banner_Info_DismissAria", 0),
+            ("Banner_Nav_NextAria", 0),
+            ("Banner_Nav_PreviousAria", 0),
+            ("Banner_Pagination", 2),
+            ("Banner_Upgrade_InProgress", 4),
+            ("Banner_Upgrade_Preparing_Many", 1),
+            ("Banner_Upgrade_Preparing_One", 1),
+            ("Banner_Upgrade_QueuedBatches_Many", 1),
+            ("Banner_Upgrade_QueuedBatches_One", 1)
+        ];
+
+        foreach ((string key, int arity) in expected)
+        {
+            Assert.True(neutralValues.TryGetValue(key, out string? value), $"Missing neutral RESX value for {key}.");
+            Assert.Equal(arity, PlaceholderArity(value));
+        }
+
+        Assert.Equal(
+            expected.Select(entry => entry.Key).OrderBy(key => key, StringComparer.Ordinal),
+            neutralValues.Keys.Where(key => key.StartsWith("Banner_", StringComparison.Ordinal)).OrderBy(key => key, StringComparer.Ordinal));
     }
 
     [Fact]
@@ -550,6 +593,15 @@ public sealed class LocalizationInfraTests
             .AddEventLogLocalization()
             .BuildServiceProvider()
             .GetRequiredService<IStringLocalizer<SharedResource>>();
+
+    private static int PlaceholderArity(string value)
+    {
+        var indexes = Regex.Matches(value, @"\{(\d+)\}")
+            .Select(match => int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture))
+            .ToList();
+
+        return indexes.Count == 0 ? 0 : indexes.Max() + 1;
+    }
 
     private static IReadOnlyList<string> ResxKeys() =>
         XDocument.Load(LocalizationSourceScan.ResxPath)

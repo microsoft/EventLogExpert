@@ -2,13 +2,16 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Restart;
 using EventLogExpert.UI.Banner;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Banner;
@@ -27,6 +30,7 @@ public sealed class CriticalBannerTests : BunitContext
         Services.AddSingleton(_applicationRestartService);
         Services.AddSingleton(_clipboardService);
         Services.AddSingleton(_traceLogger);
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
@@ -41,7 +45,7 @@ public sealed class CriticalBannerTests : BunitContext
 
         // Sync Click() returns at the handler's first real async point (the 2s Task.Delay) with
         // the chip rendered; ClickAsync would block for the full delay until the chip clears.
-        component.Find("aside.banner-critical .banner-actions button:contains('Copy details')").Click();
+        component.FindAll("aside.banner-critical .banner-actions button")[2].Click();
 
         await _clipboardService.Received(1)
             .CopyTextAsync(Arg.Is<string>(s => s != null && s.Contains("InvalidOperationException") && s.Contains("kaboom")));
@@ -57,11 +61,10 @@ public sealed class CriticalBannerTests : BunitContext
         _criticalErrorService.TryRecoverAsync().Returns(Task.FromException(new InvalidOperationException("recovery failed")));
 
         var component = Render<CriticalBanner>(p => p.Add(c => c.Critical, critical));
-        await component.Find("aside.banner-critical .banner-actions button:contains('Reload')").ClickAsync(new MouseEventArgs());
+        await component.FindAll("aside.banner-critical .banner-actions button")[0].ClickAsync(new MouseEventArgs());
 
         var subtitle = component.Find("aside.banner-critical .banner-feedback .banner-subtitle");
-        Assert.Contains("Recovery failed", subtitle.TextContent);
-        Assert.Contains("recovery failed", subtitle.TextContent);
+        Assert.Contains("[[Banner_Critical_RecoveryFailed(recovery failed)]]", subtitle.TextContent);
     }
 
     [Fact]
@@ -72,7 +75,7 @@ public sealed class CriticalBannerTests : BunitContext
         _applicationRestartService.TryRestartAsync().Returns(true);
 
         var component = Render<CriticalBanner>(p => p.Add(c => c.Critical, critical));
-        await component.Find("aside.banner-critical .banner-actions button:contains('Relaunch')").ClickAsync(new MouseEventArgs());
+        await component.FindAll("aside.banner-critical .banner-actions button")[1].ClickAsync(new MouseEventArgs());
 
         await _applicationRestartService.Received(1).TryRestartAsync();
     }
@@ -85,10 +88,10 @@ public sealed class CriticalBannerTests : BunitContext
         _applicationRestartService.TryRestartAsync().Returns(false);
 
         var component = Render<CriticalBanner>(p => p.Add(c => c.Critical, critical));
-        await component.Find("aside.banner-critical .banner-actions button:contains('Relaunch')").ClickAsync(new MouseEventArgs());
+        await component.FindAll("aside.banner-critical .banner-actions button")[1].ClickAsync(new MouseEventArgs());
 
         var subtitle = component.Find("aside.banner-critical .banner-feedback .banner-subtitle");
-        Assert.Contains("Restart failed", subtitle.TextContent);
+        Assert.Contains("[[Banner_Critical_RestartFailed]]", subtitle.TextContent);
     }
 
     [Fact]
@@ -99,7 +102,7 @@ public sealed class CriticalBannerTests : BunitContext
         _criticalErrorService.TryRecoverAsync().Returns(Task.CompletedTask);
 
         var component = Render<CriticalBanner>(p => p.Add(c => c.Critical, critical));
-        await component.Find("aside.banner-critical .banner-actions button:contains('Reload')").ClickAsync(new MouseEventArgs());
+        await component.FindAll("aside.banner-critical .banner-actions button")[0].ClickAsync(new MouseEventArgs());
 
         await _criticalErrorService.Received(1).TryRecoverAsync();
     }
@@ -113,13 +116,12 @@ public sealed class CriticalBannerTests : BunitContext
         var component = Render<CriticalBanner>(p => p.Add(c => c.Critical, critical));
 
         var banner = component.Find("aside.banner-critical");
-        Assert.Contains("InvalidOperationException", banner.TextContent);
-        Assert.Contains("kaboom", banner.TextContent);
+        Assert.Contains("[[Banner_Critical_Unexpected(InvalidOperationException|kaboom)]]", banner.TextContent);
 
         var buttons = component.FindAll("aside.banner-critical .banner-actions button");
         Assert.Equal(3, buttons.Count);
-        Assert.Contains("Reload", buttons[0].TextContent);
-        Assert.Contains("Relaunch", buttons[1].TextContent);
-        Assert.Contains("Copy details", buttons[2].TextContent);
+        Assert.Contains("[[Banner_Critical_Reload]]", buttons[0].TextContent);
+        Assert.Contains("[[Banner_Critical_Relaunch]]", buttons[1].TextContent);
+        Assert.Contains("[[Banner_Critical_CopyDetails]]", buttons[2].TextContent);
     }
 }
