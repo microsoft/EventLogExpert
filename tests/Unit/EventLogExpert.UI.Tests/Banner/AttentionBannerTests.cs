@@ -2,14 +2,17 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Banner;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using NSubstitute;
 
@@ -27,6 +30,7 @@ public sealed class AttentionBannerTests : BunitContext
         Services.AddSingleton(_attentionBannerService);
         Services.AddSingleton(_errorBannerService);
         Services.AddSingleton(_menuActionService);
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
         Services.AddSingleton(_traceLogger);
 
         JSInterop.Mode = JSRuntimeMode.Loose;
@@ -76,7 +80,7 @@ public sealed class AttentionBannerTests : BunitContext
 
         _attentionBannerService.Received(1).DismissAttention();
         _errorBannerService.Received(1)
-            .ReportError("Databases", Arg.Is<string>(s => s != null && s.Contains("Failed to open databases")));
+            .ReportError("[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailed]]");
         Assert.NotNull(captured);
         Assert.Equal(BannerView.Error, captured.View);
     }
@@ -113,7 +117,7 @@ public sealed class AttentionBannerTests : BunitContext
 
         _attentionBannerService.Received(1).DismissAttention();
         _errorBannerService.Received(1)
-            .ReportError("Databases", Arg.Is<string>(s => s != null && s.Contains("modal boom")));
+            .ReportError("[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailedDetail(modal boom)]]");
         _traceLogger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
             h.ToString().Contains(nameof(AttentionBanner)) && h.ToString().Contains("modal boom")));
         Assert.NotNull(captured);
@@ -126,8 +130,8 @@ public sealed class AttentionBannerTests : BunitContext
         var component = RenderAttentionBanner(2);
 
         var banner = component.Find("aside.banner-attention");
-        Assert.Contains("2 databases need attention", banner.TextContent);
-        Assert.Equal("Open Databases", component.Find("aside.banner-attention button.banner-action").TextContent.Trim());
+        Assert.Contains("[[Banner_Attention_Many(2)]]", banner.TextContent);
+        Assert.Equal("[[Banner_Attention_OpenDatabases]]", component.Find("aside.banner-attention button.banner-action").TextContent.Trim());
         Assert.Single(component.FindAll("aside.banner-attention button.banner-dismiss"));
     }
 
@@ -137,9 +141,8 @@ public sealed class AttentionBannerTests : BunitContext
         var component = RenderAttentionBanner(1);
 
         var banner = component.Find("aside.banner-attention");
-        Assert.Contains("1 database needs attention", banner.TextContent);
-        Assert.DoesNotContain("databases", banner.TextContent);
-        Assert.DoesNotContain("database need ", banner.TextContent);
+        Assert.Contains("[[Banner_Attention_One(1)]]", banner.TextContent);
+        Assert.DoesNotContain("[[Banner_Attention_Many", banner.TextContent);
     }
 
     private IRenderedComponent<AttentionBanner> RenderAttentionBanner(

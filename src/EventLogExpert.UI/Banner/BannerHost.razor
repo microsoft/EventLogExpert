@@ -17,15 +17,15 @@
     RenderFragment cycleNav = @<text>
                                    @if (showCyclePagination)
                                    {
-                                       <span class="banner-pagination">@(displayedIndex + 1) of @items.Count</span>
+                                       <span class="banner-pagination">@Localizer["Banner_Pagination", displayedIndex + 1, items.Count]</span>
 
-                                       <Button aria-label="Previous banner"
+                                       <Button aria-label='@Localizer["Banner_Nav_PreviousAria"]'
                                            CssClass="banner-cycle-prev"
                                            Disabled="@(displayedIndex == 0)"
                                            IconClass="bi bi-chevron-left"
                                            OnClick="CycleState.MovePrev" />
 
-                                       <Button aria-label="Next banner"
+                                       <Button aria-label='@Localizer["Banner_Nav_NextAria"]'
                                            CssClass="banner-cycle-next"
                                            Disabled="@(displayedIndex == items.Count - 1)"
                                            IconClass="bi bi-chevron-right"

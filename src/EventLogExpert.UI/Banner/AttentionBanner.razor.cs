@@ -1,10 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Menu;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.Banner;
@@ -19,13 +21,11 @@ public sealed partial class AttentionBanner : ComponentBase
 
     [Inject] private IAttentionBannerService AttentionBannerService { get; init; } = null!;
 
-    private string DatabasesLabel => AttentionCount == 1 ? "database" : "databases";
-
     [Inject] private IErrorBannerService ErrorBannerService { get; init; } = null!;
 
-    [Inject] private IMenuActionService MenuActionService { get; init; } = null!;
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
-    private string NeedsLabel => AttentionCount == 1 ? "needs" : "need";
+    [Inject] private IMenuActionService MenuActionService { get; init; } = null!;
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
@@ -55,8 +55,8 @@ public sealed partial class AttentionBanner : ComponentBase
                 $"{nameof(AttentionBanner)}.{nameof(OnOpenDatabasesClickedAsync)}: open databases threw: {ex}");
 
             BannerId errorId = ErrorBannerService.ReportError(
-                "Databases",
-                $"Failed to open databases: {ex.Message}");
+                Localizer["Banner_Attention_ErrorTitle"],
+                Localizer["Banner_Attention_OpenFailedDetail", ex.Message]);
             await OnFallbackErrorPosted.InvokeAsync(new BannerCycleItem(BannerView.Error, 0, errorId));
 
             return;
@@ -68,8 +68,8 @@ public sealed partial class AttentionBanner : ComponentBase
                 $"{nameof(AttentionBanner)}.{nameof(OnOpenDatabasesClickedAsync)}: open databases returned false");
 
             BannerId errorId = ErrorBannerService.ReportError(
-                "Databases",
-                "Failed to open databases; try again from the menu.");
+                Localizer["Banner_Attention_ErrorTitle"],
+                Localizer["Banner_Attention_OpenFailed"]);
             await OnFallbackErrorPosted.InvokeAsync(new BannerCycleItem(BannerView.Error, 0, errorId));
         }
     }

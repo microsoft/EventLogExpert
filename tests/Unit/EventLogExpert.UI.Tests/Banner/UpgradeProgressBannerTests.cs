@@ -2,13 +2,16 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.UI.Banner;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Banner;
@@ -20,6 +23,7 @@ public sealed class UpgradeProgressBannerTests : BunitContext
     public UpgradeProgressBannerTests()
     {
         Services.AddSingleton(_traceLogger);
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
@@ -85,8 +89,8 @@ public sealed class UpgradeProgressBannerTests : BunitContext
         var component = Render<UpgradeProgressBanner>(p => p.Add(c => c.Progress, entry));
 
         var banner = component.Find("aside.banner-upgrade-progress");
-        Assert.Contains("Preparing upgrade of 3 databases", banner.TextContent);
-        Assert.DoesNotContain("Upgrading database 0", banner.TextContent);
+        Assert.Contains("[[Banner_Upgrade_Preparing_Many(3)]]", banner.TextContent);
+        Assert.DoesNotContain("[[Banner_Upgrade_InProgress(0", banner.TextContent);
     }
 
     [Fact]
@@ -105,10 +109,8 @@ public sealed class UpgradeProgressBannerTests : BunitContext
         var component = Render<UpgradeProgressBanner>(p => p.Add(c => c.Progress, entry));
 
         var banner = component.Find("aside.banner-upgrade-progress");
-        Assert.Contains("Upgrading database 2 of 5", banner.TextContent);
-        Assert.Contains("MyDb.evtx", banner.TextContent);
-        Assert.Contains("MigratingSchema", banner.TextContent);
-        Assert.Equal("Cancel", component.Find("aside.banner-upgrade-progress button.banner-action").TextContent.Trim());
+        Assert.Contains("[[Banner_Upgrade_InProgress(2|5|MyDb.evtx|MigratingSchema)]]", banner.TextContent);
+        Assert.Equal("[[Modal_Cancel]]", component.Find("aside.banner-upgrade-progress button.banner-action").TextContent.Trim());
         Assert.Single(component.FindAll("aside.banner-upgrade-progress .banner-spinner"));
     }
 
@@ -128,6 +130,6 @@ public sealed class UpgradeProgressBannerTests : BunitContext
         var component = Render<UpgradeProgressBanner>(p => p.Add(c => c.Progress, entry));
 
         var subtitle = component.Find("aside.banner-upgrade-progress .banner-subtitle");
-        Assert.Contains("+3 batches queued", subtitle.TextContent);
+        Assert.Contains("[[Banner_Upgrade_QueuedBatches_Many(3)]]", subtitle.TextContent);
     }
 }
