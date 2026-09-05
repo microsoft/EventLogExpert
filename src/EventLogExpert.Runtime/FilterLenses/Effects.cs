@@ -74,12 +74,19 @@ internal sealed class Effects(
     [EffectMethod(typeof(PromoteAllFilterLensesAction))]
     public Task HandlePromoteAll(IDispatcher dispatcher)
     {
+        var promoted = 0;
+
         foreach (var lens in _lensState.Value.Lenses)
         {
             if (lens.ExcludeFilters.IsEmpty && lens.Window is not { IsEnabled: true }) { continue; }
 
             dispatcher.Dispatch(new CommitPromotedLensAction(lens.Id, lens.ExcludeFilters, lens.Window));
+            promoted++;
         }
+
+        // Announce from the effect (not the breadcrumb) so it reflects what was actually committed, and stays
+        // silent when nothing was promotable. This is an in-memory commit, so unlike SaveAsGroup it cannot fail.
+        if (promoted > 0) { _announcementService.AnnounceLensesSavedAll(); }
 
         return Task.CompletedTask;
     }
@@ -94,6 +101,17 @@ internal sealed class Effects(
     public Task HandleRemoveForLog(RemoveLensesForLogAction action, IDispatcher dispatcher) => Reapply(dispatcher);
 
     [EffectMethod]
+    public Task HandleSaveFilterSetSucceeded(SaveFilterSetSucceededAction action, IDispatcher dispatcher)
+    {
+        if (action.Origin == SaveFilterSetOrigin.Lens)
+        {
+            _announcementService.AnnounceLensGroupSaved(action.Name);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod]
     public Task HandleSaveLensesAsGroup(SaveLensesAsGroupAction action, IDispatcher dispatcher)
     {
         if (string.IsNullOrWhiteSpace(action.Name)) { return Task.CompletedTask; }
@@ -102,7 +120,9 @@ internal sealed class Effects(
 
         if (filters.IsEmpty) { return Task.CompletedTask; }
 
-        dispatcher.Dispatch(new SaveFilterSetAction(action.Name, filters));
+        // Tag the save as lens-originated. The terminal SaveFilterSetSucceededAction is announced (below) only
+        // for this origin, and only after the write actually succeeds; failure surfaces via the error banner.
+        dispatcher.Dispatch(new SaveFilterSetAction(action.Name, filters, SaveFilterSetOrigin.Lens));
 
         return Task.CompletedTask;
     }

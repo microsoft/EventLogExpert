@@ -107,6 +107,31 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
+    public void ActiveGroupHeaderName_RepeatSpaceKeyDown_DoesNotToggle()
+    {
+        // Holding Space (key auto-repeat) must not toggle the group over and over; the handler ignores e.Repeat.
+        var (state, groupId, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
+        _logTableState.Value.Returns(state);
+        var cut = Render<LogTabBar>();
+
+        cut.Find(".group-header > span").KeyDown(new KeyboardEventArgs { Key = " ", Repeat = true });
+
+        _logTableCommands.DidNotReceive().SetTabGroupCollapsed(groupId, true);
+    }
+
+    [Fact]
+    public void ActiveGroupHeaderName_SpaceKeyDown_TogglesCollapse()
+    {
+        var (state, groupId, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
+        _logTableState.Value.Returns(state);
+        var cut = Render<LogTabBar>();
+
+        cut.Find(".group-header > span").KeyDown(new KeyboardEventArgs { Key = " " });
+
+        _logTableCommands.Received(1).SetTabGroupCollapsed(groupId, true);
+    }
+
+    [Fact]
     public async Task ActiveTabChange_Rerenders()
     {
         var alpha = EventLogId.Create();

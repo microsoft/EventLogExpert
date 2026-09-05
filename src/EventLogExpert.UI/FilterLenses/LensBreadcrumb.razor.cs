@@ -3,7 +3,6 @@
 
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
-using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLenses;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -14,8 +13,6 @@ namespace EventLogExpert.UI.FilterLenses;
 public sealed partial class LensBreadcrumb
 {
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
-
-    [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
     private bool CanSaveAsGroup => LensSource.Lenses.Any(lens => lens.Kind == LensKind.Property);
 
@@ -43,11 +40,7 @@ public sealed partial class LensBreadcrumb
         }
     }
 
-    private void SaveAll()
-    {
-        Commands.PromoteAllLenses();
-        AnnouncementService.Announce(Localizer["FilterLens_SavedAllAnnouncement"]);
-    }
+    private void SaveAll() => Commands.PromoteAllLenses();
 
     private async Task SaveAsGroupAsync()
     {
@@ -60,9 +53,6 @@ public sealed partial class LensBreadcrumb
 
         if (string.IsNullOrWhiteSpace(name)) { return; }
 
-        var trimmed = name.Trim();
-
-        Commands.SaveLensesAsGroup(trimmed);
-        AnnouncementService.Announce(Localizer["FilterLens_SavedAsGroupAnnouncement", trimmed]);
+        Commands.SaveLensesAsGroup(name.Trim());
     }
 }

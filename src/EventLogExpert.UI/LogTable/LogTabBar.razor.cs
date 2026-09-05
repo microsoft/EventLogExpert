@@ -339,14 +339,14 @@ public sealed partial class LogTabBar
 
     private void OnCloseGroupKeyDown(KeyboardEventArgs e, LogTabGroup group)
     {
-        if (e.Key != "Enter" && e.Key != " ") { return; }
+        if (e.Repeat || (e.Key != "Enter" && e.Key != " ")) { return; }
 
         CloseGroup(group);
     }
 
     private void OnCloseLogKeyDown(KeyboardEventArgs e, LogView table)
     {
-        if (e.Key != "Enter" && e.Key != " ") { return; }
+        if (e.Repeat || (e.Key != "Enter" && e.Key != " ")) { return; }
 
         CloseLog(table);
     }
@@ -360,14 +360,14 @@ public sealed partial class LogTabBar
 
     private void OnGroupHeaderKeyDown(KeyboardEventArgs e, GroupRow row)
     {
-        if (e.Key != "Enter" && e.Key != " ") { return; }
+        if (e.Repeat || (e.Key != "Enter" && e.Key != " ")) { return; }
 
         ActivateOrToggleGroup(row);
     }
 
     private void OnTabKeyDown(KeyboardEventArgs e, LogView table)
     {
-        if (e.Key != "Enter" && e.Key != " ") { return; }
+        if (e.Repeat || (e.Key != "Enter" && e.Key != " ")) { return; }
 
         SetActiveLog(table);
     }

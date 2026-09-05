@@ -61,7 +61,7 @@ public sealed class FilterLensEffectsTests
     }
 
     [Fact]
-    public async Task HandlePromoteAll_CommitsEveryPromotableLens_WithoutAnnouncing()
+    public async Task HandlePromoteAll_CommitsEveryPromotableLens_AndAnnouncesOnce()
     {
         var keep = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
         var time = FilterLensFactory.ForTimeWindow(DateTime.UtcNow, TimeSpan.FromMinutes(5), TimeZoneInfo.Utc);
@@ -70,9 +70,11 @@ public sealed class FilterLensEffectsTests
 
         await effects.HandlePromoteAll(dispatcher);
 
-        // One commit per lens; the breadcrumb announces once at the UI layer, so the effect itself stays silent.
+        // One commit per lens, plus a single "saved all" announcement from the effect so it reflects what was
+        // actually committed. No per-lens "kept" announcement for the bulk action.
         dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action => action != null && action.Id == keep.Id));
         dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action => action != null && action.Id == time.Id));
+        announcer.Received(1).AnnounceLensesSavedAll();
         announcer.DidNotReceive().AnnounceLensKept(Arg.Any<FilterLensLabel>());
     }
 
@@ -89,6 +91,24 @@ public sealed class FilterLensEffectsTests
         dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action =>
             action != null && action.Id == keep.Id &&
             action.Filters.Count == keep.ExcludeFilters.Count && action.Filters.All(filter => filter.IsExcluded)));
+    }
+
+    [Fact]
+    public async Task HandlePromoteAll_NoPromotableLenses_DoesNotAnnounceOrCommit()
+    {
+        var degenerate = new FilterLens
+        {
+            Label = new FilterLensLabel.PropertyComparison(EventProperty.Source, IsEqual: true, "empty"),
+            Kind = LensKind.Property,
+            ExcludeFilters = []
+        };
+        var (effects, dispatcher, announcer) =
+            CreateEffectsWithAnnouncer(new FilterLensState { Lenses = [degenerate] }, new FilterPaneState());
+
+        await effects.HandlePromoteAll(dispatcher);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<CommitPromotedLensAction>());
+        announcer.DidNotReceive().AnnounceLensesSavedAll();
     }
 
     [Fact]
@@ -217,6 +237,30 @@ public sealed class FilterLensEffectsTests
     }
 
     [Fact]
+    public async Task HandleSaveFilterSetSucceeded_LensOrigin_AnnouncesGroupSaved()
+    {
+        var (effects, dispatcher, announcer) =
+            CreateEffectsWithAnnouncer(new FilterLensState(), new FilterPaneState());
+
+        await effects.HandleSaveFilterSetSucceeded(
+            new SaveFilterSetSucceededAction("My Group", SaveFilterSetOrigin.Lens), dispatcher);
+
+        announcer.Received(1).AnnounceLensGroupSaved("My Group");
+    }
+
+    [Fact]
+    public async Task HandleSaveFilterSetSucceeded_LibraryOrigin_DoesNotAnnounce()
+    {
+        var (effects, dispatcher, announcer) =
+            CreateEffectsWithAnnouncer(new FilterLensState(), new FilterPaneState());
+
+        await effects.HandleSaveFilterSetSucceeded(
+            new SaveFilterSetSucceededAction("Pane Preset", SaveFilterSetOrigin.Library), dispatcher);
+
+        announcer.DidNotReceive().AnnounceLensGroupSaved(Arg.Any<string>());
+    }
+
+    [Fact]
     public async Task HandleSaveLensesAsGroup_BlankName_DoesNothing()
     {
         var keep = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
@@ -271,7 +315,7 @@ public sealed class FilterLensEffectsTests
         // Both lenses contribute their AND-narrowing EXCLUDE criteria - NOT positive includes, which would OR into a
         // union broader than the intersected lens stack the user sees.
         dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetAction>(action =>
-            action != null && action.Name == "My Group" &&
+            action != null && action.Name == "My Group" && action.Origin == SaveFilterSetOrigin.Lens &&
             action.Filters.Count == 2 && action.Filters.All(filter => filter.IsExcluded)));
 
         // The lenses stay active after saving (matching the other save-to-filter-set flows); nothing is cleared.

@@ -20,10 +20,8 @@ namespace EventLogExpert.UI.Tests.FilterLenses;
 public sealed class LensBreadcrumbTests : BunitContext
 {
     private readonly IAlertDialogService _alertDialog = Substitute.For<IAlertDialogService>();
-
     private readonly IAnnouncementService _announcements = Substitute.For<IAnnouncementService>();
     private readonly IFilterLensCommands _commands = Substitute.For<IFilterLensCommands>();
-
     private readonly IFilterLensSource _source = Substitute.For<IFilterLensSource>();
 
     public LensBreadcrumbTests()
@@ -105,7 +103,7 @@ public sealed class LensBreadcrumbTests : BunitContext
     }
 
     [Fact]
-    public void SaveAllButton_PromotesAllLenses_AndAnnounces()
+    public void SaveAllButton_PromotesAllLenses()
     {
         _source.Lenses.Returns(ImmutableList.Create(Summary("a"), Summary("b")));
 
@@ -114,7 +112,10 @@ public sealed class LensBreadcrumbTests : BunitContext
         SaveActionButton(cut, Localizer["FilterLens_SaveAll"].Value).Click();
 
         _commands.Received(1).PromoteAllLenses();
-        _announcements.Received(1).Announce(Localizer["FilterLens_SavedAllAnnouncement"].Value);
+
+        // The "saved all" announcement now originates from the promote effect (after the commit), not the
+        // breadcrumb, so the breadcrumb must not announce anything itself.
+        _announcements.DidNotReceive().Announce(Arg.Any<string>());
     }
 
     [Fact]
@@ -141,7 +142,10 @@ public sealed class LensBreadcrumbTests : BunitContext
         await button.ClickAsync(new MouseEventArgs());
 
         _commands.Received(1).SaveLensesAsGroup("My Group");
-        _announcements.Received(1).Announce(Localizer["FilterLens_SavedAsGroupAnnouncement", "My Group"].Value);
+
+        // Success is announced from the lens effect only after the write actually persists (failure surfaces via
+        // the error banner), so the breadcrumb no longer announces optimistically on click.
+        _announcements.DidNotReceive().Announce(Arg.Any<string>());
     }
 
     [Fact]

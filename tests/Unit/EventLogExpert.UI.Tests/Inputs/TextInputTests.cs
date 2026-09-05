@@ -3,6 +3,7 @@
 
 using Bunit;
 using EventLogExpert.UI.Inputs;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace EventLogExpert.UI.Tests.Inputs;
 
@@ -20,6 +21,48 @@ public sealed class TextInputTests : BunitContext
         component.Find("input").Change("committed");
 
         Assert.Equal("committed", captured);
+    }
+
+    [Fact]
+    public void KeyDown_EnterWhileComposing_DoesNotInvokeOnEnter()
+    {
+        var invoked = false;
+
+        var component = Render<TextInput>(parameters => parameters
+            .Add(p => p.Value, string.Empty)
+            .Add(p => p.OnEnter, () => { invoked = true; }));
+
+        component.Find("input").KeyDown(new KeyboardEventArgs { Key = "Enter", IsComposing = true });
+
+        Assert.False(invoked);
+    }
+
+    [Fact]
+    public void KeyDown_Enter_InvokesOnEnter()
+    {
+        var invoked = false;
+
+        var component = Render<TextInput>(parameters => parameters
+            .Add(p => p.Value, string.Empty)
+            .Add(p => p.OnEnter, () => { invoked = true; }));
+
+        component.Find("input").KeyDown(new KeyboardEventArgs { Key = "Enter" });
+
+        Assert.True(invoked);
+    }
+
+    [Fact]
+    public void KeyDown_NonEnterKey_DoesNotInvokeOnEnter()
+    {
+        var invoked = false;
+
+        var component = Render<TextInput>(parameters => parameters
+            .Add(p => p.Value, string.Empty)
+            .Add(p => p.OnEnter, () => { invoked = true; }));
+
+        component.Find("input").KeyDown(new KeyboardEventArgs { Key = "a" });
+
+        Assert.False(invoked);
     }
 
     [Fact]
@@ -67,17 +110,6 @@ public sealed class TextInputTests : BunitContext
     }
 
     [Fact]
-    public void Render_AriaLabelledBy_AppliedToInput()
-    {
-        var component = Render<TextInput>(parameters => parameters
-            .Add(p => p.Value, string.Empty)
-            .Add(p => p.AriaLabelledBy, "external-label-id"));
-
-        var input = component.Find("input[type='text']");
-        Assert.Equal("external-label-id", input.GetAttribute("aria-labelledby"));
-    }
-
-    [Fact]
     public void Render_AriaLabelledByAndAriaLabel_SuppressesAriaLabel()
     {
         var component = Render<TextInput>(parameters => parameters
@@ -87,6 +119,17 @@ public sealed class TextInputTests : BunitContext
 
         var input = component.Find("input[type='text']");
         Assert.False(input.HasAttribute("aria-label"));
+        Assert.Equal("external-label-id", input.GetAttribute("aria-labelledby"));
+    }
+
+    [Fact]
+    public void Render_AriaLabelledBy_AppliedToInput()
+    {
+        var component = Render<TextInput>(parameters => parameters
+            .Add(p => p.Value, string.Empty)
+            .Add(p => p.AriaLabelledBy, "external-label-id"));
+
+        var input = component.Find("input[type='text']");
         Assert.Equal("external-label-id", input.GetAttribute("aria-labelledby"));
     }
 

@@ -4,6 +4,7 @@
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Announcement;
+using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
 using System.Collections.Immutable;
@@ -17,6 +18,7 @@ internal sealed class Effects(
     ILegacyFilterMigrator legacyMigrator,
     IBackslashNameMigrator backslashMigrator,
     IAnnouncementService announcementService,
+    IErrorBannerService errorBannerService,
     ITraceLogger logger,
     TagBulkUpdateFailedNotifier tagBulkUpdateFailedNotifier)
 {
@@ -469,9 +471,9 @@ internal sealed class Effects(
     }
 
     [EffectMethod]
-    public Task HandleSaveFilterSet(SaveFilterSetAction action, IDispatcher dispatcher)
+    public async Task HandleSaveFilterSet(SaveFilterSetAction action, IDispatcher dispatcher)
     {
-        if (string.IsNullOrWhiteSpace(action.Name) || action.Filters.IsEmpty) { return Task.CompletedTask; }
+        if (string.IsNullOrWhiteSpace(action.Name) || action.Filters.IsEmpty) { return; }
 
         var created = new LibraryEntryFilterSet
         {
@@ -481,7 +483,18 @@ internal sealed class Effects(
             Origin = LibraryEntryOrigin.UserSaved,
         };
 
-        return PersistAddAsync(created, dispatcher);
+        if (await PersistAddAsync(created, dispatcher).ConfigureAwait(false))
+        {
+            dispatcher.Dispatch(new SaveFilterSetSucceededAction(created.Name, action.Origin));
+
+            return;
+        }
+
+        // The write failed and was already logged in PersistAddAsync. Surface it visibly: the error banner is
+        // role="alert", so it also reaches screen readers - do not also announce, or it would be spoken twice.
+        errorBannerService.ReportError(
+            "Couldn't save filter set",
+            $"'{created.Name}' couldn't be saved to the filter library.");
     }
 
     [EffectMethod]
@@ -827,7 +840,7 @@ internal sealed class Effects(
         IDispatcher dispatcher) =>
         DispatchUpdateWithLatestSnapshot(id, mutate, dispatcher, state.Value.Entries);
 
-    private async Task PersistAddAsync(LibraryEntry entry, IDispatcher dispatcher)
+    private async Task<bool> PersistAddAsync(LibraryEntry entry, IDispatcher dispatcher)
     {
         await _writeGate.WaitAsync().ConfigureAwait(false);
 
@@ -838,10 +851,12 @@ internal sealed class Effects(
             {
                 logger.Warning($"FilterLibrary Add failed for {entry.Id}. {ex.Message}");
 
-                return;
+                return false;
             }
 
             dispatcher.Dispatch(new AddLibraryEntrySuccessAction(entry));
+
+            return true;
         }
         finally
         {

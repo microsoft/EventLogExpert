@@ -34,12 +34,21 @@ public sealed class AnnouncementService : IAnnouncementService
         Publish(new Announcement.Text(message));
     }
 
+    public void AnnounceLensGroupSaved(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        Publish(new Announcement.LensGroupSaved(name));
+    }
+
     public void AnnounceLensKept(FilterLensLabel label)
     {
         ArgumentNullException.ThrowIfNull(label);
 
         Publish(new Announcement.LensKept(label));
     }
+
+    public void AnnounceLensesSavedAll() => Publish(new Announcement.LensesSavedAll());
 
     private void Publish(Announcement payload)
     {

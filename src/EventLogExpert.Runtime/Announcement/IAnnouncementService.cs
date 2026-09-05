@@ -13,5 +13,9 @@ public interface IAnnouncementService
 
     void Announce(string message);
 
+    void AnnounceLensGroupSaved(string name);
+
     void AnnounceLensKept(FilterLensLabel label);
+
+    void AnnounceLensesSavedAll();
 }

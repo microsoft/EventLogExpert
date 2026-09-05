@@ -36,6 +36,10 @@ public sealed partial class AnnouncerHost : ComponentBase, IDisposable
             AnnouncementPayload.Text(var message) => message,
             AnnouncementPayload.LensKept(var label) =>
                 Localizer["FilterLens_KeptAnnouncement", FilterLensLabelFormatter.Format(Localizer, label)].Value,
+            AnnouncementPayload.LensGroupSaved(var name) =>
+                Localizer["FilterLens_SavedAsGroupAnnouncement", name].Value,
+            AnnouncementPayload.LensesSavedAll _ =>
+                Localizer["FilterLens_SavedAllAnnouncement"].Value,
             _ => throw new ArgumentOutOfRangeException(nameof(current.Payload), current.Payload, null)
         };
 

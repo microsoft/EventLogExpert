@@ -4,6 +4,7 @@
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Announcement;
+using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
@@ -233,7 +234,7 @@ public sealed class FilterLibraryMigrationIntegrationTests : IDisposable
 
         backslashMigrator ??= Substitute.For<IBackslashNameMigrator>();
 
-        return new Effects(store, libraryState, paneState, migrator, backslashMigrator, Substitute.For<IAnnouncementService>(), Substitute.For<ITraceLogger>(), new TagBulkUpdateFailedNotifier(Substitute.For<ITraceLogger>()));
+        return new Effects(store, libraryState, paneState, migrator, backslashMigrator, Substitute.For<IAnnouncementService>(), Substitute.For<IErrorBannerService>(), Substitute.For<ITraceLogger>(), new TagBulkUpdateFailedNotifier(Substitute.For<ITraceLogger>()));
     }
 
     private string CreateTempDatabasePath()

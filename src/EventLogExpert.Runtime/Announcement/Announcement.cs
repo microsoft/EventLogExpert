@@ -12,4 +12,8 @@ public abstract record Announcement
     public sealed record Text(string Message) : Announcement;
 
     public sealed record LensKept(FilterLensLabel Label) : Announcement;
+
+    public sealed record LensGroupSaved(string Name) : Announcement;
+
+    public sealed record LensesSavedAll : Announcement;
 }
