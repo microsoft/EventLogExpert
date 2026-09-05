@@ -119,13 +119,41 @@ public sealed class LensBreadcrumbTests : BunitContext
     }
 
     [Fact]
-    public void SaveAsGroupButton_WithOnlyTimeWindowLenses_IsDisabled()
+    public async Task SaveAsGroupButton_WhenAriaDisabled_ActivationIsNoOp()
+    {
+        // aria-disabled (unlike the native disabled attribute) does NOT block activation in the browser, so the
+        // SaveAsGroupAsync guard is now the sole protection. Lock it in: activating the unavailable button must not
+        // prompt or save.
+        _source.Lenses.Returns(ImmutableList.Create(TimeSummary()));
+
+        var cut = Render<LensBreadcrumb>();
+        var button = SaveActionButton(cut, Localizer["FilterLens_SaveAsGroup"].Value);
+
+        await button.ClickAsync(new MouseEventArgs());
+
+        await _alertDialog.DidNotReceive().DisplayPrompt(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+        _commands.DidNotReceive().SaveLensesAsGroup(Arg.Any<string>());
+    }
+
+    [Fact]
+    public void SaveAsGroupButton_WithOnlyTimeWindowLenses_IsAriaDisabled_WithAccessibleReason()
     {
         _source.Lenses.Returns(ImmutableList.Create(TimeSummary()));
 
         var cut = Render<LensBreadcrumb>();
 
-        Assert.True(SaveActionButton(cut, Localizer["FilterLens_SaveAsGroup"].Value).HasAttribute("disabled"));
+        var button = SaveActionButton(cut, Localizer["FilterLens_SaveAsGroup"].Value);
+
+        // Unavailable via aria-disabled, NOT the native disabled attribute (which would drop keyboard focus), so a
+        // screen-reader user can still reach the button and hear why it is unavailable.
+        Assert.Equal("true", button.GetAttribute("aria-disabled"));
+        Assert.False(button.HasAttribute("disabled"));
+
+        // The reason is exposed as a real accessible description (aria-describedby -> visually-hidden text), not just
+        // a title tooltip that assistive tech does not reliably announce.
+        var hintId = button.GetAttribute("aria-describedby");
+        Assert.False(string.IsNullOrEmpty(hintId));
+        Assert.Equal(Localizer["FilterLens_SaveAsGroup_DisabledTitle"].Value, cut.Find($"#{hintId}").TextContent.Trim());
     }
 
     [Fact]
@@ -138,6 +166,8 @@ public sealed class LensBreadcrumbTests : BunitContext
 
         var button = SaveActionButton(cut, Localizer["FilterLens_SaveAsGroup"].Value);
         Assert.False(button.HasAttribute("disabled"));
+        Assert.Equal("false", button.GetAttribute("aria-disabled"));
+        Assert.False(button.HasAttribute("aria-describedby"));
 
         await button.ClickAsync(new MouseEventArgs());
 

@@ -20,6 +20,17 @@ internal sealed class Reducers
     }
 
     [ReducerMethod]
+    public static FilterLensState ReduceCommitPromotedLenses(FilterLensState state, CommitPromotedLensesAction action)
+    {
+        if (action.Commits.IsEmpty) { return state; }
+
+        var promotedIds = action.Commits.Select(commit => commit.Id).ToHashSet();
+        var updated = state.Lenses.RemoveAll(lens => promotedIds.Contains(lens.Id));
+
+        return updated.Count == state.Lenses.Count ? state : state with { Lenses = updated };
+    }
+
+    [ReducerMethod]
     public static FilterLensState ReducePush(FilterLensState state, PushFilterLensAction action) =>
         state with { Lenses = state.Lenses.Add(action.Lens) };
 

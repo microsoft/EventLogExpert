@@ -70,10 +70,13 @@ public sealed class FilterLensEffectsTests
 
         await effects.HandlePromoteAll(dispatcher);
 
-        // One commit per lens, plus a single "saved all" announcement from the effect so it reflects what was
-        // actually committed. No per-lens "kept" announcement for the bulk action.
-        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action => action != null && action.Id == keep.Id));
-        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action => action != null && action.Id == time.Id));
+        // One batch commit for the whole "Save all" (both lenses in a single action, not one action per lens), plus a
+        // single "saved all" announcement. No per-lens singular commit and no per-lens "kept" announcement.
+        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensesAction>(action =>
+            action != null && action.Commits.Count == 2 &&
+            action.Commits.Any(commit => commit.Id == keep.Id) &&
+            action.Commits.Any(commit => commit.Id == time.Id)));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<CommitPromotedLensAction>());
         announcer.Received(1).AnnounceLensesSavedAll();
         announcer.DidNotReceive().AnnounceLensKept(Arg.Any<FilterLensLabel>());
     }
@@ -88,9 +91,10 @@ public sealed class FilterLensEffectsTests
 
         await effects.HandlePromoteAll(dispatcher);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action =>
-            action != null && action.Id == keep.Id &&
-            action.Filters.Count == keep.ExcludeFilters.Count && action.Filters.All(filter => filter.IsExcluded)));
+        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensesAction>(action =>
+            action != null && action.Commits.Count == 1 && action.Commits[0].Id == keep.Id &&
+            action.Commits[0].Filters.Count == keep.ExcludeFilters.Count &&
+            action.Commits[0].Filters.All(filter => filter.IsExcluded)));
     }
 
     [Fact]
@@ -107,7 +111,7 @@ public sealed class FilterLensEffectsTests
 
         await effects.HandlePromoteAll(dispatcher);
 
-        dispatcher.DidNotReceive().Dispatch(Arg.Any<CommitPromotedLensAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<CommitPromotedLensesAction>());
         announcer.DidNotReceive().AnnounceLensesSavedAll();
     }
 
@@ -126,8 +130,9 @@ public sealed class FilterLensEffectsTests
 
         await effects.HandlePromoteAll(dispatcher);
 
-        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action => action != null && action.Id == real.Id));
-        dispatcher.DidNotReceive().Dispatch(Arg.Is<CommitPromotedLensAction>(action => action != null && action.Id == degenerate.Id));
+        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensesAction>(action =>
+            action != null && action.Commits.Count == 1 && action.Commits[0].Id == real.Id));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<CommitPromotedLensAction>());
     }
 
     [Fact]

@@ -74,19 +74,20 @@ internal sealed class Effects(
     [EffectMethod(typeof(PromoteAllFilterLensesAction))]
     public Task HandlePromoteAll(IDispatcher dispatcher)
     {
-        var promoted = 0;
+        var commits = ImmutableList.CreateBuilder<PromotedLensCommit>();
 
         foreach (var lens in _lensState.Value.Lenses)
         {
             if (lens.ExcludeFilters.IsEmpty && lens.Window is not { IsEnabled: true }) { continue; }
 
-            dispatcher.Dispatch(new CommitPromotedLensAction(lens.Id, lens.ExcludeFilters, lens.Window));
-            promoted++;
+            commits.Add(new PromotedLensCommit(lens.Id, lens.ExcludeFilters, lens.Window));
         }
 
-        // Announce from the effect (not the breadcrumb) so it reflects what was actually committed, and stays
-        // silent when nothing was promotable. This is an in-memory commit, so unlike SaveAsGroup it cannot fail.
-        if (promoted > 0) { _announcementService.AnnounceLensesSavedAll(); }
+        if (commits.Count == 0) { return Task.CompletedTask; }
+
+        dispatcher.Dispatch(new CommitPromotedLensesAction(commits.ToImmutable()));
+
+        _announcementService.AnnounceLensesSavedAll();
 
         return Task.CompletedTask;
     }

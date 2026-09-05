@@ -55,12 +55,12 @@
 
 /* Non-destructive actions use the shared neutral background-shift on hover (not the red that Clear
    all / chip-remove use), matching the app's standardized icon-button hover. */
-.lens-action:hover:not(:disabled) {
+.lens-action:hover:not([aria-disabled="true"]) {
     background: var(--menu-hover-overlay);
     border-radius: 3px;
 }
 
-.lens-action:disabled {
+.lens-action[aria-disabled="true"] {
     color: var(--text-secondary);
     cursor: default;
     opacity: 0.6;
@@ -81,4 +81,16 @@
 .lens-clear:focus-visible,
 .lens-action:focus-visible {
     outline: 1px solid var(--toggle-accent);
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
 }

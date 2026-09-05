@@ -28,6 +28,46 @@ public sealed class FilterLensReducerTests
     }
 
     [Fact]
+    public void CommitPromotedLenses_EmptyBatch_ReturnsSameStateInstance()
+    {
+        var state = new FilterLensState { Lenses = [Lens("a")] };
+
+        var result = Reducers.ReduceCommitPromotedLenses(state, new CommitPromotedLensesAction([]));
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
+    public void CommitPromotedLenses_NoMatch_ReturnsSameStateInstance()
+    {
+        var state = new FilterLensState { Lenses = [Lens("a")] };
+
+        var result = Reducers.ReduceCommitPromotedLenses(
+            state,
+            new CommitPromotedLensesAction([new PromotedLensCommit(Lens("other").Id, [], null)]));
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
+    public void CommitPromotedLenses_RemovesEveryCommittedLens_KeepsOthers()
+    {
+        var a = Lens("a");
+        var b = Lens("b");
+        var c = Lens("c");
+        var state = new FilterLensState { Lenses = [a, b, c] };
+
+        var result = Reducers.ReduceCommitPromotedLenses(
+            state,
+            new CommitPromotedLensesAction(
+                [new PromotedLensCommit(a.Id, [], null), new PromotedLensCommit(c.Id, [], null)]));
+
+        // Only the committed lenses (a, c) are dropped; the skipped lens (b) survives.
+        Assert.Single(result.Lenses);
+        Assert.Same(b, result.Lenses[0]);
+    }
+
+    [Fact]
     public void CommitPromoted_RemovesLensById()
     {
         var a = Lens("a");

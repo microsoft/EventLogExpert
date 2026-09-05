@@ -37,13 +37,18 @@
         }
 
         <button class="lens-action" @onclick="SaveAll" type="button">@Localizer["FilterLens_SaveAll"]</button>
-        <button class="lens-action"
-            disabled="@(!CanSaveAsGroup)"
+        <button aria-describedby="@SaveAsGroupHintRef"
+            aria-disabled="@SaveAsGroupAriaDisabled"
+            class="lens-action"
             @onclick="SaveAsGroupAsync"
             title="@(CanSaveAsGroup ? null : Localizer["FilterLens_SaveAsGroup_DisabledTitle"].Value)"
             type="button">
             @Localizer["FilterLens_SaveAsGroup"]
         </button>
+        @if (!CanSaveAsGroup)
+        {
+            <span class="visually-hidden" id="@_saveAsGroupHintId">@Localizer["FilterLens_SaveAsGroup_DisabledTitle"].Value</span>
+        }
         <button class="lens-clear" @onclick="Commands.ClearLenses" type="button">@Localizer["FilterLens_ClearAll"]</button>
     </div>
 }

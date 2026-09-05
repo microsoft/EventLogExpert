@@ -21,43 +21,39 @@ internal sealed class Reducers
     [ReducerMethod]
     public static FilterPaneState ReduceCommitPromoted(FilterPaneState state, CommitPromotedLensAction action)
     {
+        var filters = MergePromotedFilters(state.Filters, action.Filters);
+
+        var date = action.Window is { IsEnabled: true } window ?
+            EffectiveFilterBuilder.IntersectWindow(state.FilteredDateRange, window) :
+            state.FilteredDateRange;
+
+        return ReferenceEquals(filters, state.Filters) && date == state.FilteredDateRange ?
+            state :
+            state with { Filters = filters, FilteredDateRange = date };
+    }
+
+    [ReducerMethod]
+    public static FilterPaneState ReduceCommitPromotedLenses(FilterPaneState state, CommitPromotedLensesAction action)
+    {
         var filters = state.Filters;
+        var date = state.FilteredDateRange;
 
-        foreach (var promoted in action.Filters)
+        // Fold every lens into the SAME running accumulators so batch == the sequential single-lens result: a filter
+        // added for one lens deduplicates the next lens's identical filter, and each enabled window intersects
+        // cumulatively (order-independent - dedup keys are exact and IntersectWindow is min/max of bounds).
+        foreach (var commit in action.Commits)
         {
-            // Match only a USABLE (compiled) equivalent, ordinal-exact so case-variant values stay distinct predicates
-            // (filter string equality is ordinal, unlike the lowercased library MRU in ReduceMergeFilters). A dead
-            // (uncompiled) ordinal match narrows nothing, so it is passed over and the working filter is added below.
-            var existingIndex = filters.FindIndex(filter =>
-                string.Equals(filter.ComparisonText, promoted.ComparisonText, StringComparison.Ordinal) &&
-                filter.Mode == promoted.Mode &&
-                filter.IsExcluded == promoted.IsExcluded &&
-                filter.Compiled is not null);
+            filters = MergePromotedFilters(filters, commit.Filters);
 
-            if (existingIndex >= 0)
+            if (commit.Window is { IsEnabled: true } window)
             {
-                var existing = filters[existingIndex];
-
-                // Re-enable a disabled equivalent in place so the promoted narrowing stays active; an already-enabled
-                // equivalent needs no change. Either way, no duplicate row.
-                if (!existing.IsEnabled)
-                {
-                    filters = filters.SetItem(existingIndex, existing with { IsEnabled = true });
-                }
-
-                continue;
+                date = EffectiveFilterBuilder.IntersectWindow(date, window);
             }
-
-            filters = filters.Add(promoted with { Id = FilterId.Create(), IsEnabled = promoted.Compiled is not null });
         }
 
-        var date = action.Window is { IsEnabled: true } window
-            ? EffectiveFilterBuilder.IntersectWindow(state.FilteredDateRange, window)
-            : state.FilteredDateRange;
-
-        return ReferenceEquals(filters, state.Filters) && date == state.FilteredDateRange
-            ? state
-            : state with { Filters = filters, FilteredDateRange = date };
+        return ReferenceEquals(filters, state.Filters) && date == state.FilteredDateRange ?
+            state :
+            state with { Filters = filters, FilteredDateRange = date };
     }
 
     [ReducerMethod]
@@ -163,6 +159,43 @@ internal sealed class Reducers
     [ReducerMethod(typeof(ToggleIsEnabledAction))]
     public static FilterPaneState ReduceToggleIsEnabled(FilterPaneState state) =>
         state with { IsEnabled = !state.IsEnabled };
+
+    // Folds one lens's promoted filters into the RUNNING list (not a fresh read of state.Filters, so a batch dedups
+    // across lenses): re-enable a disabled compiled-equivalent in place, leave a live one, else append a fresh copy.
+    private static ImmutableList<SavedFilter> MergePromotedFilters(
+        ImmutableList<SavedFilter> running,
+        ImmutableList<SavedFilter> promotedFilters)
+    {
+        foreach (var promoted in promotedFilters)
+        {
+            // Match only a USABLE (compiled) equivalent, ordinal-exact so case-variant values stay distinct predicates
+            // (filter string equality is ordinal, unlike the lowercased library MRU in ReduceMergeFilters). A dead
+            // (uncompiled) ordinal match narrows nothing, so it is passed over and the working filter is added below.
+            var existingIndex = running.FindIndex(filter =>
+                string.Equals(filter.ComparisonText, promoted.ComparisonText, StringComparison.Ordinal) &&
+                filter.Mode == promoted.Mode &&
+                filter.IsExcluded == promoted.IsExcluded &&
+                filter.Compiled is not null);
+
+            if (existingIndex >= 0)
+            {
+                var existing = running[existingIndex];
+
+                // Re-enable a disabled equivalent in place so the promoted narrowing stays active; an already-enabled
+                // equivalent needs no change. Either way, no duplicate row.
+                if (!existing.IsEnabled)
+                {
+                    running = running.SetItem(existingIndex, existing with { IsEnabled = true });
+                }
+
+                continue;
+            }
+
+            running = running.Add(promoted with { Id = FilterId.Create(), IsEnabled = promoted.Compiled is not null });
+        }
+
+        return running;
+    }
 
     private static FilterPaneState UpdateFilterById(
         FilterPaneState state,
