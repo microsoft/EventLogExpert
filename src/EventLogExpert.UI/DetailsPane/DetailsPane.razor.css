@@ -5,7 +5,7 @@
     flex: 0 0 auto;
     height: var(--details-pane-height, 30%);
     min-height: 20%;
-    margin: 0 5px;
+    margin: 0;
     border-top: solid var(--background-darkgray);
     overflow: hidden;
 
@@ -338,6 +338,7 @@
 .details-correlation-tab {
     flex: 1 1 auto;
     min-height: 0;
+    padding: 0 0.85rem;
     overflow-x: hidden;
     overflow-y: auto;
 }
