@@ -239,21 +239,21 @@
     vector-effect: non-scaling-stroke;
 }
 
-.histogram-cat-0 { fill: light-dark(#0072b2, #56b4e9); }
+.histogram-cat-0 { fill: var(--cat-color-0); }
 
-.histogram-cat-1 { fill: light-dark(#b66d00, #e69f00); }
+.histogram-cat-1 { fill: var(--cat-color-1); }
 
-.histogram-cat-2 { fill: light-dark(#007a5a, #009e73); }
+.histogram-cat-2 { fill: var(--cat-color-2); }
 
-.histogram-cat-3 { fill: light-dark(#a64f82, #cc79a7); }
+.histogram-cat-3 { fill: var(--cat-color-3); }
 
-.histogram-cat-4 { fill: light-dark(#6f5aa8, #8e7cc3); }
+.histogram-cat-4 { fill: var(--cat-color-4); }
 
-.histogram-cat-5 { fill: light-dark(#8f6a00, #f0e442); }
+.histogram-cat-5 { fill: var(--cat-color-5); }
 
-.histogram-cat-6 { fill: light-dark(#8a3f00, #d55e00); }
+.histogram-cat-6 { fill: var(--cat-color-6); }
 
-.histogram-cat-7 { fill: light-dark(#007983, #00a6b8); }
+.histogram-cat-7 { fill: var(--cat-color-7); }
 
 .histogram-cat-other { fill: var(--text-secondary); }
 

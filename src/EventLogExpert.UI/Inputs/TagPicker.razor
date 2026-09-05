@@ -7,10 +7,10 @@
 
             <span class="tag-picker-chip" role="listitem">
                 <span class="tag-picker-chip-label">@tag</span>
-                <ChromelessButton aria-label="@($"Remove {tag}")"
-                    CssClass="tag-picker-chip-remove"
-                    IconClass="bi bi-x"
-                    OnClick="@(() => RemoveTagAsync(index))" />
+                <ChromelessButton CssClass="tag-picker-chip-remove"
+                    IconClass="bi bi-x-circle"
+                    OnClick="@(() => RemoveTagAsync(index))"
+                    aria-label="@($"Remove {tag}")" />
             </span>
         }
 

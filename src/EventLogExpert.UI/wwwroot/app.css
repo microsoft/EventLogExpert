@@ -35,6 +35,17 @@
 
     --toggle-accent: light-dark(#0A4C8C, #6FB2F5);
 
+    /* Categorical palette (Okabe-Ito, colorblind-safe), theme-aware. Single source shared by the event
+       histogram category bars and the tab-group indicator lines so both draw the same set of hues. */
+    --cat-color-0: light-dark(#0072b2, #56b4e9);
+    --cat-color-1: light-dark(#b66d00, #e69f00);
+    --cat-color-2: light-dark(#007a5a, #009e73);
+    --cat-color-3: light-dark(#a64f82, #cc79a7);
+    --cat-color-4: light-dark(#6f5aa8, #8e7cc3);
+    --cat-color-5: light-dark(#8f6a00, #f0e442);
+    --cat-color-6: light-dark(#8a3f00, #d55e00);
+    --cat-color-7: light-dark(#007983, #00a6b8);
+
     /* Recessed surface used for content wells (e.g. the trash strip exposed
        behind a database row when it slides aside). Always darker than
        --background-dark in both schemes so the well reads as cut into the
@@ -186,6 +197,22 @@
 }
 
 :focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+}
+
+/* Text boxes, the value-select input, and elements the chrome autofocuses on open keep the focus ring
+   KEYBOARD-ONLY. Chromium matches :focus-visible on a mouse click for text/search fields, and on an
+   autofocused <dialog> button opened by pointer (crbug 469468111), so opt those out and paint the ring only
+   while the root input modality is keyboard. keyboardFocusRing.js tracks data-modality (registered once by
+   MainLayout). Every other control relies on native :focus-visible, already keyboard-only in WebView2. */
+input[type="text"]:focus-visible,
+input[type="search"]:focus-visible,
+[autofocus]:focus-visible { outline: none; }
+
+:root[data-modality="keyboard"] input[type="text"]:focus,
+:root[data-modality="keyboard"] input[type="search"]:focus,
+:root[data-modality="keyboard"] [autofocus]:focus {
     outline: var(--focus-ring-width) solid var(--focus-ring-color);
     outline-offset: var(--focus-ring-offset);
 }

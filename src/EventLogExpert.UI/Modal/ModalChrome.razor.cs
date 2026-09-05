@@ -309,6 +309,13 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         await OnInlineAlertResolved.InvokeAsync(new InlineAlertResult(true, promptValue));
     }
 
+    // Enter in the prompt input confirms, but only when there is an accept action and no validation error -
+    // mirroring the guard the accept button applies via its disabled state.
+    private Task HandleInlineAlertAcceptOnEnterAsync() =>
+        !string.IsNullOrEmpty(InlineAlert?.AcceptLabel) && ValidationError is null ?
+            HandleInlineAlertAcceptAsync() :
+            Task.CompletedTask;
+
     private Task HandleInlineAlertCancelAsync() =>
         OnInlineAlertResolved.InvokeAsync(new InlineAlertResult(false, null));
 

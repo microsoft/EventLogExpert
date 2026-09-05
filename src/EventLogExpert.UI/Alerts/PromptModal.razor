@@ -12,18 +12,19 @@
     OnCancel="OnCancelAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
     OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
-    @ref="ChromeRef"
-    Title="@Title">
+    Title="@Title"
+    @ref="ChromeRef">
     <ChildContent>
         <label class="prompt-modal-label" for="@_inputId">@Message</label>
         <TextInput AriaDescribedBy="@(ValidationError is not null ? _errorId : null)"
             AriaInvalid="@(ValidationError is not null)"
             CssClass="input dialog-input"
             Id="@_inputId"
-            @ref="_input"
+            OnEnter="HandleAcceptClickedAsync"
             UpdateOnInput="true"
             Value="@_value"
-            ValueChanged="HandleValueChanged" />
+            ValueChanged="HandleValueChanged"
+            @ref="_input" />
 
         @if (ValidationError is not null)
         {

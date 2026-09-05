@@ -17,7 +17,7 @@
         {
             if (row is AllLogsRow allLogs)
             {
-                <div class="@GetActiveTab(presentation, allLogs.Header)" @oncontextmenu="OpenAllLogsMenu"
+                <div class="@GetActiveTab(presentation, allLogs.Header) all-logs" @oncontextmenu="OpenAllLogsMenu"
                     @oncontextmenu:preventDefault="true"
                     @oncontextmenu:stopPropagation="true"
                     title="@GetTabTooltip(allLogs.Header)">
@@ -31,27 +31,20 @@
             }
             else if (row is GroupRow group)
             {
-                <div class="tab-group">
+                <div class="tab-group" style="--group-color: var(--cat-color-@(GetGroupColorIndex(group.Group.Id)));">
                     <div class="@GetActiveTab(presentation, group.Header) group-header" @oncontextmenu="args => OpenGroupHeaderMenu(args, group.Group)"
                         @oncontextmenu:preventDefault="true"
                         @oncontextmenu:stopPropagation="true"
                         title="@GetTabTooltip(group.Header)">
-                        <button aria-expanded="@(group.Group.IsCollapsed ? "false" : "true")"
-                            aria-label="@(group.Group.IsCollapsed ? Localizer["TabBar_ExpandGroupAria"] : Localizer["TabBar_CollapseGroupAria"])"
-                            class="chevron"
-                            @onclick="() => ToggleCollapse(group.Group)"
-                            title="@(group.Group.IsCollapsed ? Localizer["TabBar_ExpandGroupAria"] : Localizer["TabBar_CollapseGroupAria"])"
-                            type="button">
-                            <i class="bi bi-chevron-@(group.Group.IsCollapsed ? "down" : "right")"></i>
-                        </button>
-                        <span @onkeydown="e => OnTabKeyDown(e, group.Header)"
-                            @onmousedown="e => OnTabMouseDown(e, group.Header)"
+                        <span aria-expanded="@(presentation.ActiveTabId == group.Header.Id ? (group.Group.IsCollapsed ? "false" : "true") : null)"
+                            @onclick="() => ActivateOrToggleGroup(group)"
+                            @onkeydown="e => OnGroupHeaderKeyDown(e, group)"
                             role="button"
                             tabindex="0">
                             @GetTabName(presentation, group.Header)
                         </span>
                         <i aria-label="@Localizer["TabBar_CloseGroup"]"
-                            class="bi bi-x"
+                            class="bi bi-x-circle"
                             @onclick="() => CloseGroup(group.Group)"
                             @onkeydown="e => OnCloseGroupKeyDown(e, group.Group)"
                             role="button"
@@ -78,7 +71,7 @@
                                 @GetTabName(presentation, member)
                             </span>
                             <i aria-label="@Localizer["TabBar_CloseLogAria"]"
-                                class="bi bi-x"
+                                class="bi bi-x-circle"
                                 @onkeydown="e => OnCloseLogKeyDown(e, member)"
                                 @onmousedown="e => OnCloseLogMouseDown(e, member)"
                                 role="button"
@@ -108,7 +101,7 @@
                         @GetTabName(presentation, standalone.Tab)
                     </span>
                     <i aria-label="@Localizer["TabBar_CloseLogAria"]"
-                        class="bi bi-x"
+                        class="bi bi-x-circle"
                         @onkeydown="e => OnCloseLogKeyDown(e, standalone.Tab)"
                         @onmousedown="e => OnCloseLogMouseDown(e, standalone.Tab)"
                         role="button"

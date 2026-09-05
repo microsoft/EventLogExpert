@@ -1924,12 +1924,6 @@
   <data name="Copy_Markdown_DescriptionHeader" xml:space="preserve">
     <value>Description</value>
   </data>
-  <data name="TabBar_ExpandGroupAria" xml:space="preserve">
-    <value>Expand group</value>
-  </data>
-  <data name="TabBar_CollapseGroupAria" xml:space="preserve">
-    <value>Collapse group</value>
-  </data>
   <data name="TabBar_CloseGroup" xml:space="preserve">
     <value>Close group</value>
   </data>

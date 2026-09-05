@@ -25,7 +25,7 @@
                     <Button aria-label="@EffectiveCloseButtonAriaLabel"
                         CssClass="dialog-close"
                         Disabled="@HasInlineAlert"
-                        IconClass="bi bi-x"
+                        IconClass="bi bi-x-circle"
                         OnClick="HandleCloseButtonAsync" />
                 }
             </header>
@@ -137,6 +137,7 @@
                     AriaInvalid="@(ValidationError is not null)"
                     AriaLabelledBy="@_inlineAlertMessageId"
                     CssClass="input dialog-input"
+                    OnEnter="HandleInlineAlertAcceptOnEnterAsync"
                     @ref="_inlineAlertInput"
                     UpdateOnInput="true"
                     Value="@_inlineAlertPromptValue"

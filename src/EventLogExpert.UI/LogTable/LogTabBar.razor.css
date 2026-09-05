@@ -3,99 +3,125 @@
     margin: 0 5px;
     height: 33px;
     overflow: hidden;
+    background: var(--background-dark);
 }
 
 .tab-row {
     display: flex;
     align-items: flex-end;
+    height: 100%;
 }
 
 .tab-group {
     display: inline-flex;
     align-items: flex-end;
+    height: 100%;
 }
 
 .tab {
+    /* --tab-inline-pad frames the label on the left and the close glyph on the right by the same amount.
+       The close button carries its own --close-btn-pad of internal white space (like the app's icon
+       buttons); a tab that has a close button trims that much off its right padding (see the
+       .tab:not(.all-logs) rule) so the glyph still lands --tab-inline-pad from the edge. */
+    --tab-inline-pad: 10px;
+    --close-btn-pad: 4px;
+
     position: relative;
-    top: 2px;
+    display: flex;
+    /* Anchor content to the bottom edge so the label + close button stay fixed when the tab grows upward. */
+    align-items: flex-end;
+    gap: 4px;
+
+    box-sizing: border-box;
+    height: 27px;
 
     flex: 0 1 auto;
-    min-width: 120px;
+    min-width: 90px;
     max-width: 240px;
     margin: 0 1px 0 0;
-    padding: 4px 22px;
+    padding: 0 var(--tab-inline-pad) 3px;
+    border-top: 3px solid transparent;
     border-radius: 3px 3px 0 0;
 
-    text-align: center;
-
     background: var(--background-darkgray);
-    transition: background-color 0.1s ease-in-out, padding 0.1s ease-in-out;
+    transition: height 0.1s ease-in-out, background-color 0.1s ease-in-out, border-color 0.1s ease-in-out;
 
     cursor: pointer;
 
+    /* The tab-row is bottom-aligned, so increasing the height raises only the tab's TOP edge - the bottom,
+       and the bottom-anchored label, stay fixed. The tab pops up like a real tab (the beveled step) and the
+       blue top border appears, all without the text drifting (no sponginess). */
     &:hover,
     &.active {
-        padding-top: 6px;
-        border-top: 2px solid var(--clr-lightblue);
+        height: 31px;
+        border-top-color: var(--clr-lightblue);
+    }
+
+    & > span {
+        flex: 1 1 auto;
+        min-width: 0;
+        text-align: left;
     }
 
     & > i {
-        position: absolute;
-        right: 3px;
-        top: 4px;
-
-        width: 1.5em;
-        border: 1px solid transparent;
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        /* Internal white space gives the hover pill breathing room; no fixed width, so the button hugs its
+           glyph plus this padding. height:1lh matches the label's line box, so the tab's bottom-alignment
+           lands the glyph on the label's vertical center (the base font is 10pt, so a fixed 22px box would
+           sit well above the text). */
+        padding: 0 var(--close-btn-pad);
+        height: 1lh;
         border-radius: 3px;
 
         color: var(--text-secondary);
+        font-size: 1rem;
 
-        &:hover {
-            border-color: var(--clr-lightblue);
-            color: var(--clr-lightblue);
+        opacity: 0;
+        transition: opacity 0.1s ease-in-out, color 0.1s ease-in-out, background-color 0.1s ease-in-out;
+
+        /* Neutralize Bootstrap Icons' baseline shift so the glyph sits at the geometric center (the same fix
+           .button.icon-button uses). */
+        &::before {
+            vertical-align: 0;
+            line-height: 0;
         }
 
+        &:hover,
         &:focus-visible {
-            border-color: var(--clr-lightblue);
+            background: var(--menu-hover-overlay);
             color: var(--clr-lightblue);
         }
     }
 
     &:hover > i,
-    &.active > i {
-        color: var(--clr-lightblue);
+    &.active > i,
+    & > i:focus-visible {
+        opacity: 1;
     }
+}
+
+/* The Combined tab has no close button, so size it to its label with equal left/right padding rather than
+   the shared min-width. Every tab still starts its text at the same left offset (the shared padding). */
+.all-logs {
+    min-width: auto;
+}
+
+/* A tab with a close button trims its right padding by the button's own white space, so the close glyph
+   sits the same distance from the right edge as the label sits from the left. (Combined has no close
+   button, so it keeps the symmetric padding above.) */
+.tab:not(.all-logs) {
+    padding-right: calc(var(--tab-inline-pad) - var(--close-btn-pad));
 }
 
 .tab-group > .tab {
-    box-shadow: inset 0 2px 0 0 var(--clr-lightgray);
-}
-
-.group-header > .chevron {
-    position: absolute;
-    z-index: 1;
-    top: 0;
-    bottom: 0;
-    left: 0;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    width: 20px;
-    padding: 0;
-    border: none;
-
-    color: inherit;
-
-    background: transparent;
-
-    cursor: pointer;
-
-    &:hover,
-    &:focus-visible {
-        color: var(--clr-lightblue);
-    }
+    /* The colored top border marks which tabs belong to a group (per-group hue via --group-color, set
+       inline on .tab-group from the shared categorical palette). It takes the place of the blue active
+       border on grouped tabs - the pop-up height alone signals which grouped tab is active, so we never
+       stack two colors on one tab. */
+    border-top-color: var(--group-color, var(--clr-lightgray));
 }
 
 span {

@@ -12,6 +12,10 @@ namespace EventLogExpert.UI.Layout;
 
 public sealed partial class MainLayout : IAsyncDisposable
 {
+    private bool _disposed;
+    private Task<IJSObjectReference>? _focusRingModuleLoad;
+    private Task<IJSObjectReference>? _themeModuleLoad;
+
     [Inject] private IAppTitleService AppTitleService { get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
@@ -21,9 +25,6 @@ public sealed partial class MainLayout : IAsyncDisposable
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
     [Inject] private IUpdateService UpdateService { get; init; } = null!;
-
-    private Task<IJSObjectReference>? _themeModuleLoad;
-    private bool _disposed;
 
     public async ValueTask DisposeAsync()
     {
@@ -46,6 +47,21 @@ public sealed partial class MainLayout : IAsyncDisposable
 
             _themeModuleLoad = null;
         }
+
+        if (_focusRingModuleLoad is not null)
+        {
+            try
+            {
+                var module = await _focusRingModuleLoad;
+                await module.DisposeAsync();
+            }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+            catch (ObjectDisposedException) { }
+            catch (TaskCanceledException) { }
+
+            _focusRingModuleLoad = null;
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -54,6 +70,7 @@ public sealed partial class MainLayout : IAsyncDisposable
         {
             await ApplyThemeAsync();
             await KeyboardShortcutService.EnsureRegisteredAsync(JSRuntime);
+            await RegisterKeyboardFocusRingAsync();
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -95,4 +112,26 @@ public sealed partial class MainLayout : IAsyncDisposable
     }
 
     private void OnThemeChanged() => _ = InvokeAsync(ApplyThemeAsync);
+
+    private async Task RegisterKeyboardFocusRingAsync()
+    {
+        if (_disposed) { return; }
+
+        var load = _focusRingModuleLoad ??= JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import",
+            "./_content/EventLogExpert.UI/Common/keyboardFocusRing.js").AsTask();
+
+        try
+        {
+            var module = await load;
+            await module.InvokeVoidAsync("registerKeyboardFocusRing");
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or JSException or ObjectDisposedException or TaskCanceledException)
+        {
+            if (!load.IsCompletedSuccessfully && ReferenceEquals(_focusRingModuleLoad, load))
+            {
+                _focusRingModuleLoad = null;
+            }
+        }
+    }
 }

@@ -92,6 +92,21 @@ public sealed class LogTabBarTests : BunitContext
         Services.GetRequiredService<IStringLocalizer<SharedResource>>();
 
     [Fact]
+    public void ActiveGroupHeaderName_Click_TogglesCollapse()
+    {
+        // With the chevron removed, clicking an already-active group header toggles its collapse state. The
+        // toggle is on click (not mousedown) so a drag-scroll of the tab strip started on the header does not
+        // collapse the group.
+        var (state, groupId, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
+        _logTableState.Value.Returns(state);
+        var cut = Render<LogTabBar>();
+
+        cut.Find(".group-header > span").Click();
+
+        _logTableCommands.Received(1).SetTabGroupCollapsed(groupId, true);
+    }
+
+    [Fact]
     public async Task ActiveTabChange_Rerenders()
     {
         var alpha = EventLogId.Create();
@@ -140,35 +155,14 @@ public sealed class LogTabBarTests : BunitContext
     [Fact]
     public void AriaLabelsAndTitles_RouteThroughMarkerLocalizer()
     {
-        var (collapsedState, _, _, _, _) = GroupedState(collapsed: true, activeIsMember1: false);
-        _logTableState.Value.Returns(collapsedState);
-        var collapsedCut = Render<LogTabBar>();
-
-        Assert.Equal(Localizer["TabBar_ExpandGroupAria"].Value, collapsedCut.Find("button.chevron").GetAttribute("aria-label"));
-        Assert.Equal(Localizer["TabBar_ExpandGroupAria"].Value, collapsedCut.Find("button.chevron").GetAttribute("title"));
-
         var (expandedState, _, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
         _logTableState.Value.Returns(expandedState);
         var expandedCut = Render<LogTabBar>();
 
-        Assert.Equal(Localizer["TabBar_CollapseGroupAria"].Value, expandedCut.Find("button.chevron").GetAttribute("aria-label"));
-        Assert.Equal(Localizer["TabBar_CollapseGroupAria"].Value, expandedCut.Find("button.chevron").GetAttribute("title"));
-        Assert.Equal(Localizer["TabBar_CloseGroup"].Value, expandedCut.Find(".group-header > i.bi-x").GetAttribute("aria-label"));
-        Assert.Equal(Localizer["TabBar_CloseGroup"].Value, expandedCut.Find(".group-header > i.bi-x").GetAttribute("title"));
-        Assert.Equal(Localizer["TabBar_CloseLogAria"].Value, expandedCut.Find(".tab.member > i.bi-x").GetAttribute("aria-label"));
-        Assert.Equal(Localizer["TabBar_CloseLogAria"].Value, expandedCut.Find(".tab.member > i.bi-x").GetAttribute("title"));
-    }
-
-    [Fact]
-    public void ChevronClick_DispatchesSetTabGroupCollapsed()
-    {
-        var (state, groupId, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
-        _logTableState.Value.Returns(state);
-        var cut = Render<LogTabBar>();
-
-        cut.Find("button.chevron").Click();
-
-        _logTableCommands.Received(1).SetTabGroupCollapsed(groupId, true);
+        Assert.Equal(Localizer["TabBar_CloseGroup"].Value, expandedCut.Find(".group-header > i.bi-x-circle").GetAttribute("aria-label"));
+        Assert.Equal(Localizer["TabBar_CloseGroup"].Value, expandedCut.Find(".group-header > i.bi-x-circle").GetAttribute("title"));
+        Assert.Equal(Localizer["TabBar_CloseLogAria"].Value, expandedCut.Find(".tab.member > i.bi-x-circle").GetAttribute("aria-label"));
+        Assert.Equal(Localizer["TabBar_CloseLogAria"].Value, expandedCut.Find(".tab.member > i.bi-x-circle").GetAttribute("title"));
     }
 
     [Fact]
@@ -232,6 +226,17 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
+    public void CollapsedGroup_HeaderAriaExpandedFalse()
+    {
+        var (state, _, _, _, _) = GroupedState(collapsed: true, activeIsMember1: false);
+        _logTableState.Value.Returns(state);
+
+        var cut = Render<LogTabBar>();
+
+        Assert.Equal("false", cut.Find(".group-header > span").GetAttribute("aria-expanded"));
+    }
+
+    [Fact]
     public void CollapsedGroup_HidesInactiveMembers()
     {
         var (state, _, _, _, _) = GroupedState(collapsed: true, activeIsMember1: true);
@@ -241,17 +246,6 @@ public sealed class LogTabBarTests : BunitContext
 
         Assert.Contains("Alpha", cut.Markup);
         Assert.DoesNotContain("Beta", cut.Markup);
-    }
-
-    [Fact]
-    public void CollapsedGroup_RendersDownChevron()
-    {
-        var (state, _, _, _, _) = GroupedState(collapsed: true, activeIsMember1: false);
-        _logTableState.Value.Returns(state);
-
-        var cut = Render<LogTabBar>();
-
-        Assert.Contains("bi-chevron-down", cut.Markup);
     }
 
     [Fact]
@@ -295,6 +289,17 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
+    public void ExpandedGroup_HeaderAriaExpandedTrue()
+    {
+        var (state, _, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
+        _logTableState.Value.Returns(state);
+
+        var cut = Render<LogTabBar>();
+
+        Assert.Equal("true", cut.Find(".group-header > span").GetAttribute("aria-expanded"));
+    }
+
+    [Fact]
     public void ExpandedGroup_RendersHeaderNameAndMembers()
     {
         var (state, _, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
@@ -305,17 +310,6 @@ public sealed class LogTabBarTests : BunitContext
         Assert.Contains("MyGroup", cut.Markup);
         Assert.Contains("Alpha", cut.Markup);
         Assert.Contains("Beta", cut.Markup);
-    }
-
-    [Fact]
-    public void ExpandedGroup_RendersRightChevron()
-    {
-        var (state, _, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
-        _logTableState.Value.Returns(state);
-
-        var cut = Render<LogTabBar>();
-
-        Assert.Contains("bi-chevron-right", cut.Markup);
     }
 
     [Fact]
@@ -338,19 +332,20 @@ public sealed class LogTabBarTests : BunitContext
         _logTableState.Value.Returns(state);
         var cut = Render<LogTabBar>();
 
-        cut.Find(".group-header > i.bi-x").Click();
+        cut.Find(".group-header > i.bi-x-circle").Click();
 
         _logTableCommands.Received(1).CloseGroup(groupId);
     }
 
     [Fact]
-    public void GroupHeaderName_MouseDown_DispatchesSetActiveTable()
+    public void GroupHeaderName_Click_DispatchesSetActiveTable()
     {
-        var (state, _, headerId, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
+        // Member1 is active (not the header), so clicking the header activates the group's combined view.
+        var (state, _, headerId, _, _) = GroupedState(collapsed: false, activeIsMember1: true);
         _logTableState.Value.Returns(state);
         var cut = Render<LogTabBar>();
 
-        cut.Find(".group-header > span").MouseDown();
+        cut.Find(".group-header > span").Click();
 
         _logTableCommands.Received(1).SetActiveTable(headerId);
     }
@@ -590,7 +585,7 @@ public sealed class LogTabBarTests : BunitContext
         _logTableState.Value.Returns(TwoTabState(alpha, beta));
         var cut = Render<LogTabBar>();
 
-        cut.Find(".tab > i.bi-x").MouseDown(new MouseEventArgs { Button = 2 });
+        cut.Find(".tab > i.bi-x-circle").MouseDown(new MouseEventArgs { Button = 2 });
 
         _eventLogCommands.DidNotReceive().CloseLog(Arg.Any<EventLogId>(), Arg.Any<string>());
     }

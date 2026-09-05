@@ -20,6 +20,9 @@ namespace EventLogExpert.UI.LogTable;
 
 public sealed partial class LogTabBar
 {
+    // Number of --cat-color-N palette entries defined in app.css; a group's palette slot wraps within this range.
+    private const int CategoricalPaletteSize = 8;
+
     private IJSObjectReference? _logTabBarModule;
     private ElementReference _logTabBarRootRef;
     private LogTabBarPresentation? _renderedPresentation;
@@ -184,10 +187,27 @@ public sealed partial class LogTabBar
         string? disabledReason = null) =>
         MenuItem.Item(label, onClickAsync, isEnabled: isEnabled, isDanger: true, disabledReason: disabledReason);
 
+    private static int GetGroupColorIndex(LogTabGroupId id) =>
+        // Stable, deterministic palette slot from the group's GUID so the color survives re-renders (and
+        // persisted layouts) without storing it. (& 0x7FFFFFFF keeps the modulo operand non-negative.)
+        (id.Value.GetHashCode() & 0x7FFFFFFF) % CategoricalPaletteSize;
+
     private static IReadOnlyList<LogView> VisibleMembers(LogTabBarPresentation presentation, GroupRow row) =>
         row.Group.IsCollapsed ?
             [.. row.Members.Where(member => member.Id == presentation.ActiveTabId)] :
             row.Members;
+
+    private void ActivateOrToggleGroup(GroupRow row)
+    {
+        if (Source.Current.ActiveTabId == row.Header.Id)
+        {
+            ToggleCollapse(row.Group);
+
+            return;
+        }
+
+        SetActiveLog(row.Header);
+    }
 
     private IReadOnlyList<MenuItem> BuildAllLogsMenu() =>
     [
@@ -336,6 +356,13 @@ public sealed partial class LogTabBar
         if (e.Button != 0) { return; }
 
         CloseLog(table);
+    }
+
+    private void OnGroupHeaderKeyDown(KeyboardEventArgs e, GroupRow row)
+    {
+        if (e.Key != "Enter" && e.Key != " ") { return; }
+
+        ActivateOrToggleGroup(row);
     }
 
     private void OnTabKeyDown(KeyboardEventArgs e, LogView table)
