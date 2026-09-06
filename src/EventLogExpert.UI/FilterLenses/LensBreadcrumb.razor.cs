@@ -55,13 +55,20 @@ public sealed partial class LensBreadcrumb
     {
         if (!CanSaveAsGroup) { return; }
 
-        var name = await AlertDialogService.DisplayPrompt(
+        PromptOutcome outcome = await AlertDialogService.DisplayPromptWithSecondary(
             Localizer["FilterLens_SaveAsGroup_PromptTitle"],
             Localizer["FilterLens_SaveAsGroup_PromptMessage"],
-            Localizer["FilterLens_SaveAsGroup_DefaultName"]);
+            Localizer["FilterLens_SaveAsGroup_DefaultName"],
+            Localizer["FilterLens_SaveAsGroup_Save"],
+            Localizer["FilterLens_SaveAsGroup_SaveAndClear"],
+            Localizer["FilterLens_SaveAsGroup_Cancel"]);
 
-        if (string.IsNullOrWhiteSpace(name)) { return; }
+        if (outcome.Choice == PromptChoice.Cancel || string.IsNullOrWhiteSpace(outcome.Value)) { return; }
 
-        Commands.SaveLensesAsGroup(name.Trim());
+        string name = outcome.Value.Trim();
+
+        // Save and clear (Secondary) defers the clear to the persist-success effect, so a failed save leaves the active
+        // lenses intact instead of discarding them.
+        Commands.SaveLensesAsGroup(name, clearAfterSave: outcome.Choice == PromptChoice.Secondary);
     }
 }

@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.Modal;
@@ -8,12 +9,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.Alerts;
 
-/// <summary>
-///     Standalone prompt modal used by <c>AlertDialogService</c> when no host modal is active. Returns the input
-///     value on Accept, or <see cref="string.Empty" /> on Cancel/Esc to match the existing
-///     <c>IAlertDialogService.DisplayPrompt</c> non-null contract.
-/// </summary>
-public sealed partial class PromptModal : ModalBase<string>
+public sealed partial class PromptModal : ModalBase<PromptOutcome>
 {
     private readonly string _errorId = ComponentId.NewUnique("prompt-modal-validation").Value;
     private readonly string _inputId = ComponentId.NewUnique("prompt-modal-input").Value;
@@ -22,9 +18,15 @@ public sealed partial class PromptModal : ModalBase<string>
     private TextInput? _input;
     private string _value = string.Empty;
 
+    [Parameter] public string CancelLabel { get; set; } = "Cancel";
+
     [Parameter] public string InitialValue { get; set; } = string.Empty;
 
     [Parameter] public string Message { get; set; } = string.Empty;
+
+    [Parameter] public string PrimaryLabel { get; set; } = "OK";
+
+    [Parameter] public string? SecondaryActionLabel { get; set; }
 
     [Parameter] public string Title { get; set; } = string.Empty;
 
@@ -53,7 +55,7 @@ public sealed partial class PromptModal : ModalBase<string>
         await base.OnAfterRenderAsync(firstRender);
     }
 
-    protected override Task OnCancelAsync() => CompleteAsync(string.Empty);
+    protected override Task OnCancelAsync() => CompleteAsync(new PromptOutcome(PromptChoice.Cancel, string.Empty));
 
     protected override void OnInitialized()
     {
@@ -61,8 +63,14 @@ public sealed partial class PromptModal : ModalBase<string>
         base.OnInitialized();
     }
 
+    private Task CompleteIfValidAsync(PromptChoice choice) =>
+        ValidationError is not null ? Task.CompletedTask : CompleteAsync(new PromptOutcome(choice, _value));
+
     private Task HandleAcceptClickedAsync() =>
-        ValidationError is not null ? Task.CompletedTask : CompleteAsync(_value);
+        CompleteIfValidAsync(PromptChoice.Primary);
+
+    private Task HandleSecondaryActionClickedAsync() =>
+        CompleteIfValidAsync(PromptChoice.Secondary);
 
     private void HandleValueChanged(string value) => _value = value;
 }

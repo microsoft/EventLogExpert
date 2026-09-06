@@ -485,7 +485,7 @@ internal sealed class Effects(
 
         if (await PersistAddAsync(created, dispatcher).ConfigureAwait(false))
         {
-            dispatcher.Dispatch(new SaveFilterSetSucceededAction(created.Name, action.Origin));
+            dispatcher.Dispatch(new SaveFilterSetSucceededAction(created.Name, action.Origin, action.LensesToClearOnSuccess));
 
             return;
         }

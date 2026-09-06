@@ -102,11 +102,22 @@ internal sealed class Effects(
     public Task HandleRemoveForLog(RemoveLensesForLogAction action, IDispatcher dispatcher) => Reapply(dispatcher);
 
     [EffectMethod]
+    public Task HandleRemoveLenses(RemoveFilterLensesAction action, IDispatcher dispatcher) => Reapply(dispatcher);
+
+    [EffectMethod]
     public Task HandleSaveFilterSetSucceeded(SaveFilterSetSucceededAction action, IDispatcher dispatcher)
     {
         if (action.Origin == SaveFilterSetOrigin.Lens)
         {
             _announcementService.AnnounceLensGroupSaved(action.Name);
+        }
+
+        // Save-and-clear removes only the lenses that were actually saved (captured before the persist began), so any
+        // lens the user added while the write was in flight survives. The removal rides the confirmed-persist signal,
+        // so a failed save never removes anything.
+        if (action.LensesToClearOnSuccess is { Count: > 0 } lensesToClear)
+        {
+            dispatcher.Dispatch(new RemoveFilterLensesAction(lensesToClear));
         }
 
         return Task.CompletedTask;
@@ -117,13 +128,17 @@ internal sealed class Effects(
     {
         if (string.IsNullOrWhiteSpace(action.Name)) { return Task.CompletedTask; }
 
-        var filters = _lensState.Value.Lenses.SelectMany(lens => lens.ExcludeFilters).ToImmutableList();
+        var lenses = _lensState.Value.Lenses;
+        var filters = lenses.SelectMany(lens => lens.ExcludeFilters).ToImmutableList();
 
         if (filters.IsEmpty) { return Task.CompletedTask; }
 
-        // Tag the save as lens-originated. The terminal SaveFilterSetSucceededAction is announced (below) only
-        // for this origin, and only after the write actually succeeds; failure surfaces via the error banner.
-        dispatcher.Dispatch(new SaveFilterSetAction(action.Name, filters, SaveFilterSetOrigin.Lens));
+        // For save-and-clear, capture the ids of exactly the lenses being saved. The terminal
+        // SaveFilterSetSucceededAction removes only those - and only after the write succeeds - so a lens added while
+        // the persist is in flight survives, and a failed save (surfaced via the error banner) discards nothing.
+        var lensesToClearOnSuccess = action.ClearAfterSave ? lenses.Select(lens => lens.Id).ToImmutableList() : null;
+
+        dispatcher.Dispatch(new SaveFilterSetAction(action.Name, filters, SaveFilterSetOrigin.Lens, lensesToClearOnSuccess));
 
         return Task.CompletedTask;
     }

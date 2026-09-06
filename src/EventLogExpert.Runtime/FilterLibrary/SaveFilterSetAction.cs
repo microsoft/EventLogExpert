@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Runtime.FilterLenses;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.FilterLibrary;
@@ -16,4 +17,5 @@ internal enum SaveFilterSetOrigin
 internal sealed record SaveFilterSetAction(
     string Name,
     ImmutableList<SavedFilter> Filters,
-    SaveFilterSetOrigin Origin = SaveFilterSetOrigin.Library);
+    SaveFilterSetOrigin Origin = SaveFilterSetOrigin.Library,
+    ImmutableList<FilterLensId>? LensesToClearOnSuccess = null);

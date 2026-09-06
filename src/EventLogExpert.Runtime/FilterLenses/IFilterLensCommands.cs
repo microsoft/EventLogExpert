@@ -23,7 +23,7 @@ public interface IFilterLensCommands
 
     void RemoveLens(FilterLensId id);
 
-    void SaveLensesAsGroup(string name);
+    void SaveLensesAsGroup(string name, bool clearAfterSave = false);
 
     void ShowEventsNearTime(DateTime timeCreated, TimeSpan radius, TimeZoneInfo displayZone, string? originLog = null);
 

@@ -131,8 +131,111 @@ public sealed class LensBreadcrumbTests : BunitContext
 
         await button.ClickAsync(new MouseEventArgs());
 
-        await _alertDialog.DidNotReceive().DisplayPrompt(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
-        _commands.DidNotReceive().SaveLensesAsGroup(Arg.Any<string>());
+        await _alertDialog.DidNotReceive().DisplayPromptWithSecondary(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>());
+        _commands.DidNotReceive().SaveLensesAsGroup(Arg.Any<string>(), Arg.Any<bool>());
+    }
+
+    [Fact]
+    public async Task SaveAsGroupButton_WhenPromptReturnsCancel_DoesNotSaveOrClear()
+    {
+        _source.Lenses.Returns(ImmutableList.Create(Summary("a")));
+        _alertDialog.DisplayPromptWithSecondary(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>())
+            .Returns(new PromptOutcome(PromptChoice.Cancel, string.Empty));
+
+        var cut = Render<LensBreadcrumb>();
+
+        await SaveActionButton(cut, Localizer["FilterLens_SaveAsGroup"].Value).ClickAsync(new MouseEventArgs());
+
+        _commands.DidNotReceive().SaveLensesAsGroup(Arg.Any<string>(), Arg.Any<bool>());
+        _commands.DidNotReceive().ClearLenses();
+    }
+
+    [Fact]
+    public async Task SaveAsGroupButton_WhenPromptReturnsDefaultOutcome_DoesNotSaveOrClear()
+    {
+        // A forced modal close or host teardown completes the standalone prompt with default(PromptOutcome),
+        // whose Value is null. The breadcrumb must treat it as a cancel and never dereference the null name.
+        _source.Lenses.Returns(ImmutableList.Create(Summary("a")));
+        _alertDialog.DisplayPromptWithSecondary(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>())
+            .Returns(default(PromptOutcome));
+
+        var cut = Render<LensBreadcrumb>();
+
+        await SaveActionButton(cut, Localizer["FilterLens_SaveAsGroup"].Value).ClickAsync(new MouseEventArgs());
+
+        _commands.DidNotReceive().SaveLensesAsGroup(Arg.Any<string>(), Arg.Any<bool>());
+        _commands.DidNotReceive().ClearLenses();
+    }
+
+    [Fact]
+    public async Task SaveAsGroupButton_WhenPromptReturnsPrimary_SavesGroupWithoutClearing()
+    {
+        _source.Lenses.Returns(ImmutableList.Create(Summary("a")));
+        _alertDialog.DisplayPromptWithSecondary(
+                Localizer["FilterLens_SaveAsGroup_PromptTitle"].Value,
+                Localizer["FilterLens_SaveAsGroup_PromptMessage"].Value,
+                Localizer["FilterLens_SaveAsGroup_DefaultName"].Value,
+                Localizer["FilterLens_SaveAsGroup_Save"].Value,
+                Localizer["FilterLens_SaveAsGroup_SaveAndClear"].Value,
+                Localizer["FilterLens_SaveAsGroup_Cancel"].Value)
+            .Returns(new PromptOutcome(PromptChoice.Primary, "My Group"));
+
+        var cut = Render<LensBreadcrumb>();
+
+        var button = SaveActionButton(cut, Localizer["FilterLens_SaveAsGroup"].Value);
+        Assert.False(button.HasAttribute("disabled"));
+        Assert.Equal("false", button.GetAttribute("aria-disabled"));
+        Assert.False(button.HasAttribute("aria-describedby"));
+
+        await button.ClickAsync(new MouseEventArgs());
+
+        _commands.Received(1).SaveLensesAsGroup("My Group", clearAfterSave: false);
+        _commands.DidNotReceive().ClearLenses();
+
+        // Success is announced from the lens effect only after the write actually persists (failure surfaces via
+        // the error banner), so the breadcrumb no longer announces optimistically on click.
+        _announcements.DidNotReceive().Announce(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task SaveAsGroupButton_WhenPromptReturnsSecondary_SavesGroupWithClearAfterSave()
+    {
+        _source.Lenses.Returns(ImmutableList.Create(Summary("a")));
+        _alertDialog.DisplayPromptWithSecondary(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>())
+            .Returns(new PromptOutcome(PromptChoice.Secondary, "My Group"));
+
+        var cut = Render<LensBreadcrumb>();
+
+        await SaveActionButton(cut, Localizer["FilterLens_SaveAsGroup"].Value).ClickAsync(new MouseEventArgs());
+
+        // Save and clear defers the clear to the persist-success effect, so the breadcrumb itself never calls
+        // ClearLenses directly - it flags the save with clearAfterSave: true.
+        _commands.Received(1).SaveLensesAsGroup("My Group", clearAfterSave: true);
+        _commands.DidNotReceive().ClearLenses();
     }
 
     [Fact]
@@ -154,28 +257,6 @@ public sealed class LensBreadcrumbTests : BunitContext
         var hintId = button.GetAttribute("aria-describedby");
         Assert.False(string.IsNullOrEmpty(hintId));
         Assert.Equal(Localizer["FilterLens_SaveAsGroup_DisabledTitle"].Value, cut.Find($"#{hintId}").TextContent.Trim());
-    }
-
-    [Fact]
-    public async Task SaveAsGroupButton_WithValueLens_PromptsAndSavesGroup()
-    {
-        _source.Lenses.Returns(ImmutableList.Create(Summary("a")));
-        _alertDialog.DisplayPrompt(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()).Returns("My Group");
-
-        var cut = Render<LensBreadcrumb>();
-
-        var button = SaveActionButton(cut, Localizer["FilterLens_SaveAsGroup"].Value);
-        Assert.False(button.HasAttribute("disabled"));
-        Assert.Equal("false", button.GetAttribute("aria-disabled"));
-        Assert.False(button.HasAttribute("aria-describedby"));
-
-        await button.ClickAsync(new MouseEventArgs());
-
-        _commands.Received(1).SaveLensesAsGroup("My Group");
-
-        // Success is announced from the lens effect only after the write actually persists (failure surfaces via
-        // the error banner), so the breadcrumb no longer announces optimistically on click.
-        _announcements.DidNotReceive().Announce(Arg.Any<string>());
     }
 
     [Fact]

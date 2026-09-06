@@ -13,6 +13,160 @@ namespace EventLogExpert.UI.Tests.Alerts;
 public sealed class ModalAlertDialogServiceTests
 {
     [Fact]
+    public async Task DisplayPromptWithSecondary_WhenActiveHostAccepts_ShouldReturnPrimaryChoice()
+    {
+        var host = Substitute.For<IInlineAlertHost>();
+        host.ShowInlineAlertAsync(Arg.Any<InlineAlertRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new InlineAlertResult(true, "group")));
+
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
+        {
+            call[0] = host;
+            return true;
+        });
+
+        Func<string, string?> validate = value => string.IsNullOrWhiteSpace(value) ? "Required." : null;
+        var sut = new AlertDialogService(
+            coordinator,
+            PassthroughMainThread(),
+            Substitute.For<IErrorBannerService>(),
+            Substitute.For<IInfoBannerService>(),
+            _ => Task.FromResult(false),
+            _ => Task.FromResult(string.Empty));
+
+        PromptOutcome result = await sut.DisplayPromptWithSecondary(
+            "Save as group",
+            "Group name",
+            "New Group",
+            "Save",
+            "Save and clear",
+            "Cancel",
+            validate);
+
+        Assert.Equal(new PromptOutcome(PromptChoice.Primary, "group"), result);
+        await host.Received(1).ShowInlineAlertAsync(
+            Arg.Is<InlineAlertRequest>(request =>
+                request != null &&
+                request.Title == "Save as group" &&
+                request.Message == "Group name" &&
+                request.PromptInitialValue == "New Group" &&
+                request.AcceptLabel == "Save" &&
+                request.SecondaryActionLabel == "Save and clear" &&
+                request.CancelLabel == "Cancel" &&
+                request.IsPrompt &&
+                ReferenceEquals(request.Validate, validate)),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DisplayPromptWithSecondary_WhenActiveHostCancels_ShouldReturnCancelChoice()
+    {
+        var host = Substitute.For<IInlineAlertHost>();
+        host.ShowInlineAlertAsync(Arg.Any<InlineAlertRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new InlineAlertResult(false, "ignored")));
+
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
+        {
+            call[0] = host;
+            return true;
+        });
+
+        var sut = new AlertDialogService(
+            coordinator,
+            PassthroughMainThread(),
+            Substitute.For<IErrorBannerService>(),
+            Substitute.For<IInfoBannerService>(),
+            _ => Task.FromResult(false),
+            _ => Task.FromResult(string.Empty));
+
+        PromptOutcome result = await sut.DisplayPromptWithSecondary(
+            "Save as group",
+            "Group name",
+            "New Group",
+            "Save",
+            "Save and clear",
+            "Cancel");
+
+        Assert.Equal(new PromptOutcome(PromptChoice.Cancel, string.Empty), result);
+    }
+
+    [Fact]
+    public async Task DisplayPromptWithSecondary_WhenActiveHostChoosesSecondary_ShouldReturnSecondaryChoice()
+    {
+        var host = Substitute.For<IInlineAlertHost>();
+        host.ShowInlineAlertAsync(Arg.Any<InlineAlertRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new InlineAlertResult(false, "group") { SecondaryChosen = true }));
+
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
+        {
+            call[0] = host;
+            return true;
+        });
+
+        var sut = new AlertDialogService(
+            coordinator,
+            PassthroughMainThread(),
+            Substitute.For<IErrorBannerService>(),
+            Substitute.For<IInfoBannerService>(),
+            _ => Task.FromResult(false),
+            _ => Task.FromResult(string.Empty));
+
+        PromptOutcome result = await sut.DisplayPromptWithSecondary(
+            "Save as group",
+            "Group name",
+            "New Group",
+            "Save",
+            "Save and clear",
+            "Cancel");
+
+        Assert.Equal(new PromptOutcome(PromptChoice.Secondary, "group"), result);
+    }
+
+    [Fact]
+    public async Task DisplayPromptWithSecondary_WhenNoActiveHost_ShouldCallStandalonePromptOpener()
+    {
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(false);
+
+        IReadOnlyDictionary<string, object?>? capturedPrompt = null;
+        Func<string, string?> validate = value => string.IsNullOrWhiteSpace(value) ? "Required." : null;
+        var sut = new AlertDialogService(
+            coordinator,
+            PassthroughMainThread(),
+            Substitute.For<IErrorBannerService>(),
+            Substitute.For<IInfoBannerService>(),
+            _ => Task.FromResult(false),
+            _ => Task.FromResult(string.Empty),
+            parameters =>
+            {
+                capturedPrompt = parameters;
+                return Task.FromResult(new PromptOutcome(PromptChoice.Secondary, "group"));
+            });
+
+        PromptOutcome result = await sut.DisplayPromptWithSecondary(
+            "Save as group",
+            "Group name",
+            "New Group",
+            "Save",
+            "Save and clear",
+            "Cancel",
+            validate);
+
+        Assert.Equal(new PromptOutcome(PromptChoice.Secondary, "group"), result);
+        Assert.NotNull(capturedPrompt);
+        Assert.Equal("Save as group", capturedPrompt!["Title"]);
+        Assert.Equal("Group name", capturedPrompt["Message"]);
+        Assert.Equal("New Group", capturedPrompt["InitialValue"]);
+        Assert.Equal("Save", capturedPrompt["PrimaryLabel"]);
+        Assert.Equal("Save and clear", capturedPrompt["SecondaryActionLabel"]);
+        Assert.Equal("Cancel", capturedPrompt["CancelLabel"]);
+        Assert.Same(validate, capturedPrompt["Validate"]);
+    }
+
+    [Fact]
     public async Task DisplayPrompt_WhenActiveHost_ShouldRouteInlineAndReturnTypedValue()
     {
         var host = Substitute.For<IInlineAlertHost>();
@@ -114,29 +268,6 @@ public sealed class ModalAlertDialogServiceTests
 
         Assert.NotNull(capturedPrompt);
         Assert.Same(validate, capturedPrompt!["Validate"]);
-    }
-
-    [Fact]
-    public async Task ShowAlert_ShouldMarshalThroughMainThreadService()
-    {
-        var coordinator = Substitute.For<IModalCoordinator>();
-        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(false);
-
-        var mainThread = Substitute.For<IMainThreadService>();
-        mainThread.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>())
-            .Returns(call => call.ArgAt<Func<Task>>(0)());
-
-        var sut = new AlertDialogService(
-            coordinator,
-            mainThread,
-            Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
-            _ => Task.FromResult(true),
-            _ => Task.FromResult(string.Empty));
-
-        await sut.ShowAlert("t", "m", "c");
-
-        await mainThread.Received(1).InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
     }
 
     [Fact]
@@ -411,6 +542,29 @@ public sealed class ModalAlertDialogServiceTests
         var result = await sut.ShowAlert("Confirm", "Sure?", "Yes", "No");
 
         Assert.False(result);
+    }
+
+    [Fact]
+    public async Task ShowAlert_ShouldMarshalThroughMainThreadService()
+    {
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(false);
+
+        var mainThread = Substitute.For<IMainThreadService>();
+        mainThread.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>())
+            .Returns(call => call.ArgAt<Func<Task>>(0)());
+
+        var sut = new AlertDialogService(
+            coordinator,
+            mainThread,
+            Substitute.For<IErrorBannerService>(),
+            Substitute.For<IInfoBannerService>(),
+            _ => Task.FromResult(true),
+            _ => Task.FromResult(string.Empty));
+
+        await sut.ShowAlert("t", "m", "c");
+
+        await mainThread.Received(1).InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
     }
 
     [Fact]

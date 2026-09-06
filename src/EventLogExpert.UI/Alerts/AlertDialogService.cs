@@ -14,7 +14,9 @@ public sealed class AlertDialogService(
     IErrorBannerService errorBannerService,
     IInfoBannerService infoBannerService,
     Func<IReadOnlyDictionary<string, object?>, Task<bool>> openStandaloneAlert,
-    Func<IReadOnlyDictionary<string, object?>, Task<string>> openStandalonePrompt) : IAlertDialogService
+    Func<IReadOnlyDictionary<string, object?>, Task<string>> openStandalonePrompt,
+    Func<IReadOnlyDictionary<string, object?>, Task<PromptOutcome>>? openStandalonePromptWithSecondary = null)
+    : IAlertDialogService
 {
     private readonly IErrorBannerService _errorBannerService = errorBannerService;
     private readonly IInfoBannerService _infoBannerService = infoBannerService;
@@ -23,6 +25,8 @@ public sealed class AlertDialogService(
     private readonly Func<IReadOnlyDictionary<string, object?>, Task<bool>> _openStandaloneAlert = openStandaloneAlert;
     private readonly Func<IReadOnlyDictionary<string, object?>, Task<string>> _openStandalonePrompt =
         openStandalonePrompt;
+    private readonly Func<IReadOnlyDictionary<string, object?>, Task<PromptOutcome>> _openStandalonePromptWithSecondary =
+        openStandalonePromptWithSecondary ?? (_ => Task.FromResult(new PromptOutcome(PromptChoice.Cancel, string.Empty)));
 
     public Task<string> DisplayPrompt(string title, string message) => DisplayPromptCore(title, message, null, null);
 
@@ -31,6 +35,16 @@ public sealed class AlertDialogService(
 
     public Task<string> DisplayPrompt(string title, string message, string initialValue, Func<string, string?>? validate) =>
         DisplayPromptCore(title, message, initialValue, validate);
+
+    public Task<PromptOutcome> DisplayPromptWithSecondary(
+        string title,
+        string message,
+        string initialValue,
+        string primaryLabel,
+        string secondaryLabel,
+        string cancelLabel,
+        Func<string, string?>? validate = null) =>
+        DisplayPromptWithSecondaryCore(title, message, initialValue, primaryLabel, secondaryLabel, cancelLabel, validate);
 
     public Task ShowAlert(string title, string message, string cancel) =>
         ShowAlert(title, message, cancel, AlertPresentation.Auto);
@@ -94,6 +108,55 @@ public sealed class AlertDialogService(
             catch (TaskCanceledException)
             {
                 return string.Empty;
+            }
+        });
+
+    private Task<PromptOutcome> DisplayPromptWithSecondaryCore(
+        string title,
+        string message,
+        string initialValue,
+        string primaryLabel,
+        string secondaryLabel,
+        string cancelLabel,
+        Func<string, string?>? validate) =>
+        InvokeOnMainThreadAsync(async () =>
+        {
+            if (!_modalCoordinator.TryGetInlineAlertHost(out var host))
+            {
+                return await _openStandalonePromptWithSecondary(new Dictionary<string, object?>
+                {
+                    ["Title"] = title,
+                    ["Message"] = message,
+                    ["InitialValue"] = initialValue,
+                    ["Validate"] = validate,
+                    ["PrimaryLabel"] = primaryLabel,
+                    ["SecondaryActionLabel"] = secondaryLabel,
+                    ["CancelLabel"] = cancelLabel,
+                });
+            }
+
+            try
+            {
+                InlineAlertResult result = await host.ShowInlineAlertAsync(
+                    new InlineAlertRequest(title, message, primaryLabel, cancelLabel, true, initialValue)
+                    {
+                        SecondaryActionLabel = secondaryLabel,
+                        Validate = validate,
+                    },
+                    CancellationToken.None);
+
+                if (result.Accepted)
+                {
+                    return new PromptOutcome(PromptChoice.Primary, result.PromptValue ?? string.Empty);
+                }
+
+                return result.SecondaryChosen ?
+                    new PromptOutcome(PromptChoice.Secondary, result.PromptValue ?? string.Empty) :
+                    new PromptOutcome(PromptChoice.Cancel, string.Empty);
+            }
+            catch (TaskCanceledException)
+            {
+                return new PromptOutcome(PromptChoice.Cancel, string.Empty);
             }
         });
 

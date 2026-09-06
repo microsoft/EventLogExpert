@@ -129,6 +129,32 @@ public sealed class FilterLensReducerTests
     }
 
     [Fact]
+    public void RemoveLenses_EmptyIds_ReturnsSameStateInstance()
+    {
+        var state = new FilterLensState { Lenses = [Lens("a")] };
+
+        var result = Reducers.ReduceRemoveLenses(state, new RemoveFilterLensesAction([]));
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
+    public void RemoveLenses_RemovesOnlySpecifiedLenses_LeavingOthers()
+    {
+        var saved1 = Lens("saved1");
+        var saved2 = Lens("saved2");
+        var addedDuringSave = Lens("added");
+        var state = new FilterLensState { Lenses = [saved1, saved2, addedDuringSave] };
+
+        // Mirrors save-and-clear: only the saved lenses are removed on persist success; a lens the user added while the
+        // save was in flight (addedDuringSave) is preserved.
+        var result = Reducers.ReduceRemoveLenses(state, new RemoveFilterLensesAction([saved1.Id, saved2.Id]));
+
+        Assert.Single(result.Lenses);
+        Assert.Same(addedDuringSave, result.Lenses[0]);
+    }
+
+    [Fact]
     public void Remove_DuplicateContentLenses_RemovesOnlyTargetedInstance()
     {
         var first = Lens("duplicate");

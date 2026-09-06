@@ -1,9 +1,10 @@
-@inherits ModalBase<string>
+@using EventLogExpert.Runtime.Alerts
+@inherits ModalBase<PromptOutcome>
 
 <ModalChrome AcceptDisabled="@(ValidationError is not null)"
-    AcceptLabel="OK"
+    AcceptLabel="@PrimaryLabel"
     AriaLabel="@AriaLabelText"
-    CancelLabel="Cancel"
+    CancelLabel="@CancelLabel"
     Footer="FooterPreset.AcceptCancel"
     InlineAlert="@CurrentInlineAlert"
     MaxWidth="min(34rem, calc(100vw - 2rem))"
@@ -12,6 +13,9 @@
     OnCancel="OnCancelAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
     OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
+    OnSecondaryAction="HandleSecondaryActionClickedAsync"
+    SecondaryActionDisabled="@(ValidationError is not null)"
+    SecondaryActionLabel="@SecondaryActionLabel"
     Title="@Title"
     @ref="ChromeRef">
     <ChildContent>

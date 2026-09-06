@@ -112,7 +112,18 @@ public sealed class FilterLensCommandsTests
         new FilterLensCommands(dispatcher).SaveLensesAsGroup("My Group");
 
         dispatcher.Received(1).Dispatch(Arg.Is<SaveLensesAsGroupAction>(action =>
-            action != null && action.Name == "My Group"));
+            action != null && action.Name == "My Group" && !action.ClearAfterSave));
+    }
+
+    [Fact]
+    public void SaveLensesAsGroup_WithClearAfterSave_DispatchesSaveAsGroupWithClearFlag()
+    {
+        var dispatcher = Substitute.For<IDispatcher>();
+
+        new FilterLensCommands(dispatcher).SaveLensesAsGroup("My Group", clearAfterSave: true);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<SaveLensesAsGroupAction>(action =>
+            action != null && action.Name == "My Group" && action.ClearAfterSave));
     }
 
     [Theory]

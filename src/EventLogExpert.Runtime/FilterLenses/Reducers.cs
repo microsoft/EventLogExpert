@@ -50,4 +50,15 @@ internal sealed class Reducers
 
         return updated.Count == state.Lenses.Count ? state : state with { Lenses = updated };
     }
+
+    [ReducerMethod]
+    public static FilterLensState ReduceRemoveLenses(FilterLensState state, RemoveFilterLensesAction action)
+    {
+        if (action.Ids.IsEmpty) { return state; }
+
+        var ids = action.Ids.ToHashSet();
+        var updated = state.Lenses.RemoveAll(lens => ids.Contains(lens.Id));
+
+        return updated.Count == state.Lenses.Count ? state : state with { Lenses = updated };
+    }
 }

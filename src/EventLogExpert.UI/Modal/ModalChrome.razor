@@ -101,6 +101,14 @@
                         @EffectiveAcceptLabel
                     </PrimaryButton>
 
+                    @if (!string.IsNullOrEmpty(SecondaryActionLabel))
+                    {
+                        <Button Disabled="@(HasInlineAlert || FooterDisabled || SecondaryActionDisabled)"
+                            OnClick="HandleSecondaryActionAsync">
+                            @SecondaryActionLabel
+                        </Button>
+                    }
+
                     <Button Disabled="@(HasInlineAlert || FooterDisabled)"
                         OnClick="HandleCancelButtonAsync">
                         @EffectiveCancelLabel
@@ -165,7 +173,8 @@
                 }
                 @if (!string.IsNullOrEmpty(InlineAlert.SecondaryActionLabel))
                 {
-                    <Button OnClick="HandleInlineAlertSecondaryAsync">
+                    <Button Disabled="@(ValidationError is not null)"
+                        OnClick="HandleInlineAlertSecondaryAsync">
                         @InlineAlert.SecondaryActionLabel
                     </Button>
                 }

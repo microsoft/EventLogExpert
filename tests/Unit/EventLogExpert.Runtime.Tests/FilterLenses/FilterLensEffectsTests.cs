@@ -251,6 +251,9 @@ public sealed class FilterLensEffectsTests
             new SaveFilterSetSucceededAction("My Group", SaveFilterSetOrigin.Lens), dispatcher);
 
         announcer.Received(1).AnnounceLensGroupSaved("My Group");
+
+        // A plain lens save carries no lenses-to-clear, so the stack stays active - only save-and-clear removes lenses.
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<RemoveFilterLensesAction>());
     }
 
     [Fact]
@@ -266,6 +269,24 @@ public sealed class FilterLensEffectsTests
     }
 
     [Fact]
+    public async Task HandleSaveFilterSetSucceeded_WithLensesToClear_AnnouncesAndRemovesSavedLenses()
+    {
+        var savedA = FilterLensId.Create();
+        var savedB = FilterLensId.Create();
+        var (effects, dispatcher, announcer) =
+            CreateEffectsWithAnnouncer(new FilterLensState(), new FilterPaneState());
+
+        await effects.HandleSaveFilterSetSucceeded(
+            new SaveFilterSetSucceededAction("My Group", SaveFilterSetOrigin.Lens, [savedA, savedB]), dispatcher);
+
+        // The removal rides the confirmed-persist signal and targets exactly the saved lenses; a failed save never
+        // dispatches SaveFilterSetSucceededAction and so removes nothing.
+        announcer.Received(1).AnnounceLensGroupSaved("My Group");
+        dispatcher.Received(1).Dispatch(Arg.Is<RemoveFilterLensesAction>(action =>
+            action != null && action.Ids.Count == 2 && action.Ids.Contains(savedA) && action.Ids.Contains(savedB)));
+    }
+
+    [Fact]
     public async Task HandleSaveLensesAsGroup_BlankName_DoesNothing()
     {
         var keep = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
@@ -275,6 +296,29 @@ public sealed class FilterLensEffectsTests
 
         dispatcher.DidNotReceive().Dispatch(Arg.Any<SaveFilterSetAction>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<RemoveFilterLensAction>());
+    }
+
+    [Fact]
+    public async Task HandleSaveLensesAsGroup_ClearAfterSave_CarriesSavedLensIdsForDeferredRemoval()
+    {
+        var keep = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
+        var hide = FilterLensFactory.ForExcludedValue(EventProperty.Source, "Contoso")!;
+        var (effects, dispatcher) =
+            CreateEffects(new FilterLensState { Lenses = [keep, hide] }, new FilterPaneState());
+
+        await effects.HandleSaveLensesAsGroup(new SaveLensesAsGroupAction("My Group", ClearAfterSave: true), dispatcher);
+
+        // Save-and-clear tags the save with the ids of exactly the lenses being saved; the removal is deferred to the
+        // persist-success effect. The save effect itself must not remove anything up front (that would discard the
+        // lenses even if the save fails).
+        dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetAction>(action =>
+            action != null && action.Name == "My Group" && action.Origin == SaveFilterSetOrigin.Lens &&
+            action.LensesToClearOnSuccess != null && action.LensesToClearOnSuccess.Count == 2 &&
+            action.LensesToClearOnSuccess.Contains(keep.Id) && action.LensesToClearOnSuccess.Contains(hide.Id) &&
+            action.Filters.Count == 2 && action.Filters.All(filter => filter.IsExcluded)));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<RemoveFilterLensAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<RemoveFilterLensesAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<ClearFilterLensesAction>());
     }
 
     [Fact]
@@ -321,11 +365,12 @@ public sealed class FilterLensEffectsTests
         // union broader than the intersected lens stack the user sees.
         dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetAction>(action =>
             action != null && action.Name == "My Group" && action.Origin == SaveFilterSetOrigin.Lens &&
+            action.LensesToClearOnSuccess == null &&
             action.Filters.Count == 2 && action.Filters.All(filter => filter.IsExcluded)));
 
-        // The lenses stay active after saving (matching the other save-to-filter-set flows); nothing is cleared.
+        // A plain save carries no lenses-to-clear and stays active (matching the other save-to-filter-set flows).
         dispatcher.DidNotReceive().Dispatch(Arg.Any<RemoveFilterLensAction>());
-        dispatcher.DidNotReceive().Dispatch(Arg.Any<ClearFilterLensesAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<RemoveFilterLensesAction>());
     }
 
     private static SavedFilter Compile(string text) =>

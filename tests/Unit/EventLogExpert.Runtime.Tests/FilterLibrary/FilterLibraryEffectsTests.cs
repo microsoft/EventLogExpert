@@ -5,6 +5,7 @@ using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Banner;
+using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
@@ -1689,6 +1690,25 @@ public sealed class FilterLibraryEffectsTests
 
         await store.DidNotReceive().AddAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
+    }
+
+    [Fact]
+    public async Task HandleSaveFilterSet_WithLensesToClearOnSuccess_ForwardsThemToSucceeded()
+    {
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+        var lensA = FilterLensId.Create();
+        var lensB = FilterLensId.Create();
+        var (effects, _, dispatcher, _, _) = CreateEffects();
+
+        await effects.HandleSaveFilterSet(
+            new SaveFilterSetAction("My Group", [filter], SaveFilterSetOrigin.Lens, [lensA, lensB]), dispatcher);
+
+        // The saved-lens ids ride opaquely through the FilterLibrary save so the FilterLenses success handler can
+        // remove exactly the saved lenses once the write is confirmed persisted.
+        dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetSucceededAction>(a =>
+            a != null && a.LensesToClearOnSuccess != null && a.LensesToClearOnSuccess.Count == 2 &&
+            a.LensesToClearOnSuccess.Contains(lensA) && a.LensesToClearOnSuccess.Contains(lensB)));
     }
 
     [Fact]

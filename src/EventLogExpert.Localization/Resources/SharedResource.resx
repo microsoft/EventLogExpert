@@ -1516,6 +1516,18 @@
   <data name="FilterLens_SaveAsGroup_DefaultName" xml:space="preserve">
     <value>New Group</value>
   </data>
+  <data name="FilterLens_SaveAsGroup_Save" xml:space="preserve">
+    <value>Save</value>
+    <comment>Primary button label for saving the active lenses as a group without clearing them.</comment>
+  </data>
+  <data name="FilterLens_SaveAsGroup_SaveAndClear" xml:space="preserve">
+    <value>Save and clear</value>
+    <comment>Secondary button label for saving the active lenses as a group and then clearing the active lens stack.</comment>
+  </data>
+  <data name="FilterLens_SaveAsGroup_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Cancel button label for the save-as-group prompt.</comment>
+  </data>
   <data name="FilterLens_SavedAllAnnouncement" xml:space="preserve">
     <value>Saved all lenses as filters</value>
   </data>

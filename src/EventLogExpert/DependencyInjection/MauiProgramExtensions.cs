@@ -75,10 +75,19 @@ internal static class MauiProgramExtensions
                     },
                     async parameters =>
                     {
-                        ModalOpenResult<string> result = await modalCoordinator.PushAsync<PromptModal, string>(
+                        ModalOpenResult<PromptOutcome> result = await modalCoordinator.PushAsync<PromptModal, PromptOutcome>(
                             parameters as IDictionary<string, object?> ?? new Dictionary<string, object?>(parameters));
 
-                        return result.WasOpened ? result.Result ?? string.Empty : string.Empty;
+                        return result.WasOpened ? result.Result.Value ?? string.Empty : string.Empty;
+                    },
+                    async parameters =>
+                    {
+                        ModalOpenResult<PromptOutcome> result = await modalCoordinator.PushAsync<PromptModal, PromptOutcome>(
+                            parameters as IDictionary<string, object?> ?? new Dictionary<string, object?>(parameters));
+
+                        return result.WasOpened ?
+                            result.Result with { Value = result.Result.Value ?? string.Empty } :
+                            new PromptOutcome(PromptChoice.Cancel, string.Empty);
                     });
             });
 

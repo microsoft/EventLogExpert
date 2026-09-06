@@ -86,7 +86,13 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Parameter] public EventCallback OnSave { get; set; }
 
+    [Parameter] public EventCallback OnSecondaryAction { get; set; }
+
     [Parameter] public string? SaveLabel { get; set; }
+
+    [Parameter] public bool SecondaryActionDisabled { get; set; }
+
+    [Parameter] public string? SecondaryActionLabel { get; set; }
 
     [Parameter] public bool ShowCloseButton { get; set; }
 
@@ -325,12 +331,16 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
     {
         if (InlineAlert is null) { return; }
 
+        if (ValidationError is not null) { return; }
+
         string? promptValue = InlineAlert.IsPrompt ? _inlineAlertPromptValue : null;
 
         await OnInlineAlertResolved.InvokeAsync(new InlineAlertResult(false, promptValue) { SecondaryChosen = true });
     }
 
     private Task HandleSaveAsync() => OnSave.InvokeAsync();
+
+    private Task HandleSecondaryActionAsync() => OnSecondaryAction.InvokeAsync();
 
     private void ResetInlineAlertPromptValueIfChanged()
     {
