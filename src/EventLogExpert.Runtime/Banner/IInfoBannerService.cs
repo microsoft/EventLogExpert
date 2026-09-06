@@ -11,5 +11,5 @@ public interface IInfoBannerService
 
     void DismissInfoBanner(BannerId id);
 
-    void ReportInfoBanner(string title, string message, BannerSeverity severity);
+    void ReportInfoBanner(BannerMessage content, BannerSeverity severity);
 }

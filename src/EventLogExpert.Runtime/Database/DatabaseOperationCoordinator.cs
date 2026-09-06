@@ -21,19 +21,12 @@ internal sealed class DatabaseOperationCoordinator(
     private readonly IErrorBannerService _errorBanners = errorBanners;
     private readonly IFilePickerService _filePicker = filePicker;
     private readonly IInfoBannerService _infoBanners = infoBanners;
-    private readonly ITraceLogger _logger = logger;
     private readonly ILogReloadCoordinator _logReload = logReload;
+    private readonly ITraceLogger _logger = logger;
     private readonly Lock _upgradeGate = new();
     private readonly HashSet<string> _upgradesInFlight = new(StringComparer.OrdinalIgnoreCase);
 
     public event Action? UpgradeStateChanged;
-
-    internal enum ResultSeverity
-    {
-        Info,
-        Warning,
-        Error,
-    }
 
     public bool IsAnyUpgradeInFlight
     {
@@ -53,8 +46,7 @@ internal sealed class DatabaseOperationCoordinator(
 
             await RunOperationAsync(
                 operationName: "toggle",
-                failureTitle: "Failed to Update Database",
-                operationNoun: $"updating '{fileName}'",
+                operation: new DatabaseOperation.Toggle(fileName),
                 body: () =>
                 {
                     _databases.Toggle(fileName);
@@ -72,8 +64,7 @@ internal sealed class DatabaseOperationCoordinator(
 
         return await RunOperationAsync(
             operationName: "import",
-            failureTitle: "Import Failed",
-            operationNoun: "importing provider databases",
+            operation: new DatabaseOperation.Import(),
             fallbackOutcome: ImportOutcome.None,
             body: async () =>
             {
@@ -100,8 +91,7 @@ internal sealed class DatabaseOperationCoordinator(
 
         return await RunOperationAsync(
             operationName: "import",
-            failureTitle: "Import Failed",
-            operationNoun: "importing provider databases",
+            operation: new DatabaseOperation.Import(),
             fallbackOutcome: ImportOutcome.None,
             body: () => ImportPathsCoreAsync(sourcePaths, enableOnImport, askOverwriteAsync, cancellationToken));
     }
@@ -167,9 +157,7 @@ internal sealed class DatabaseOperationCoordinator(
         catch (Exception ex)
         {
             _logger.Warning($"{nameof(RemoveDatabaseAsync)} remove failed: {ex}");
-            _errorBanners.ReportError(
-                "Failed to Remove Database",
-                $"An exception occurred while removing '{fileName}': {ex.Message}");
+            _errorBanners.ReportError(new DatabaseRemoveFailed(fileName, ex.Message));
         }
 
         bool logsReopened = false;
@@ -206,17 +194,14 @@ internal sealed class DatabaseOperationCoordinator(
 
             await RunOperationAsync(
                 operationName: "upgrade",
-                failureTitle: "Database Upgrade Failed",
-                operationNoun: $"upgrading '{fileName}'",
+                operation: new DatabaseOperation.UpgradeSingle(fileName),
                 body: async () =>
                 {
                     var result = await _databases.UpgradeBatchAsync([fileName], scope, cancellationToken);
 
                     foreach (var failure in result.Failed)
                     {
-                        _errorBanners.ReportError(
-                            "Database Upgrade Failed",
-                            $"Failed to upgrade '{failure.FileName}': {failure.Message}");
+                        _errorBanners.ReportError(new DatabaseUpgradeFailed(failure.FileName, failure.Message));
                     }
                 });
         }
@@ -257,8 +242,7 @@ internal sealed class DatabaseOperationCoordinator(
 
             return await RunOperationAsync(
                 operationName: "upgrade",
-                failureTitle: "Database Upgrade Failed",
-                operationNoun: $"upgrading {fileNames.Count} database{(fileNames.Count == 1 ? string.Empty : "s")}",
+                operation: new DatabaseOperation.UpgradeBatch(fileNames.Count),
                 fallbackOutcome: fallback,
                 body: async () =>
                 {
@@ -266,9 +250,7 @@ internal sealed class DatabaseOperationCoordinator(
 
                     foreach (var failure in batchResult.Failed)
                     {
-                        _errorBanners.ReportError(
-                            "Database Upgrade Failed",
-                            $"Failed to upgrade '{failure.FileName}': {failure.Message}");
+                        _errorBanners.ReportError(new DatabaseUpgradeFailed(failure.FileName, failure.Message));
                     }
 
                     return batchResult;
@@ -285,50 +267,14 @@ internal sealed class DatabaseOperationCoordinator(
         }
     }
 
-    internal static (string Title, string Message, ResultSeverity Severity) BuildImportSummary(ImportResult importResult)
+    internal static DatabaseImportSummary BuildImportSummary(ImportResult importResult)
     {
         ArgumentNullException.ThrowIfNull(importResult);
 
-        var imported = importResult.Imported;
-        var failures = importResult.Failures;
-        var upgradeFailures = importResult.UpgradeFailures;
-
-        if (failures.Count == 0 && upgradeFailures.Count == 0)
-        {
-            if (imported == 0) { return ("Import Successful", "No databases were imported.", ResultSeverity.Info); }
-
-            var successMessage = imported > 1
-                ? $"{imported} databases have successfully been imported"
-                : "1 database has successfully been imported";
-
-            return ("Import Successful", successMessage, ResultSeverity.Info);
-        }
-
-        var failureSummary = FormatFailureSummary(failures, upgradeFailures);
-
-        if (imported == 0)
-        {
-            return ("Import Failed", $"No databases were imported; {failureSummary}", ResultSeverity.Error);
-        }
-
-        var partialMessage = imported > 1
-            ? $"{imported} databases imported"
-            : "1 database imported";
-
-        return ("Import Completed with Errors", $"{partialMessage}; {failureSummary}", ResultSeverity.Warning);
-    }
-
-    private static string FormatFailureSummary(
-        IReadOnlyList<ImportFailure> failures,
-        IReadOnlyList<ImportFailure> upgradeFailures)
-    {
-        var parts = new List<string>(failures.Count + upgradeFailures.Count);
-
-        foreach (var entry in failures) { parts.Add($"{entry.FileName} ({entry.Reason})"); }
-
-        foreach (var entry in upgradeFailures) { parts.Add($"{entry.FileName} upgrade ({entry.Reason})"); }
-
-        return $"failed: {string.Join(", ", parts)}";
+        return new DatabaseImportSummary(
+            importResult.Imported,
+            importResult.Failures,
+            importResult.UpgradeFailures);
     }
 
     private async Task EnableFreshlyImportedReadyDatabasesAsync(
@@ -361,9 +307,9 @@ internal sealed class DatabaseOperationCoordinator(
     {
         var skip = await ResolveImportConflictsAsync(sourcePaths, askOverwriteAsync, cancellationToken);
         var result = await _databases.ImportAsync(sourcePaths, skip, cancellationToken);
-        var (title, message, severity) = BuildImportSummary(result);
+        var summary = BuildImportSummary(result);
 
-        ReportPostOperationResult(title, message, severity);
+        ReportPostOperationResult(summary);
 
         if (enableOnImport)
         {
@@ -397,20 +343,20 @@ internal sealed class DatabaseOperationCoordinator(
         }
     }
 
-    private void ReportPostOperationResult(string title, string message, ResultSeverity severity)
+    private void ReportPostOperationResult(DatabaseImportSummary summary)
     {
-        switch (severity)
+        switch (summary.Severity)
         {
-            case ResultSeverity.Info:
-                _infoBanners.ReportInfoBanner(title, message, BannerSeverity.Info);
+            case DatabaseImportSeverity.Info:
+                _infoBanners.ReportInfoBanner(summary, BannerSeverity.Info);
 
                 break;
-            case ResultSeverity.Warning:
-                _infoBanners.ReportInfoBanner(title, message, BannerSeverity.Warning);
+            case DatabaseImportSeverity.Warning:
+                _infoBanners.ReportInfoBanner(summary, BannerSeverity.Warning);
 
                 break;
-            case ResultSeverity.Error:
-                _errorBanners.ReportError(title, message);
+            case DatabaseImportSeverity.Error:
+                _errorBanners.ReportError(summary);
 
                 break;
         }
@@ -496,8 +442,7 @@ internal sealed class DatabaseOperationCoordinator(
 
     private async Task<T> RunOperationAsync<T>(
         string operationName,
-        string failureTitle,
-        string operationNoun,
+        DatabaseOperation operation,
         T fallbackOutcome,
         Func<Task<T>> body)
     {
@@ -506,9 +451,7 @@ internal sealed class DatabaseOperationCoordinator(
         catch (Exception ex)
         {
             _logger.Warning($"{operationName} failed: {ex}");
-            _errorBanners.ReportError(
-                failureTitle,
-                $"An exception occurred while {operationNoun}: {ex.Message}");
+            _errorBanners.ReportError(new DatabaseOperationFailed(operation, ex.Message));
 
             return fallbackOutcome;
         }
@@ -516,8 +459,7 @@ internal sealed class DatabaseOperationCoordinator(
 
     private async Task RunOperationAsync(
         string operationName,
-        string failureTitle,
-        string operationNoun,
+        DatabaseOperation operation,
         Func<Task> body)
     {
         try { await body(); }
@@ -528,9 +470,7 @@ internal sealed class DatabaseOperationCoordinator(
         catch (Exception ex)
         {
             _logger.Warning($"{operationName} failed: {ex}");
-            _errorBanners.ReportError(
-                failureTitle,
-                $"An exception occurred while {operationNoun}: {ex.Message}");
+            _errorBanners.ReportError(new DatabaseOperationFailed(operation, ex.Message));
         }
     }
 }

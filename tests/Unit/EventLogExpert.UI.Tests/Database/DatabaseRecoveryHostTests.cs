@@ -1,13 +1,17 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.Modal;
+using EventLogExpert.UI.Tests.TestUtils;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
@@ -18,6 +22,7 @@ public sealed class DatabaseRecoveryHostTests
     private readonly ICriticalErrorService _criticalErrorService = Substitute.For<ICriticalErrorService>();
     private readonly IDatabaseService _databaseService = Substitute.For<IDatabaseService>();
     private readonly IErrorBannerService _errorBannerService = Substitute.For<IErrorBannerService>();
+    private readonly IStringLocalizer<SharedResource> _localizer = new MarkerLocalizer();
     private readonly IMainThreadService _mainThreadService = Substitute.For<IMainThreadService>();
     private readonly IModalCoordinator _modalCoordinator = Substitute.For<IModalCoordinator>();
     private readonly ITraceLogger _traceLogger = Substitute.For<ITraceLogger>();
@@ -32,9 +37,7 @@ public sealed class DatabaseRecoveryHostTests
 
         _errorBannerService
             .ReportError(
-                Arg.Any<string>(),
-                Arg.Any<string>(),
-                Arg.Any<string?>(),
+                Arg.Any<BannerMessage>(),
                 Arg.Do<Func<Task>?>(action => _capturedRecoveryAction = action))
             .Returns(_ => _nextBannerId);
 
@@ -59,7 +62,7 @@ public sealed class DatabaseRecoveryHostTests
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
         _errorBannerService.ErrorBanners.Returns(
-            [new ErrorBannerEntry(initialId, "Database upgrade recovery", "...", "Resolve", null,
+            [new ErrorBannerEntry(initialId, new Preformatted("Database upgrade recovery", "...", "Resolve"), null,
                 new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc))]);
 
         using var host = CreateHost();
@@ -72,9 +75,7 @@ public sealed class DatabaseRecoveryHostTests
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         _errorBannerService.DidNotReceive().ReportError(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<string?>(),
+            Arg.Any<BannerMessage>(),
             Arg.Any<Func<Task>?>());
     }
 
@@ -85,7 +86,7 @@ public sealed class DatabaseRecoveryHostTests
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
         _errorBannerService.ErrorBanners.Returns(
-            [new ErrorBannerEntry(initialId, "Database upgrade recovery", "...", "Resolve", null,
+            [new ErrorBannerEntry(initialId, new Preformatted("Database upgrade recovery", "...", "Resolve"), null,
                 new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc))]);
 
         using var host = CreateHost();
@@ -102,9 +103,7 @@ public sealed class DatabaseRecoveryHostTests
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         _errorBannerService.Received(1).ReportError(
-            "Database upgrade recovery",
-            "2 databases need recovery from interrupted upgrade.",
-            "Resolve",
+            Arg.Is<BannerMessage>(message => IsRecoveryContent(message, 2)),
             Arg.Any<Func<Task>?>());
     }
 
@@ -118,9 +117,7 @@ public sealed class DatabaseRecoveryHostTests
 
         // Assert
         _errorBannerService.Received(1).ReportError(
-            "Database upgrade recovery",
-            "1 database needs recovery from interrupted upgrade.",
-            "Resolve",
+            Arg.Is<BannerMessage>(message => IsRecoveryContent(message, 1)),
             Arg.Any<Func<Task>?>());
     }
 
@@ -172,9 +169,7 @@ public sealed class DatabaseRecoveryHostTests
 
         _errorBannerService.DidNotReceive().DismissError(Arg.Any<BannerId>());
         _errorBannerService.DidNotReceive().ReportError(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<string?>(),
+            Arg.Any<BannerMessage>(),
             Arg.Any<Func<Task>?>());
     }
 
@@ -221,9 +216,7 @@ public sealed class DatabaseRecoveryHostTests
 
         _errorBannerService.Received(1).DismissError(initialId);
         _errorBannerService.DidNotReceive().ReportError(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<string?>(),
+            Arg.Any<BannerMessage>(),
             Arg.Any<Func<Task>?>());
     }
 
@@ -286,9 +279,7 @@ public sealed class DatabaseRecoveryHostTests
 
         _errorBannerService.Received(1).DismissError(initialId);
         _errorBannerService.Received(1).ReportError(
-            "Database upgrade recovery",
-            "2 databases need recovery from interrupted upgrade.",
-            "Resolve",
+            Arg.Is<BannerMessage>(message => IsRecoveryContent(message, 2)),
             Arg.Any<Func<Task>?>());
     }
 
@@ -305,9 +296,7 @@ public sealed class DatabaseRecoveryHostTests
 
         _errorBannerService.DidNotReceive().DismissError(Arg.Any<BannerId>());
         _errorBannerService.DidNotReceive().ReportError(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<string?>(),
+            Arg.Any<BannerMessage>(),
             Arg.Any<Func<Task>?>());
     }
 
@@ -328,9 +317,7 @@ public sealed class DatabaseRecoveryHostTests
 
         _errorBannerService.Received(1).DismissError(initialId);
         _errorBannerService.Received(1).ReportError(
-            "Database upgrade recovery",
-            "1 database needs recovery from interrupted upgrade.",
-            "Resolve",
+            Arg.Is<BannerMessage>(message => IsRecoveryContent(message, 1)),
             Arg.Any<Func<Task>?>());
     }
 
@@ -343,9 +330,7 @@ public sealed class DatabaseRecoveryHostTests
         using var host = CreateHost();
 
         _errorBannerService.Received(1).ReportError(
-            "Database upgrade recovery",
-            "2 databases need recovery from interrupted upgrade.",
-            "Resolve",
+            Arg.Is<BannerMessage>(message => IsRecoveryContent(message, 2)),
             Arg.Any<Func<Task>?>());
     }
 
@@ -357,9 +342,7 @@ public sealed class DatabaseRecoveryHostTests
         using var host = CreateHost();
 
         _errorBannerService.Received(1).ReportError(
-            "Database upgrade recovery",
-            "1 database needs recovery from interrupted upgrade.",
-            "Resolve",
+            Arg.Is<BannerMessage>(message => IsRecoveryContent(message, 1)),
             Arg.Any<Func<Task>?>());
     }
 
@@ -371,9 +354,7 @@ public sealed class DatabaseRecoveryHostTests
         using var host = CreateHost();
 
         _errorBannerService.DidNotReceive().ReportError(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<string?>(),
+            Arg.Any<BannerMessage>(),
             Arg.Any<Func<Task>?>());
     }
 
@@ -436,6 +417,22 @@ public sealed class DatabaseRecoveryHostTests
             DatabaseStatus.UpgradeRequired,
             backupExists);
 
+    private static bool IsRecoveryContent(BannerMessage? message, int count) =>
+        message is Preformatted preformatted &&
+        preformatted.Title == "[[Banner_Recovery_Needed_Title]]" &&
+        preformatted.Message == (count == 1
+            ? "[[Banner_Recovery_Needed_One(1)]]"
+            : $"[[Banner_Recovery_Needed_Many({count})]]") &&
+        preformatted.ActionLabel == "[[Banner_Recovery_Resolve]]";
+
     private DatabaseRecoveryHost CreateHost() =>
-        new(_criticalErrorService, _errorBannerService, _databaseService, _modalCoordinator, _traceLogger, _mainThreadService);
+        new(
+            _criticalErrorService,
+            _errorBannerService,
+            _databaseService,
+            _modalCoordinator,
+            _traceLogger,
+            _mainThreadService,
+            _localizer);
 }
+

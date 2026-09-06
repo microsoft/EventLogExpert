@@ -274,8 +274,8 @@ public sealed class BannerServiceTests
     {
         // Arrange
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
-        sut.ReportError("First Title", "First Message");
-        sut.ReportError("Second Title", "Second Message");
+        sut.ReportError(new ExportFailed("First Message"));
+        sut.ReportError(new ExportFailed("Second Message"));
         BannerId firstId = sut.ErrorBanners[0].Id;
         int stateChangedCount = 0;
         ((IErrorBannerService)sut).StateChanged += () => stateChangedCount++;
@@ -285,7 +285,7 @@ public sealed class BannerServiceTests
 
         // Assert
         Assert.Single(sut.ErrorBanners);
-        Assert.Equal("Second Title", sut.ErrorBanners[0].Title);
+        Assert.Equal(new ExportFailed("Second Message"), sut.ErrorBanners[0].Content);
         Assert.Equal(1, stateChangedCount);
     }
 
@@ -294,7 +294,7 @@ public sealed class BannerServiceTests
     {
         // Arrange
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
-        sut.ReportError("Title", "Message");
+        sut.ReportError(new ExportFailed("Message"));
         int stateChangedCount = 0;
         ((IErrorBannerService)sut).StateChanged += () => stateChangedCount++;
 
@@ -311,8 +311,8 @@ public sealed class BannerServiceTests
     {
         // Arrange
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
-        sut.ReportInfoBanner("First Title", "First Message", BannerSeverity.Info);
-        sut.ReportInfoBanner("Second Title", "Second Message", BannerSeverity.Warning);
+        sut.ReportInfoBanner(new ExportFailed("First Message"), BannerSeverity.Info);
+        sut.ReportInfoBanner(new ExportFailed("Second Message"), BannerSeverity.Warning);
         BannerId firstId = sut.InfoBanners[0].Id;
         int stateChangedCount = 0;
         ((IInfoBannerService)sut).StateChanged += () => stateChangedCount++;
@@ -322,7 +322,7 @@ public sealed class BannerServiceTests
 
         // Assert
         Assert.Single(sut.InfoBanners);
-        Assert.Equal("Second Title", sut.InfoBanners[0].Title);
+        Assert.Equal(new ExportFailed("Second Message"), sut.InfoBanners[0].Content);
         Assert.Equal(1, stateChangedCount);
     }
 
@@ -331,7 +331,7 @@ public sealed class BannerServiceTests
     {
         // Arrange
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
-        sut.ReportInfoBanner("Title", "Message", BannerSeverity.Info);
+        sut.ReportInfoBanner(new ExportFailed("Message"), BannerSeverity.Info);
         int stateChangedCount = 0;
         ((IInfoBannerService)sut).StateChanged += () => stateChangedCount++;
 
@@ -504,7 +504,7 @@ public sealed class BannerServiceTests
         ((IErrorBannerService)sut).StateChanged += () => secondCalled = true;
 
         // Act — any path that raises StateChanged works; ReportError is the simplest.
-        sut.ReportError("title", "message");
+        sut.ReportError(new ExportFailed("message"));
 
         // Assert
         Assert.True(secondCalled);
@@ -644,13 +644,11 @@ public sealed class BannerServiceTests
         ((IErrorBannerService)sut).StateChanged += () => stateChangedCount++;
 
         // Act
-        sut.ReportError("Title", "Message");
+        sut.ReportError(new ExportFailed("Message"));
 
         // Assert
         Assert.Single(sut.ErrorBanners);
-        Assert.Equal("Title", sut.ErrorBanners[0].Title);
-        Assert.Equal("Message", sut.ErrorBanners[0].Message);
-        Assert.Null(sut.ErrorBanners[0].ActionLabel);
+        Assert.Equal(new ExportFailed("Message"), sut.ErrorBanners[0].Content);
         Assert.Null(sut.ErrorBanners[0].Action);
         Assert.NotEqual(default(BannerId), sut.ErrorBanners[0].Id);
         Assert.Equal(1, stateChangedCount);
@@ -663,7 +661,7 @@ public sealed class BannerServiceTests
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
 
         // Act
-        BannerId id = sut.ReportError("Title", "Message");
+        BannerId id = sut.ReportError(new ExportFailed("Message"));
 
         // Assert
         Assert.NotEqual(default(BannerId), id);
@@ -677,82 +675,62 @@ public sealed class BannerServiceTests
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
 
         // Act
-        sut.ReportError("First Title", "First Message");
-        sut.ReportError("Second Title", "Second Message");
+        sut.ReportError(new ExportFailed("First Message"));
+        sut.ReportError(new ExportFailed("Second Message"));
 
         // Assert
         Assert.Equal(2, sut.ErrorBanners.Count);
-        Assert.Equal("First Title", sut.ErrorBanners[0].Title);
-        Assert.Equal("Second Title", sut.ErrorBanners[1].Title);
+        Assert.Equal(new ExportFailed("First Message"), sut.ErrorBanners[0].Content);
+        Assert.Equal(new ExportFailed("Second Message"), sut.ErrorBanners[1].Content);
     }
 
     [Fact]
-    public void ReportError_WithActionButNoLabel_Throws()
+    public void ReportError_WithActionAndContentNotRequiringAction_Throws()
     {
         // Arrange
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
-        string? actionLabel = null;
         Func<Task> action = () => Task.CompletedTask;
 
         // Act + Assert
         var ex = Assert.Throws<ArgumentException>(() =>
-            sut.ReportError("Title", "Message", actionLabel, action));
-        Assert.Equal(nameof(actionLabel), ex.ParamName);
+            sut.ReportError(new ExportFailed("Message"), action));
+        Assert.Equal("content", ex.ParamName);
     }
 
     [Fact]
-    public void ReportError_WithActionLabelAndAction_StoresBothOnEntry()
+    public void ReportError_WithActionRequiredContentAndAction_StoresBothOnEntry()
     {
         // Arrange
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
+        BannerMessage content = new ActionRequiredContent();
         Func<Task> action = () => Task.CompletedTask;
 
         // Act
-        sut.ReportError("Title", "Message", "Resolve", action);
+        sut.ReportError(content, action);
 
         // Assert
-        Assert.Equal("Resolve", sut.ErrorBanners[0].ActionLabel);
+        Assert.Same(content, sut.ErrorBanners[0].Content);
         Assert.Same(action, sut.ErrorBanners[0].Action);
     }
 
     [Fact]
-    public void ReportError_WithActionLabelButNoAction_Throws()
+    public void ReportError_WithActionRequiredContentButNoAction_Throws()
     {
         // Arrange
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
-        Func<Task>? action = null;
 
         // Act + Assert
         var ex = Assert.Throws<ArgumentException>(() =>
-            sut.ReportError("Title", "Message", "Resolve", action));
-        Assert.Equal(nameof(action), ex.ParamName);
+            sut.ReportError(new ActionRequiredContent()));
+        Assert.Equal("action", ex.ParamName);
     }
 
     [Fact]
-    public void ReportError_WithWhitespaceLabelAndAction_Throws()
+    public void ReportError_WithNullContent_Throws()
     {
-        // Arrange — whitespace label is not a renderable button label, so it must be rejected when an action is supplied.
-        var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
-        string actionLabel = "   ";
-
-        // Act + Assert
-        var ex = Assert.Throws<ArgumentException>(() =>
-            sut.ReportError("Title", "Message", actionLabel, () => Task.CompletedTask));
-        Assert.Equal(nameof(actionLabel), ex.ParamName);
-    }
-
-    [Fact]
-    public void ReportError_WithWhitespaceLabelAndNoAction_AcceptsAndStoresNull()
-    {
-        // Arrange — both effectively absent: the whitespace label is normalized to null and no action is supplied.
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
 
-        // Act
-        sut.ReportError("Title", "Message", "   ");
-
-        // Assert
-        Assert.Null(sut.ErrorBanners[0].ActionLabel);
-        Assert.Null(sut.ErrorBanners[0].Action);
+        Assert.Throws<ArgumentNullException>(() => sut.ReportError(null!));
     }
 
     [Fact]
@@ -764,12 +742,11 @@ public sealed class BannerServiceTests
         ((IInfoBannerService)sut).StateChanged += () => stateChangedCount++;
 
         // Act
-        sut.ReportInfoBanner("Title", "Message", BannerSeverity.Warning);
+        sut.ReportInfoBanner(new ExportFailed("Message"), BannerSeverity.Warning);
 
         // Assert
         Assert.Single(sut.InfoBanners);
-        Assert.Equal("Title", sut.InfoBanners[0].Title);
-        Assert.Equal("Message", sut.InfoBanners[0].Message);
+        Assert.Equal(new ExportFailed("Message"), sut.InfoBanners[0].Content);
         Assert.Equal(BannerSeverity.Warning, sut.InfoBanners[0].Severity);
         Assert.NotEqual(default(BannerId), sut.InfoBanners[0].Id);
         Assert.Equal(1, stateChangedCount);
@@ -782,15 +759,25 @@ public sealed class BannerServiceTests
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
 
         // Act
-        sut.ReportInfoBanner("First Title", "First Message", BannerSeverity.Info);
-        sut.ReportInfoBanner("Second Title", "Second Message", BannerSeverity.Warning);
+        sut.ReportInfoBanner(new ExportFailed("First Message"), BannerSeverity.Info);
+        sut.ReportInfoBanner(new ExportFailed("Second Message"), BannerSeverity.Warning);
 
         // Assert
         Assert.Equal(2, sut.InfoBanners.Count);
-        Assert.Equal("First Title", sut.InfoBanners[0].Title);
+        Assert.Equal(new ExportFailed("First Message"), sut.InfoBanners[0].Content);
         Assert.Equal(BannerSeverity.Info, sut.InfoBanners[0].Severity);
-        Assert.Equal("Second Title", sut.InfoBanners[1].Title);
+        Assert.Equal(new ExportFailed("Second Message"), sut.InfoBanners[1].Content);
         Assert.Equal(BannerSeverity.Warning, sut.InfoBanners[1].Severity);
+    }
+
+    [Fact]
+    public void ReportInfoBanner_WithActionRequiredContent_Throws()
+    {
+        var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
+
+        var ex = Assert.Throws<ArgumentException>(() =>
+            sut.ReportInfoBanner(new ActionRequiredContent(), BannerSeverity.Warning));
+        Assert.Equal("content", ex.ParamName);
     }
 
     [Fact]
@@ -1135,5 +1122,10 @@ public sealed class BannerServiceTests
         Assert.NotNull(sut.ManageDatabasesProgress);
         Assert.Equal(batchId, sut.ManageDatabasesProgress.BatchId);
         Assert.Equal(UpgradeProgressScope.ManageDatabasesTriggered, sut.ManageDatabasesProgress.Scope);
+    }
+
+    private sealed record ActionRequiredContent : BannerMessage
+    {
+        public override bool RequiresAction => true;
     }
 }

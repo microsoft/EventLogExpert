@@ -16,140 +16,6 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     private readonly List<string> _tempDatabases = [];
 
     [Fact]
-    public async Task Add_NoTags_PersistsAsNullColumn_DefaultsToEmptyOnLoad()
-    {
-        var dbPath = CreateTempDatabasePath();
-        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        var entry = BuildFilterEntry("Untagged");
-
-        await store.AddAsync(entry, TestContext.Current.CancellationToken);
-        var result = await store.LoadAllAsync(TestContext.Current.CancellationToken);
-
-        var loaded = Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(result));
-        Assert.NotNull(loaded.Tags);
-        Assert.Empty(loaded.Tags);
-    }
-
-    [Fact]
-    public async Task Add_PersistsAllNewColumns_FavoriteLastUsedOrigin()
-    {
-        var dbPath = CreateTempDatabasePath();
-        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        var lastUsed = new DateTimeOffset(2026, 5, 31, 14, 0, 0, TimeSpan.Zero);
-        var filter = SavedFilter.TryCreate("Level == 4");
-        Assert.NotNull(filter);
-
-        var entry = new LibraryEntrySavedFilter
-        {
-            Name = "Fav",
-            CreatedUtc = DateTimeOffset.UtcNow,
-            IsFavorite = true,
-            LastUsedUtc = lastUsed,
-            Origin = LibraryEntryOrigin.AutoTracked,
-            Filter = filter,
-        };
-
-        await store.AddAsync(entry, TestContext.Current.CancellationToken);
-        var result = await store.LoadAllAsync(TestContext.Current.CancellationToken);
-
-        var loaded = Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(result));
-        Assert.True(loaded.IsFavorite);
-        Assert.Equal(lastUsed, loaded.LastUsedUtc);
-        Assert.Equal(LibraryEntryOrigin.AutoTracked, loaded.Origin);
-    }
-
-    [Fact]
-    public async Task Add_PersistsAndIsReadable()
-    {
-        var dbPath = CreateTempDatabasePath();
-        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        var entry = BuildFilterEntry("First");
-
-        await store.AddAsync(entry, TestContext.Current.CancellationToken);
-        var result = await store.LoadAllAsync(TestContext.Current.CancellationToken);
-
-        Assert.Single(result);
-        var loaded = Assert.IsType<LibraryEntrySavedFilter>(result[0]);
-        Assert.Equal(entry.Id, loaded.Id);
-        Assert.Equal("First", loaded.Name);
-        Assert.Equal("Level == 4", loaded.Filter.ComparisonText);
-        Assert.False(loaded.IsFavorite);
-        Assert.Null(loaded.LastUsedUtc);
-        Assert.Equal(LibraryEntryOrigin.UserSaved, loaded.Origin);
-    }
-
-    [Fact]
-    public async Task Add_PersistsFilterSetEntryWithMultipleFilters()
-    {
-        var dbPath = CreateTempDatabasePath();
-        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-
-        var f1 = SavedFilter.TryCreate("Level == 2");
-        var f2 = SavedFilter.TryCreate("Level == 4");
-        Assert.NotNull(f1);
-        Assert.NotNull(f2);
-
-        var filterSet = new LibraryEntryFilterSet
-        {
-            Name = "Filter Set",
-            CreatedUtc = DateTimeOffset.UtcNow,
-            Filters = [f1, f2],
-        };
-
-        await store.AddAsync(filterSet, TestContext.Current.CancellationToken);
-        var result = await store.LoadAllAsync(TestContext.Current.CancellationToken);
-
-        var loaded = Assert.IsType<LibraryEntryFilterSet>(result[0]);
-        Assert.Equal(2, loaded.Filters.Count);
-    }
-
-    [Fact]
-    public async Task Add_PersistsTagsRoundTrip_FilterSetEntry()
-    {
-        var dbPath = CreateTempDatabasePath();
-        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        var filter = SavedFilter.TryCreate("Level == 4");
-        Assert.NotNull(filter);
-
-        var entry = new LibraryEntryFilterSet
-        {
-            Name = "Tagged Set",
-            CreatedUtc = DateTimeOffset.UtcNow,
-            Tags = ["network", "dns"],
-            Filters = [filter],
-        };
-
-        await store.AddAsync(entry, TestContext.Current.CancellationToken);
-        var result = await store.LoadAllAsync(TestContext.Current.CancellationToken);
-
-        var loaded = Assert.IsType<LibraryEntryFilterSet>(Assert.Single(result));
-        Assert.Equal(["network", "dns"], loaded.Tags);
-    }
-
-    [Fact]
-    public async Task Add_PersistsTagsRoundTrip_SavedFilterEntry()
-    {
-        var dbPath = CreateTempDatabasePath();
-        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        var filter = SavedFilter.TryCreate("Level == 4");
-        Assert.NotNull(filter);
-
-        var entry = new LibraryEntrySavedFilter
-        {
-            Name = "Tagged",
-            CreatedUtc = DateTimeOffset.UtcNow,
-            Tags = ["exchange", "hub"],
-            Filter = filter,
-        };
-
-        await store.AddAsync(entry, TestContext.Current.CancellationToken);
-        var result = await store.LoadAllAsync(TestContext.Current.CancellationToken);
-
-        var loaded = Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(result));
-        Assert.Equal(["exchange", "hub"], loaded.Tags);
-    }
-
-    [Fact]
     public async Task AddOrReturnExistingFilter_DifferentMode_AllowsCoexistence()
     {
         var dbPath = CreateTempDatabasePath();
@@ -315,6 +181,140 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Add_NoTags_PersistsAsNullColumn_DefaultsToEmptyOnLoad()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var entry = BuildFilterEntry("Untagged");
+
+        await store.AddAsync(entry, TestContext.Current.CancellationToken);
+        var result = await store.LoadAllAsync(TestContext.Current.CancellationToken);
+
+        var loaded = Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(result));
+        Assert.NotNull(loaded.Tags);
+        Assert.Empty(loaded.Tags);
+    }
+
+    [Fact]
+    public async Task Add_PersistsAllNewColumns_FavoriteLastUsedOrigin()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var lastUsed = new DateTimeOffset(2026, 5, 31, 14, 0, 0, TimeSpan.Zero);
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+
+        var entry = new LibraryEntrySavedFilter
+        {
+            Name = "Fav",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            IsFavorite = true,
+            LastUsedUtc = lastUsed,
+            Origin = LibraryEntryOrigin.AutoTracked,
+            Filter = filter,
+        };
+
+        await store.AddAsync(entry, TestContext.Current.CancellationToken);
+        var result = await store.LoadAllAsync(TestContext.Current.CancellationToken);
+
+        var loaded = Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(result));
+        Assert.True(loaded.IsFavorite);
+        Assert.Equal(lastUsed, loaded.LastUsedUtc);
+        Assert.Equal(LibraryEntryOrigin.AutoTracked, loaded.Origin);
+    }
+
+    [Fact]
+    public async Task Add_PersistsAndIsReadable()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var entry = BuildFilterEntry("First");
+
+        await store.AddAsync(entry, TestContext.Current.CancellationToken);
+        var result = await store.LoadAllAsync(TestContext.Current.CancellationToken);
+
+        Assert.Single(result);
+        var loaded = Assert.IsType<LibraryEntrySavedFilter>(result[0]);
+        Assert.Equal(entry.Id, loaded.Id);
+        Assert.Equal("First", loaded.Name);
+        Assert.Equal("Level == 4", loaded.Filter.ComparisonText);
+        Assert.False(loaded.IsFavorite);
+        Assert.Null(loaded.LastUsedUtc);
+        Assert.Equal(LibraryEntryOrigin.UserSaved, loaded.Origin);
+    }
+
+    [Fact]
+    public async Task Add_PersistsFilterSetEntryWithMultipleFilters()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+
+        var f1 = SavedFilter.TryCreate("Level == 2");
+        var f2 = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(f1);
+        Assert.NotNull(f2);
+
+        var filterSet = new LibraryEntryFilterSet
+        {
+            Name = "Filter Set",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filters = [f1, f2],
+        };
+
+        await store.AddAsync(filterSet, TestContext.Current.CancellationToken);
+        var result = await store.LoadAllAsync(TestContext.Current.CancellationToken);
+
+        var loaded = Assert.IsType<LibraryEntryFilterSet>(result[0]);
+        Assert.Equal(2, loaded.Filters.Count);
+    }
+
+    [Fact]
+    public async Task Add_PersistsTagsRoundTrip_FilterSetEntry()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+
+        var entry = new LibraryEntryFilterSet
+        {
+            Name = "Tagged Set",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Tags = ["network", "dns"],
+            Filters = [filter],
+        };
+
+        await store.AddAsync(entry, TestContext.Current.CancellationToken);
+        var result = await store.LoadAllAsync(TestContext.Current.CancellationToken);
+
+        var loaded = Assert.IsType<LibraryEntryFilterSet>(Assert.Single(result));
+        Assert.Equal(["network", "dns"], loaded.Tags);
+    }
+
+    [Fact]
+    public async Task Add_PersistsTagsRoundTrip_SavedFilterEntry()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+
+        var entry = new LibraryEntrySavedFilter
+        {
+            Name = "Tagged",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Tags = ["exchange", "hub"],
+            Filter = filter,
+        };
+
+        await store.AddAsync(entry, TestContext.Current.CancellationToken);
+        var result = await store.LoadAllAsync(TestContext.Current.CancellationToken);
+
+        var loaded = Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(result));
+        Assert.Equal(["exchange", "hub"], loaded.Tags);
+    }
+
+    [Fact]
     public async Task Delete_RemovesEntry()
     {
         var dbPath = CreateTempDatabasePath();
@@ -395,21 +395,6 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         Assert.Equal(LibraryEntryOrigin.UserSaved, legacy.Origin);
         Assert.False(legacy.IsFavorite);
         Assert.Null(legacy.LastUsedUtc);
-    }
-
-    [Fact]
-    public async Task Load_FromPreTagsSchema_AddsTagsColumnViaAlterTable_ExistingRowsGetEmptyTags()
-    {
-        var dbPath = CreateTempDatabasePath();
-        var preTagsId = SeedPreTagsRow(dbPath);
-
-        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        var result = await store.LoadAllAsync(TestContext.Current.CancellationToken);
-
-        var loaded = Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(result));
-        Assert.Equal(preTagsId, loaded.Id);
-        Assert.NotNull(loaded.Tags);
-        Assert.Empty(loaded.Tags);
     }
 
     [Fact]
@@ -498,7 +483,8 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
             Assert.Equal(1L, CountRows(dbPath, new LibraryEntryId(Guid.Parse(id))));
         }
 
-        banner.ReceivedWithAnyArgs(1).ReportError(default!, default!);
+        banner.Received(1).ReportError(Arg.Is<BannerMessage>(message =>
+            IsFilterLibraryNotFullyLoaded(message, 3)));
     }
 
     [Fact]
@@ -553,7 +539,8 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
             Assert.Equal(1L, CountRows(dbPath, new LibraryEntryId(Guid.Parse(id))));
         }
 
-        banner.ReceivedWithAnyArgs(1).ReportError(default!, default!);
+        banner.Received(1).ReportError(Arg.Is<BannerMessage>(message =>
+            IsFilterLibraryNotFullyLoaded(message, 4)));
     }
 
     [Fact]
@@ -597,7 +584,8 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
 
         Assert.Equal(2, result.Count);
         foreach (var id in badIds) { Assert.Equal(1L, CountRows(dbPath, id)); }
-        banner.ReceivedWithAnyArgs(1).ReportError(default!, default!);
+        banner.Received(1).ReportError(Arg.Is<BannerMessage>(message =>
+            IsFilterLibraryNotFullyLoaded(message, 2)));
     }
 
     [Fact]
@@ -667,7 +655,33 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
 
         Assert.Empty(result);
         foreach (var id in ids) { Assert.Equal(1L, CountRows(dbPath, id)); }
-        banner.ReceivedWithAnyArgs(1).ReportError(default!, default!);
+        banner.Received(1).ReportError(Arg.Is<BannerMessage>(message =>
+            IsFilterLibraryNotFullyLoaded(message, 3)));
+    }
+
+    [Fact]
+    public async Task LoadAll_UnknownKindWithUnparseableColumns_KeepsRow()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var seed = BuildFilterEntry("Seed");
+        await store.AddAsync(seed, TestContext.Current.CancellationToken);
+        await store.DeleteAsync(seed.Id, TestContext.Current.CancellationToken);
+
+        var unknownId = new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-0000000000aa"));
+
+        using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            connection.Open();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded) VALUES ('{unknownId.Value:D}', 'FutureRow', 'not-a-date', 'SomeFutureKind', '{{}}', 0, NULL, 'UserSaved', NULL, NULL, NULL);";
+            cmd.ExecuteNonQuery();
+        }
+
+        var result = await store.LoadAllAsync(TestContext.Current.CancellationToken);
+
+        Assert.Empty(result);
+        Assert.Equal(1L, CountRows(dbPath, unknownId));
     }
 
     [Fact]
@@ -698,28 +712,18 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task LoadAll_UnknownKindWithUnparseableColumns_KeepsRow()
+    public async Task Load_FromPreTagsSchema_AddsTagsColumnViaAlterTable_ExistingRowsGetEmptyTags()
     {
         var dbPath = CreateTempDatabasePath();
+        var preTagsId = SeedPreTagsRow(dbPath);
+
         var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        var seed = BuildFilterEntry("Seed");
-        await store.AddAsync(seed, TestContext.Current.CancellationToken);
-        await store.DeleteAsync(seed.Id, TestContext.Current.CancellationToken);
-
-        var unknownId = new LibraryEntryId(Guid.Parse("00000000-0000-0000-0000-0000000000aa"));
-
-        using (var connection = new SqliteConnection($"Data Source={dbPath}"))
-        {
-            connection.Open();
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = $"INSERT INTO library_entries (id, name, created_utc, kind, payload, is_favorite, last_used_utc, origin, comparison_text, mode, is_excluded) VALUES ('{unknownId.Value:D}', 'FutureRow', 'not-a-date', 'SomeFutureKind', '{{}}', 0, NULL, 'UserSaved', NULL, NULL, NULL);";
-            cmd.ExecuteNonQuery();
-        }
-
         var result = await store.LoadAllAsync(TestContext.Current.CancellationToken);
 
-        Assert.Empty(result);
-        Assert.Equal(1L, CountRows(dbPath, unknownId));
+        var loaded = Assert.IsType<LibraryEntrySavedFilter>(Assert.Single(result));
+        Assert.Equal(preTagsId, loaded.Id);
+        Assert.NotNull(loaded.Tags);
+        Assert.Empty(loaded.Tags);
     }
 
     [Fact]
@@ -863,6 +867,43 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateRange_SkipsAbsentRow_ReturnsOnlyPresentIds()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var present = BuildFilterEntry("Present");
+        var absent = BuildFilterEntry("Absent");
+        await store.AddAsync(present, TestContext.Current.CancellationToken);
+
+        var ids = await store.UpdateRangeAsync([present with { Tags = ["x"] }, absent with { Tags = ["y"] }], TestContext.Current.CancellationToken);
+
+        Assert.Single(ids);
+        Assert.Contains(present.Id, ids);
+        Assert.DoesNotContain(absent.Id, ids);
+    }
+
+    [Fact]
+    public async Task UpdateRange_UpdatesAllPresentRows_ReturnsTheirIds()
+    {
+        var dbPath = CreateTempDatabasePath();
+        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
+        var a = BuildFilterEntry("A");
+        var b = BuildFilterEntry("B");
+        await store.AddAsync(a, TestContext.Current.CancellationToken);
+        await store.AddAsync(b, TestContext.Current.CancellationToken);
+
+        var ids = await store.UpdateRangeAsync([a with { Tags = ["x"] }, b with { Tags = ["y"] }], TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, ids.Count);
+        Assert.Contains(a.Id, ids);
+        Assert.Contains(b.Id, ids);
+
+        var afterLoad = await store.LoadAllAsync(TestContext.Current.CancellationToken);
+        Assert.Contains(afterLoad, e => e.Id == a.Id && e.Tags.SequenceEqual(new[] { "x" }));
+        Assert.Contains(afterLoad, e => e.Id == b.Id && e.Tags.SequenceEqual(new[] { "y" }));
+    }
+
+    [Fact]
     public async Task Update_PersistsTagChanges()
     {
         var dbPath = CreateTempDatabasePath();
@@ -898,43 +939,6 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
 
         Assert.Single(result);
         Assert.Equal("First (renamed)", result[0].Name);
-    }
-
-    [Fact]
-    public async Task UpdateRange_SkipsAbsentRow_ReturnsOnlyPresentIds()
-    {
-        var dbPath = CreateTempDatabasePath();
-        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        var present = BuildFilterEntry("Present");
-        var absent = BuildFilterEntry("Absent");
-        await store.AddAsync(present, TestContext.Current.CancellationToken);
-
-        var ids = await store.UpdateRangeAsync([present with { Tags = ["x"] }, absent with { Tags = ["y"] }], TestContext.Current.CancellationToken);
-
-        Assert.Single(ids);
-        Assert.Contains(present.Id, ids);
-        Assert.DoesNotContain(absent.Id, ids);
-    }
-
-    [Fact]
-    public async Task UpdateRange_UpdatesAllPresentRows_ReturnsTheirIds()
-    {
-        var dbPath = CreateTempDatabasePath();
-        var store = new FilterLibrarySqliteStore(dbPath, Substitute.For<ITraceLogger>());
-        var a = BuildFilterEntry("A");
-        var b = BuildFilterEntry("B");
-        await store.AddAsync(a, TestContext.Current.CancellationToken);
-        await store.AddAsync(b, TestContext.Current.CancellationToken);
-
-        var ids = await store.UpdateRangeAsync([a with { Tags = ["x"] }, b with { Tags = ["y"] }], TestContext.Current.CancellationToken);
-
-        Assert.Equal(2, ids.Count);
-        Assert.Contains(a.Id, ids);
-        Assert.Contains(b.Id, ids);
-
-        var afterLoad = await store.LoadAllAsync(TestContext.Current.CancellationToken);
-        Assert.Contains(afterLoad, e => e.Id == a.Id && e.Tags.SequenceEqual(new[] { "x" }));
-        Assert.Contains(afterLoad, e => e.Id == b.Id && e.Tags.SequenceEqual(new[] { "y" }));
     }
 
     private static LibraryEntrySavedFilter BuildAutoTrackedFilterEntry(string comparisonText, FilterMode mode = FilterMode.Advanced)
@@ -977,6 +981,10 @@ public sealed class FilterLibrarySqliteStoreTests : IDisposable
         cmd.Parameters.AddWithValue("$id", id.Value.ToString("D"));
         return (long)cmd.ExecuteScalar()!;
     }
+
+    private static bool IsFilterLibraryNotFullyLoaded(BannerMessage? message, int count) =>
+        message is FilterLibraryNotFullyLoaded filterLibraryNotFullyLoaded &&
+        filterLibraryNotFullyLoaded.Count == count;
 
     private static List<string> ReadColumnNames(SqliteConnection connection)
     {

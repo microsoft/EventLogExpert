@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.LogTable;
@@ -17,16 +16,16 @@ public sealed class EventExportCoordinator(
     IEventTableExporter eventTableExporter,
     IFileSaveService fileSaveService,
     IExportProgressBannerService exportProgress,
-    IAlertDialogService dialogService,
+    IInfoBannerService infoBanners,
     ISettingsService settings,
     ILogTableColumnDefaultsProvider columnDefaults,
     ITraceLogger traceLogger)
 {
     private readonly ILogTableColumnDefaultsProvider _columnDefaults = columnDefaults;
-    private readonly IAlertDialogService _dialogService = dialogService;
     private readonly IEventTableExporter _eventTableExporter = eventTableExporter;
     private readonly IExportProgressBannerService _exportProgress = exportProgress;
     private readonly IFileSaveService _fileSaveService = fileSaveService;
+    private readonly IInfoBannerService _infoBanners = infoBanners;
     private readonly IState<LogTableState> _logTableState = logTableState;
     private readonly ISettingsService _settings = settings;
     private readonly ITraceLogger _traceLogger = traceLogger;
@@ -40,15 +39,14 @@ public sealed class EventExportCoordinator(
 
         if (events.Count == 0)
         {
-            string reason = state.PresentationState switch
+            ExportBlockReason reason = state.PresentationState switch
             {
-                PresentationState.Faulted => "These events cannot be exported because the view could not be prepared.",
-                PresentationState.Updating =>
-                    "These events are still being prepared. Please try again once they have finished loading.",
-                _ => "There are no events to export."
+                PresentationState.Faulted => ExportBlockReason.Faulted,
+                PresentationState.Updating => ExportBlockReason.Updating,
+                _ => ExportBlockReason.NoEvents
             };
 
-            await _dialogService.ShowAlert("Export events", reason, "Ok", AlertPresentation.Banner);
+            _infoBanners.ReportInfoBanner(new ExportBlocked(reason), BannerSeverity.Warning);
 
             return;
         }
@@ -57,8 +55,7 @@ public sealed class EventExportCoordinator(
 
         if (columns.Count == 0)
         {
-            await _dialogService.ShowAlert(
-                "Export events", "There are no visible columns to export.", "Ok", AlertPresentation.Banner);
+            _infoBanners.ReportInfoBanner(new ExportBlocked(ExportBlockReason.NoColumns), BannerSeverity.Warning);
 
             return;
         }
@@ -72,8 +69,7 @@ public sealed class EventExportCoordinator(
 
         if (Interlocked.CompareExchange(ref _exportInFlight, 1, 0) != 0)
         {
-            await _dialogService.ShowAlert(
-                "Export events", "An export is already in progress.", "Ok", AlertPresentation.Banner);
+            _infoBanners.ReportInfoBanner(new ExportBlocked(ExportBlockReason.AlreadyInProgress), BannerSeverity.Warning);
 
             return;
         }
@@ -90,13 +86,11 @@ public sealed class EventExportCoordinator(
                 fileTypes,
                 async (stream, _) =>
                 {
-                    _exportProgress.Begin(
-                        "Exporting events...",
-                        () =>
-                        {
-                            try { cancellation.Cancel(); }
-                            catch (ObjectDisposedException) { /* Teardown disposed the CTS; a late Cancel is a no-op. */ }
-                        });
+                    _exportProgress.Begin(() =>
+                    {
+                        try { cancellation.Cancel(); }
+                        catch (ObjectDisposedException) { /* Teardown disposed the CTS; a late Cancel is a no-op. */ }
+                    });
 
                     await _eventTableExporter.ExportAsync(
                         stream, format, events, columns, timeZone, includeDescription: true, cancellation.Token);
@@ -126,8 +120,7 @@ public sealed class EventExportCoordinator(
 
         if (canceled)
         {
-            await _dialogService.ShowAlert(
-                "Export canceled", "The export was canceled.", "Ok", AlertPresentation.Banner);
+            _infoBanners.ReportInfoBanner(new ExportCanceled(), BannerSeverity.Warning);
 
             return;
         }
@@ -136,18 +129,14 @@ public sealed class EventExportCoordinator(
         {
             _traceLogger.Error($"Failed to export events: {failure}");
 
-            await _dialogService.ShowAlert("Export failed", failure.Message, "Ok", AlertPresentation.Banner);
+            _infoBanners.ReportInfoBanner(new ExportFailed(failure.Message), BannerSeverity.Warning);
 
             return;
         }
 
         if (savedPath is not null)
         {
-            await _dialogService.ShowAlert(
-                "Export complete",
-                $"Exported {events.Count:N0} {(events.Count == 1 ? "event" : "events")} to {savedPath}.",
-                "Ok",
-                AlertPresentation.Banner);
+            _infoBanners.ReportInfoBanner(new ExportComplete(events.Count, savedPath), BannerSeverity.Warning);
         }
     }
 }

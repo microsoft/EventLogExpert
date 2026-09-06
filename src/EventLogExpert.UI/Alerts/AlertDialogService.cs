@@ -4,6 +4,7 @@
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Threading;
+using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Modal;
 
 namespace EventLogExpert.UI.Alerts;
@@ -12,14 +13,12 @@ public sealed class AlertDialogService(
     IModalCoordinator modalCoordinator,
     IMainThreadService mainThreadService,
     IErrorBannerService errorBannerService,
-    IInfoBannerService infoBannerService,
     Func<IReadOnlyDictionary<string, object?>, Task<bool>> openStandaloneAlert,
     Func<IReadOnlyDictionary<string, object?>, Task<string>> openStandalonePrompt,
     Func<IReadOnlyDictionary<string, object?>, Task<PromptOutcome>>? openStandalonePromptWithSecondary = null)
     : IAlertDialogService
 {
     private readonly IErrorBannerService _errorBannerService = errorBannerService;
-    private readonly IInfoBannerService _infoBannerService = infoBannerService;
     private readonly IMainThreadService _mainThreadService = mainThreadService;
     private readonly IModalCoordinator _modalCoordinator = modalCoordinator;
     private readonly Func<IReadOnlyDictionary<string, object?>, Task<bool>> _openStandaloneAlert = openStandaloneAlert;
@@ -62,20 +61,12 @@ public sealed class AlertDialogService(
         string cancel,
         AlertPresentation presentation)
     {
-        if (presentation == AlertPresentation.Banner)
-        {
-            throw new ArgumentException(
-                $"{nameof(AlertPresentation)}.{nameof(AlertPresentation.Banner)} is not valid for two-button alerts " +
-                "(the banner has no accept/cancel pair).",
-                nameof(presentation));
-        }
-
         return ShowAlertCore(title, message, accept, cancel, presentation);
     }
 
     public Task ShowErrorAlert(string title, string message, string? actionLabel = null, Func<Task>? action = null)
     {
-        _errorBannerService.ReportError(title, message, actionLabel, action);
+        _errorBannerService.ReportError(new Preformatted(title, message, actionLabel), action);
 
         return Task.CompletedTask;
     }
@@ -176,13 +167,6 @@ public sealed class AlertDialogService(
         string cancel,
         AlertPresentation presentation)
     {
-        if (presentation == AlertPresentation.Banner)
-        {
-            _infoBannerService.ReportInfoBanner(title, message, BannerSeverity.Warning);
-
-            return Task.FromResult(false);
-        }
-
         return InvokeOnMainThreadAsync(async () =>
         {
             _modalCoordinator.TryGetInlineAlertHost(out var host);

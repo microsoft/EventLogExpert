@@ -11,5 +11,5 @@ public interface IErrorBannerService
 
     void DismissError(BannerId id);
 
-    BannerId ReportError(string title, string message, string? actionLabel = null, Func<Task>? action = null);
+    BannerId ReportError(BannerMessage content, Func<Task>? action = null);
 }

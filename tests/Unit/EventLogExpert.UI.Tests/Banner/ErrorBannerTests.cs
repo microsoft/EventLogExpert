@@ -34,9 +34,7 @@ public sealed class ErrorBannerTests : BunitContext
     {
         int actionInvocationCount = 0;
         var entry = new ErrorBannerEntry(BannerId.Create(),
-            "Database",
-            "Recovery required",
-            "Resolve",
+            new Preformatted("Database", "Recovery required", "Resolve"),
             () => { actionInvocationCount++; return Task.CompletedTask; },
             DateTime.UtcNow);
 
@@ -52,9 +50,7 @@ public sealed class ErrorBannerTests : BunitContext
         // Arrange — action exceptions must be swallowed so they do not bubble up to ErrorBoundary.
         var actionException = new InvalidOperationException("action boom");
         var entry = new ErrorBannerEntry(BannerId.Create(),
-            "Database",
-            "Recovery required",
-            "Resolve",
+            new Preformatted("Database", "Recovery required", "Resolve"),
             () => throw actionException,
             DateTime.UtcNow);
 
@@ -72,7 +68,11 @@ public sealed class ErrorBannerTests : BunitContext
     [Fact]
     public async Task ErrorBanner_DismissClicked_CallsDismissErrorWithEntryId()
     {
-        var entry = new ErrorBannerEntry(BannerId.Create(), "Database", "Schema invalid", null, null, DateTime.UtcNow);
+        var entry = new ErrorBannerEntry(
+            BannerId.Create(),
+            new Preformatted("Database", "Schema invalid"),
+            null,
+            DateTime.UtcNow);
 
         var component = Render<ErrorBanner>(p => p.Add(c => c.Entry, entry));
         await component.Find("aside.banner-error button.banner-dismiss").ClickAsync(new MouseEventArgs());
@@ -81,12 +81,38 @@ public sealed class ErrorBannerTests : BunitContext
     }
 
     [Fact]
+    public void ErrorBanner_WithActionButNoActionLabel_DoesNotRenderActionButton()
+    {
+        var entry = new ErrorBannerEntry(
+            BannerId.Create(),
+            new Preformatted("Database", "Schema invalid"),
+            () => Task.CompletedTask,
+            DateTime.UtcNow);
+
+        var component = Render<ErrorBanner>(p => p.Add(c => c.Entry, entry));
+
+        Assert.Empty(component.FindAll("aside.banner-error button.banner-action"));
+    }
+
+    [Fact]
+    public void ErrorBanner_WithActionLabelButNoAction_DoesNotRenderActionButton()
+    {
+        var entry = new ErrorBannerEntry(
+            BannerId.Create(),
+            new Preformatted("Database", "Recovery required", "Resolve"),
+            null,
+            DateTime.UtcNow);
+
+        var component = Render<ErrorBanner>(p => p.Add(c => c.Entry, entry));
+
+        Assert.Empty(component.FindAll("aside.banner-error button.banner-action"));
+    }
+
+    [Fact]
     public void ErrorBanner_WithAction_RendersActionButtonWithLabel()
     {
         var entry = new ErrorBannerEntry(BannerId.Create(),
-            "Database",
-            "Recovery required",
-            "Resolve",
+            new Preformatted("Database", "Recovery required", "Resolve"),
             () => Task.CompletedTask,
             DateTime.UtcNow);
 
@@ -99,7 +125,11 @@ public sealed class ErrorBannerTests : BunitContext
     [Fact]
     public void ErrorBanner_WithoutAction_DoesNotRenderActionButton()
     {
-        var entry = new ErrorBannerEntry(BannerId.Create(), "Database", "Schema invalid", null, null, DateTime.UtcNow);
+        var entry = new ErrorBannerEntry(
+            BannerId.Create(),
+            new Preformatted("Database", "Schema invalid"),
+            null,
+            DateTime.UtcNow);
 
         var component = Render<ErrorBanner>(p => p.Add(c => c.Entry, entry));
 

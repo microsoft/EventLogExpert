@@ -3,4 +3,7 @@
 
 namespace EventLogExpert.Runtime.Banner;
 
-public sealed record ExportProgressEntry(Action Cancel);
+public abstract partial record BannerMessage
+{
+    public virtual bool RequiresAction => false;
+}

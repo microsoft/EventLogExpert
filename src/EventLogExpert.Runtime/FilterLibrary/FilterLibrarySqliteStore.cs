@@ -673,8 +673,6 @@ internal sealed class FilterLibrarySqliteStore : IFilterLibraryStore
 
         if (Interlocked.Exchange(ref _systemicUnloadableReported, 1) != 0) { return; }
 
-        _errorBannerService.ReportError(
-            "Filter library not fully loaded",
-            $"{unloadableCount} library entries couldn't be read and were left in place to avoid data loss. This usually means the library was written by a newer version of the app.");
+        _errorBannerService.ReportError(new FilterLibraryNotFullyLoaded(unloadableCount));
     }
 }

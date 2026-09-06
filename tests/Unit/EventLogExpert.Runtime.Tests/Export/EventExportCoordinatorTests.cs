@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Export;
@@ -25,9 +24,9 @@ public sealed class EventExportCoordinatorTests
 
     private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(5);
 
-    private readonly IAlertDialogService _dialogs = Substitute.For<IAlertDialogService>();
     private readonly IEventTableExporter _exporter = Substitute.For<IEventTableExporter>();
     private readonly IFileSaveService _fileSave = Substitute.For<IFileSaveService>();
+    private readonly IInfoBannerService _infoBanners = Substitute.For<IInfoBannerService>();
     private readonly IState<LogTableState> _logTableState = Substitute.For<IState<LogTableState>>();
     private readonly IExportProgressBannerService _progress = Substitute.For<IExportProgressBannerService>();
     private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
@@ -109,6 +108,52 @@ public sealed class EventExportCoordinatorTests
     }
 
     [Fact]
+    public async Task Export_WhenSaveIsCanceled_EmitsCanceledWarningBanner()
+    {
+        _state = StateWith(Event(1, "Alpha"));
+        _progress.When(progress => progress.Begin(Arg.Any<Action>()))
+            .Do(call => call.ArgAt<Action>(0).Invoke());
+        _exporter.ExportAsync(
+                Arg.Any<Stream>(),
+                Arg.Any<ExportFormat>(),
+                Arg.Any<IEventColumnView>(),
+                Arg.Any<IReadOnlyList<ColumnName>>(),
+                Arg.Any<TimeZoneInfo>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                call.ArgAt<CancellationToken>(6).ThrowIfCancellationRequested();
+                return Task.CompletedTask;
+            });
+        CaptureWrite();
+
+        await CreateCoordinator().ExportEventsAsync(ExportFormat.Csv);
+
+        _infoBanners.Received(1).ReportInfoBanner(
+            Arg.Is<BannerMessage>(message => IsExportCanceled(message)),
+            BannerSeverity.Warning);
+    }
+
+    [Fact]
+    public async Task Export_WhenSaveThrows_EmitsFailedWarningBanner()
+    {
+        _state = StateWith(Event(1, "Alpha"));
+        _fileSave.SaveStreamingAsync(
+                Arg.Any<string>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>>(),
+                Arg.Any<Func<Stream, CancellationToken, Task>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<string?>(new InvalidOperationException("disk full")));
+
+        await CreateCoordinator().ExportEventsAsync(ExportFormat.Csv);
+
+        _infoBanners.Received(1).ReportInfoBanner(
+            Arg.Is<BannerMessage>(message => IsExportFailed(message, "disk full")),
+            BannerSeverity.Warning);
+    }
+
+    [Fact]
     public async Task Export_WhenTheEngineFailedButRowsAreStillOnScreen_WritesTheRowsTheUserCanSee()
     {
         _state = Reducers.ReduceOrderedViewDisplayFaulted(
@@ -167,8 +212,10 @@ public sealed class EventExportCoordinatorTests
 
         await second;
 
-        await _dialogs.Received(1).ShowAlert(
-            "Export events", "An export is already in progress.", Arg.Any<string>(), Arg.Any<AlertPresentation>());
+        _infoBanners.Received(1).ReportInfoBanner(
+            Arg.Is<BannerMessage>(message =>
+                IsExportBlocked(message, ExportBlockReason.AlreadyInProgress)),
+            BannerSeverity.Warning);
 
         releaseFirstWrite.TrySetResult();
 
@@ -188,11 +235,10 @@ public sealed class EventExportCoordinatorTests
             Arg.Any<Func<Stream, CancellationToken, Task>>(),
             Arg.Any<CancellationToken>());
 
-        await _dialogs.Received(1).ShowAlert(
-            "Export events",
-            "These events are still being prepared. Please try again once they have finished loading.",
-            Arg.Any<string>(),
-            Arg.Any<AlertPresentation>());
+        _infoBanners.Received(1).ReportInfoBanner(
+            Arg.Is<BannerMessage>(message =>
+                IsExportBlocked(message, ExportBlockReason.Updating)),
+            BannerSeverity.Warning);
     }
 
     [Fact]
@@ -208,11 +254,10 @@ public sealed class EventExportCoordinatorTests
             Arg.Any<Func<Stream, CancellationToken, Task>>(),
             Arg.Any<CancellationToken>());
 
-        await _dialogs.Received(1).ShowAlert(
-            "Export events",
-            "These events cannot be exported because the view could not be prepared.",
-            Arg.Any<string>(),
-            Arg.Any<AlertPresentation>());
+        _infoBanners.Received(1).ReportInfoBanner(
+            Arg.Is<BannerMessage>(message =>
+                IsExportBlocked(message, ExportBlockReason.Faulted)),
+            BannerSeverity.Warning);
     }
 
     [Fact]
@@ -231,8 +276,10 @@ public sealed class EventExportCoordinatorTests
             Arg.Any<Func<Stream, CancellationToken, Task>>(),
             Arg.Any<CancellationToken>());
 
-        await _dialogs.Received(1).ShowAlert(
-            "Export events", "There are no events to export.", Arg.Any<string>(), Arg.Any<AlertPresentation>());
+        _infoBanners.Received(1).ReportInfoBanner(
+            Arg.Is<BannerMessage>(message =>
+                IsExportBlocked(message, ExportBlockReason.NoEvents)),
+            BannerSeverity.Warning);
     }
 
     [Fact]
@@ -251,8 +298,10 @@ public sealed class EventExportCoordinatorTests
             Arg.Any<Func<Stream, CancellationToken, Task>>(),
             Arg.Any<CancellationToken>());
 
-        await _dialogs.Received(1).ShowAlert(
-            "Export events", "There are no events to export.", Arg.Any<string>(), Arg.Any<AlertPresentation>());
+        _infoBanners.Received(1).ReportInfoBanner(
+            Arg.Is<BannerMessage>(message =>
+                IsExportBlocked(message, ExportBlockReason.NoEvents)),
+            BannerSeverity.Warning);
     }
 
     [Fact]
@@ -272,8 +321,10 @@ public sealed class EventExportCoordinatorTests
             Arg.Any<Func<Stream, CancellationToken, Task>>(),
             Arg.Any<CancellationToken>());
 
-        await _dialogs.Received(1).ShowAlert(
-            "Export events", "There are no visible columns to export.", Arg.Any<string>(), Arg.Any<AlertPresentation>());
+        _infoBanners.Received(1).ReportInfoBanner(
+            Arg.Is<BannerMessage>(message =>
+                IsExportBlocked(message, ExportBlockReason.NoColumns)),
+            BannerSeverity.Warning);
     }
 
     [Fact]
@@ -285,6 +336,9 @@ public sealed class EventExportCoordinatorTests
         await CreateCoordinator().ExportEventsAsync(ExportFormat.Csv);
 
         Assert.Equal(3, ExportedRows()!.Count);
+        _infoBanners.Received(1).ReportInfoBanner(
+            Arg.Is<BannerMessage>(message => IsExportComplete(message, 3, @"C:\events.csv")),
+            BannerSeverity.Warning);
     }
 
     private static ResolvedEvent Event(long recordId, string source) =>
@@ -297,6 +351,22 @@ public sealed class EventExportCoordinatorTests
             Source = source,
             LogName = LogName
         };
+
+    private static bool IsExportBlocked(BannerMessage? message, ExportBlockReason reason) =>
+        message is ExportBlocked exportBlocked &&
+        exportBlocked.Reason == reason;
+
+    private static bool IsExportCanceled(BannerMessage? message) =>
+        message is ExportCanceled;
+
+    private static bool IsExportComplete(BannerMessage? message, int count, string path) =>
+        message is ExportComplete exportComplete &&
+        exportComplete.Count == count &&
+        exportComplete.Path == path;
+
+    private static bool IsExportFailed(BannerMessage? message, string detail) =>
+        message is ExportFailed exportFailed &&
+        exportFailed.Detail == detail;
 
     private static LogTableState Serving(LogTableState state, EventLogId logId, IEventColumnView view) =>
         state with
@@ -354,7 +424,7 @@ public sealed class EventExportCoordinatorTests
             _exporter,
             _fileSave,
             _progress,
-            _dialogs,
+            _infoBanners,
             _settings,
             new ColumnDefaults(),
             Substitute.For<ITraceLogger>());

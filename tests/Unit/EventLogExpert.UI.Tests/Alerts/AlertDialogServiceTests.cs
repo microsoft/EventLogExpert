@@ -5,6 +5,7 @@ using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.UI.Alerts;
+using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Modal;
 using NSubstitute;
 
@@ -31,7 +32,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -77,7 +77,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -110,7 +109,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -137,7 +135,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty),
             parameters =>
@@ -184,7 +181,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -214,7 +210,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -234,7 +229,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             _ => Task.FromResult(false),
             parameters => { capturedPrompt = parameters; return Task.FromResult("user-typed"); });
 
@@ -260,7 +254,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             _ => Task.FromResult(false),
             parameters => { capturedPrompt = parameters; return Task.FromResult("user-typed"); });
 
@@ -268,54 +261,6 @@ public sealed class ModalAlertDialogServiceTests
 
         Assert.NotNull(capturedPrompt);
         Assert.Same(validate, capturedPrompt!["Validate"]);
-    }
-
-    [Fact]
-    public async Task ShowAlertOneButton_BannerPresentation_DoesNotMarshalThroughMainThreadService()
-    {
-        var infoBannerService = Substitute.For<IInfoBannerService>();
-        var errorBannerService = Substitute.For<IErrorBannerService>();
-        var mainThread = Substitute.For<IMainThreadService>();
-
-        var sut = new AlertDialogService(
-            Substitute.For<IModalCoordinator>(),
-            mainThread,
-            errorBannerService,
-            infoBannerService,
-            _ => Task.FromResult(false),
-            _ => Task.FromResult(string.Empty));
-
-        await sut.ShowAlert("t", "m", "OK", AlertPresentation.Banner);
-
-        await mainThread.DidNotReceive().InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
-        infoBannerService.Received(1).ReportInfoBanner("t", "m", BannerSeverity.Warning);
-        errorBannerService.DidNotReceive().ReportError(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<Func<Task>?>());
-    }
-
-    [Fact]
-    public async Task ShowAlertOneButton_BannerPresentation_RoutesToReportInfoBanner_WithWarningSeverity()
-    {
-        var infoBannerService = Substitute.For<IInfoBannerService>();
-        var errorBannerService = Substitute.For<IErrorBannerService>();
-        var coordinator = Substitute.For<IModalCoordinator>();
-        var standaloneCalled = false;
-
-        var sut = new AlertDialogService(
-            coordinator,
-            PassthroughMainThread(),
-            errorBannerService,
-            infoBannerService,
-            _ => { standaloneCalled = true; return Task.FromResult(false); },
-            _ => Task.FromResult(string.Empty));
-
-        await sut.ShowAlert("Banner Title", "Banner Message", "OK", AlertPresentation.Banner);
-
-        infoBannerService.Received(1).ReportInfoBanner("Banner Title", "Banner Message", BannerSeverity.Warning);
-        errorBannerService.DidNotReceive().ReportError(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<Func<Task>?>());
-        Assert.False(standaloneCalled);
-        coordinator.DidNotReceive().TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>());
     }
 
     [Fact]
@@ -328,7 +273,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -355,7 +299,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             _ => { standaloneCalled = true; return Task.FromResult(false); },
             _ => Task.FromResult(string.Empty));
 
@@ -381,7 +324,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             parameters => { capturedAlert = parameters; return Task.FromResult(true); },
             _ => Task.FromResult(string.Empty));
 
@@ -403,7 +345,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             parameters => { capturedAlert = parameters; return Task.FromResult(true); },
             _ => Task.FromResult(string.Empty));
 
@@ -417,22 +358,6 @@ public sealed class ModalAlertDialogServiceTests
     }
 
     [Fact]
-    public async Task ShowAlertTwoButton_BannerPresentation_ThrowsArgumentException()
-    {
-        var sut = new AlertDialogService(
-            Substitute.For<IModalCoordinator>(),
-            PassthroughMainThread(),
-            Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
-            _ => Task.FromResult(false),
-            _ => Task.FromResult(string.Empty));
-
-        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-            sut.ShowAlert("t", "m", "Yes", "No", AlertPresentation.Banner));
-        Assert.Equal("presentation", ex.ParamName);
-    }
-
-    [Fact]
     public async Task ShowAlertTwoButton_InlineOnlyNoHost_ThrowsInvalidOperationException()
     {
         var coordinator = Substitute.For<IModalCoordinator>();
@@ -442,7 +367,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -466,7 +390,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             parameters => { capturedAlert = parameters; return Task.FromResult(true); },
             _ => Task.FromResult(string.Empty));
 
@@ -498,7 +421,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             _ => { standaloneCalled = true; return Task.FromResult(false); },
             _ => Task.FromResult(string.Empty));
 
@@ -535,7 +457,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -558,7 +479,6 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             mainThread,
             Substitute.For<IErrorBannerService>(),
-            Substitute.For<IInfoBannerService>(),
             _ => Task.FromResult(true),
             _ => Task.FromResult(string.Empty));
 
@@ -571,29 +491,26 @@ public sealed class ModalAlertDialogServiceTests
     public async Task ShowErrorAlert_DoesNotMarshalThroughMainThreadService()
     {
         var errorBannerService = Substitute.For<IErrorBannerService>();
-        var infoBannerService = Substitute.For<IInfoBannerService>();
         var mainThread = Substitute.For<IMainThreadService>();
 
         var sut = new AlertDialogService(
             Substitute.For<IModalCoordinator>(),
             mainThread,
             errorBannerService,
-            infoBannerService,
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
         await sut.ShowErrorAlert("t", "m");
 
         await mainThread.DidNotReceive().InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
-        errorBannerService.Received(1).ReportError("t", "m");
-        infoBannerService.DidNotReceive().ReportInfoBanner(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<BannerSeverity>());
+        errorBannerService.Received(1).ReportError(Arg.Is<BannerMessage>(content =>
+            IsPreformatted(content, "t", "m")));
     }
 
     [Fact]
     public async Task ShowErrorAlert_RoutesToBannerServiceReportError_WithTitleAndMessage()
     {
         var errorBannerService = Substitute.For<IErrorBannerService>();
-        var infoBannerService = Substitute.For<IInfoBannerService>();
         var coordinator = Substitute.For<IModalCoordinator>();
         var standaloneCalled = false;
 
@@ -601,14 +518,13 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             errorBannerService,
-            infoBannerService,
             _ => { standaloneCalled = true; return Task.FromResult(false); },
             _ => Task.FromResult(string.Empty));
 
         await sut.ShowErrorAlert("Error Title", "Error Message");
 
-        errorBannerService.Received(1).ReportError("Error Title", "Error Message");
-        infoBannerService.DidNotReceive().ReportInfoBanner(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<BannerSeverity>());
+        errorBannerService.Received(1).ReportError(Arg.Is<BannerMessage>(content =>
+            IsPreformatted(content, "Error Title", "Error Message")));
         Assert.False(standaloneCalled);
         coordinator.DidNotReceive().TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>());
     }
@@ -617,22 +533,28 @@ public sealed class ModalAlertDialogServiceTests
     public async Task ShowErrorAlert_WithActionLabelAndAction_PassesThroughToBannerService()
     {
         var errorBannerService = Substitute.For<IErrorBannerService>();
-        var infoBannerService = Substitute.For<IInfoBannerService>();
         Func<Task> action = () => Task.CompletedTask;
 
         var sut = new AlertDialogService(
             Substitute.For<IModalCoordinator>(),
             PassthroughMainThread(),
             errorBannerService,
-            infoBannerService,
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
         await sut.ShowErrorAlert("Error Title", "Error Message", "Resolve", action);
 
-        errorBannerService.Received(1).ReportError("Error Title", "Error Message", "Resolve", action);
-        infoBannerService.DidNotReceive().ReportInfoBanner(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<BannerSeverity>());
+        errorBannerService.Received(1).ReportError(
+            Arg.Is<BannerMessage>(content =>
+                IsPreformatted(content, "Error Title", "Error Message", "Resolve")),
+            action);
     }
+
+    private static bool IsPreformatted(BannerMessage? message, string title, string text, string? actionLabel = null) =>
+        message is Preformatted preformatted &&
+        preformatted.Title == title &&
+        preformatted.Message == text &&
+        preformatted.ActionLabel == actionLabel;
 
     private static IMainThreadService PassthroughMainThread() => new PassthroughMainThreadService();
 

@@ -54,9 +54,9 @@ public sealed partial class AttentionBanner : ComponentBase
             TraceLogger.Error(
                 $"{nameof(AttentionBanner)}.{nameof(OnOpenDatabasesClickedAsync)}: open databases threw: {ex}");
 
-            BannerId errorId = ErrorBannerService.ReportError(
+            BannerId errorId = ErrorBannerService.ReportError(new Preformatted(
                 Localizer["Banner_Attention_ErrorTitle"],
-                Localizer["Banner_Attention_OpenFailedDetail", ex.Message]);
+                Localizer["Banner_Attention_OpenFailedDetail", ex.Message]));
             await OnFallbackErrorPosted.InvokeAsync(new BannerCycleItem(BannerView.Error, 0, errorId));
 
             return;
@@ -67,9 +67,9 @@ public sealed partial class AttentionBanner : ComponentBase
             TraceLogger.Error(
                 $"{nameof(AttentionBanner)}.{nameof(OnOpenDatabasesClickedAsync)}: open databases returned false");
 
-            BannerId errorId = ErrorBannerService.ReportError(
+            BannerId errorId = ErrorBannerService.ReportError(new Preformatted(
                 Localizer["Banner_Attention_ErrorTitle"],
-                Localizer["Banner_Attention_OpenFailed"]);
+                Localizer["Banner_Attention_OpenFailed"]));
             await OnFallbackErrorPosted.InvokeAsync(new BannerCycleItem(BannerView.Error, 0, errorId));
         }
     }

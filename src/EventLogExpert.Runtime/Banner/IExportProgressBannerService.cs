@@ -14,11 +14,7 @@ public interface IExportProgressBannerService
 
     ExportProgressEntry? CurrentExport { get; }
 
-    /// <summary>
-    ///     Marks an export as started. Replaces any existing entry; callers are expected to gate re-entry so only one
-    ///     export runs at a time.
-    /// </summary>
-    void Begin(string message, Action cancel);
+    void Begin(Action cancel);
 
     /// <summary>Clears the current export entry. Idempotent when no export is in progress.</summary>
     void End();

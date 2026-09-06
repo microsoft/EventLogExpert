@@ -5,7 +5,6 @@ namespace EventLogExpert.Runtime.Banner;
 
 public sealed record BannerInfoEntry(
     BannerId Id,
-    string Title,
-    string Message,
+    BannerMessage Content,
     BannerSeverity Severity,
     DateTime CreatedUtc);

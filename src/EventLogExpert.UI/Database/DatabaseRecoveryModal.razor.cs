@@ -1,11 +1,14 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.Database;
 
@@ -29,6 +32,8 @@ public sealed partial class DatabaseRecoveryModal : ModalBase<bool>
     [Inject] private IDatabaseService DatabaseService { get; init; } = null!;
 
     [Inject] private IErrorBannerService ErrorBannerService { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
@@ -128,11 +133,11 @@ public sealed partial class DatabaseRecoveryModal : ModalBase<bool>
                 {
                     _failedFileNames.Add(fileName);
 
-                    var message = action == RecoveryAction.Restore
-                        ? $"Failed to restore '{fileName}' from backup."
-                        : $"Failed to delete '{fileName}'.";
+                    var message = action == RecoveryAction.Restore ?
+                        Localizer["Banner_Recovery_Failed_Restore", fileName] :
+                        Localizer["Banner_Recovery_Failed_Delete", fileName];
 
-                    ErrorBannerService.ReportError("Database recovery failed", message);
+                    ErrorBannerService.ReportError(new Preformatted(Localizer["Banner_Recovery_Failed_Title"], message));
                 }
             }
         }

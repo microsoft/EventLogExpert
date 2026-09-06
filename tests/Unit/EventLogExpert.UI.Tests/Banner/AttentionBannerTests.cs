@@ -59,7 +59,7 @@ public sealed class AttentionBannerTests : BunitContext
                 _attentionBannerService.DismissAttention();
                 _ = _menuActionService.OpenDatabaseToolsAsync();
             });
-        _errorBannerService.DidNotReceive().ReportError(Arg.Any<string>(), Arg.Any<string>());
+        _errorBannerService.DidNotReceive().ReportError(Arg.Any<BannerMessage>());
     }
 
     [Fact]
@@ -80,7 +80,8 @@ public sealed class AttentionBannerTests : BunitContext
 
         _attentionBannerService.Received(1).DismissAttention();
         _errorBannerService.Received(1)
-            .ReportError("[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailed]]");
+            .ReportError(Arg.Is<BannerMessage>(content =>
+                IsPreformatted(content, "[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailed]]")));
         Assert.NotNull(captured);
         Assert.Equal(BannerView.Error, captured.View);
     }
@@ -95,7 +96,7 @@ public sealed class AttentionBannerTests : BunitContext
         await component.Find("aside.banner-attention button.banner-action").ClickAsync(new MouseEventArgs());
 
         _attentionBannerService.Received(1).DismissAttention();
-        _errorBannerService.DidNotReceive().ReportError(Arg.Any<string>(), Arg.Any<string>());
+        _errorBannerService.DidNotReceive().ReportError(Arg.Any<BannerMessage>());
     }
 
     [Fact]
@@ -117,7 +118,8 @@ public sealed class AttentionBannerTests : BunitContext
 
         _attentionBannerService.Received(1).DismissAttention();
         _errorBannerService.Received(1)
-            .ReportError("[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailedDetail(modal boom)]]");
+            .ReportError(Arg.Is<BannerMessage>(content =>
+                IsPreformatted(content, "[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailedDetail(modal boom)]]")));
         _traceLogger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
             h.ToString().Contains(nameof(AttentionBanner)) && h.ToString().Contains("modal boom")));
         Assert.NotNull(captured);
@@ -144,6 +146,12 @@ public sealed class AttentionBannerTests : BunitContext
         Assert.Contains("[[Banner_Attention_One(1)]]", banner.TextContent);
         Assert.DoesNotContain("[[Banner_Attention_Many", banner.TextContent);
     }
+
+    private static bool IsPreformatted(BannerMessage? message, string title, string text, string? actionLabel = null) =>
+        message is Preformatted preformatted &&
+        preformatted.Title == title &&
+        preformatted.Message == text &&
+        preformatted.ActionLabel == actionLabel;
 
     private IRenderedComponent<AttentionBanner> RenderAttentionBanner(
         int attentionCount,

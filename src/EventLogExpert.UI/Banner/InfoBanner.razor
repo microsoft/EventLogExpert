@@ -1,10 +1,14 @@
+@{
+    BannerContentText text = BannerContentLocalizer.Resolve(Localizer, Entry.Content);
+}
+
 <aside class="banner @SeverityClass" role="status">
-    <span class="banner-message">@Entry.Title: @Entry.Message</span>
+    <span class="banner-message">@text.Title: @text.Message</span>
 
     @CycleNav
 
-    <Button aria-label='@Localizer["Banner_Info_DismissAria"]'
-        CssClass="banner-dismiss"
+    <Button CssClass="banner-dismiss"
         IconClass="bi bi-x-circle"
-        OnClick="OnDismissInfo" />
+        OnClick="OnDismissInfo"
+        aria-label='@Localizer["Banner_Info_DismissAria"]' />
 </aside>

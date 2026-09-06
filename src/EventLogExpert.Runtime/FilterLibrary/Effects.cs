@@ -492,9 +492,7 @@ internal sealed class Effects(
 
         // The write failed and was already logged in PersistAddAsync. Surface it visibly: the error banner is
         // role="alert", so it also reaches screen readers - do not also announce, or it would be spoken twice.
-        errorBannerService.ReportError(
-            "Couldn't save filter set",
-            $"'{created.Name}' couldn't be saved to the filter library.");
+        errorBannerService.ReportError(new FilterSetSaveFailed(created.Name));
     }
 
     [EffectMethod]

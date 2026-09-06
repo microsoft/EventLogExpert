@@ -57,22 +57,6 @@ public sealed class BannerViewSelectorTests
         Assert.Equal(new BannerCycleItem(BannerView.Info, 2, i2.Id), result[6]);
     }
 
-    [Fact]
-    public void BuildCycle_AttentionDismissed_AttentionExcluded()
-    {
-        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
-            .BuildCycle(currentCritical: null,
-                errorBanners: [],
-                attentionEntries: [BuildAttention("a.db")],
-                attentionDismissed: true,
-                attentionSuppressedByModalContext: false,
-                backgroundProgress: null,
-                exportProgress: null,
-                infoBanners: []);
-
-        Assert.Empty(result);
-    }
-
     [Theory]
     [InlineData(false, false, true)]
     [InlineData(true, false, false)]
@@ -102,6 +86,22 @@ public sealed class BannerViewSelectorTests
         {
             Assert.Empty(result);
         }
+    }
+
+    [Fact]
+    public void BuildCycle_AttentionDismissed_AttentionExcluded()
+    {
+        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [],
+                attentionEntries: [BuildAttention("a.db")],
+                attentionDismissed: true,
+                attentionSuppressedByModalContext: false,
+                backgroundProgress: null,
+                exportProgress: null,
+                infoBanners: []);
+
+        Assert.Empty(result);
     }
 
     [Fact]
@@ -372,13 +372,13 @@ public sealed class BannerViewSelectorTests
         new(fileName, $@"C:\dbs\{fileName}", IsEnabled: false, DatabaseStatus.UpgradeRequired);
 
     private static ErrorBannerEntry BuildError() =>
-        new(BannerId.Create(), "Error Title", "Error Message", null, null, s_testTime);
+        new(BannerId.Create(), new Preformatted("Error Title", "Error Message"), null, s_testTime);
 
     private static ExportProgressEntry BuildExportProgress() =>
-        new("Exporting events…", () => { });
+        new(() => { });
 
     private static BannerInfoEntry BuildInfo() =>
-        new(BannerId.Create(), "Info Title", "Info Message", BannerSeverity.Info, s_testTime);
+        new(BannerId.Create(), new Preformatted("Info Title", "Info Message"), BannerSeverity.Info, s_testTime);
 
     private static BannerProgressEntry BuildProgress() =>
         new(BatchId: UpgradeBatchId.Create(),

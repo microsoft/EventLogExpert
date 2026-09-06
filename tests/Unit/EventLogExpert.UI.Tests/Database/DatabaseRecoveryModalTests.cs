@@ -4,16 +4,19 @@
 using AngleSharp.Dom;
 using AngleSharp.Html.Dom;
 using Bunit;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.UI.Alerts;
+using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Database;
@@ -33,6 +36,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
     {
         Services.AddBannerHostDependencies();
         Services.AddMenuMocks();
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 
         _databaseService.Entries.Returns([]);
         _modalService.ActiveModalId.Returns(_modalId);
@@ -90,8 +94,8 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
         await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         _errorBannerService.Received(1).ReportError(
-            "Database recovery failed",
-            "Failed to delete 'a.db'.");
+            Arg.Is<BannerMessage>(message =>
+                IsPreformatted(message, "[[Banner_Recovery_Failed_Title]]", "[[Banner_Recovery_Failed_Delete(a.db)]]")));
 
         var rowClass = component.Find("li.recovery-row").GetAttribute("class") ?? string.Empty;
         Assert.Contains("recovery-row-failed", rowClass);
@@ -160,8 +164,8 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
         await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         _errorBannerService.Received(1).ReportError(
-            "Database recovery failed",
-            "Failed to restore 'a.db' from backup.");
+            Arg.Is<BannerMessage>(message =>
+                IsPreformatted(message, "[[Banner_Recovery_Failed_Title]]", "[[Banner_Recovery_Failed_Restore(a.db)]]")));
 
         var rowClass = component.Find("li.recovery-row").GetAttribute("class") ?? string.Empty;
         Assert.Contains("recovery-row-failed", rowClass);
@@ -179,11 +183,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
-        _errorBannerService.DidNotReceive().ReportError(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<string?>(),
-            Arg.Any<Func<Task>?>());
+        _errorBannerService.DidNotReceive().ReportError(Arg.Any<BannerMessage>());
 
         var rowClass = component.Find("li.recovery-row").GetAttribute("class") ?? string.Empty;
         Assert.DoesNotContain("recovery-row-failed", rowClass);
@@ -201,8 +201,8 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
         await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         _errorBannerService.Received(1).ReportError(
-            "Database recovery failed",
-            "Failed to restore 'a.db' from backup.");
+            Arg.Is<BannerMessage>(message =>
+                IsPreformatted(message, "[[Banner_Recovery_Failed_Title]]", "[[Banner_Recovery_Failed_Restore(a.db)]]")));
 
         var rowClass = component.Find("li.recovery-row").GetAttribute("class") ?? string.Empty;
         Assert.Contains("recovery-row-failed", rowClass);
@@ -526,11 +526,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         await _databaseService.Received(1).RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>());
         await _databaseService.DidNotReceive().RestoreFromBackupAsync("b.db", Arg.Any<CancellationToken>());
-        _errorBannerService.DidNotReceive().ReportError(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<string?>(),
-            Arg.Any<Func<Task>?>());
+        _errorBannerService.DidNotReceive().ReportError(Arg.Any<BannerMessage>());
     }
 
     [Fact]
@@ -581,4 +577,10 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
         throw new InvalidOperationException(
             $"No recovery row found whose text contains '{fileName}'.");
     }
+
+    private static bool IsPreformatted(BannerMessage? message, string title, string text, string? actionLabel = null) =>
+        message is Preformatted preformatted &&
+        preformatted.Title == title &&
+        preformatted.Message == text &&
+        preformatted.ActionLabel == actionLabel;
 }
