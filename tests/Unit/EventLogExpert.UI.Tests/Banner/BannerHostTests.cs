@@ -75,7 +75,7 @@ public sealed class BannerHostTests : BunitContext
     {
         _criticalErrorService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
         _errorBannerService.ErrorBanners.Returns(
-            [new ErrorBannerEntry(BannerId.Create(), "E", "m", null, null, DateTime.UtcNow)]);
+            [BuildError("E", "m")]);
         _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
@@ -92,10 +92,10 @@ public sealed class BannerHostTests : BunitContext
         _criticalErrorService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
 
         _errorBannerService.ErrorBanners.Returns(
-            [new ErrorBannerEntry(BannerId.Create(), "Error", "E", null, null, DateTime.UtcNow)]);
+            [BuildError("Error", "E")]);
 
         _infoBannerService.InfoBanners.Returns([
-            new BannerInfoEntry(BannerId.Create(), "Info", "I", BannerSeverity.Info, DateTime.UtcNow)
+            BuildInfo("Info", "I")
         ]);
 
         var component = Render<BannerHost>();
@@ -108,7 +108,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_CycleErrorAndAttention_RendersFirstErrorWithCyclePagination_TwoOfTwo()
     {
-        var error = new ErrorBannerEntry(BannerId.Create(), "Err", "msg", null, null, DateTime.UtcNow);
+        var error = BuildError("Err", "msg");
         _errorBannerService.ErrorBanners.Returns([error]);
         _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
@@ -123,9 +123,9 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_CycleNextAndPrev_AcrossThreeInfoBanners_UpdatesDisplayedEntryAndPagination()
     {
-        var i0 = new BannerInfoEntry(BannerId.Create(), "First", "first message", BannerSeverity.Info, DateTime.UtcNow);
-        var i1 = new BannerInfoEntry(BannerId.Create(), "Second", "second message", BannerSeverity.Info, DateTime.UtcNow);
-        var i2 = new BannerInfoEntry(BannerId.Create(), "Third", "third message", BannerSeverity.Info, DateTime.UtcNow);
+        var i0 = BuildInfo("First", "first message");
+        var i1 = BuildInfo("Second", "second message");
+        var i2 = BuildInfo("Third", "third message");
         _infoBannerService.InfoBanners.Returns([i0, i1, i2]);
 
         var component = Render<BannerHost>();
@@ -162,7 +162,7 @@ public sealed class BannerHostTests : BunitContext
     public async Task BannerHost_CycleNextAtLast_DisabledAndDoesNotAdvance()
     {
         _errorBannerService.ErrorBanners.Returns(
-            [new ErrorBannerEntry(BannerId.Create(), "E", "m", null, null, DateTime.UtcNow)]);
+            [BuildError("E", "m")]);
         _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
@@ -180,7 +180,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_CycleNextClicked_AdvancesToAttentionItem()
     {
-        var error = new ErrorBannerEntry(BannerId.Create(), "Err", "msg", null, null, DateTime.UtcNow);
+        var error = BuildError("Err", "msg");
         _errorBannerService.ErrorBanners.Returns([error]);
         _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
@@ -197,7 +197,7 @@ public sealed class BannerHostTests : BunitContext
     public async Task BannerHost_CyclePrevAtFirst_DisabledAndDoesNotAdvance()
     {
         _errorBannerService.ErrorBanners.Returns(
-            [new ErrorBannerEntry(BannerId.Create(), "E", "m", null, null, DateTime.UtcNow)]);
+            [BuildError("E", "m")]);
         _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
@@ -213,9 +213,9 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_CycleStableSelection_DismissingPrecedingError_StaysOnSameLogicalError()
     {
-        var e0 = new ErrorBannerEntry(BannerId.Create(), "First", "first message", null, null, DateTime.UtcNow);
-        var e1 = new ErrorBannerEntry(BannerId.Create(), "Second", "second message", null, null, DateTime.UtcNow);
-        var e2 = new ErrorBannerEntry(BannerId.Create(), "Third", "third message", null, null, DateTime.UtcNow);
+        var e0 = BuildError("First", "first message");
+        var e1 = BuildError("Second", "second message");
+        var e2 = BuildError("Third", "third message");
         _errorBannerService.ErrorBanners.Returns([e0, e1, e2]);
 
         var component = Render<BannerHost>();
@@ -241,7 +241,7 @@ public sealed class BannerHostTests : BunitContext
     {
         bool canceled = false;
         _exportProgressBannerService.CurrentExport.Returns(
-            new ExportProgressEntry("Exporting events…", () => canceled = true));
+            new ExportProgressEntry(() => canceled = true));
 
         var component = Render<BannerHost>();
         await component.Find("aside.banner-export-progress button.banner-action").ClickAsync(new MouseEventArgs());
@@ -253,20 +253,20 @@ public sealed class BannerHostTests : BunitContext
     public void BannerHost_ExportInProgress_RendersExportProgressBannerWithMessage()
     {
         _exportProgressBannerService.CurrentExport.Returns(
-            new ExportProgressEntry("Exporting events…", () => { }));
+            new ExportProgressEntry(() => { }));
 
         var component = Render<BannerHost>();
 
         var banner = component.Find("aside.banner-export-progress");
-        Assert.Contains("Exporting events…", banner.TextContent);
+        Assert.Contains("[[Banner_Export_Progress]]", banner.TextContent);
         Assert.Single(component.FindAll("aside.banner-export-progress button.banner-action"));
     }
 
     [Fact]
     public void BannerHost_MultipleErrorBanners_RendersFirstWithPagination()
     {
-        var first = new ErrorBannerEntry(BannerId.Create(), "First", "First message", null, null, DateTime.UtcNow);
-        var second = new ErrorBannerEntry(BannerId.Create(), "Second", "Second message", null, null, DateTime.UtcNow);
+        var first = BuildError("First", "First message");
+        var second = BuildError("Second", "Second message");
         _errorBannerService.ErrorBanners.Returns([first, second]);
 
         var component = Render<BannerHost>();
@@ -294,15 +294,14 @@ public sealed class BannerHostTests : BunitContext
         var newErrorId = BannerId.Create();
         var newError = new ErrorBannerEntry(
             newErrorId,
-            "[[Banner_Attention_ErrorTitle]]",
-            "[[Banner_Attention_OpenFailed]]",
-            null,
+            new Preformatted("[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailed]]"),
             null,
             DateTime.UtcNow);
 
         _attentionBannerService.AttentionEntries.Returns([attention]);
         _menuActionService.OpenDatabaseToolsAsync().Returns(Task.FromResult(false));
-        _errorBannerService.ReportError("[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailed]]")
+        _errorBannerService.ReportError(Arg.Is<BannerMessage>(content =>
+                IsPreformatted(content, "[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailed]]")))
             .Returns(_ =>
             {
                 _errorBannerService.ErrorBanners.Returns([newError]);
@@ -325,7 +324,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_SingleErrorBanner_RendersWithoutPagination()
     {
-        var entry = new ErrorBannerEntry(BannerId.Create(), "Database", "Schema invalid", null, null, DateTime.UtcNow);
+        var entry = BuildError("Database", "Schema invalid");
         _errorBannerService.ErrorBanners.Returns([entry]);
 
         var component = Render<BannerHost>();
@@ -368,7 +367,7 @@ public sealed class BannerHostTests : BunitContext
     public void Render_AsInsideModal_WithDatabaseToolsModalActive_OmitsAttentionBanner_RendersOtherBanners()
     {
         var errorEntry = new ErrorBannerEntry(
-            BannerId.Create(), "Title", "msg", null, null, DateTime.UtcNow);
+            BannerId.Create(), new Preformatted("Title", "msg"), null, DateTime.UtcNow);
         _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
         _errorBannerService.ErrorBanners.Returns([errorEntry]);
         _modalCoordinator.ActiveSession.Returns(
@@ -463,4 +462,15 @@ public sealed class BannerHostTests : BunitContext
 
     private static DatabaseEntry BuildDatabaseEntry(string fileName) =>
         new(fileName, $@"C:\dbs\{fileName}", false, DatabaseStatus.UpgradeRequired);
+
+    private static ErrorBannerEntry BuildError(string title, string message) =>
+        new(BannerId.Create(), new Preformatted(title, message), null, DateTime.UtcNow);
+
+    private static BannerInfoEntry BuildInfo(string title, string message) =>
+        new(BannerId.Create(), new Preformatted(title, message), BannerSeverity.Info, DateTime.UtcNow);
+
+    private static bool IsPreformatted(BannerMessage? message, string title, string text) =>
+        message is Preformatted preformatted &&
+        preformatted.Title == title &&
+        preformatted.Message == text;
 }

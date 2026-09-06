@@ -1674,7 +1674,8 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleSaveFilterSet(
             new SaveFilterSetAction("My Group", [filter], SaveFilterSetOrigin.Lens), dispatcher);
 
-        errorBanner.Received(1).ReportError(Arg.Any<string>(), Arg.Any<string>());
+        errorBanner.Received(1).ReportError(
+            Arg.Is<BannerMessage>(message => IsFilterSetSaveFailed(message, "My Group")));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<SaveFilterSetSucceededAction>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
     }
@@ -2004,6 +2005,9 @@ public sealed class FilterLibraryEffectsTests
 
         return (effects, store, dispatcher, stateMock, migrator, logger);
     }
+
+    private static bool IsFilterSetSaveFailed(BannerMessage? message, string name) =>
+        message is FilterSetSaveFailed saveFailed && saveFailed.Name == name;
 
     private static async Task PollUntilAsync(Func<bool> predicate, TimeSpan timeout, CancellationToken cancellationToken)
     {

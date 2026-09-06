@@ -1,11 +1,15 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.UI.Banner;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Modal;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.Database;
 
@@ -14,6 +18,7 @@ public sealed class DatabaseRecoveryHost : IDisposable
     private readonly ICriticalErrorService _criticalErrorService;
     private readonly IDatabaseService _databaseService;
     private readonly IErrorBannerService _errorBannerService;
+    private readonly IStringLocalizer<SharedResource> _localizer;
     private readonly IMainThreadService _mainThreadService;
     private readonly IModalCoordinator _modalCoordinator;
     private readonly ITraceLogger _traceLogger;
@@ -28,7 +33,8 @@ public sealed class DatabaseRecoveryHost : IDisposable
         IDatabaseService databaseService,
         IModalCoordinator modalCoordinator,
         ITraceLogger traceLogger,
-        IMainThreadService mainThreadService)
+        IMainThreadService mainThreadService,
+        IStringLocalizer<SharedResource> localizer)
     {
         ArgumentNullException.ThrowIfNull(criticalErrorService);
         ArgumentNullException.ThrowIfNull(errorBannerService);
@@ -36,6 +42,7 @@ public sealed class DatabaseRecoveryHost : IDisposable
         ArgumentNullException.ThrowIfNull(modalCoordinator);
         ArgumentNullException.ThrowIfNull(traceLogger);
         ArgumentNullException.ThrowIfNull(mainThreadService);
+        ArgumentNullException.ThrowIfNull(localizer);
 
         _criticalErrorService = criticalErrorService;
         _errorBannerService = errorBannerService;
@@ -43,6 +50,7 @@ public sealed class DatabaseRecoveryHost : IDisposable
         _modalCoordinator = modalCoordinator;
         _traceLogger = traceLogger;
         _mainThreadService = mainThreadService;
+        _localizer = localizer;
 
         _databaseService.EntriesChanged += OnEntriesChanged;
         _errorBannerService.StateChanged += OnBannerStateChanged;
@@ -155,11 +163,16 @@ public sealed class DatabaseRecoveryHost : IDisposable
 
     private BannerId ReportRecoveryBanner(int count)
     {
-        string message = count == 1
-            ? "1 database needs recovery from interrupted upgrade."
-            : $"{count} databases need recovery from interrupted upgrade.";
-
-        return _errorBannerService.ReportError("Database upgrade recovery", message, "Resolve", OpenRecoveryDialogAsync);
+        return _errorBannerService.ReportError(
+            new Preformatted(
+                _localizer["Banner_Recovery_Needed_Title"],
+                LocalizedCount.OneOrManyRaw(
+                    _localizer,
+                    count,
+                    "Banner_Recovery_Needed_One",
+                    "Banner_Recovery_Needed_Many"),
+                _localizer["Banner_Recovery_Resolve"]),
+            OpenRecoveryDialogAsync);
     }
 
     private void SafeInvoke(Action action)

@@ -28,7 +28,11 @@ public sealed class InfoBannerTests : BunitContext
     [Fact]
     public async Task InfoBanner_DismissClicked_CallsDismissInfoBannerWithEntryId()
     {
-        var info = new BannerInfoEntry(BannerId.Create(), "Notice", "Heads up", BannerSeverity.Info, DateTime.UtcNow);
+        var info = new BannerInfoEntry(
+            BannerId.Create(),
+            new Preformatted("Notice", "Heads up"),
+            BannerSeverity.Info,
+            DateTime.UtcNow);
 
         var component = Render<InfoBanner>(p => p.Add(c => c.Entry, info));
         await component.Find("aside.banner-info button.banner-dismiss").ClickAsync(new MouseEventArgs());
@@ -39,7 +43,11 @@ public sealed class InfoBannerTests : BunitContext
     [Fact]
     public void InfoBanner_InfoSeverity_RendersInfoStyledBanner()
     {
-        var info = new BannerInfoEntry(BannerId.Create(), "Notice", "Heads up", BannerSeverity.Info, DateTime.UtcNow);
+        var info = new BannerInfoEntry(
+            BannerId.Create(),
+            new Preformatted("Notice", "Heads up"),
+            BannerSeverity.Info,
+            DateTime.UtcNow);
 
         var component = Render<InfoBanner>(p => p.Add(c => c.Entry, info));
 
@@ -52,8 +60,7 @@ public sealed class InfoBannerTests : BunitContext
     public void InfoBanner_WarningSeverity_RendersWarningStyledBanner()
     {
         var info = new BannerInfoEntry(BannerId.Create(),
-            "Slow",
-            "Performance dip",
+            new Preformatted("Slow", "Performance dip"),
             BannerSeverity.Warning,
             DateTime.UtcNow);
 

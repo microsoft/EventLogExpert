@@ -1,9 +1,13 @@
+@{
+    BannerContentText text = BannerContentLocalizer.Resolve(Localizer, Entry.Content);
+}
+
 <aside class="banner banner-error" role="alert">
-    <span class="banner-message">@Entry.Title: @Entry.Message</span>
+    <span class="banner-message">@text.Title: @text.Message</span>
 
     @CycleNav
 
-    @if (Entry is { ActionLabel: { } actionLabel, Action: { } action })
+    @if (text.ActionLabel is { } actionLabel && Entry.Action is { } action)
     {
         <Button CssClass="banner-action"
             OnClick="() => OnErrorActionClickedAsync(action)">
@@ -11,8 +15,8 @@
         </Button>
     }
 
-    <Button aria-label='@Localizer["Banner_Error_DismissAria"]'
-        CssClass="banner-dismiss"
+    <Button CssClass="banner-dismiss"
         IconClass="bi bi-x-circle"
-        OnClick="OnDismissError" />
+        OnClick="OnDismissError"
+        aria-label='@Localizer["Banner_Error_DismissAria"]' />
 </aside>

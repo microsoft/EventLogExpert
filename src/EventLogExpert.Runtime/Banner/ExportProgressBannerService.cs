@@ -16,14 +16,13 @@ internal sealed class ExportProgressBannerService : IExportProgressBannerService
         get { using (_stateLock.EnterScope()) { return _currentExport; } }
     }
 
-    public void Begin(string message, Action cancel)
+    public void Begin(Action cancel)
     {
-        ArgumentException.ThrowIfNullOrEmpty(message);
         ArgumentNullException.ThrowIfNull(cancel);
 
         using (_stateLock.EnterScope())
         {
-            _currentExport = new ExportProgressEntry(message, cancel);
+            _currentExport = new ExportProgressEntry(cancel);
         }
 
         // Raised outside the lock so a subscriber re-reading CurrentExport cannot deadlock.

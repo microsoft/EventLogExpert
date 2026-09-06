@@ -227,21 +227,20 @@ internal sealed class BannerService
         RaiseCriticalStateChanged();
     }
 
-    public BannerId ReportError(string title, string message, string? actionLabel = null, Func<Task>? action = null)
+    public BannerId ReportError(BannerMessage content, Func<Task>? action = null)
     {
-        bool hasAction = action is not null;
-        bool hasLabel = !string.IsNullOrWhiteSpace(actionLabel);
+        ArgumentNullException.ThrowIfNull(content);
 
-        if (hasAction != hasLabel)
+        bool hasAction = action is not null;
+
+        if (content.RequiresAction != hasAction)
         {
             throw new ArgumentException(
-                "actionLabel and action must both be provided together, or both omitted.",
-                hasAction ? nameof(actionLabel) : nameof(action));
+                "Banner content action requirement must match the provided action.",
+                hasAction ? nameof(content) : nameof(action));
         }
 
-        string? normalizedLabel = hasLabel ? actionLabel : null;
-        Func<Task>? normalizedAction = hasAction ? action : null;
-        var entry = new ErrorBannerEntry(BannerId.Create(), title, message, normalizedLabel, normalizedAction, DateTime.UtcNow);
+        var entry = new ErrorBannerEntry(BannerId.Create(), content, action, DateTime.UtcNow);
 
         lock (_stateLock)
         {
@@ -252,9 +251,16 @@ internal sealed class BannerService
         return entry.Id;
     }
 
-    public void ReportInfoBanner(string title, string message, BannerSeverity severity)
+    public void ReportInfoBanner(BannerMessage content, BannerSeverity severity)
     {
-        var entry = new BannerInfoEntry(BannerId.Create(), title, message, severity, DateTime.UtcNow);
+        ArgumentNullException.ThrowIfNull(content);
+
+        if (content.RequiresAction)
+        {
+            throw new ArgumentException("Info banners cannot contain action content.", nameof(content));
+        }
+
+        var entry = new BannerInfoEntry(BannerId.Create(), content, severity, DateTime.UtcNow);
 
         lock (_stateLock)
         {

@@ -5,8 +5,6 @@ namespace EventLogExpert.Runtime.Banner;
 
 public sealed record ErrorBannerEntry(
     BannerId Id,
-    string Title,
-    string Message,
-    string? ActionLabel,
+    BannerMessage Content,
     Func<Task>? Action,
     DateTime CreatedUtc);

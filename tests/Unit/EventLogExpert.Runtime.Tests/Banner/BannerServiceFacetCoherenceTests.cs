@@ -130,7 +130,7 @@ public sealed class BannerServiceFacetCoherenceTests
         counters.AttachAll(sut);
 
         // Act
-        sut.ReportError("title", "msg");
+        sut.ReportError(new ExportFailed("msg"));
 
         // Assert
         counters.AssertOnly(nameof(IErrorBannerService));
@@ -146,7 +146,7 @@ public sealed class BannerServiceFacetCoherenceTests
         int initialAttentionCount = sut.AttentionEntries.Count;
 
         // Act
-        BannerId id = sut.ReportError("title", "msg");
+        BannerId id = sut.ReportError(new ExportFailed("msg"));
 
         // Assert — Error facet observed the mutation; Attention facet's state was unaffected.
         Assert.Single(sut.ErrorBanners);
@@ -165,7 +165,7 @@ public sealed class BannerServiceFacetCoherenceTests
         counters.AttachAll(sut);
 
         // Act
-        sut.ReportInfoBanner("title", "msg", BannerSeverity.Info);
+        sut.ReportInfoBanner(new ExportFailed("msg"), BannerSeverity.Info);
 
         // Assert
         counters.AssertOnly(nameof(IInfoBannerService));

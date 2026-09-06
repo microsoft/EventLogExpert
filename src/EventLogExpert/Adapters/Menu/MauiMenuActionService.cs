@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Versioning;
@@ -40,6 +41,7 @@ public sealed class MauiMenuActionService(
     ILogTableCommands logTableCommands,
     IClipboardService clipboardService,
     IAlertDialogService dialogService,
+    IInfoBannerService infoBannerService,
     IModalCoordinator modalCoordinator,
     ISettingsService settings,
     IUpdateService updateService,
@@ -62,6 +64,7 @@ public sealed class MauiMenuActionService(
     private readonly IFilterPaneCommands _filterPaneCommands = filterPaneCommands;
     private readonly IFolderPickerService _folderPickerService = folderPickerService;
     private readonly IHistogramCommands _histogramCommands = histogramCommands;
+    private readonly IInfoBannerService _infoBannerService = infoBannerService;
     private readonly ILogTableCommands _logTableCommands = logTableCommands;
     private readonly IModalCoordinator _modalCoordinator = modalCoordinator;
     private readonly ISettingsService _settings = settings;
@@ -451,11 +454,7 @@ public sealed class MauiMenuActionService(
 
         if (emptyDisplayNames is { Count: > 0 })
         {
-            await _dialogService.ShowAlert(
-                "Empty log",
-                EmptyLogAlertFormatter.BuildMessage(emptyDisplayNames),
-                "Ok",
-                AlertPresentation.Banner);
+            _infoBannerService.ReportInfoBanner(new EmptyLogs(emptyDisplayNames), BannerSeverity.Warning);
         }
 
         return new OpenLogsBatchResult(

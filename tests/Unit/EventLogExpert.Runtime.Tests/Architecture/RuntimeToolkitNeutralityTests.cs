@@ -4,6 +4,7 @@
 using EventLogExpert.Runtime.Alerts;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using System.Runtime.CompilerServices;
 
 namespace EventLogExpert.Runtime.Tests.Architecture;
 
@@ -24,12 +25,35 @@ public sealed class RuntimeToolkitNeutralityTests
     }
 
     [Fact]
+    public void Runtime_SourceDoesNotCallShowErrorAlert()
+    {
+        string sourceRoot = Path.Combine(FindRepositoryRoot(), "src", "EventLogExpert.Runtime");
+        string[] offenders = [.. Directory.EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => File.ReadAllText(path).Contains($".{nameof(IAlertDialogService.ShowErrorAlert)}(", StringComparison.Ordinal))
+            .OrderBy(path => path, StringComparer.Ordinal)];
+
+        Assert.Empty(offenders);
+    }
+
+    [Fact]
     public void Scanner_DetectsReferencesThatAreKnownToBePresent()
     {
         IReadOnlyList<(string Namespace, string FullName)> references = ReadTypeReferences();
 
         Assert.Contains(references, reference => IsUnderRoot(reference.Namespace, "Fluxor"));
         Assert.Contains(references, reference => IsUnderRoot(reference.Namespace, "Microsoft.Extensions"));
+    }
+
+    private static string FindRepositoryRoot([CallerFilePath] string testFilePath = "")
+    {
+        for (var directory = new DirectoryInfo(Path.GetDirectoryName(testFilePath)!);
+            directory is not null;
+            directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "EventLogExpert.slnx"))) { return directory.FullName; }
+        }
+
+        throw new InvalidOperationException("Could not locate the repository root from the test source path.");
     }
 
     private static bool IsUnderRoot(string candidateNamespace, string root) =>

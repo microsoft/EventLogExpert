@@ -109,6 +109,36 @@ public sealed class BannerCycleStateServiceTests
     }
 
     [Fact]
+    public void ModalContentDisplayed_DefaultsFalse_OnNewInstance()
+    {
+        var service = CreateService();
+
+        Assert.False(service.ModalContentDisplayed);
+    }
+
+    [Fact]
+    public void ModalSuppression_PreservesUserPreferredAttention_DoesNotTriggerPriorityOverrideOnReentry()
+    {
+        _attention.AttentionEntries.Returns([MakeAttention("db1.db")]);
+        _errors.ErrorBanners.Returns([MakeError()]);
+        var service = CreateService();
+        service.MoveNext();
+        Assert.Equal(BannerView.Attention, service.SelectedItem?.View);
+
+        _modalCoordinator.ActiveSession.Returns(
+            new ModalSession(new ModalId(1), typeof(DatabaseToolsModal), null));
+        _modalCoordinator.StateChanged += Raise.Event<Action>();
+
+        _modalCoordinator.ActiveSession.Returns((ModalSession?)null);
+        _modalCoordinator.StateChanged += Raise.Event<Action>();
+        Assert.Equal(BannerView.Attention, service.SelectedItem?.View);
+
+        _infos.InfoBanners.Returns([MakeInfo()]);
+        _infos.StateChanged += Raise.Event<Action>();
+        Assert.Equal(BannerView.Attention, service.SelectedItem?.View);
+    }
+
+    [Fact]
     public void Modal_Close_RestoresAttention_EvenWhenHigherPriorityErrorCoexists()
     {
         _errors.ErrorBanners.Returns([MakeError()]);
@@ -150,36 +180,6 @@ public sealed class BannerCycleStateServiceTests
 
         _modalCoordinator.ActiveSession.Returns((ModalSession?)null);
         _modalCoordinator.StateChanged += Raise.Event<Action>();
-        Assert.Equal(BannerView.Attention, service.SelectedItem?.View);
-    }
-
-    [Fact]
-    public void ModalContentDisplayed_DefaultsFalse_OnNewInstance()
-    {
-        var service = CreateService();
-
-        Assert.False(service.ModalContentDisplayed);
-    }
-
-    [Fact]
-    public void ModalSuppression_PreservesUserPreferredAttention_DoesNotTriggerPriorityOverrideOnReentry()
-    {
-        _attention.AttentionEntries.Returns([MakeAttention("db1.db")]);
-        _errors.ErrorBanners.Returns([MakeError()]);
-        var service = CreateService();
-        service.MoveNext();
-        Assert.Equal(BannerView.Attention, service.SelectedItem?.View);
-
-        _modalCoordinator.ActiveSession.Returns(
-            new ModalSession(new ModalId(1), typeof(DatabaseToolsModal), null));
-        _modalCoordinator.StateChanged += Raise.Event<Action>();
-
-        _modalCoordinator.ActiveSession.Returns((ModalSession?)null);
-        _modalCoordinator.StateChanged += Raise.Event<Action>();
-        Assert.Equal(BannerView.Attention, service.SelectedItem?.View);
-
-        _infos.InfoBanners.Returns([MakeInfo()]);
-        _infos.StateChanged += Raise.Event<Action>();
         Assert.Equal(BannerView.Attention, service.SelectedItem?.View);
     }
 
@@ -567,12 +567,12 @@ public sealed class BannerCycleStateServiceTests
         new(fileName, $@"C:\dbs\{fileName}", IsEnabled: false, DatabaseStatus.UpgradeRequired);
 
     private static ErrorBannerEntry MakeError() =>
-        new(BannerId.Create(), "Title", "msg", null, null, DateTime.UtcNow);
+        new(BannerId.Create(), new Preformatted("Title", "msg"), null, DateTime.UtcNow);
 
-    private static ExportProgressEntry MakeExport() => new("Exporting events…", () => { });
+    private static ExportProgressEntry MakeExport() => new(() => { });
 
     private static BannerInfoEntry MakeInfo() =>
-        new(BannerId.Create(), "Title", "msg", BannerSeverity.Info, DateTime.UtcNow);
+        new(BannerId.Create(), new Preformatted("Title", "msg"), BannerSeverity.Info, DateTime.UtcNow);
 
     private static BannerProgressEntry MakeProgress() =>
         new(

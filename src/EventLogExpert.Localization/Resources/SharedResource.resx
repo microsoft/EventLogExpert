@@ -322,6 +322,214 @@
     <value>(+{0} batch queued)</value>
     <comment>Upgrade progress subtitle for one queued batch. {0} is the raw queued-batch count.</comment>
   </data>
+  <!-- Export banner messages. -->
+  <data name="Banner_Export_Title" xml:space="preserve">
+    <value>Export events</value>
+    <comment>Title for export banners that explain why export cannot start.</comment>
+  </data>
+  <data name="Banner_Export_Blocked_Faulted" xml:space="preserve">
+    <value>These events cannot be exported because the view could not be prepared.</value>
+    <comment>Export blocked because the current event view is faulted.</comment>
+  </data>
+  <data name="Banner_Export_Blocked_Updating" xml:space="preserve">
+    <value>These events are still being prepared. Please try again once they have finished loading.</value>
+    <comment>Export blocked because the event view is still updating.</comment>
+  </data>
+  <data name="Banner_Export_Blocked_NoEvents" xml:space="preserve">
+    <value>There are no events to export.</value>
+    <comment>Export blocked because the current event view is empty.</comment>
+  </data>
+  <data name="Banner_Export_Blocked_NoColumns" xml:space="preserve">
+    <value>There are no visible columns to export.</value>
+    <comment>Export blocked because every column is hidden.</comment>
+  </data>
+  <data name="Banner_Export_Blocked_InProgress" xml:space="preserve">
+    <value>An export is already in progress.</value>
+    <comment>Export blocked because another export is already running.</comment>
+  </data>
+  <data name="Banner_Export_Canceled_Title" xml:space="preserve">
+    <value>Export canceled</value>
+    <comment>Title for the export-canceled banner.</comment>
+  </data>
+  <data name="Banner_Export_Canceled_Message" xml:space="preserve">
+    <value>The export was canceled.</value>
+    <comment>Message for the export-canceled banner.</comment>
+  </data>
+  <data name="Banner_Export_Failed_Title" xml:space="preserve">
+    <value>Export failed</value>
+    <comment>Title for the export-failed banner.</comment>
+  </data>
+  <data name="Banner_Export_Complete_Title" xml:space="preserve">
+    <value>Export complete</value>
+    <comment>Title for the export-complete banner.</comment>
+  </data>
+  <data name="Banner_Export_Complete_One" xml:space="preserve">
+    <value>Exported {0:N0} event to {1}.</value>
+    <comment>Export-complete message for one event. {0} is the exported event count; {1} is the destination path.</comment>
+  </data>
+  <data name="Banner_Export_Complete_Many" xml:space="preserve">
+    <value>Exported {0:N0} events to {1}.</value>
+    <comment>Export-complete message for multiple events. {0} is the exported event count; {1} is the destination path.</comment>
+  </data>
+  <data name="Banner_Export_Progress" xml:space="preserve">
+    <value>Exporting events...</value>
+    <comment>Indeterminate export progress banner text.</comment>
+  </data>
+  <!-- Database operation banner messages. -->
+  <data name="Banner_Db_RemoveFailed_Title" xml:space="preserve">
+    <value>Failed to Remove Database</value>
+    <comment>Title for a failed database removal.</comment>
+  </data>
+  <data name="Banner_Db_RemoveFailed_Message" xml:space="preserve">
+    <value>An exception occurred while removing '{0}': {1}</value>
+    <comment>Database removal failure. {0} is the file name; {1} is the exception detail.</comment>
+  </data>
+  <data name="Banner_Db_UpgradeFailed_Title" xml:space="preserve">
+    <value>Database Upgrade Failed</value>
+    <comment>Title for failed database upgrades.</comment>
+  </data>
+  <data name="Banner_Db_UpgradeFailed_Message" xml:space="preserve">
+    <value>Failed to upgrade '{0}': {1}</value>
+    <comment>Database upgrade failure. {0} is the file name; {1} is the reason.</comment>
+  </data>
+  <data name="Banner_Db_UpdateFailed_Title" xml:space="preserve">
+    <value>Failed to Update Database</value>
+    <comment>Title for failed database toggle/update operations.</comment>
+  </data>
+  <data name="Banner_Db_OperationFailed_Message" xml:space="preserve">
+    <value>An exception occurred while {0}: {1}</value>
+    <comment>Generic database operation failure. {0} is the operation noun phrase; {1} is the exception detail.</comment>
+  </data>
+  <data name="Banner_Db_OperationNoun_Toggle" xml:space="preserve">
+    <value>updating '{0}'</value>
+    <comment>Operation noun phrase for a database toggle. {0} is the file name.</comment>
+  </data>
+  <data name="Banner_Db_OperationNoun_Import" xml:space="preserve">
+    <value>importing provider databases</value>
+    <comment>Operation noun phrase for provider database import.</comment>
+  </data>
+  <data name="Banner_Db_OperationNoun_UpgradeSingle" xml:space="preserve">
+    <value>upgrading '{0}'</value>
+    <comment>Operation noun phrase for upgrading one named database. {0} is the file name.</comment>
+  </data>
+  <data name="Banner_Db_OperationNoun_UpgradeBatch_One" xml:space="preserve">
+    <value>upgrading {0} database</value>
+    <comment>Operation noun phrase for upgrading one database. {0} is the raw database count.</comment>
+  </data>
+  <data name="Banner_Db_OperationNoun_UpgradeBatch_Many" xml:space="preserve">
+    <value>upgrading {0} databases</value>
+    <comment>Operation noun phrase for upgrading multiple databases. {0} is the raw database count.</comment>
+  </data>
+  <data name="Banner_Db_Import_Success_Title" xml:space="preserve">
+    <value>Import Successful</value>
+    <comment>Title for successful provider database imports.</comment>
+  </data>
+  <data name="Banner_Db_Import_None" xml:space="preserve">
+    <value>No databases were imported.</value>
+    <comment>Import result when no database was selected or imported.</comment>
+  </data>
+  <data name="Banner_Db_Import_Success_One" xml:space="preserve">
+    <value>1 database has successfully been imported</value>
+    <comment>Import success message for one database.</comment>
+  </data>
+  <data name="Banner_Db_Import_Success_Many" xml:space="preserve">
+    <value>{0} databases have successfully been imported</value>
+    <comment>Import success message for multiple databases. {0} is the raw imported count.</comment>
+  </data>
+  <data name="Banner_Db_Import_Failed_Title" xml:space="preserve">
+    <value>Import Failed</value>
+    <comment>Title for failed provider database imports.</comment>
+  </data>
+  <data name="Banner_Db_Import_Failed_Message" xml:space="preserve">
+    <value>No databases were imported; {0}</value>
+    <comment>Import failure message. {0} is the composed failure summary.</comment>
+  </data>
+  <data name="Banner_Db_Import_Partial_Title" xml:space="preserve">
+    <value>Import Completed with Errors</value>
+    <comment>Title for provider database imports that partially succeed.</comment>
+  </data>
+  <data name="Banner_Db_Import_Partial_One" xml:space="preserve">
+    <value>1 database imported</value>
+    <comment>Partial import message prefix for one imported database.</comment>
+  </data>
+  <data name="Banner_Db_Import_Partial_Many" xml:space="preserve">
+    <value>{0} databases imported</value>
+    <comment>Partial import message prefix for multiple imported databases. {0} is the raw imported count.</comment>
+  </data>
+  <data name="Banner_Db_Import_Partial_Message" xml:space="preserve">
+    <value>{0}; {1}</value>
+    <comment>Partial import message. {0} is the imported-count phrase; {1} is the composed failure summary.</comment>
+  </data>
+  <data name="Banner_Db_Import_FailureSummary" xml:space="preserve">
+    <value>failed: {0}</value>
+    <comment>Import failure summary wrapper. {0} is the comma-separated failure detail list.</comment>
+  </data>
+  <data name="Banner_Db_Import_FailurePart" xml:space="preserve">
+    <value>{0} ({1})</value>
+    <comment>Import failure detail. {0} is the file name; {1} is the reason.</comment>
+  </data>
+  <data name="Banner_Db_Import_UpgradeFailurePart" xml:space="preserve">
+    <value>{0} upgrade ({1})</value>
+    <comment>Import upgrade failure detail. {0} is the file name; {1} is the reason.</comment>
+  </data>
+  <!-- Filter and empty-log banner messages. -->
+  <data name="Banner_Filter_NotLoaded_Title" xml:space="preserve">
+    <value>Filter library not fully loaded</value>
+    <comment>Title for a filter library load warning.</comment>
+  </data>
+  <data name="Banner_Filter_NotLoaded_Message" xml:space="preserve">
+    <value>{0} library entries couldn't be read and were left in place to avoid data loss. This usually means the library was written by a newer version of the app.</value>
+    <comment>Filter library load warning. {0} is the raw count of unreadable entries.</comment>
+  </data>
+  <data name="Banner_Filter_SaveFailed_Title" xml:space="preserve">
+    <value>Couldn't save filter set</value>
+    <comment>Title shown when saving a filter set to the library fails.</comment>
+  </data>
+  <data name="Banner_Filter_SaveFailed_Message" xml:space="preserve">
+    <value>'{0}' couldn't be saved to the filter library.</value>
+    <comment>Filter set save failure. {0} is the filter set name.</comment>
+  </data>
+  <data name="Banner_EmptyLog_Title" xml:space="preserve">
+    <value>Empty log</value>
+    <comment>Title for empty-log open warnings.</comment>
+  </data>
+  <data name="Banner_EmptyLog_One" xml:space="preserve">
+    <value>Log contains no events: {0}</value>
+    <comment>Message for one empty log. {0} is the display name.</comment>
+  </data>
+  <data name="Banner_EmptyLog_Many" xml:space="preserve">
+    <value>{0} logs contained no events: {1}</value>
+    <comment>Message for multiple empty logs. {0} is the raw log count; {1} is the comma-separated display names.</comment>
+  </data>
+  <!-- Recovery banner messages. -->
+  <data name="Banner_Recovery_Needed_Title" xml:space="preserve">
+    <value>Database upgrade recovery</value>
+    <comment>Title for the database recovery banner.</comment>
+  </data>
+  <data name="Banner_Recovery_Needed_One" xml:space="preserve">
+    <value>1 database needs recovery from interrupted upgrade.</value>
+    <comment>Recovery-needed message for one database.</comment>
+  </data>
+  <data name="Banner_Recovery_Needed_Many" xml:space="preserve">
+    <value>{0} databases need recovery from interrupted upgrade.</value>
+    <comment>Recovery-needed message for multiple databases. {0} is the raw database count.</comment>
+  </data>
+  <data name="Banner_Recovery_Resolve" xml:space="preserve">
+    <value>Resolve</value>
+    <comment>Action label that opens the database recovery dialog.</comment>
+  </data>
+  <data name="Banner_Recovery_Failed_Title" xml:space="preserve">
+    <value>Database recovery failed</value>
+    <comment>Title for recovery operation failure banners.</comment>
+  </data>
+  <data name="Banner_Recovery_Failed_Restore" xml:space="preserve">
+    <value>Failed to restore '{0}' from backup.</value>
+    <comment>Recovery restore failure. {0} is the database file name.</comment>
+  </data>
+  <data name="Banner_Recovery_Failed_Delete" xml:space="preserve">
+    <value>Failed to delete '{0}'.</value>
+    <comment>Recovery delete failure. {0} is the database file name.</comment>
+  </data>
   <!-- Dashboard (empty-state welcome screen): masthead + Quick Launch. -->
   <data name="Dashboard_Lead" xml:space="preserve">
     <value>Open a log to get started, or jump straight into a common investigation.</value>

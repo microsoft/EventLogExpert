@@ -17,10 +17,14 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
+using System.Globalization;
 
 namespace EventLogExpert.UI.Tests.Banner;
 
+[Collection(CultureSensitiveCollection.Name)]
 public sealed class BannerLocalizationTests : BunitContext
 {
     private static readonly DateTime s_createdUtc = new(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc);
@@ -83,7 +87,8 @@ public sealed class BannerLocalizationTests : BunitContext
         BannerId errorId = BannerId.Create();
         BannerCycleItem? postedItem = null;
         _menuActionService.OpenDatabaseToolsAsync().Returns(Task.FromResult(false));
-        _errorBannerService.ReportError("[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailed]]")
+        _errorBannerService.ReportError(Arg.Is<BannerMessage>(content =>
+                IsPreformatted(content, "[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailed]]")))
             .Returns(errorId);
 
         var component = Render<AttentionBanner>(parameters => parameters
@@ -95,7 +100,8 @@ public sealed class BannerLocalizationTests : BunitContext
         await component.Find("button.banner-action").ClickAsync(new MouseEventArgs());
 
         _errorBannerService.Received(1)
-            .ReportError("[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailed]]");
+            .ReportError(Arg.Is<BannerMessage>(content =>
+                IsPreformatted(content, "[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailed]]")));
         Assert.NotNull(postedItem);
         Assert.Equal(new BannerCycleItem(BannerView.Error, 0, errorId), postedItem);
     }
@@ -107,7 +113,8 @@ public sealed class BannerLocalizationTests : BunitContext
         BannerCycleItem? postedItem = null;
         _menuActionService.OpenDatabaseToolsAsync()
             .Returns(Task.FromException<bool>(new InvalidOperationException("modal boom")));
-        _errorBannerService.ReportError("[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailedDetail(modal boom)]]")
+        _errorBannerService.ReportError(Arg.Is<BannerMessage>(content =>
+                IsPreformatted(content, "[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailedDetail(modal boom)]]")))
             .Returns(errorId);
 
         var component = Render<AttentionBanner>(parameters => parameters
@@ -119,7 +126,8 @@ public sealed class BannerLocalizationTests : BunitContext
         await component.Find("button.banner-action").ClickAsync(new MouseEventArgs());
 
         _errorBannerService.Received(1)
-            .ReportError("[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailedDetail(modal boom)]]");
+            .ReportError(Arg.Is<BannerMessage>(content =>
+                IsPreformatted(content, "[[Banner_Attention_ErrorTitle]]", "[[Banner_Attention_OpenFailedDetail(modal boom)]]")));
         Assert.NotNull(postedItem);
         Assert.Equal(new BannerCycleItem(BannerView.Error, 0, errorId), postedItem);
     }
@@ -128,8 +136,8 @@ public sealed class BannerLocalizationTests : BunitContext
     public void BannerHost_RoutesPaginationAndNavigationAriaThroughLocalizer()
     {
         _errorBannerService.ErrorBanners.Returns([
-            new ErrorBannerEntry(BannerId.Create(), "First", "Message", null, null, s_createdUtc),
-            new ErrorBannerEntry(BannerId.Create(), "Second", "Message", null, null, s_createdUtc)
+            new ErrorBannerEntry(BannerId.Create(), new Preformatted("First", "Message"), null, s_createdUtc),
+            new ErrorBannerEntry(BannerId.Create(), new Preformatted("Second", "Message"), null, s_createdUtc)
         ]);
 
         var component = Render<BannerHost>();
@@ -215,13 +223,17 @@ public sealed class BannerLocalizationTests : BunitContext
     {
         var error = Render<ErrorBanner>(parameters => parameters.Add(
             banner => banner.Entry,
-            new ErrorBannerEntry(BannerId.Create(), "Database", "Recovery required", "Resolve", () => Task.CompletedTask, s_createdUtc)));
+            new ErrorBannerEntry(
+                BannerId.Create(),
+                new Preformatted("Database", "Recovery required", "Resolve"),
+                () => Task.CompletedTask,
+                s_createdUtc)));
         var info = Render<InfoBanner>(parameters => parameters.Add(
             banner => banner.Entry,
-            new BannerInfoEntry(BannerId.Create(), "Notice", "Heads up", BannerSeverity.Info, s_createdUtc)));
+            new BannerInfoEntry(BannerId.Create(), new Preformatted("Notice", "Heads up"), BannerSeverity.Info, s_createdUtc)));
         var export = Render<ExportProgressBanner>(parameters => parameters.Add(
             banner => banner.Export,
-            new ExportProgressEntry("Export raw message", () => { })));
+            new ExportProgressEntry(() => { })));
 
         Assert.Equal("Database: Recovery required", error.Find(".banner-message").TextContent.Trim());
         Assert.DoesNotContain("[[", error.Find(".banner-message").TextContent, StringComparison.Ordinal);
@@ -229,15 +241,22 @@ public sealed class BannerLocalizationTests : BunitContext
         Assert.DoesNotContain("[[", error.Find("button.banner-action").TextContent, StringComparison.Ordinal);
         Assert.Equal("Notice: Heads up", info.Find(".banner-message").TextContent.Trim());
         Assert.DoesNotContain("[[", info.Find(".banner-message").TextContent, StringComparison.Ordinal);
-        Assert.Equal("Export raw message", export.Find(".banner-message").TextContent.Trim());
-        Assert.DoesNotContain("[[", export.Find(".banner-message").TextContent, StringComparison.Ordinal);
+        Assert.Equal("[[Banner_Export_Progress]]", export.Find(".banner-message").TextContent.Trim());
     }
 
     [Fact]
     public void ErrorAndInfoBanners_RouteDismissAriaOnlyThroughLocalizer()
     {
-        var error = new ErrorBannerEntry(BannerId.Create(), "Raw title", "Raw message", null, null, s_createdUtc);
-        var info = new BannerInfoEntry(BannerId.Create(), "Raw info", "Raw details", BannerSeverity.Info, s_createdUtc);
+        var error = new ErrorBannerEntry(
+            BannerId.Create(),
+            new Preformatted("Raw title", "Raw message"),
+            null,
+            s_createdUtc);
+        var info = new BannerInfoEntry(
+            BannerId.Create(),
+            new Preformatted("Raw info", "Raw details"),
+            BannerSeverity.Info,
+            s_createdUtc);
 
         var errorComponent = Render<ErrorBanner>(parameters => parameters.Add(banner => banner.Entry, error));
         var infoComponent = Render<InfoBanner>(parameters => parameters.Add(banner => banner.Entry, info));
@@ -249,14 +268,34 @@ public sealed class BannerLocalizationTests : BunitContext
     }
 
     [Fact]
-    public void ExportProgressBanner_RoutesCancelOnlyThroughLocalizer()
+    public void ExportProgressBanner_RoutesMessageAndCancelThroughLocalizer()
     {
         var component = Render<ExportProgressBanner>(parameters => parameters.Add(
             banner => banner.Export,
-            new ExportProgressEntry("Export raw message", () => { })));
+            new ExportProgressEntry(() => { })));
 
-        Assert.Equal("Export raw message", component.Find(".banner-message").TextContent.Trim());
+        Assert.Equal("[[Banner_Export_Progress]]", component.Find(".banner-message").TextContent.Trim());
         Assert.Equal("[[Modal_Cancel]]", component.Find("button.banner-action").TextContent.Trim());
+    }
+
+    [Fact]
+    public void NeutralExportProgressAndRecoveryKeys_KeepByteIdenticalEnglish()
+    {
+        IStringLocalizer<SharedResource> localizer = BuildLocalizer();
+
+        WithEnUsCulture(() =>
+        {
+            Assert.Equal("Exporting events...", localizer["Banner_Export_Progress"].Value);
+            Assert.Equal("Database upgrade recovery", localizer["Banner_Recovery_Needed_Title"].Value);
+            Assert.Equal("1 database needs recovery from interrupted upgrade.", localizer["Banner_Recovery_Needed_One"].Value);
+            Assert.Equal(
+                "3 databases need recovery from interrupted upgrade.",
+                localizer["Banner_Recovery_Needed_Many", 3].Value);
+            Assert.Equal("Resolve", localizer["Banner_Recovery_Resolve"].Value);
+            Assert.Equal("Database recovery failed", localizer["Banner_Recovery_Failed_Title"].Value);
+            Assert.Equal("Failed to restore 'x' from backup.", localizer["Banner_Recovery_Failed_Restore", "x"].Value);
+            Assert.Equal("Failed to delete 'x'.", localizer["Banner_Recovery_Failed_Delete", "x"].Value);
+        });
     }
 
     [Fact]
@@ -327,9 +366,20 @@ public sealed class BannerLocalizationTests : BunitContext
         Assert.Equal("[[Modal_Cancel]]", inProgress.Find("button.banner-action").TextContent.Trim());
     }
 
+    private static IStringLocalizer<SharedResource> BuildLocalizer() =>
+        new ServiceCollection()
+            .AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance)
+            .AddEventLogLocalization()
+            .BuildServiceProvider()
+            .GetRequiredService<IStringLocalizer<SharedResource>>();
+
     private static ErrorBannerEntry[] CreateErrorEntries(int count) =>
         Enumerable.Range(1, count)
-            .Select(index => new ErrorBannerEntry(BannerId.Create(), $"Title {index}", "Message", null, null, s_createdUtc))
+            .Select(index => new ErrorBannerEntry(
+                BannerId.Create(),
+                new Preformatted($"Title {index}", "Message"),
+                null,
+                s_createdUtc))
             .ToArray();
 
     private static BannerProgressEntry CreateUpgradeProgress(int position, int size, string entryName, int queuedBatches) =>
@@ -342,4 +392,28 @@ public sealed class BannerLocalizationTests : BunitContext
             UpgradePhase.BackingUp,
             queuedBatches,
             () => { });
+
+    private static bool IsPreformatted(BannerMessage? message, string title, string text, string? actionLabel = null) =>
+        message is Preformatted preformatted &&
+        preformatted.Title == title &&
+        preformatted.Message == text &&
+        preformatted.ActionLabel == actionLabel;
+
+    private static void WithEnUsCulture(Action assertion)
+    {
+        CultureInfo priorCulture = CultureInfo.CurrentCulture;
+        CultureInfo priorUiCulture = CultureInfo.CurrentUICulture;
+
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en-US");
+            assertion();
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = priorCulture;
+            CultureInfo.CurrentUICulture = priorUiCulture;
+        }
+    }
 }

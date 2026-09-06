@@ -59,13 +59,11 @@ internal static class MauiProgramExtensions
                 var modalCoordinator = provider.GetRequiredService<IModalCoordinator>();
                 var mainThreadService = provider.GetRequiredService<IMainThreadService>();
                 var errorBannerService = provider.GetRequiredService<IErrorBannerService>();
-                var infoBannerService = provider.GetRequiredService<IInfoBannerService>();
 
                 return new AlertDialogService(
                     modalCoordinator,
                     mainThreadService,
                     errorBannerService,
-                    infoBannerService,
                     async parameters =>
                     {
                         ModalOpenResult<bool> result = await modalCoordinator.PushAsync<AlertModal, bool>(

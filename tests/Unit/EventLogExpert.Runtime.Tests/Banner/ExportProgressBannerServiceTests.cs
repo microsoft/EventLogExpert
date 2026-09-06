@@ -8,27 +8,11 @@ namespace EventLogExpert.Runtime.Tests.Banner;
 public sealed class ExportProgressBannerServiceTests
 {
     [Fact]
-    public void Begin_EmptyMessage_Throws()
-    {
-        ExportProgressBannerService sut = new();
-
-        Assert.Throws<ArgumentException>(() => sut.Begin(string.Empty, () => { }));
-    }
-
-    [Fact]
     public void Begin_NullCancel_Throws()
     {
         ExportProgressBannerService sut = new();
 
-        Assert.Throws<ArgumentNullException>(() => sut.Begin("Exporting events…", null!));
-    }
-
-    [Fact]
-    public void Begin_NullMessage_Throws()
-    {
-        ExportProgressBannerService sut = new();
-
-        Assert.Throws<ArgumentNullException>(() => sut.Begin(null!, () => { }));
+        Assert.Throws<ArgumentNullException>(() => sut.Begin(null!));
     }
 
     [Fact]
@@ -38,7 +22,7 @@ public sealed class ExportProgressBannerServiceTests
         int fires = 0;
         sut.StateChanged += () => fires++;
 
-        sut.Begin("Exporting events…", () => { });
+        sut.Begin(() => { });
 
         Assert.Equal(1, fires);
     }
@@ -48,11 +32,10 @@ public sealed class ExportProgressBannerServiceTests
     {
         ExportProgressBannerService sut = new();
 
-        sut.Begin("Exporting events…", () => { });
+        sut.Begin(() => { });
 
         ExportProgressEntry? current = sut.CurrentExport;
         Assert.NotNull(current);
-        Assert.Equal("Exporting events…", current.Message);
     }
 
     [Fact]
@@ -64,10 +47,9 @@ public sealed class ExportProgressBannerServiceTests
         ExportProgressEntry? observed = null;
         sut.StateChanged += () => observed = sut.CurrentExport;
 
-        sut.Begin("Exporting events…", () => { });
+        sut.Begin(() => { });
 
         Assert.NotNull(observed);
-        Assert.Equal("Exporting events…", observed.Message);
     }
 
     [Fact]
@@ -75,7 +57,7 @@ public sealed class ExportProgressBannerServiceTests
     {
         ExportProgressBannerService sut = new();
         bool canceled = false;
-        sut.Begin("Exporting events…", () => canceled = true);
+        sut.Begin(() => canceled = true);
 
         ExportProgressEntry? current = sut.CurrentExport;
         Assert.NotNull(current);
@@ -88,7 +70,7 @@ public sealed class ExportProgressBannerServiceTests
     public void End_ClearsCurrentExport()
     {
         ExportProgressBannerService sut = new();
-        sut.Begin("Exporting events…", () => { });
+        sut.Begin(() => { });
 
         sut.End();
 
@@ -99,7 +81,7 @@ public sealed class ExportProgressBannerServiceTests
     public void End_RaisesStateChanged()
     {
         ExportProgressBannerService sut = new();
-        sut.Begin("Exporting events…", () => { });
+        sut.Begin(() => { });
         int fires = 0;
         sut.StateChanged += () => fires++;
 
