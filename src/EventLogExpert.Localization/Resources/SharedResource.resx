@@ -481,6 +481,102 @@
     <value>{0} library entries couldn't be read and were left in place to avoid data loss. This usually means the library was written by a newer version of the app.</value>
     <comment>Filter library load warning. {0} is the raw count of unreadable entries.</comment>
   </data>
+  <data name="Banner_Filter_CreateFailed_Title" xml:space="preserve">
+    <value>Couldn't create filter set</value>
+    <comment>Title shown when creating a filter set in the filter library fails.</comment>
+  </data>
+  <data name="Banner_Filter_CreateFailed_Message" xml:space="preserve">
+    <value>'{0}' couldn't be saved to the filter library.</value>
+    <comment>Filter set create failure. {0} is the filter set name.</comment>
+  </data>
+  <data name="Banner_Filter_EntrySaveFailed_Title" xml:space="preserve">
+    <value>Couldn't save to library</value>
+    <comment>Title shown when saving a filter library entry fails.</comment>
+  </data>
+  <data name="Banner_Filter_EntrySaveFailed_Message" xml:space="preserve">
+    <value>'{0}' couldn't be saved to the filter library.</value>
+    <comment>Filter library entry save failure. {0} is the entry name.</comment>
+  </data>
+  <data name="Banner_Filter_DeleteFailed_Title" xml:space="preserve">
+    <value>Couldn't delete</value>
+    <comment>Title shown when deleting an item from the filter library fails.</comment>
+  </data>
+  <data name="Banner_Filter_DeleteFailed_Message" xml:space="preserve">
+    <value>The item couldn't be removed from the filter library.</value>
+    <comment>Filter library delete failure message.</comment>
+  </data>
+  <data name="Banner_Filter_EntryUpdateFailed_Title" xml:space="preserve">
+    <value>Couldn't save changes</value>
+    <comment>Title shown when saving filter library entry changes fails.</comment>
+  </data>
+  <data name="Banner_Filter_EntryUpdateFailed_Message" xml:space="preserve">
+    <value>Your changes to '{0}' couldn't be saved to the filter library.</value>
+    <comment>Filter library entry update failure. {0} is the entry name.</comment>
+  </data>
+  <data name="Banner_Filter_AddToSetFailed_Title" xml:space="preserve">
+    <value>Couldn't add filter</value>
+    <comment>Title shown when adding a filter to a filter set fails.</comment>
+  </data>
+  <data name="Banner_Filter_AddToSetFailed_Message" xml:space="preserve">
+    <value>The filter couldn't be added to the filter set.</value>
+    <comment>Filter set add-filter failure message.</comment>
+  </data>
+  <data name="Banner_Filter_PromoteFailed_Title" xml:space="preserve">
+    <value>Couldn't save</value>
+    <comment>Title shown when promoting an auto-tracked filter into the filter library fails.</comment>
+  </data>
+  <data name="Banner_Filter_PromoteFailed_Message" xml:space="preserve">
+    <value>This filter couldn't be saved to the library.</value>
+    <comment>Filter library promotion failure message.</comment>
+  </data>
+  <data name="Banner_Filter_RenameFailed_Title" xml:space="preserve">
+    <value>Couldn't rename</value>
+    <comment>Title shown when renaming a filter library entry fails.</comment>
+  </data>
+  <data name="Banner_Filter_RenameFailed_Message" xml:space="preserve">
+    <value>The new name couldn't be saved to the filter library.</value>
+    <comment>Filter library rename failure message.</comment>
+  </data>
+  <data name="Banner_Filter_EntryTagsFailed_Title" xml:space="preserve">
+    <value>Couldn't update tags</value>
+    <comment>Title shown when saving tag changes for a filter library entry fails.</comment>
+  </data>
+  <data name="Banner_Filter_EntryTagsFailed_Message" xml:space="preserve">
+    <value>The tag change couldn't be saved to the filter library.</value>
+    <comment>Filter library entry tag-save failure message.</comment>
+  </data>
+  <data name="Banner_Filter_SetUpdateFailed_Title" xml:space="preserve">
+    <value>Couldn't save filter set</value>
+    <comment>Title shown when saving changes to a filter set fails.</comment>
+  </data>
+  <data name="Banner_Filter_SetUpdateFailed_Message" xml:space="preserve">
+    <value>Your changes couldn't be saved to the filter library.</value>
+    <comment>Filter set update failure message.</comment>
+  </data>
+  <data name="Banner_Filter_FavoriteFailed_Title" xml:space="preserve">
+    <value>Couldn't update favorite</value>
+    <comment>Title shown when saving a filter library favorite change fails.</comment>
+  </data>
+  <data name="Banner_Filter_FavoriteFailed_Message" xml:space="preserve">
+    <value>The favorite change couldn't be saved to the filter library.</value>
+    <comment>Filter library favorite-change failure message.</comment>
+  </data>
+  <data name="Banner_Filter_TagBulkFailed_Title" xml:space="preserve">
+    <value>Couldn't update tags</value>
+    <comment>Title shown when saving a bulk filter library tag change fails.</comment>
+  </data>
+  <data name="Banner_Filter_TagBulkFailed_Message" xml:space="preserve">
+    <value>The tag change couldn't be saved. The library was reloaded.</value>
+    <comment>Bulk filter library tag update failure message.</comment>
+  </data>
+  <data name="Banner_Filter_ImportFailed_Title" xml:space="preserve">
+    <value>Couldn't finish importing</value>
+    <comment>Title shown when importing entries into the filter library fails.</comment>
+  </data>
+  <data name="Banner_Filter_ImportFailed_Message" xml:space="preserve">
+    <value>Some items couldn't be saved to the filter library. The library was reloaded.</value>
+    <comment>Filter library import failure message.</comment>
+  </data>
   <data name="Banner_Filter_SaveFailed_Title" xml:space="preserve">
     <value>Couldn't save filter set</value>
     <comment>Title shown when saving a filter set to the library fails.</comment>

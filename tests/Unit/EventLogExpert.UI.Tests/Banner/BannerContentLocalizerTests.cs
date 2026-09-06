@@ -216,11 +216,83 @@ public sealed class BannerContentLocalizerTests
             "Filter library not fully loaded",
             "3 library entries couldn't be read and were left in place to avoid data loss. This usually means the library was written by a newer version of the app.");
         AssertResolved(
+            new FilterLibraryImportFailed(),
+            "[[Banner_Filter_ImportFailed_Title]]",
+            "[[Banner_Filter_ImportFailed_Message]]",
+            "Couldn't finish importing",
+            "Some items couldn't be saved to the filter library. The library was reloaded.");
+        AssertResolved(
+            new FilterAddToSetFailed(),
+            "[[Banner_Filter_AddToSetFailed_Title]]",
+            "[[Banner_Filter_AddToSetFailed_Message]]",
+            "Couldn't add filter",
+            "The filter couldn't be added to the filter set.");
+        AssertResolved(
+            new FilterSetCreateFailed("My Set"),
+            "[[Banner_Filter_CreateFailed_Title]]",
+            "[[Banner_Filter_CreateFailed_Message(My Set)]]",
+            "Couldn't create filter set",
+            "'My Set' couldn't be saved to the filter library.");
+        AssertResolved(
             new FilterSetSaveFailed("My Set"),
             "[[Banner_Filter_SaveFailed_Title]]",
             "[[Banner_Filter_SaveFailed_Message(My Set)]]",
             "Couldn't save filter set",
             "'My Set' couldn't be saved to the filter library.");
+        AssertResolved(
+            new FilterSetUpdateFailed(),
+            "[[Banner_Filter_SetUpdateFailed_Title]]",
+            "[[Banner_Filter_SetUpdateFailed_Message]]",
+            "Couldn't save filter set",
+            "Your changes couldn't be saved to the filter library.");
+        AssertResolved(
+            new LibraryEntryDeleteFailed(),
+            "[[Banner_Filter_DeleteFailed_Title]]",
+            "[[Banner_Filter_DeleteFailed_Message]]",
+            "Couldn't delete",
+            "The item couldn't be removed from the filter library.");
+        AssertResolved(
+            new LibraryEntryFavoriteFailed(),
+            "[[Banner_Filter_FavoriteFailed_Title]]",
+            "[[Banner_Filter_FavoriteFailed_Message]]",
+            "Couldn't update favorite",
+            "The favorite change couldn't be saved to the filter library.");
+        AssertResolved(
+            new LibraryEntryPromoteFailed(),
+            "[[Banner_Filter_PromoteFailed_Title]]",
+            "[[Banner_Filter_PromoteFailed_Message]]",
+            "Couldn't save",
+            "This filter couldn't be saved to the library.");
+        AssertResolved(
+            new LibraryEntryRenameFailed(),
+            "[[Banner_Filter_RenameFailed_Title]]",
+            "[[Banner_Filter_RenameFailed_Message]]",
+            "Couldn't rename",
+            "The new name couldn't be saved to the filter library.");
+        AssertResolved(
+            new LibraryEntrySaveFailed("Entry"),
+            "[[Banner_Filter_EntrySaveFailed_Title]]",
+            "[[Banner_Filter_EntrySaveFailed_Message(Entry)]]",
+            "Couldn't save to library",
+            "'Entry' couldn't be saved to the filter library.");
+        AssertResolved(
+            new LibraryEntryTagsSaveFailed(),
+            "[[Banner_Filter_EntryTagsFailed_Title]]",
+            "[[Banner_Filter_EntryTagsFailed_Message]]",
+            "Couldn't update tags",
+            "The tag change couldn't be saved to the filter library.");
+        AssertResolved(
+            new LibraryEntryUpdateFailed("Entry"),
+            "[[Banner_Filter_EntryUpdateFailed_Title]]",
+            "[[Banner_Filter_EntryUpdateFailed_Message(Entry)]]",
+            "Couldn't save changes",
+            "Your changes to 'Entry' couldn't be saved to the filter library.");
+        AssertResolved(
+            new LibraryTagsBulkUpdateFailed(),
+            "[[Banner_Filter_TagBulkFailed_Title]]",
+            "[[Banner_Filter_TagBulkFailed_Message]]",
+            "Couldn't update tags",
+            "The tag change couldn't be saved. The library was reloaded.");
         AssertResolved(
             new EmptyLogs(["Application.evtx"]),
             "[[Banner_EmptyLog_Title]]",
@@ -261,7 +333,19 @@ public sealed class BannerContentLocalizerTests
             [typeof(DatabaseOperationFailed)] = new DatabaseOperationFailed(new DatabaseOperation.Import(), "failure"),
             [typeof(DatabaseImportSummary)] = new DatabaseImportSummary(1, [], []),
             [typeof(FilterLibraryNotFullyLoaded)] = new FilterLibraryNotFullyLoaded(1),
+            [typeof(FilterLibraryImportFailed)] = new FilterLibraryImportFailed(),
+            [typeof(FilterAddToSetFailed)] = new FilterAddToSetFailed(),
+            [typeof(FilterSetCreateFailed)] = new FilterSetCreateFailed("Set"),
             [typeof(FilterSetSaveFailed)] = new FilterSetSaveFailed("Set"),
+            [typeof(FilterSetUpdateFailed)] = new FilterSetUpdateFailed(),
+            [typeof(LibraryEntryDeleteFailed)] = new LibraryEntryDeleteFailed(),
+            [typeof(LibraryEntryFavoriteFailed)] = new LibraryEntryFavoriteFailed(),
+            [typeof(LibraryEntryPromoteFailed)] = new LibraryEntryPromoteFailed(),
+            [typeof(LibraryEntryRenameFailed)] = new LibraryEntryRenameFailed(),
+            [typeof(LibraryEntrySaveFailed)] = new LibraryEntrySaveFailed("Entry"),
+            [typeof(LibraryEntryTagsSaveFailed)] = new LibraryEntryTagsSaveFailed(),
+            [typeof(LibraryEntryUpdateFailed)] = new LibraryEntryUpdateFailed("Entry"),
+            [typeof(LibraryTagsBulkUpdateFailed)] = new LibraryTagsBulkUpdateFailed(),
             [typeof(EmptyLogs)] = new EmptyLogs(["Application.evtx"]),
             [typeof(Preformatted)] = new Preformatted("Title", "Message")
         };

@@ -38,9 +38,45 @@ internal static partial class BannerContentLocalizer
             FilterLibraryNotFullyLoaded filterLibraryNotFullyLoaded => new BannerContentText(
                 localizer["Banner_Filter_NotLoaded_Title"],
                 localizer["Banner_Filter_NotLoaded_Message", filterLibraryNotFullyLoaded.Count]),
+            FilterLibraryImportFailed => new BannerContentText(
+                localizer["Banner_Filter_ImportFailed_Title"],
+                localizer["Banner_Filter_ImportFailed_Message"]),
+            FilterAddToSetFailed => new BannerContentText(
+                localizer["Banner_Filter_AddToSetFailed_Title"],
+                localizer["Banner_Filter_AddToSetFailed_Message"]),
+            FilterSetCreateFailed filterSetCreateFailed => new BannerContentText(
+                localizer["Banner_Filter_CreateFailed_Title"],
+                localizer["Banner_Filter_CreateFailed_Message", filterSetCreateFailed.Name]),
             FilterSetSaveFailed filterSetSaveFailed => new BannerContentText(
                 localizer["Banner_Filter_SaveFailed_Title"],
                 localizer["Banner_Filter_SaveFailed_Message", filterSetSaveFailed.Name]),
+            FilterSetUpdateFailed => new BannerContentText(
+                localizer["Banner_Filter_SetUpdateFailed_Title"],
+                localizer["Banner_Filter_SetUpdateFailed_Message"]),
+            LibraryEntryDeleteFailed => new BannerContentText(
+                localizer["Banner_Filter_DeleteFailed_Title"],
+                localizer["Banner_Filter_DeleteFailed_Message"]),
+            LibraryEntryFavoriteFailed => new BannerContentText(
+                localizer["Banner_Filter_FavoriteFailed_Title"],
+                localizer["Banner_Filter_FavoriteFailed_Message"]),
+            LibraryEntryPromoteFailed => new BannerContentText(
+                localizer["Banner_Filter_PromoteFailed_Title"],
+                localizer["Banner_Filter_PromoteFailed_Message"]),
+            LibraryEntryRenameFailed => new BannerContentText(
+                localizer["Banner_Filter_RenameFailed_Title"],
+                localizer["Banner_Filter_RenameFailed_Message"]),
+            LibraryEntrySaveFailed libraryEntrySaveFailed => new BannerContentText(
+                localizer["Banner_Filter_EntrySaveFailed_Title"],
+                localizer["Banner_Filter_EntrySaveFailed_Message", libraryEntrySaveFailed.Name]),
+            LibraryEntryTagsSaveFailed => new BannerContentText(
+                localizer["Banner_Filter_EntryTagsFailed_Title"],
+                localizer["Banner_Filter_EntryTagsFailed_Message"]),
+            LibraryEntryUpdateFailed libraryEntryUpdateFailed => new BannerContentText(
+                localizer["Banner_Filter_EntryUpdateFailed_Title"],
+                localizer["Banner_Filter_EntryUpdateFailed_Message", libraryEntryUpdateFailed.Name]),
+            LibraryTagsBulkUpdateFailed => new BannerContentText(
+                localizer["Banner_Filter_TagBulkFailed_Title"],
+                localizer["Banner_Filter_TagBulkFailed_Message"]),
             EmptyLogs emptyLogs => new BannerContentText(
                 localizer["Banner_EmptyLog_Title"],
                 emptyLogs.DisplayNames.Count == 1

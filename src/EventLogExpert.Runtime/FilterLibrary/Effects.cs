@@ -35,7 +35,11 @@ internal sealed class Effects(
 
         var newFilter = action.Filter with { Id = FilterId.Create(), IsEnabled = false };
 
-        await PersistAndDispatchAsync(filterSet.Id, e => AppendFilterToSetIfMissing(e, newFilter), dispatcher).ConfigureAwait(false);
+        await PersistAndDispatchAsync(
+            filterSet.Id,
+            e => AppendFilterToSetIfMissing(e, newFilter),
+            dispatcher,
+            new FilterAddToSetFailed()).ConfigureAwait(false);
         await PromoteSourceIfAutoTracked(action.SourceEntryId, dispatcher).ConfigureAwait(false);
     }
 
@@ -60,6 +64,7 @@ internal sealed class Effects(
             catch (Exception ex)
             {
                 logger.Warning($"FilterLibrary Add (new filter set) failed for {created.Id}. {ex.Message}");
+                errorBannerService.ReportError(new FilterSetCreateFailed(created.Name));
 
                 return;
             }
@@ -88,6 +93,7 @@ internal sealed class Effects(
         catch (Exception ex)
         {
             logger.Warning($"FilterLibrary Add failed for entry {action.Entry.Id}. {ex.Message}");
+            errorBannerService.ReportError(new LibraryEntrySaveFailed(action.Entry.Name));
         }
         finally
         {
@@ -124,6 +130,7 @@ internal sealed class Effects(
         catch (Exception ex)
         {
             logger.Warning($"FilterLibrary Delete failed for entry {action.EntryId}. {ex.Message}");
+            errorBannerService.ReportError(new LibraryEntryDeleteFailed());
         }
         finally
         {
@@ -151,6 +158,64 @@ internal sealed class Effects(
         }
 
         await ApplyBulkTagUpdate(updatedEntries, dispatcher, count => $"Removed tag '{normalized}' from {count} {EntriesWord(count)}").ConfigureAwait(false);
+    }
+
+    [EffectMethod]
+    public async Task HandleImportLibraryEntries(ImportLibraryEntriesAction action, IDispatcher dispatcher)
+    {
+        if (action.ToAdd.IsEmpty && action.ToUpdate.IsEmpty)
+        {
+            announcementService.Announce(FormatImportSummary(action.Summary));
+
+            return;
+        }
+
+        await _writeGate.WaitAsync().ConfigureAwait(false);
+
+        try
+        {
+            IReadOnlyList<LibraryEntryId> updatedIds;
+
+            try
+            {
+                await store.AddRangeAsync(action.ToAdd).ConfigureAwait(false);
+                updatedIds = await store.UpdateRangeAsync(action.ToUpdate).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger.Warning($"FilterLibrary import failed; reloading library. {ex.Message}");
+                errorBannerService.ReportError(new FilterLibraryImportFailed());
+                dispatcher.Dispatch(new LoadLibraryAction());
+
+                return;
+            }
+
+            foreach (var entry in action.ToAdd)
+            {
+                dispatcher.Dispatch(new AddLibraryEntrySuccessAction(entry));
+            }
+
+            var updatedIdSet = updatedIds.ToHashSet();
+
+            foreach (var entry in action.ToUpdate)
+            {
+                if (updatedIdSet.Contains(entry.Id))
+                {
+                    dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(entry));
+                }
+            }
+
+            if (action.ToUpdate.Count > 0 && updatedIds.Count < action.ToUpdate.Count)
+            {
+                dispatcher.Dispatch(new LoadLibraryAction());
+            }
+
+            announcementService.Announce(FormatImportSummary(action.Summary));
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
     }
 
     [EffectMethod(typeof(LoadLibraryAction))]
@@ -467,7 +532,11 @@ internal sealed class Effects(
 
         if (entry is null || entry.Origin == LibraryEntryOrigin.UserSaved) { return Task.CompletedTask; }
 
-        return PersistAndDispatchAsync(action.EntryId, PromoteOriginToUserSaved, dispatcher);
+        return PersistAndDispatchAsync(
+            action.EntryId,
+            PromoteOriginToUserSaved,
+            dispatcher,
+            new LibraryEntryPromoteFailed());
     }
 
     [EffectMethod]
@@ -514,7 +583,11 @@ internal sealed class Effects(
     {
         var newName = action.Name;
 
-        return PersistAndDispatchAsync(action.EntryId, e => ApplyName(e, newName), dispatcher);
+        return PersistAndDispatchAsync(
+            action.EntryId,
+            e => ApplyName(e, newName),
+            dispatcher,
+            new LibraryEntryRenameFailed());
     }
 
     [EffectMethod]
@@ -522,7 +595,11 @@ internal sealed class Effects(
     {
         var newTags = action.Tags;
 
-        return PersistAndDispatchAsync(action.EntryId, e => ApplyTags(e, newTags), dispatcher);
+        return PersistAndDispatchAsync(
+            action.EntryId,
+            e => ApplyTags(e, newTags),
+            dispatcher,
+            new LibraryEntryTagsSaveFailed());
     }
 
     [EffectMethod]
@@ -530,7 +607,11 @@ internal sealed class Effects(
     {
         var newFilters = action.Filters;
 
-        return PersistAndDispatchAsync(action.FilterSetId, e => ApplyFilters(e, newFilters), dispatcher);
+        return PersistAndDispatchAsync(
+            action.FilterSetId,
+            e => ApplyFilters(e, newFilters),
+            dispatcher,
+            new FilterSetUpdateFailed());
     }
 
     [EffectMethod]
@@ -543,7 +624,11 @@ internal sealed class Effects(
         var setIsFavorite = action.IsFavorite;
         var unfavoriteTimestamp = DateTimeOffset.UtcNow;
 
-        return PersistAndDispatchAsync(action.EntryId, e => ApplyFavoriteToggle(e, setIsFavorite, unfavoriteTimestamp), dispatcher);
+        return PersistAndDispatchAsync(
+            action.EntryId,
+            e => ApplyFavoriteToggle(e, setIsFavorite, unfavoriteTimestamp),
+            dispatcher,
+            new LibraryEntryFavoriteFailed());
     }
 
     [EffectMethod(typeof(TagBulkUpdateFailedAction))]
@@ -568,6 +653,7 @@ internal sealed class Effects(
         catch (Exception ex)
         {
             logger.Warning($"FilterLibrary Update failed for entry {action.Entry.Id}. {ex.Message}");
+            errorBannerService.ReportError(new LibraryEntryUpdateFailed(action.Entry.Name));
         }
         finally
         {
@@ -698,6 +784,10 @@ internal sealed class Effects(
             _ => throw new InvalidOperationException($"Unhandled LibraryEntry type '{entry.GetType().FullName}'."),
         };
 
+    private static string FormatImportSummary(ImportSummary summary) =>
+        $"Imported {summary.Added} new, replaced {summary.Replaced}, updated {summary.UpdatedTags} tags, skipped {summary.Skipped}" +
+        (summary.Ambiguous > 0 ? $", imported {summary.Ambiguous} ambiguous as new" : string.Empty);
+
     private static bool NonTagFieldsDiffer(LibraryEntry latest, LibraryEntry bulkEntry) => (latest, bulkEntry) switch
     {
         (LibraryEntrySavedFilter latestFilter, LibraryEntrySavedFilter bulkFilter) =>
@@ -751,7 +841,7 @@ internal sealed class Effects(
             catch (Exception ex)
             {
                 logger.Warning($"FilterLibrary bulk tag update failed; reloading library. {ex.Message}");
-                announcementService.Announce("Couldn't update tags. The library was reloaded.");
+                errorBannerService.ReportError(new LibraryTagsBulkUpdateFailed());
                 dispatcher.Dispatch(new LoadLibraryAction());
                 dispatcher.Dispatch(new TagBulkUpdateFailedAction());
 
@@ -760,7 +850,7 @@ internal sealed class Effects(
 
             if (updatedIds.Count == 0)
             {
-                announcementService.Announce("Couldn't update tags. The library was reloaded.");
+                errorBannerService.ReportError(new LibraryTagsBulkUpdateFailed());
                 dispatcher.Dispatch(new LoadLibraryAction());
                 dispatcher.Dispatch(new TagBulkUpdateFailedAction());
 
@@ -806,7 +896,7 @@ internal sealed class Effects(
                 catch (Exception ex)
                 {
                     logger.Warning($"FilterLibrary bulk tag re-issue against latest snapshot failed; reloading library. {ex.Message}");
-                    announcementService.Announce("Couldn't update tags. The library was reloaded.");
+                    errorBannerService.ReportError(new LibraryTagsBulkUpdateFailed());
                     dispatcher.Dispatch(new LoadLibraryAction());
                     dispatcher.Dispatch(new TagBulkUpdateFailedAction());
 
@@ -865,7 +955,8 @@ internal sealed class Effects(
     private async Task PersistAndDispatchAsync(
         LibraryEntryId id,
         Func<LibraryEntry, LibraryEntry> mutate,
-        IDispatcher dispatcher)
+        IDispatcher dispatcher,
+        BannerMessage? failureBanner = null)
     {
         await _writeGate.WaitAsync().ConfigureAwait(false);
 
@@ -884,6 +975,11 @@ internal sealed class Effects(
             {
                 logger.Warning($"FilterLibrary Update failed for {id}. {ex.Message}");
 
+                if (failureBanner is { } banner)
+                {
+                    errorBannerService.ReportError(banner);
+                }
+
                 return;
             }
 
@@ -900,6 +996,11 @@ internal sealed class Effects(
                 {
                     logger.Warning($"FilterLibrary Update (re-issue against latest snapshot) failed for {id}. {ex.Message}");
                     dispatcher.Dispatch(new LoadLibraryAction());
+
+                    if (failureBanner is { } banner)
+                    {
+                        errorBannerService.ReportError(banner);
+                    }
 
                     return;
                 }

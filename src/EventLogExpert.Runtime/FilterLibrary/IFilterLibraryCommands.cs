@@ -35,6 +35,8 @@ public interface IFilterLibraryCommands
     /// </summary>
     void DeleteTag(string name);
 
+    void ImportEntries(ImmutableList<LibraryEntry> toAdd, ImmutableList<LibraryEntry> toUpdate, ImportSummary summary);
+
     /// <summary>Loads persisted library entries from the store into the FilterLibrary state.</summary>
     void LoadLibrary();
 
