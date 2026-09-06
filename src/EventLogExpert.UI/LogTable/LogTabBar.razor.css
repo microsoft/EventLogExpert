@@ -132,3 +132,27 @@ span {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* The group header is a real <button> so Enter/Space match native button semantics - Space activates it once
+   without also scrolling the tab row - while these rules strip the native chrome so it still presents as the
+   flex-filling tab label (mirrors the .tab > span label styling above). */
+.group-header > .group-header-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    box-sizing: border-box;
+
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    user-select: none;
+
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+}

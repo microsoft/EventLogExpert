@@ -36,13 +36,12 @@
                         @oncontextmenu:preventDefault="true"
                         @oncontextmenu:stopPropagation="true"
                         title="@GetTabTooltip(group.Header)">
-                        <span aria-expanded="@(presentation.ActiveTabId == group.Header.Id ? (group.Group.IsCollapsed ? "false" : "true") : null)"
+                        <button aria-expanded="@(presentation.ActiveTabId == group.Header.Id ? (group.Group.IsCollapsed ? "false" : "true") : null)"
+                            class="group-header-label"
                             @onclick="() => ActivateOrToggleGroup(group)"
-                            @onkeydown="e => OnGroupHeaderKeyDown(e, group)"
-                            role="button"
-                            tabindex="0">
+                            type="button">
                             @GetTabName(presentation, group.Header)
-                        </span>
+                        </button>
                         <i aria-label="@Localizer["TabBar_CloseGroup"]"
                             class="bi bi-x-circle"
                             @onclick="() => CloseGroup(group.Group)"

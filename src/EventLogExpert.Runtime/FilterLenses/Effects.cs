@@ -129,7 +129,10 @@ internal sealed class Effects(
         if (string.IsNullOrWhiteSpace(action.Name)) { return Task.CompletedTask; }
 
         var lenses = _lensState.Value.Lenses;
-        var filters = lenses.SelectMany(lens => lens.ExcludeFilters).ToImmutableList();
+        var filters = lenses
+            .SelectMany(lens => lens.ExcludeFilters)
+            .DistinctBy(filter => (filter.ComparisonText.ToLowerInvariant(), filter.Mode, filter.IsExcluded))
+            .ToImmutableList();
 
         if (filters.IsEmpty) { return Task.CompletedTask; }
 

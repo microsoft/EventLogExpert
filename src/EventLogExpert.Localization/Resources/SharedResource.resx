@@ -1528,6 +1528,10 @@
     <value>Cancel</value>
     <comment>Cancel button label for the save-as-group prompt.</comment>
   </data>
+  <data name="FilterLens_SaveAsGroup_NameRequired" xml:space="preserve">
+    <value>Group name is required.</value>
+    <comment>Validation message shown when the save-as-group prompt name is left blank.</comment>
+  </data>
   <data name="FilterLens_SavedAllAnnouncement" xml:space="preserve">
     <value>Saved all lenses as filters</value>
   </data>

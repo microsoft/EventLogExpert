@@ -61,7 +61,8 @@ public sealed partial class LensBreadcrumb
             Localizer["FilterLens_SaveAsGroup_DefaultName"],
             Localizer["FilterLens_SaveAsGroup_Save"],
             Localizer["FilterLens_SaveAsGroup_SaveAndClear"],
-            Localizer["FilterLens_SaveAsGroup_Cancel"]);
+            Localizer["FilterLens_SaveAsGroup_Cancel"],
+            candidate => string.IsNullOrWhiteSpace(candidate) ? Localizer["FilterLens_SaveAsGroup_NameRequired"].Value : null);
 
         if (outcome.Choice == PromptChoice.Cancel || string.IsNullOrWhiteSpace(outcome.Value)) { return; }
 

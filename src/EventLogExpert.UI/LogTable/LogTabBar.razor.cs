@@ -358,13 +358,6 @@ public sealed partial class LogTabBar
         CloseLog(table);
     }
 
-    private void OnGroupHeaderKeyDown(KeyboardEventArgs e, GroupRow row)
-    {
-        if (e.Repeat || (e.Key != "Enter" && e.Key != " ")) { return; }
-
-        ActivateOrToggleGroup(row);
-    }
-
     private void OnTabKeyDown(KeyboardEventArgs e, LogView table)
     {
         if (e.Repeat || (e.Key != "Enter" && e.Key != " ")) { return; }

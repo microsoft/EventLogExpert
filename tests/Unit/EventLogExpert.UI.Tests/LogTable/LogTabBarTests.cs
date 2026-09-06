@@ -96,39 +96,30 @@ public sealed class LogTabBarTests : BunitContext
     {
         // With the chevron removed, clicking an already-active group header toggles its collapse state. The
         // toggle is on click (not mousedown) so a drag-scroll of the tab strip started on the header does not
-        // collapse the group.
+        // collapse the group. The header is a native <button>, so Enter/Space also activate it via onclick
+        // without scrolling the tab row.
         var (state, groupId, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
         _logTableState.Value.Returns(state);
         var cut = Render<LogTabBar>();
 
-        cut.Find(".group-header > span").Click();
+        cut.Find(".group-header > button").Click();
 
         _logTableCommands.Received(1).SetTabGroupCollapsed(groupId, true);
     }
 
     [Fact]
-    public void ActiveGroupHeaderName_RepeatSpaceKeyDown_DoesNotToggle()
+    public void ActiveGroupHeader_RendersAsNativeButton_ForKeyboardSemantics()
     {
-        // Holding Space (key auto-repeat) must not toggle the group over and over; the handler ignores e.Repeat.
-        var (state, groupId, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
+        // The header is a native <button> (not a span[role=button]) so the browser provides correct Enter/Space
+        // activation - Space activates it once without also scrolling the tab row.
+        var (state, _, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
         _logTableState.Value.Returns(state);
         var cut = Render<LogTabBar>();
 
-        cut.Find(".group-header > span").KeyDown(new KeyboardEventArgs { Key = " ", Repeat = true });
+        var header = cut.Find(".group-header > button.group-header-label");
 
-        _logTableCommands.DidNotReceive().SetTabGroupCollapsed(groupId, true);
-    }
-
-    [Fact]
-    public void ActiveGroupHeaderName_SpaceKeyDown_TogglesCollapse()
-    {
-        var (state, groupId, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
-        _logTableState.Value.Returns(state);
-        var cut = Render<LogTabBar>();
-
-        cut.Find(".group-header > span").KeyDown(new KeyboardEventArgs { Key = " " });
-
-        _logTableCommands.Received(1).SetTabGroupCollapsed(groupId, true);
+        Assert.Equal("BUTTON", header.TagName);
+        Assert.Equal("button", header.GetAttribute("type"));
     }
 
     [Fact]
@@ -258,7 +249,7 @@ public sealed class LogTabBarTests : BunitContext
 
         var cut = Render<LogTabBar>();
 
-        Assert.Equal("false", cut.Find(".group-header > span").GetAttribute("aria-expanded"));
+        Assert.Equal("false", cut.Find(".group-header > button").GetAttribute("aria-expanded"));
     }
 
     [Fact]
@@ -321,7 +312,7 @@ public sealed class LogTabBarTests : BunitContext
 
         var cut = Render<LogTabBar>();
 
-        Assert.Equal("true", cut.Find(".group-header > span").GetAttribute("aria-expanded"));
+        Assert.Equal("true", cut.Find(".group-header > button").GetAttribute("aria-expanded"));
     }
 
     [Fact]
@@ -370,7 +361,7 @@ public sealed class LogTabBarTests : BunitContext
         _logTableState.Value.Returns(state);
         var cut = Render<LogTabBar>();
 
-        cut.Find(".group-header > span").Click();
+        cut.Find(".group-header > button").Click();
 
         _logTableCommands.Received(1).SetActiveTable(headerId);
     }

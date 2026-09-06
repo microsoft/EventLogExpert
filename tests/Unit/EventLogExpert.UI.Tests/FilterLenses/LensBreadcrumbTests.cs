@@ -119,6 +119,32 @@ public sealed class LensBreadcrumbTests : BunitContext
     }
 
     [Fact]
+    public async Task SaveAsGroupButton_SuppliesWhitespaceRejectingValidatorToPrompt()
+    {
+        // Without a validator, clearing the name and pressing save closes the dialog and the outcome is silently
+        // discarded. The prompt must reject blank names (keeping itself open) like the tab-group prompts do.
+        Func<string, string?>? capturedValidator = null;
+        _source.Lenses.Returns(ImmutableList.Create(Summary("a")));
+        _alertDialog.DisplayPromptWithSecondary(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Do<Func<string, string?>?>(validator => capturedValidator = validator))
+            .Returns(new PromptOutcome(PromptChoice.Cancel, string.Empty));
+
+        var cut = Render<LensBreadcrumb>();
+
+        await SaveActionButton(cut, Localizer["FilterLens_SaveAsGroup"].Value).ClickAsync(new MouseEventArgs());
+
+        Assert.NotNull(capturedValidator);
+        Assert.False(string.IsNullOrEmpty(capturedValidator!("   ")));
+        Assert.Null(capturedValidator!("Valid name"));
+    }
+
+    [Fact]
     public async Task SaveAsGroupButton_WhenAriaDisabled_ActivationIsNoOp()
     {
         // aria-disabled (unlike the native disabled attribute) does NOT block activation in the browser, so the
@@ -137,7 +163,8 @@ public sealed class LensBreadcrumbTests : BunitContext
             Arg.Any<string>(),
             Arg.Any<string>(),
             Arg.Any<string>(),
-            Arg.Any<string>());
+            Arg.Any<string>(),
+            Arg.Any<Func<string, string?>?>());
         _commands.DidNotReceive().SaveLensesAsGroup(Arg.Any<string>(), Arg.Any<bool>());
     }
 
@@ -151,7 +178,8 @@ public sealed class LensBreadcrumbTests : BunitContext
                 Arg.Any<string>(),
                 Arg.Any<string>(),
                 Arg.Any<string>(),
-                Arg.Any<string>())
+                Arg.Any<string>(),
+                Arg.Any<Func<string, string?>?>())
             .Returns(new PromptOutcome(PromptChoice.Cancel, string.Empty));
 
         var cut = Render<LensBreadcrumb>();
@@ -174,7 +202,8 @@ public sealed class LensBreadcrumbTests : BunitContext
                 Arg.Any<string>(),
                 Arg.Any<string>(),
                 Arg.Any<string>(),
-                Arg.Any<string>())
+                Arg.Any<string>(),
+                Arg.Any<Func<string, string?>?>())
             .Returns(default(PromptOutcome));
 
         var cut = Render<LensBreadcrumb>();
@@ -190,12 +219,13 @@ public sealed class LensBreadcrumbTests : BunitContext
     {
         _source.Lenses.Returns(ImmutableList.Create(Summary("a")));
         _alertDialog.DisplayPromptWithSecondary(
-                Localizer["FilterLens_SaveAsGroup_PromptTitle"].Value,
-                Localizer["FilterLens_SaveAsGroup_PromptMessage"].Value,
-                Localizer["FilterLens_SaveAsGroup_DefaultName"].Value,
-                Localizer["FilterLens_SaveAsGroup_Save"].Value,
-                Localizer["FilterLens_SaveAsGroup_SaveAndClear"].Value,
-                Localizer["FilterLens_SaveAsGroup_Cancel"].Value)
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<Func<string, string?>?>())
             .Returns(new PromptOutcome(PromptChoice.Primary, "My Group"));
 
         var cut = Render<LensBreadcrumb>();
@@ -225,7 +255,8 @@ public sealed class LensBreadcrumbTests : BunitContext
                 Arg.Any<string>(),
                 Arg.Any<string>(),
                 Arg.Any<string>(),
-                Arg.Any<string>())
+                Arg.Any<string>(),
+                Arg.Any<Func<string, string?>?>())
             .Returns(new PromptOutcome(PromptChoice.Secondary, "My Group"));
 
         var cut = Render<LensBreadcrumb>();

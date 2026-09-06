@@ -322,6 +322,23 @@ public sealed class FilterLensEffectsTests
     }
 
     [Fact]
+    public async Task HandleSaveLensesAsGroup_DeduplicatesFiltersWithIdenticalContent()
+    {
+        // Distinct lenses can carry identical exclude criteria (the reducer supports same-content, distinct-id
+        // lenses). The saved set must dedupe by (ComparisonText, Mode, IsExcluded) so it never persists duplicate
+        // rows, matching the FilterPane/store invariant.
+        var first = FilterLensFactory.ForExcludedValue(EventProperty.Source, "Contoso")!;
+        var second = FilterLensFactory.ForExcludedValue(EventProperty.Source, "Contoso")!;
+        var (effects, dispatcher) =
+            CreateEffects(new FilterLensState { Lenses = [first, second] }, new FilterPaneState());
+
+        await effects.HandleSaveLensesAsGroup(new SaveLensesAsGroupAction("My Group"), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetAction>(action =>
+            action != null && action.Filters.Count == 1 && action.Filters[0].IsExcluded));
+    }
+
+    [Fact]
     public async Task HandleSaveLensesAsGroup_MixedStack_SavesOnlyValueLensAndLeavesAllLensesActive()
     {
         var keep = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
