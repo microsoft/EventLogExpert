@@ -173,10 +173,12 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         IReadOnlyList<LibraryEntry> existingEntries)
     {
         var knownIds = existingEntries.Select(e => e.Id).ToHashSet();
+        var toAdd = new List<LibraryEntry>(preflight.ToAdd.Count + preflight.AmbiguousMatches.Count);
+        var toUpdate = new List<LibraryEntry>(preflight.ToReplace.Count + CountDistinctUpdates(preflight));
 
         foreach (var entry in preflight.ToAdd)
         {
-            commands.AddEntry(PrepareEntryForAdd(entry, knownIds));
+            toAdd.Add(PrepareEntryForAdd(entry, knownIds));
         }
 
         foreach (var (existing, incoming) in preflight.ToReplace)
@@ -190,7 +192,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
                 Tags = LibraryEntryTagNormalizer.Normalize(incoming.Tags),
             };
 
-            commands.UpdateEntry(updated);
+            toUpdate.Add(updated);
         }
 
         foreach (var group in preflight.ToUpdate.GroupBy(t => t.Existing.Id))
@@ -207,13 +209,22 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
                 _ => existing,
             };
 
-            commands.UpdateEntry(updated);
+            toUpdate.Add(updated);
         }
 
         foreach (var ambiguous in preflight.AmbiguousMatches)
         {
-            commands.AddEntry(PrepareEntryForAdd(ambiguous.Incoming, knownIds));
+            toAdd.Add(PrepareEntryForAdd(ambiguous.Incoming, knownIds));
         }
+
+        var summary = new ImportSummary(
+            preflight.ToAdd.Count,
+            preflight.ToReplace.Count,
+            CountDistinctUpdates(preflight),
+            preflight.SkippedDuplicates.Count,
+            preflight.AmbiguousMatches.Count);
+
+        commands.ImportEntries([.. toAdd], [.. toUpdate], summary);
     }
 
     internal static string BuildPreflightSummary(ImportPreflight preflight)
@@ -777,16 +788,6 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         if (!result.Accepted) { return; }
 
         ApplyImportPreflight(preflight, FilterLibraryCommands, LibraryEntries.Current);
-
-        var ambiguousCount = preflight.AmbiguousMatches.Count;
-        var updatedCount = CountDistinctUpdates(preflight);
-
-        AnnouncementService.Announce(
-            $"Imported {preflight.ToAdd.Count} new, " +
-            $"replaced {preflight.ToReplace.Count}, " +
-            $"updated {updatedCount} tags, " +
-            $"skipped {preflight.SkippedDuplicates.Count}" +
-            (ambiguousCount > 0 ? $", imported {ambiguousCount} ambiguous as new" : string.Empty));
     }
 
     private async Task<EmptyValueChoice> PromptEmptyValueChoiceAsync(IReadOnlyList<string> entryNames)

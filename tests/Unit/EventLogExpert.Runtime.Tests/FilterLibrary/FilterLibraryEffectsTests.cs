@@ -25,14 +25,18 @@ public sealed class FilterLibraryEffectsTests
     private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(5);
 
     [Fact]
-    public async Task ApplyBulkTagUpdate_ReissueAgainstLatestSnapshotFails_ReloadsLibrary_AnnouncesFailure_DispatchesNoProjection()
+    public async Task ApplyBulkTagUpdate_ReissueAgainstLatestSnapshotFails_ReloadsLibrary_ReportsErrorBanner_DispatchesNoProjection()
     {
         var staleEntry = BuildFilterEntry("A") with { Tags = ["bug"], Name = "Stale" };
         var renamedEntry = staleEntry with { Name = "Renamed" };
         var staleState = new FilterLibraryState { Entries = [staleEntry] };
         var renamedState = new FilterLibraryState { Entries = [renamedEntry] };
         var announcer = Substitute.For<IAnnouncementService>();
-        var (effects, store, dispatcher, stateMock, _) = CreateEffects(state: staleState, announcementService: announcer);
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, stateMock, _) = CreateEffects(
+            state: staleState,
+            announcementService: announcer,
+            errorBannerService: errorBanner);
 
         stateMock.Value.Returns(staleState, renamedState);
 
@@ -55,7 +59,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
         dispatcher.Received(1).Dispatch(Arg.Any<TagBulkUpdateFailedAction>());
-        announcer.Received(1).Announce("Couldn't update tags. The library was reloaded.");
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsLibraryTagsBulkUpdateFailed(message)));
+        announcer.DidNotReceiveWithAnyArgs().Announce(default!);
     }
 
     [Fact]
@@ -204,6 +209,44 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
+    public async Task HandleAddFilterToNewFilterSet_WhenSourcePromotionFails_DoesNotReportErrorBanner()
+    {
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+        var source = BuildFilterEntry("Source") with { Origin = LibraryEntryOrigin.AutoTracked };
+        var store = Substitute.For<IFilterLibraryStore>();
+        store.AddAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        store.UpdateAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("disk full"));
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, _, dispatcher, _, _, _) = CreateEffectsWithMigrator(
+            state: new FilterLibraryState { Entries = [source] },
+            store: store,
+            errorBannerService: errorBanner);
+
+        await effects.HandleAddFilterToNewFilterSet(new AddFilterToNewFilterSetAction("New", filter, source.Id), dispatcher);
+
+        errorBanner.DidNotReceiveWithAnyArgs().ReportError(default!);
+    }
+
+    [Fact]
+    public async Task HandleAddFilterToNewFilterSet_WhenStoreThrows_ReportsErrorBanner()
+    {
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+        var store = Substitute.For<IFilterLibraryStore>();
+        store.AddAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("disk full"));
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, _, dispatcher, _, _, _) = CreateEffectsWithMigrator(store: store, errorBannerService: errorBanner);
+
+        await effects.HandleAddFilterToNewFilterSet(new AddFilterToNewFilterSetAction("New", filter, SourceEntryId: null), dispatcher);
+
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsFilterSetCreateFailed(message, "New")));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
+    }
+
+    [Fact]
     public async Task HandleAddFilterToNewFilterSet_WhitespaceName_IsNoOp()
     {
         var filter = SavedFilter.TryCreate("Level == 4");
@@ -228,14 +271,16 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
-    public async Task HandleAddLibraryEntry_WhenStoreThrows_DoesNotDispatchSuccess()
+    public async Task HandleAddLibraryEntry_WhenStoreThrows_ReportsErrorBannerAndDoesNotDispatchSuccess()
     {
         var entry = BuildFilterEntry("First");
-        var (effects, store, dispatcher, _, logger) = CreateEffects();
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, _, logger) = CreateEffects(errorBannerService: errorBanner);
         store.When(s => s.AddAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>())).Do(_ => throw new InvalidOperationException("boom"));
 
         await effects.HandleAddLibraryEntry(new AddLibraryEntryAction(entry), dispatcher);
 
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsLibraryEntrySaveFailed(message, "First")));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
@@ -314,13 +359,15 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
-    public async Task HandleDeleteLibraryEntry_WhenStoreThrows_DoesNotDispatchSuccess()
+    public async Task HandleDeleteLibraryEntry_WhenStoreThrows_ReportsErrorBannerAndDoesNotDispatchSuccess()
     {
-        var (effects, store, dispatcher, _, logger) = CreateEffects();
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, _, logger) = CreateEffects(errorBannerService: errorBanner);
         store.When(s => s.DeleteAsync(Arg.Any<LibraryEntryId>(), Arg.Any<CancellationToken>())).Do(_ => throw new InvalidOperationException("boom"));
 
         await effects.HandleDeleteLibraryEntry(new DeleteLibraryEntryAction(LibraryEntryId.Create()), dispatcher);
 
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsLibraryEntryDeleteFailed(message)));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<DeleteLibraryEntrySuccessAction>());
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
@@ -380,12 +427,15 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
-    public async Task HandleDeleteTag_StorePersistsNoRows_ReloadsLibrary_AnnouncesFailure_DispatchesFailedAction()
+    public async Task HandleDeleteTag_StorePersistsNoRows_ReloadsLibrary_ReportsErrorBanner_DispatchesFailedAction()
     {
         var a = BuildFilterEntry("A") with { Tags = ["bug"] };
         var announcer = Substitute.For<IAnnouncementService>();
+        var errorBanner = Substitute.For<IErrorBannerService>();
         var (effects, store, dispatcher, _, _) = CreateEffects(
-            state: new FilterLibraryState { Entries = [a] }, announcementService: announcer);
+            state: new FilterLibraryState { Entries = [a] },
+            announcementService: announcer,
+            errorBannerService: errorBanner);
         store.UpdateRangeAsync(Arg.Any<IReadOnlyList<LibraryEntry>>(), Arg.Any<CancellationToken>()).Returns([]);
 
         await effects.HandleDeleteTag(new DeleteTagAction("bug"), dispatcher);
@@ -393,7 +443,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
         dispatcher.Received(1).Dispatch(Arg.Any<TagBulkUpdateFailedAction>());
-        announcer.Received(1).Announce("Couldn't update tags. The library was reloaded.");
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsLibraryTagsBulkUpdateFailed(message)));
+        announcer.DidNotReceiveWithAnyArgs().Announce(default!);
     }
 
     [Fact]
@@ -415,13 +466,16 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
-    public async Task HandleDeleteTag_StoreThrows_NoSuccessDispatched_ReloadsLibrary_AnnouncesFailure()
+    public async Task HandleDeleteTag_StoreThrows_NoSuccessDispatched_ReloadsLibrary_ReportsErrorBanner()
     {
         var a = BuildFilterEntry("A") with { Tags = ["bug"] };
         var b = BuildFilterEntry("B") with { Tags = ["bug"] };
         var announcer = Substitute.For<IAnnouncementService>();
+        var errorBanner = Substitute.For<IErrorBannerService>();
         var (effects, store, dispatcher, _, logger) = CreateEffects(
-            state: new FilterLibraryState { Entries = [a, b] }, announcementService: announcer);
+            state: new FilterLibraryState { Entries = [a, b] },
+            announcementService: announcer,
+            errorBannerService: errorBanner);
         store.When(s => s.UpdateRangeAsync(Arg.Any<IReadOnlyList<LibraryEntry>>(), Arg.Any<CancellationToken>())).Do(_ => throw new InvalidOperationException("boom"));
 
         await effects.HandleDeleteTag(new DeleteTagAction("bug"), dispatcher);
@@ -429,7 +483,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
         dispatcher.Received(1).Dispatch(Arg.Any<TagBulkUpdateFailedAction>());
-        announcer.Received(1).Announce("Couldn't update tags. The library was reloaded.");
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsLibraryTagsBulkUpdateFailed(message)));
+        announcer.DidNotReceiveWithAnyArgs().Announce(default!);
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
 
@@ -1452,13 +1507,16 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
-    public async Task HandleRenameTag_StoreThrows_NoSuccessDispatched_ReloadsLibrary_AnnouncesFailure()
+    public async Task HandleRenameTag_StoreThrows_NoSuccessDispatched_ReloadsLibrary_ReportsErrorBanner()
     {
         var a = BuildFilterEntry("A") with { Tags = ["bug"] };
         var b = BuildFilterEntry("B") with { Tags = ["bug"] };
         var announcer = Substitute.For<IAnnouncementService>();
+        var errorBanner = Substitute.For<IErrorBannerService>();
         var (effects, store, dispatcher, _, logger) = CreateEffects(
-            state: new FilterLibraryState { Entries = [a, b] }, announcementService: announcer);
+            state: new FilterLibraryState { Entries = [a, b] },
+            announcementService: announcer,
+            errorBannerService: errorBanner);
         store.When(s => s.UpdateRangeAsync(Arg.Any<IReadOnlyList<LibraryEntry>>(), Arg.Any<CancellationToken>())).Do(_ => throw new InvalidOperationException("boom"));
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
@@ -1466,7 +1524,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
         dispatcher.Received(1).Dispatch(Arg.Any<TagBulkUpdateFailedAction>());
-        announcer.Received(1).Announce("Couldn't update tags. The library was reloaded.");
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsLibraryTagsBulkUpdateFailed(message)));
+        announcer.DidNotReceiveWithAnyArgs().Announce(default!);
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
 
@@ -1749,6 +1808,96 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
+    public async Task HandleSetEntryName_WhenStoreThrows_ReportsErrorBanner()
+    {
+        var entry = BuildFilterEntry("First");
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, _, _) = CreateEffects(
+            state: new FilterLibraryState { Entries = [entry] },
+            errorBannerService: errorBanner);
+        store.UpdateAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("disk full"));
+
+        await effects.HandleSetEntryName(new SetEntryNameAction(entry.Id, "Renamed"), dispatcher);
+
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsLibraryEntryRenameFailed(message)));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+    }
+
+    [Fact]
+    public async Task HandleSetEntryTags_WhenStoreThrows_ReportsErrorBanner()
+    {
+        var entry = BuildFilterEntry("Tagged");
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, _, _) = CreateEffects(
+            state: new FilterLibraryState { Entries = [entry] },
+            errorBannerService: errorBanner);
+        store.UpdateAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("disk full"));
+
+        await effects.HandleSetEntryTags(new SetEntryTagsAction(entry.Id, ["updated"]), dispatcher);
+
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsLibraryEntryTagsSaveFailed(message)));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+    }
+
+    [Fact]
+    public async Task HandleSetIsFavorite_WhenStoreThrows_ReportsErrorBanner()
+    {
+        var entry = BuildFilterEntry("Fav");
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, _, _) = CreateEffects(
+            state: new FilterLibraryState { Entries = [entry] },
+            errorBannerService: errorBanner);
+        store.UpdateAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("disk full"));
+
+        await effects.HandleSetIsFavorite(new SetIsFavoriteAction(entry.Id, true), dispatcher);
+
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsLibraryEntryFavoriteFailed(message)));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+    }
+
+    [Fact]
+    public async Task HandleSetFilterSetFilters_WhenStoreThrows_ReportsErrorBanner()
+    {
+        var filterSet = BuildFilterSetEntry("Errors");
+        var newFilter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(newFilter);
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, _, _) = CreateEffects(
+            state: new FilterLibraryState { Entries = [filterSet] },
+            errorBannerService: errorBanner);
+        store.UpdateAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("disk full"));
+
+        await effects.HandleSetFilterSetFilters(new SetFilterSetFiltersAction(filterSet.Id, [newFilter]), dispatcher);
+
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsFilterSetUpdateFailed(message)));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+    }
+
+    [Fact]
+    public async Task HandleAddFilterToExistingFilterSet_WhenStoreThrows_ReportsErrorBanner()
+    {
+        var filterSet = BuildFilterSetEntry("Errors");
+        var newFilter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(newFilter);
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, _, _) = CreateEffects(
+            state: new FilterLibraryState { Entries = [filterSet] },
+            errorBannerService: errorBanner);
+        store.UpdateAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("disk full"));
+
+        await effects.HandleAddFilterToExistingFilterSet(
+            new AddFilterToExistingFilterSetAction(filterSet.Id, newFilter, null), dispatcher);
+
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsFilterAddToSetFailed(message)));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+    }
+
+    [Fact]
     public async Task HandleSetIsFavorite_AlreadyAtTargetState_IsNoOp()
     {
         var entry = BuildFilterEntry("First") with { IsFavorite = true };
@@ -1833,15 +1982,159 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
-    public async Task HandleUpdateLibraryEntry_WhenStoreThrows_DoesNotDispatchSuccess()
+    public async Task HandleUpdateLibraryEntry_WhenStoreThrows_ReportsErrorBannerAndDoesNotDispatchSuccess()
     {
         var entry = BuildFilterEntry("First");
-        var (effects, store, dispatcher, _, logger) = CreateEffects();
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, _, logger) = CreateEffects(errorBannerService: errorBanner);
         store.When(s => s.UpdateAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>())).Do(_ => throw new InvalidOperationException("boom"));
 
         await effects.HandleUpdateLibraryEntry(new UpdateLibraryEntryAction(entry), dispatcher);
 
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsLibraryEntryUpdateFailed(message, "First")));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+        logger.ReceivedWithAnyArgs(1).Warning(default);
+    }
+
+    [Fact]
+    public async Task HandleImportLibraryEntries_WhenAddRangeThrows_ReportsOneErrorBannerAndReloadsWithoutSuccessOrAnnounce()
+    {
+        var entry = BuildFilterEntry("First");
+        var announcer = Substitute.For<IAnnouncementService>();
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, _, logger) = CreateEffects(
+            announcementService: announcer,
+            errorBannerService: errorBanner);
+        store.When(s => s.AddRangeAsync(Arg.Any<IEnumerable<LibraryEntry>>(), Arg.Any<CancellationToken>()))
+            .Do(_ => throw new InvalidOperationException("boom"));
+
+        await effects.HandleImportLibraryEntries(new ImportLibraryEntriesAction([entry], [], new ImportSummary(1, 0, 0, 0, 0)), dispatcher);
+
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsFilterLibraryImportFailed(message)));
+        dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+        announcer.DidNotReceiveWithAnyArgs().Announce(default!);
+        logger.ReceivedWithAnyArgs(1).Warning(default);
+    }
+
+    [Fact]
+    public async Task HandleImportLibraryEntries_SuccessWithAddsAndUpdates_DispatchesReturnedRowsAndAnnounces()
+    {
+        var add = BuildFilterEntry("Added");
+        var updateA = BuildFilterEntry("UpdateA");
+        var updateB = BuildFilterEntry("UpdateB");
+        var announcer = Substitute.For<IAnnouncementService>();
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, _, _) = CreateEffects(
+            announcementService: announcer,
+            errorBannerService: errorBanner);
+        store.AddRangeAsync(Arg.Any<IEnumerable<LibraryEntry>>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        store.UpdateRangeAsync(Arg.Any<IReadOnlyList<LibraryEntry>>(), Arg.Any<CancellationToken>()).Returns([updateA.Id, updateB.Id]);
+
+        await effects.HandleImportLibraryEntries(new ImportLibraryEntriesAction([add], [updateA, updateB], new ImportSummary(1, 1, 1, 2, 0)), dispatcher);
+
+        await store.Received(1).AddRangeAsync(
+            Arg.Is<IEnumerable<LibraryEntry>>(entries => entries != null && entries.SequenceEqual(new[] { add })),
+            Arg.Any<CancellationToken>());
+        await store.Received(1).UpdateRangeAsync(
+            Arg.Is<IReadOnlyList<LibraryEntry>>(entries => entries != null && entries.SequenceEqual(new[] { updateA, updateB })),
+            Arg.Any<CancellationToken>());
+        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(action => action != null && ReferenceEquals(action.Entry, add)));
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(action => action != null && ReferenceEquals(action.Entry, updateA)));
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(action => action != null && ReferenceEquals(action.Entry, updateB)));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryAction>());
+        announcer.Received(1).Announce("Imported 1 new, replaced 1, updated 1 tags, skipped 2");
+        errorBanner.DidNotReceiveWithAnyArgs().ReportError(default!);
+    }
+
+    [Fact]
+    public async Task HandleImportLibraryEntries_AddsOnlySuccess_AnnouncesWithoutReportingOrReloading()
+    {
+        var add = BuildFilterEntry("Added");
+        var announcer = Substitute.For<IAnnouncementService>();
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, _, _) = CreateEffects(
+            announcementService: announcer,
+            errorBannerService: errorBanner);
+        store.AddRangeAsync(Arg.Any<IEnumerable<LibraryEntry>>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        store.UpdateRangeAsync(Arg.Any<IReadOnlyList<LibraryEntry>>(), Arg.Any<CancellationToken>()).Returns([]);
+
+        await effects.HandleImportLibraryEntries(new ImportLibraryEntriesAction([add], [], new ImportSummary(1, 0, 0, 0, 0)), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(action => action != null && ReferenceEquals(action.Entry, add)));
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryAction>());
+        announcer.Received(1).Announce("Imported 1 new, replaced 0, updated 0 tags, skipped 0");
+        errorBanner.DidNotReceiveWithAnyArgs().ReportError(default!);
+    }
+
+    [Fact]
+    public async Task HandleImportLibraryEntries_EmptyImport_AnnouncesWithoutStoreOrWriteDispatch()
+    {
+        var announcer = Substitute.For<IAnnouncementService>();
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, _, _) = CreateEffects(
+            announcementService: announcer,
+            errorBannerService: errorBanner);
+
+        await effects.HandleImportLibraryEntries(new ImportLibraryEntriesAction([], [], new ImportSummary(0, 0, 0, 3, 0)), dispatcher);
+
+        await store.DidNotReceiveWithAnyArgs().AddRangeAsync(Arg.Any<IEnumerable<LibraryEntry>>(), Arg.Any<CancellationToken>());
+        await store.DidNotReceiveWithAnyArgs().UpdateRangeAsync(Arg.Any<IReadOnlyList<LibraryEntry>>(), Arg.Any<CancellationToken>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryAction>());
+        announcer.Received(1).Announce("Imported 0 new, replaced 0, updated 0 tags, skipped 3");
+        errorBanner.DidNotReceiveWithAnyArgs().ReportError(default!);
+    }
+
+    [Fact]
+    public async Task HandleImportLibraryEntries_PartialVanish_ReloadsAndAnnouncesWithoutErrorBanner()
+    {
+        var updateA = BuildFilterEntry("UpdateA");
+        var updateB = BuildFilterEntry("UpdateB");
+        var announcer = Substitute.For<IAnnouncementService>();
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, _, _) = CreateEffects(
+            announcementService: announcer,
+            errorBannerService: errorBanner);
+        store.AddRangeAsync(Arg.Any<IEnumerable<LibraryEntry>>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        store.UpdateRangeAsync(Arg.Any<IReadOnlyList<LibraryEntry>>(), Arg.Any<CancellationToken>()).Returns([updateA.Id]);
+
+        await effects.HandleImportLibraryEntries(new ImportLibraryEntriesAction([], [updateA, updateB], new ImportSummary(0, 2, 0, 0, 1)), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(action => action != null && ReferenceEquals(action.Entry, updateA)));
+        dispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(action => action != null && ReferenceEquals(action.Entry, updateB)));
+        dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
+        announcer.Received(1).Announce("Imported 0 new, replaced 2, updated 0 tags, skipped 0, imported 1 ambiguous as new");
+        errorBanner.DidNotReceiveWithAnyArgs().ReportError(default!);
+    }
+
+    [Fact]
+    public async Task HandleImportLibraryEntries_AddSucceedsThenUpdateThrows_ReportsBannerAndReloadsWithoutSuccessOrAnnounce()
+    {
+        var add = BuildFilterEntry("Added");
+        var update = BuildFilterEntry("Update");
+        var announcer = Substitute.For<IAnnouncementService>();
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, _, logger) = CreateEffects(
+            announcementService: announcer,
+            errorBannerService: errorBanner);
+        store.AddRangeAsync(Arg.Any<IEnumerable<LibraryEntry>>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        store.When(s => s.UpdateRangeAsync(Arg.Any<IReadOnlyList<LibraryEntry>>(), Arg.Any<CancellationToken>()))
+            .Do(_ => throw new InvalidOperationException("boom"));
+
+        await effects.HandleImportLibraryEntries(
+            new ImportLibraryEntriesAction([add], [update], new ImportSummary(1, 1, 0, 0, 0)), dispatcher);
+
+        // Adds committed but the update phase threw: suppress the add/update success actions and resync via reload;
+        // exactly one banner, no announce.
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsFilterLibraryImportFailed(message)));
+        dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+        announcer.DidNotReceiveWithAnyArgs().Announce(default!);
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
 
@@ -1852,7 +2145,8 @@ public sealed class FilterLibraryEffectsTests
         var renamedEntry = staleEntry with { Name = "NewName" };
         var staleState = new FilterLibraryState { Entries = [staleEntry] };
         var renamedState = new FilterLibraryState { Entries = [renamedEntry] };
-        var (effects, store, dispatcher, stateMock, logger) = CreateEffects(state: staleState);
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, store, dispatcher, stateMock, logger) = CreateEffects(state: staleState, errorBannerService: errorBanner);
 
         stateMock.Value.Returns(staleState, staleState, renamedState);
 
@@ -1871,6 +2165,7 @@ public sealed class FilterLibraryEffectsTests
         Assert.Equal(2, updateCalls);
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
+        errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsLibraryEntryPromoteFailed(message)));
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
 
@@ -2005,6 +2300,42 @@ public sealed class FilterLibraryEffectsTests
 
         return (effects, store, dispatcher, stateMock, migrator, logger);
     }
+
+    private static bool IsFilterAddToSetFailed(BannerMessage? message) =>
+        message is FilterAddToSetFailed;
+
+    private static bool IsFilterLibraryImportFailed(BannerMessage? message) =>
+        message is FilterLibraryImportFailed;
+
+    private static bool IsFilterSetCreateFailed(BannerMessage? message, string name) =>
+        message is FilterSetCreateFailed createFailed && createFailed.Name == name;
+
+    private static bool IsFilterSetUpdateFailed(BannerMessage? message) =>
+        message is FilterSetUpdateFailed;
+
+    private static bool IsLibraryEntryDeleteFailed(BannerMessage? message) =>
+        message is LibraryEntryDeleteFailed;
+
+    private static bool IsLibraryEntryFavoriteFailed(BannerMessage? message) =>
+        message is LibraryEntryFavoriteFailed;
+
+    private static bool IsLibraryEntryPromoteFailed(BannerMessage? message) =>
+        message is LibraryEntryPromoteFailed;
+
+    private static bool IsLibraryEntryRenameFailed(BannerMessage? message) =>
+        message is LibraryEntryRenameFailed;
+
+    private static bool IsLibraryEntrySaveFailed(BannerMessage? message, string name) =>
+        message is LibraryEntrySaveFailed saveFailed && saveFailed.Name == name;
+
+    private static bool IsLibraryEntryTagsSaveFailed(BannerMessage? message) =>
+        message is LibraryEntryTagsSaveFailed;
+
+    private static bool IsLibraryEntryUpdateFailed(BannerMessage? message, string name) =>
+        message is LibraryEntryUpdateFailed updateFailed && updateFailed.Name == name;
+
+    private static bool IsLibraryTagsBulkUpdateFailed(BannerMessage? message) =>
+        message is LibraryTagsBulkUpdateFailed;
 
     private static bool IsFilterSetSaveFailed(BannerMessage? message, string name) =>
         message is FilterSetSaveFailed saveFailed && saveFailed.Name == name;
