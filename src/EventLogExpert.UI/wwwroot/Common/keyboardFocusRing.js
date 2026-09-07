@@ -94,12 +94,14 @@ export function registerKeyboardFocusRing() {
         if (!e.isTrusted) { return; }
 
         if (e.detail > 0) {
-            // Only remember an ENABLED forwarded control. The browser never dispatches the synthesised detail-0
-            // click to a disabled control, so remembering one would leave a stale target: once that control is
-            // later enabled and activated by assistive tech (a trusted detail-0 click), the stale match would
-            // misread it as a label-forwarded mouse click and wrongly suppress its focus ring.
+            // Only remember an ENABLED forwarded control that the click did NOT land on directly. The browser
+            // synthesises the detail-0 forwarded click only when the label itself (not the nested control) was clicked,
+            // and never to a disabled control - so remembering either case would strand a stale target that a later
+            // trusted detail-0 assistive-tech activation would misread as a label-forwarded mouse click and wrongly
+            // suppress its focus ring.
             const forwardedControl = e.target.closest?.("label")?.control;
-            forwardedClickTarget = forwardedControl && !forwardedControl.disabled ? forwardedControl : null;
+            forwardedClickTarget =
+                forwardedControl && forwardedControl !== e.target && !forwardedControl.disabled ? forwardedControl : null;
             return;
         }
 

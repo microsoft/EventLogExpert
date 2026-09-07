@@ -130,9 +130,12 @@ internal sealed class Effects(
 
         var contributingLenses = _lensState.Value.Lenses.Where(lens => !lens.ExcludeFilters.IsEmpty).ToImmutableList();
 
+        // Dedupe by the same case-insensitive (ComparisonText, Mode, IsExcluded) identity the library apply path uses
+        // (ReduceMergeFilters / the FilterLibrary store dedup), so the saved group round-trips faithfully - applying it
+        // never silently drops a case-variant the save kept.
         var filters = contributingLenses
             .SelectMany(lens => lens.ExcludeFilters)
-            .DistinctBy(filter => (filter.ComparisonText, filter.Mode, filter.IsExcluded))
+            .DistinctBy(filter => (filter.ComparisonText.ToLowerInvariant(), filter.Mode, filter.IsExcluded))
             .ToImmutableList();
 
         if (filters.IsEmpty) { return Task.CompletedTask; }

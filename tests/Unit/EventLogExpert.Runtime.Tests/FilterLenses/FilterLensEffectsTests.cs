@@ -340,11 +340,28 @@ public sealed class FilterLensEffectsTests
     }
 
     [Fact]
+    public async Task HandleSaveLensesAsGroup_DedupesCaseVariantFiltersToMatchLibraryApply()
+    {
+        // The saved group is applied via the case-insensitive library merge (ReduceMergeFilters), so the save dedupes
+        // case-variant values ("Contoso" / "CONTOSO") into one predicate too - saving both would not round-trip, as the
+        // apply path would collapse them and broaden the result.
+        var lower = FilterLensFactory.ForExcludedValue(EventProperty.Source, "Contoso")!;
+        var upper = FilterLensFactory.ForExcludedValue(EventProperty.Source, "CONTOSO")!;
+        var (effects, dispatcher) =
+            CreateEffects(new FilterLensState { Lenses = [lower, upper] }, new FilterPaneState());
+
+        await effects.HandleSaveLensesAsGroup(new SaveLensesAsGroupAction("My Group"), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetAction>(action =>
+            action != null && action.Filters.Count == 1 && action.Filters.All(filter => filter.IsExcluded)));
+    }
+
+    [Fact]
     public async Task HandleSaveLensesAsGroup_DeduplicatesFiltersWithIdenticalContent()
     {
         // Distinct lenses can carry byte-identical exclude criteria (the reducer supports same-content, distinct-id
-        // lenses). The saved set dedupes by the ordinal-exact (ComparisonText, Mode, IsExcluded) identity (matching
-        // MergePromotedFilters) so it never persists duplicate rows.
+        // lenses). The saved set dedupes by the same case-insensitive (ComparisonText, Mode, IsExcluded) identity the
+        // library apply uses, so it never persists duplicate rows.
         var first = FilterLensFactory.ForExcludedValue(EventProperty.Source, "Contoso")!;
         var second = FilterLensFactory.ForExcludedValue(EventProperty.Source, "Contoso")!;
         var (effects, dispatcher) =
@@ -354,22 +371,6 @@ public sealed class FilterLensEffectsTests
 
         dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetAction>(action =>
             action != null && action.Filters.Count == 1 && action.Filters[0].IsExcluded));
-    }
-
-    [Fact]
-    public async Task HandleSaveLensesAsGroup_KeepsCaseVariantFiltersAsDistinctPredicates()
-    {
-        // Dedup is ordinal-exact (like MergePromotedFilters), so case-variant values stay distinct predicates -
-        // collapsing them case-insensitively would drop an exclusion and broaden the saved group when reapplied.
-        var lower = FilterLensFactory.ForExcludedValue(EventProperty.Source, "Contoso")!;
-        var upper = FilterLensFactory.ForExcludedValue(EventProperty.Source, "CONTOSO")!;
-        var (effects, dispatcher) =
-            CreateEffects(new FilterLensState { Lenses = [lower, upper] }, new FilterPaneState());
-
-        await effects.HandleSaveLensesAsGroup(new SaveLensesAsGroupAction("My Group"), dispatcher);
-
-        dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetAction>(action =>
-            action != null && action.Filters.Count == 2 && action.Filters.All(filter => filter.IsExcluded)));
     }
 
     [Fact]
