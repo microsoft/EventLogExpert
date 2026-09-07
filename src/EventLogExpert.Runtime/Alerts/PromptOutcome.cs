@@ -10,4 +10,4 @@ public enum PromptChoice
     Secondary,
 }
 
-public readonly record struct PromptOutcome(PromptChoice Choice, string Value);
+public readonly record struct PromptOutcome(PromptChoice Choice, string? Value);
