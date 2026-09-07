@@ -184,7 +184,42 @@ public sealed class FilterLensEffectsTests
     }
 
     [Fact]
-    public async Task HandlePromote_KeepOnlyLens_AnnouncesAndDispatchesPositiveInclude()
+    public async Task HandlePromote_KeepOnlyLens_DisabledIncludeBase_DispatchesPositiveInclude()
+    {
+        // A disabled include is not in the current view, so it does not force the exclude fallback: the pin still
+        // commits the cleaner positive include, exactly as with an empty pane.
+        var lens = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
+        var paneState = new FilterPaneState { Filters = [Compile("Level == \"Error\"") with { IsEnabled = false }] };
+        var (effects, dispatcher, announcer) =
+            CreateEffectsWithAnnouncer(new FilterLensState { Lenses = [lens] }, paneState);
+
+        await effects.HandlePromote(new PromoteFilterLensAction(lens.Id), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action =>
+            action != null && action.Id == lens.Id && action.Filters.Count == 1 &&
+            !action.Filters[0].IsExcluded && action.Window == null));
+    }
+
+    [Fact]
+    public async Task HandlePromote_KeepOnlyLens_GlobalFilteringDisabled_DispatchesExcludeNarrowing()
+    {
+        // With global filtering disabled the pane applies only excludes, so a committed positive include would be
+        // ignored while the lens's active exclude is removed on commit - broadening the view. The pin must commit the
+        // exclude-of-complement instead, even though the pane has no active include.
+        var lens = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
+        var paneState = new FilterPaneState { IsEnabled = false };
+        var (effects, dispatcher, announcer) =
+            CreateEffectsWithAnnouncer(new FilterLensState { Lenses = [lens] }, paneState);
+
+        await effects.HandlePromote(new PromoteFilterLensAction(lens.Id), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action =>
+            action != null && action.Id == lens.Id && action.Filters.Count == 1 &&
+            action.Filters[0].IsExcluded && action.Window == null));
+    }
+
+    [Fact]
+    public async Task HandlePromote_KeepOnlyLens_NoActiveIncludeBase_DispatchesPositiveInclude()
     {
         var lens = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
         var (effects, dispatcher, announcer) =
@@ -194,10 +229,30 @@ public sealed class FilterLensEffectsTests
 
         announcer.Received(1).AnnounceLensKept(lens.Label);
 
-        // A keep-only lens promotes as a single POSITIVE INCLUDE (== value), not the transient exclude-of-complement.
+        // With no active include in the pane the positive include cannot broaden the view (it is equivalent to the
+        // exclude-of-complement), so a keep-only lens promotes as a single clean POSITIVE INCLUDE (== value).
         dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action =>
             action != null && action.Id == lens.Id && action.Filters.Count == 1 &&
             !action.Filters[0].IsExcluded && action.Filters[0].Compiled != null && action.Window == null));
+    }
+
+    [Fact]
+    public async Task HandlePromote_KeepOnlyLens_WithActiveIncludeBase_DispatchesExcludeNarrowing()
+    {
+        // An active include already in the pane means the lens's positive include would UNION (OR) and broaden the
+        // view. The pin must instead commit the exclude-of-complement so it reproduces the AND-narrowed intersection.
+        var lens = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
+        var paneState = new FilterPaneState { Filters = [Compile("Level == \"Error\"")] };
+        var (effects, dispatcher, announcer) =
+            CreateEffectsWithAnnouncer(new FilterLensState { Lenses = [lens] }, paneState);
+
+        await effects.HandlePromote(new PromoteFilterLensAction(lens.Id), dispatcher);
+
+        announcer.Received(1).AnnounceLensKept(lens.Label);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<CommitPromotedLensAction>(action =>
+            action != null && action.Id == lens.Id && action.Filters.Count == 1 &&
+            action.Filters[0].IsExcluded && action.Filters[0].Compiled != null && action.Window == null));
     }
 
     [Fact]
