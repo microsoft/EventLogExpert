@@ -17,10 +17,11 @@
 // (WCAG 2.4.7) instead of silently dropping it app-wide. One idempotent registration wires the listeners
 // for the whole app.
 
-// Lone modifier keydowns are not navigation. AltGraph is included because Windows AltGr dispatches its own
-// keydown (key "AltGraph") right before the printable character, which would otherwise flip modality mid-word
-// on non-US layouts.
-const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta", "AltGraph"]);
+// Lone modifier and lock keydowns are not navigation. AltGraph is included because Windows AltGr dispatches
+// its own keydown (key "AltGraph") right before the printable character, which would otherwise flip modality
+// mid-word on non-US layouts. CapsLock / NumLock / ScrollLock move no focus either, so toggling one after a
+// mouse click must not flip to keyboard mode and paint a ring on a control focus never moved to.
+const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta", "AltGraph", "CapsLock", "NumLock", "ScrollLock"]);
 const TEXT_ENTRY_INPUT_TYPES = new Set(["text", "search", "url", "tel", "email", "password", "number"]);
 // Caret / edit keys that, like a printable character, edit the field's text rather than navigate away from
 // it. ArrowUp / ArrowDown are intentionally excluded: this app has no multiline text inputs, so they never
@@ -93,8 +94,12 @@ export function registerKeyboardFocusRing() {
         if (!e.isTrusted) { return; }
 
         if (e.detail > 0) {
-            const label = e.target.closest?.("label");
-            forwardedClickTarget = label ? label.control : null;
+            // Only remember an ENABLED forwarded control. The browser never dispatches the synthesised detail-0
+            // click to a disabled control, so remembering one would leave a stale target: once that control is
+            // later enabled and activated by assistive tech (a trusted detail-0 click), the stale match would
+            // misread it as a label-forwarded mouse click and wrongly suppress its focus ring.
+            const forwardedControl = e.target.closest?.("label")?.control;
+            forwardedClickTarget = forwardedControl && !forwardedControl.disabled ? forwardedControl : null;
             return;
         }
 

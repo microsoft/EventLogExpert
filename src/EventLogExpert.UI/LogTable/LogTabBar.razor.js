@@ -40,9 +40,21 @@ function registerLogTabBarScroller(logTabBar) {
         const tabs = logTabBar.getElementsByClassName("tab");
 
         if (isScrolling) {
-            for (let i = 0; i < tabs.length; i++) {
-                tabs[i].addEventListener("click", preventClick);
+            // Suppress only the drag's own trailing click, then drop the listeners on the next task. Blazor routes
+            // activation through a document-level click listener, so a lingering suppressor would also swallow the
+            // browser click synthesized by Enter/Space on the native group-header button (which has no mouseup to
+            // clear it), breaking the first keyboard activation after a drag-scroll.
+            const scrolledTabs = Array.from(tabs);
+
+            for (let i = 0; i < scrolledTabs.length; i++) {
+                scrolledTabs[i].addEventListener("click", preventClick);
             }
+
+            setTimeout(() => {
+                for (let i = 0; i < scrolledTabs.length; i++) {
+                    scrolledTabs[i].removeEventListener("click", preventClick);
+                }
+            }, 0);
         } else {
             for (let i = 0; i < tabs.length; i++) {
                 tabs[i].removeEventListener("click", preventClick);
