@@ -66,7 +66,7 @@ internal sealed class Effects(
 
         _announcementService.AnnounceLensKept(lens.Label);
 
-        dispatcher.Dispatch(new CommitPromotedLensAction(lens.Id, PromoteForm(lens), lens.Window));
+        dispatcher.Dispatch(new CommitPromotedLensAction(lens.Id, PromoteFormFor(lens), lens.Window));
 
         return Task.CompletedTask;
     }
@@ -154,6 +154,22 @@ internal sealed class Effects(
 
     private static ImmutableList<SavedFilter> PromoteForm(FilterLens lens) =>
         lens.PromoteFilters.IsEmpty ? lens.ExcludeFilters : lens.PromoteFilters;
+
+    // A keep-only lens carries both a clean positive include (Source == X) and its exclude-of-complement (Source != X).
+    // The positive include reads better, but it is only safe to commit when it reproduces the exact view the user was
+    // narrowing. Commit the positive include ONLY when filtering is globally enabled AND the pane has no other active
+    // include - there it is provably equivalent to the exclude-complement, so pinning never broadens. Otherwise commit
+    // ExcludeFilters (AND-narrowing), matching HandlePromoteAll and the live EffectiveFilterBuilder view:
+    //  - another active include would UNION (OR) with the positive include and broaden the view; and
+    //  - when filtering is globally disabled the pane applies only excludes (FilterPaneFilterBuilder.Build), so a
+    //    committed include is ignored while the lens's active exclude is removed on commit - which also broadens.
+    // A disabled include is not "active": it is not in the current view, and re-enabling it is the user re-editing
+    // filters into a union.
+    private ImmutableList<SavedFilter> PromoteFormFor(FilterLens lens) =>
+        !_filterPaneState.Value.IsEnabled ||
+        _filterPaneState.Value.Filters.Any(filter => filter is { IsEnabled: true, IsExcluded: false }) ?
+            lens.ExcludeFilters :
+            PromoteForm(lens);
 
     private Task Reapply(IDispatcher dispatcher)
     {
