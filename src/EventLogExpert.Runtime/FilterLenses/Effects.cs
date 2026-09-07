@@ -128,19 +128,18 @@ internal sealed class Effects(
     {
         if (string.IsNullOrWhiteSpace(action.Name)) { return Task.CompletedTask; }
 
-        var lenses = _lensState.Value.Lenses;
+        var contributingLenses = _lensState.Value.Lenses.Where(lens => !lens.ExcludeFilters.IsEmpty).ToImmutableList();
 
-        var filters = lenses
+        var filters = contributingLenses
             .SelectMany(lens => lens.ExcludeFilters)
             .DistinctBy(filter => (filter.ComparisonText, filter.Mode, filter.IsExcluded))
             .ToImmutableList();
 
         if (filters.IsEmpty) { return Task.CompletedTask; }
 
-        // For save-and-clear, capture the ids of exactly the lenses being saved. The terminal
-        // SaveFilterSetSucceededAction removes only those - and only after the write succeeds - so a lens added while
-        // the persist is in flight survives, and a failed save (surfaced via the error banner) discards nothing.
-        var lensesToClearOnSuccess = action.ClearAfterSave ? lenses.Select(lens => lens.Id).ToImmutableList() : null;
+        var lensesToClearOnSuccess = action.ClearAfterSave ?
+            contributingLenses.Select(lens => lens.Id).ToImmutableList() :
+            null;
 
         dispatcher.Dispatch(new SaveFilterSetAction(action.Name, filters, SaveFilterSetOrigin.Lens, lensesToClearOnSuccess));
 

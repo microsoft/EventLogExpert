@@ -322,6 +322,24 @@ public sealed class FilterLensEffectsTests
     }
 
     [Fact]
+    public async Task HandleSaveLensesAsGroup_ClearAfterSave_MixedStack_ClearsOnlyContributingLenses()
+    {
+        // A time-window lens contributes no filter (the UI says it can't be grouped), so save-and-clear must remove
+        // only the contributing value lens and leave the non-groupable time-window lens active.
+        var value = FilterLensFactory.ForExcludedValue(EventProperty.Source, "Contoso")!;
+        var time = FilterLensFactory.ForTimeWindow(DateTime.UtcNow, TimeSpan.FromMinutes(5), TimeZoneInfo.Utc);
+        var (effects, dispatcher) =
+            CreateEffects(new FilterLensState { Lenses = [value, time] }, new FilterPaneState());
+
+        await effects.HandleSaveLensesAsGroup(new SaveLensesAsGroupAction("My Group", ClearAfterSave: true), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetAction>(action =>
+            action != null && action.Filters.Count == 1 &&
+            action.LensesToClearOnSuccess != null && action.LensesToClearOnSuccess.Count == 1 &&
+            action.LensesToClearOnSuccess.Contains(value.Id) && !action.LensesToClearOnSuccess.Contains(time.Id)));
+    }
+
+    [Fact]
     public async Task HandleSaveLensesAsGroup_DeduplicatesFiltersWithIdenticalContent()
     {
         // Distinct lenses can carry byte-identical exclude criteria (the reducer supports same-content, distinct-id
