@@ -34,8 +34,22 @@ public sealed record DatabaseImportSummary(
     IReadOnlyList<ImportFailure> Failures,
     IReadOnlyList<ImportFailure> UpgradeFailures) : BannerMessage
 {
+    public IReadOnlyList<ImportFailure> Failures { get; } = Snapshot(Failures);
+
+    public IReadOnlyList<ImportFailure> UpgradeFailures { get; } = Snapshot(UpgradeFailures);
+
     public DatabaseImportSeverity Severity =>
         Failures.Count == 0 && UpgradeFailures.Count == 0 ? DatabaseImportSeverity.Info :
         Imported == 0 ? DatabaseImportSeverity.Error :
         DatabaseImportSeverity.Warning;
+
+    // Snapshot the caller-owned list so mutating it after the banner is queued cannot retroactively change the rendered
+    // failure details or the computed Severity (banners are localized and rendered later). Get-only blocks the
+    // with-based bypass.
+    private static IReadOnlyList<ImportFailure> Snapshot(IReadOnlyList<ImportFailure> failures)
+    {
+        ArgumentNullException.ThrowIfNull(failures);
+
+        return [.. failures];
+    }
 }
