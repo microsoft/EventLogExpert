@@ -477,9 +477,13 @@
     <value>Filter library not fully loaded</value>
     <comment>Title for a filter library load warning.</comment>
   </data>
-  <data name="Banner_Filter_NotLoaded_Message" xml:space="preserve">
+  <data name="Banner_Filter_NotLoaded_Message_One" xml:space="preserve">
+    <value>1 library entry couldn't be read and was left in place to avoid data loss. This usually means the library was written by a newer version of the app.</value>
+    <comment>Filter library load warning for a single unreadable entry.</comment>
+  </data>
+  <data name="Banner_Filter_NotLoaded_Message_Many" xml:space="preserve">
     <value>{0} library entries couldn't be read and were left in place to avoid data loss. This usually means the library was written by a newer version of the app.</value>
-    <comment>Filter library load warning. {0} is the raw count of unreadable entries.</comment>
+    <comment>Filter library load warning for multiple unreadable entries. {0} is the raw count of unreadable entries.</comment>
   </data>
   <data name="Banner_Filter_CreateFailed_Title" xml:space="preserve">
     <value>Couldn't create filter set</value>

@@ -37,7 +37,9 @@ internal static partial class BannerContentLocalizer
             DatabaseImportSummary databaseImportSummary => ResolveDatabaseImportSummary(localizer, databaseImportSummary),
             FilterLibraryNotFullyLoaded filterLibraryNotFullyLoaded => new BannerContentText(
                 localizer["Banner_Filter_NotLoaded_Title"],
-                localizer["Banner_Filter_NotLoaded_Message", filterLibraryNotFullyLoaded.Count]),
+                filterLibraryNotFullyLoaded.Count == 1 ?
+                    localizer["Banner_Filter_NotLoaded_Message_One"] :
+                    localizer["Banner_Filter_NotLoaded_Message_Many", filterLibraryNotFullyLoaded.Count]),
             FilterLibraryImportFailed => new BannerContentText(
                 localizer["Banner_Filter_ImportFailed_Title"],
                 localizer["Banner_Filter_ImportFailed_Message"]),
