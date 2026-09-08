@@ -15,8 +15,7 @@
     flex: 0 0 auto;
     container: stats-pane / inline-size;
     height: 100%;
-    margin: 0 5px;
-    padding: 2px 0 4px;
+    padding: 2px 5px 4px;
     border-top: solid var(--background-darkgray);
     overflow: hidden;
     color: var(--text-secondary);

@@ -4,21 +4,7 @@
 
     & > .input { margin: 0; }
 
-    /* The readonly combobox input matches :focus-visible on a mouse click in Chromium, which would
-       ring the box on click. Opt out of the global ring and paint a keyboard-only one instead:
-       ValueSelect.razor.js sets data-pointer-focus on mousedown (cleared on keydown/blur), so a Tab
-       arrival has no marker and rings while a click does not. Mouse movement never changes the
-       marker, so a Tab ring persists. The resting bottom border is a separate cue and is untouched. */
-    & > .input:focus-visible { outline: none; }
-
-    & > .input:focus:not([data-pointer-focus]) {
-        outline: var(--focus-ring-width) solid var(--focus-ring-color);
-        outline-offset: var(--focus-ring-offset);
-    }
-
-    /* The color swatch paints its own 1px border, so push its keyboard ring outside that border to
-       stay visible instead of overpainting it in the same color. */
-    & > .input.color-dropdown:focus:not([data-pointer-focus]) {
+    :root[data-modality="keyboard"] & > .input.color-dropdown:focus {
         outline-offset: 2px;
     }
 }

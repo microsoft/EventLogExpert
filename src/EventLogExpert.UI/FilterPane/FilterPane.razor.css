@@ -3,7 +3,7 @@
     flex-direction: column;
     flex: 0 0 auto;
 
-    margin: 0 5px;
+    padding: 0 5px;
 
     max-height: 30%;
     overflow-x: hidden;

@@ -10,6 +10,10 @@ export function registerLogTabBarEvents() {
 }
 
 function registerLogTabBarScroller(logTabBar) {
+    // A press only becomes a drag-scroll after moving past this many pixels, so pointer jitter during a
+    // click does not latch scrolling and suppress the click that activates/toggles a tab.
+    const DRAG_THRESHOLD_PX = 5;
+
     let canDrag, isScrolling = false;
     let startPos, currentPos;
 
@@ -22,6 +26,9 @@ function registerLogTabBarScroller(logTabBar) {
         if (e.button !== 0) { return; }
 
         canDrag = true;
+        // Reset the latch at the start of every press so a previous drag that ended outside the bar (its
+        // mouseup never ran here) can't leave isScrolling stuck true and suppress this press's click.
+        isScrolling = false;
 
         startPos = e.pageX - logTabBar.offsetLeft;
         currentPos = logTabBar.scrollLeft;
@@ -33,9 +40,21 @@ function registerLogTabBarScroller(logTabBar) {
         const tabs = logTabBar.getElementsByClassName("tab");
 
         if (isScrolling) {
-            for (let i = 0; i < tabs.length; i++) {
-                tabs[i].addEventListener("click", preventClick);
+            // Suppress only the drag's own trailing click, then drop the listeners on the next task. Blazor routes
+            // activation through a document-level click listener, so a lingering suppressor would also swallow the
+            // browser click synthesized by Enter/Space on the native group-header button (which has no mouseup to
+            // clear it), breaking the first keyboard activation after a drag-scroll.
+            const scrolledTabs = Array.from(tabs);
+
+            for (let i = 0; i < scrolledTabs.length; i++) {
+                scrolledTabs[i].addEventListener("click", preventClick);
             }
+
+            setTimeout(() => {
+                for (let i = 0; i < scrolledTabs.length; i++) {
+                    scrolledTabs[i].removeEventListener("click", preventClick);
+                }
+            }, 0);
         } else {
             for (let i = 0; i < tabs.length; i++) {
                 tabs[i].removeEventListener("click", preventClick);
@@ -48,13 +67,15 @@ function registerLogTabBarScroller(logTabBar) {
     logTabBar.addEventListener("mousemove", (e) => {
         if (!canDrag) { return; }
 
+        const offset = e.pageX - logTabBar.offsetLeft;
+        const pos = offset - startPos;
+
+        if (!isScrolling && Math.abs(pos) < DRAG_THRESHOLD_PX) { return; }
+
         isScrolling = true;
 
         e.preventDefault();
 
-        const offset = e.pageX - logTabBar.offsetLeft;
-        const pos = offset - startPos;
-        
         logTabBar.scrollLeft = currentPos - pos;
     });
 

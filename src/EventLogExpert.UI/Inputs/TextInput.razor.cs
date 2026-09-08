@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace EventLogExpert.UI.Inputs;
 
@@ -13,6 +14,8 @@ public partial class TextInput : InputComponent<string>
     [Parameter] public bool AriaInvalid { get; set; }
 
     [Parameter] public string? Id { get; set; }
+
+    [Parameter] public EventCallback OnEnter { get; set; }
 
     [Parameter] public bool UpdateOnInput { get; set; }
 
@@ -32,6 +35,11 @@ public partial class TextInput : InputComponent<string>
 
         base.OnParametersSet();
     }
+
+    private Task HandleKeyDownAsync(KeyboardEventArgs args) =>
+        // Skip the Enter that commits an IME composition candidate (Chromium reports IsComposing on it) so a
+        // composition commit does not prematurely confirm the dialog.
+        args is { Key: "Enter", IsComposing: false } && OnEnter.HasDelegate ? OnEnter.InvokeAsync() : Task.CompletedTask;
 
     private async Task UpdateValue(ChangeEventArgs args)
     {

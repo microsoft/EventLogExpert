@@ -78,6 +78,19 @@ public sealed class FilterLensSourceTests
     }
 
     [Fact]
+    public void Lenses_ProjectTheLensKind_SoTimeWindowLensesAreNotTreatedAsValueLenses()
+    {
+        // Guards the FilterLensSummary.Kind projection: if it were dropped, a time-window lens would default to
+        // Property and wrongly enable "Save as group" (which a filter set cannot store a date window for).
+        var time = FilterLensFactory.ForTimeWindow(DateTime.UtcNow, TimeSpan.FromMinutes(5), TimeZoneInfo.Utc);
+        var harness = new Harness(time);
+
+        var summary = Assert.Single(harness.Source.Lenses);
+
+        Assert.Equal(LensKind.TimeWindow, summary.Kind);
+    }
+
+    [Fact]
     public void Lenses_SummarizeTheActiveLenses()
     {
         var first = Lens("First");

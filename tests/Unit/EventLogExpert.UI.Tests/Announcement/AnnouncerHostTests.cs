@@ -40,6 +40,20 @@ public sealed class AnnouncerHostTests : BunitContext
     }
 
     [Fact]
+    public void AnnouncerHost_LensGroupSaved_RoutesThroughLocalizer()
+    {
+        // The structured LensGroupSaved payload must have a switch arm (the default arm throws), and it localizes
+        // the "saved as group" wording with the group name at render time.
+        _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.LensGroupSaved("My Group"), 1));
+
+        var component = Render<AnnouncerHost>();
+
+        var text = component.Find("#app-announcer").TextContent;
+        Assert.Contains("[[FilterLens_SavedAsGroupAnnouncement(", text);
+        Assert.Contains("My Group", text);
+    }
+
+    [Fact]
     public void AnnouncerHost_LensKeptReannounced_RoutesThroughLocalizerAndMutatesText()
     {
         // The structured LensKept payload localizes the "kept as filter" wording at render time (MarkerLocalizer echoes
@@ -61,6 +75,18 @@ public sealed class AnnouncerHostTests : BunitContext
 
         Assert.NotEqual(first, second);
         Assert.Contains("[[FilterLens_KeptAnnouncement(", second);
+    }
+
+    [Fact]
+    public void AnnouncerHost_LensesSavedAll_RoutesThroughLocalizer()
+    {
+        // The structured LensesSavedAll payload must have a switch arm (the default arm throws) and localizes the
+        // "saved all" wording.
+        _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.LensesSavedAll(), 1));
+
+        var component = Render<AnnouncerHost>();
+
+        Assert.Contains("[[FilterLens_SavedAllAnnouncement", component.Find("#app-announcer").TextContent);
     }
 
     [Fact]

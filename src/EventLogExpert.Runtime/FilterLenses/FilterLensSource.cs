@@ -15,7 +15,7 @@ internal sealed class FilterLensSource(
     : ObservableStateSourceBase<FilterLensState, ImmutableList<FilterLensSummary>>(
             state,
             logger,
-            static state => [.. state.Lenses.Select(lens => new FilterLensSummary(lens.Id, lens.Label))],
+            static state => [.. state.Lenses.Select(lens => new FilterLensSummary(lens.Id, lens.Label, lens.Kind))],
             static (next, current) => next.SequenceEqual(current)),
         IFilterLensSource
 {

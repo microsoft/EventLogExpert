@@ -230,6 +230,69 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
+    public void ReduceCommitPromotedLenses_DuplicateAcrossCommits_AddsSingleRow()
+    {
+        // The batch folds over the RUNNING list, so the second commit's identical exclude dedups against the row the
+        // first commit just added: "Save all" of two lenses carrying the same filter yields ONE row, not two.
+        var state = new FilterPaneState();
+
+        var result = Reducers.ReduceCommitPromotedLenses(
+            state,
+            new CommitPromotedLensesAction(
+                [
+                    new PromotedLensCommit(FilterLensId.Create(), [PromotedExclude("Source != \"foo\"")], null),
+                    new PromotedLensCommit(FilterLensId.Create(), [PromotedExclude("Source != \"foo\"")], null)
+                ]));
+
+        Assert.Single(result.Filters);
+        Assert.True(result.Filters[0].IsExcluded);
+        Assert.True(result.Filters[0].IsEnabled);
+    }
+
+    [Fact]
+    public void ReduceCommitPromotedLenses_EmptyBatch_ReturnsSameStateInstance()
+    {
+        var state = new FilterPaneState { Filters = [PromotedExclude("Source != \"foo\"")] };
+
+        var result = Reducers.ReduceCommitPromotedLenses(state, new CommitPromotedLensesAction([]));
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
+    public void ReduceCommitPromotedLenses_MultipleWindows_IntersectsAllCumulatively()
+    {
+        // Every enabled window intersects cumulatively. Narrow is committed FIRST and wide LAST: if only the last
+        // window were applied the range would widen to the wide bounds, so asserting the narrow bounds proves the fold.
+        var narrow = new DateFilter
+        {
+            After = new DateTime(2024, 1, 3, 0, 0, 0, DateTimeKind.Utc),
+            Before = new DateTime(2024, 1, 5, 0, 0, 0, DateTimeKind.Utc),
+            IsEnabled = true
+        };
+        var wide = new DateFilter
+        {
+            After = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            Before = new DateTime(2024, 1, 10, 0, 0, 0, DateTimeKind.Utc),
+            IsEnabled = true
+        };
+        var state = new FilterPaneState();
+
+        var result = Reducers.ReduceCommitPromotedLenses(
+            state,
+            new CommitPromotedLensesAction(
+                [
+                    new PromotedLensCommit(FilterLensId.Create(), [], narrow),
+                    new PromotedLensCommit(FilterLensId.Create(), [], wide)
+                ]));
+
+        Assert.NotNull(result.FilteredDateRange);
+        Assert.True(result.FilteredDateRange.IsEnabled);
+        Assert.Equal(narrow.After, result.FilteredDateRange.After);
+        Assert.Equal(narrow.Before, result.FilteredDateRange.Before);
+    }
+
+    [Fact]
     public void ReduceCommitPromoted_CaseVariantValue_TreatedAsDistinct()
     {
         // Ordinal-exact dedup: the lens preserves the EXACT predicate it matched, so a case-variant value is a

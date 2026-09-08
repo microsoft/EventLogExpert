@@ -79,6 +79,21 @@ internal sealed class Effects
         return Task.CompletedTask;
     }
 
+    [EffectMethod]
+    public Task HandleCommitPromotedLenses(CommitPromotedLensesAction action, IDispatcher dispatcher)
+    {
+        dispatcher.Dispatch(new ApplyFilterAction(BuildCandidate(_filterPaneState.Value)));
+
+        if (action.Commits.Any(commit => commit.Window is { IsEnabled: true }))
+        {
+            _setFilterDateRangeSucceededNotifier.Raise();
+        }
+
+        _filterPromotedNotifier.Raise();
+
+        return Task.CompletedTask;
+    }
+
     [EffectMethod(typeof(MergeFiltersAction))]
     public Task HandleMergeFilters(IDispatcher dispatcher)
     {

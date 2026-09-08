@@ -11,6 +11,15 @@ public interface IAlertDialogService
 
     Task<string> DisplayPrompt(string title, string message, string initialValue, Func<string, string?>? validate);
 
+    Task<PromptOutcome> DisplayPromptWithSecondary(
+        string title,
+        string message,
+        string initialValue,
+        string primaryLabel,
+        string secondaryLabel,
+        string cancelLabel,
+        Func<string, string?>? validate = null);
+
     Task ShowAlert(string title, string message, string cancel);
 
     Task ShowAlert(string title, string message, string cancel, AlertPresentation presentation);

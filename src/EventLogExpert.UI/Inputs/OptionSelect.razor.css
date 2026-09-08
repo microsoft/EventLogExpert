@@ -38,8 +38,13 @@
     min-width: 4rem;
 }
 
+.option-select label:first-of-type {
+    border-radius: .25rem 0 0 .25rem;
+}
+
 .option-select label:last-of-type {
     border-right: 1px solid var(--border-divider);
+    border-radius: 0 .25rem .25rem 0;
 }
 
 /* Do not change font-weight on selected state -- bold text causes the label to

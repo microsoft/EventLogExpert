@@ -4,10 +4,13 @@
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Announcement;
+using EventLogExpert.Runtime.Banner;
+using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using System.Collections.Immutable;
 using Effects = EventLogExpert.Runtime.FilterLibrary.Effects;
 
@@ -1643,6 +1646,40 @@ public sealed class FilterLibraryEffectsTests
     }
 
     [Fact]
+    public async Task HandleSaveFilterSet_LensOrigin_Succeeds_DispatchesSucceededWithOrigin()
+    {
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+        var (effects, _, dispatcher, _, _) = CreateEffects();
+
+        await effects.HandleSaveFilterSet(
+            new SaveFilterSetAction("My Group", [filter], SaveFilterSetOrigin.Lens), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(a => a != null));
+        dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetSucceededAction>(a =>
+            a != null && a.Name == "My Group" && a.Origin == SaveFilterSetOrigin.Lens));
+    }
+
+    [Fact]
+    public async Task HandleSaveFilterSet_StoreThrows_ReportsErrorBanner_AndDoesNotDispatchSucceeded()
+    {
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+        var store = Substitute.For<IFilterLibraryStore>();
+        store.AddAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("disk full"));
+        var errorBanner = Substitute.For<IErrorBannerService>();
+        var (effects, _, dispatcher, _, _, _) = CreateEffectsWithMigrator(store: store, errorBannerService: errorBanner);
+
+        await effects.HandleSaveFilterSet(
+            new SaveFilterSetAction("My Group", [filter], SaveFilterSetOrigin.Lens), dispatcher);
+
+        errorBanner.Received(1).ReportError(Arg.Any<string>(), Arg.Any<string>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<SaveFilterSetSucceededAction>());
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
+    }
+
+    [Fact]
     public async Task HandleSaveFilterSet_WhitespaceName_IsNoOp()
     {
         var filter = SavedFilter.TryCreate("Level == 4");
@@ -1653,6 +1690,25 @@ public sealed class FilterLibraryEffectsTests
 
         await store.DidNotReceive().AddAsync(Arg.Any<LibraryEntry>(), Arg.Any<CancellationToken>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
+    }
+
+    [Fact]
+    public async Task HandleSaveFilterSet_WithLensesToClearOnSuccess_ForwardsThemToSucceeded()
+    {
+        var filter = SavedFilter.TryCreate("Level == 4");
+        Assert.NotNull(filter);
+        var lensA = FilterLensId.Create();
+        var lensB = FilterLensId.Create();
+        var (effects, _, dispatcher, _, _) = CreateEffects();
+
+        await effects.HandleSaveFilterSet(
+            new SaveFilterSetAction("My Group", [filter], SaveFilterSetOrigin.Lens, [lensA, lensB]), dispatcher);
+
+        // The saved-lens ids ride opaquely through the FilterLibrary save so the FilterLenses success handler can
+        // remove exactly the saved lenses once the write is confirmed persisted.
+        dispatcher.Received(1).Dispatch(Arg.Is<SaveFilterSetSucceededAction>(a =>
+            a != null && a.LensesToClearOnSuccess != null && a.LensesToClearOnSuccess.Count == 2 &&
+            a.LensesToClearOnSuccess.Contains(lensA) && a.LensesToClearOnSuccess.Contains(lensB)));
     }
 
     [Fact]
@@ -1889,13 +1945,15 @@ public sealed class FilterLibraryEffectsTests
     private static (Effects effects, IFilterLibraryStore store, IDispatcher dispatcher, IState<FilterLibraryState> stateMock, ITraceLogger logger) CreateEffects(
         FilterLibraryState? state = null,
         FilterPaneState? paneState = null,
-        IAnnouncementService? announcementService = null)
+        IAnnouncementService? announcementService = null,
+        IErrorBannerService? errorBannerService = null)
     {
         var (effects, store, dispatcher, stateMock, _, logger) = CreateEffectsWithMigrator(
             migrator: null,
             state: state,
             paneState: paneState,
-            announcementService: announcementService);
+            announcementService: announcementService,
+            errorBannerService: errorBannerService);
 
         return (effects, store, dispatcher, stateMock, logger);
     }
@@ -1906,7 +1964,8 @@ public sealed class FilterLibraryEffectsTests
         FilterPaneState? paneState = null,
         IFilterLibraryStore? store = null,
         IBackslashNameMigrator? backslashMigrator = null,
-        IAnnouncementService? announcementService = null)
+        IAnnouncementService? announcementService = null,
+        IErrorBannerService? errorBannerService = null)
     {
         var storeWasSupplied = store is not null;
         store ??= Substitute.For<IFilterLibraryStore>();
@@ -1937,10 +1996,11 @@ public sealed class FilterLibraryEffectsTests
 
         backslashMigrator ??= Substitute.For<IBackslashNameMigrator>();
         announcementService ??= Substitute.For<IAnnouncementService>();
+        errorBannerService ??= Substitute.For<IErrorBannerService>();
 
         var logger = Substitute.For<ITraceLogger>();
         var dispatcher = Substitute.For<IDispatcher>();
-        var effects = new Effects(store, stateMock, paneStateMock, migrator, backslashMigrator, announcementService, logger, new TagBulkUpdateFailedNotifier(Substitute.For<ITraceLogger>()));
+        var effects = new Effects(store, stateMock, paneStateMock, migrator, backslashMigrator, announcementService, errorBannerService, logger, new TagBulkUpdateFailedNotifier(Substitute.For<ITraceLogger>()));
 
         return (effects, store, dispatcher, stateMock, migrator, logger);
     }

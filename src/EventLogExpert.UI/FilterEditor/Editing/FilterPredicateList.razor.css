@@ -19,8 +19,13 @@
 
 .filter-predicate-list ::deep .add-filter-predicate-button {
     color: var(--text-secondary);
+    transition: color 0.1s ease-in-out, background-color 0.1s ease-in-out;
 }
 
-.filter-predicate-list ::deep .add-filter-predicate-button:hover {
+/* Enabled-state hover: keep the color cue and add the shared neutral background-shift so the
+   button reads as interactive. The Add button is disabled while any predicate is incomplete
+   (CanAddPredicate), and :not(:disabled) keeps the disabled state inert (no hover, no pointer). */
+.filter-predicate-list ::deep .add-filter-predicate-button:hover:not(:disabled) {
     color: var(--clr-lightblue);
+    background: var(--menu-hover-overlay);
 }

@@ -19,7 +19,6 @@
                 <DebugLogFilterRow Applied="row.Applied"
                     AvailableCategories="CategoryFilterOptions()"
                     Draft="row.Editing"
-                    @key="row.Id"
                     OnCancel="@(() => CancelEditing(row))"
                     OnChanged="OnEditorChanged"
                     OnEdit="@(() => StartEditing(row))"
@@ -27,29 +26,30 @@
                     OnExcludeToggled="@(() => ToggleExclude(row))"
                     OnRemove="@(() => RemoveFilter(row))"
                     OnSave="@(() => SaveFilter(row))"
+                    @key="row.Id"
                     @ref="_editorRefs[row.Id]" />
             }
 
-            <Button aria-label="Add filter"
-                CssClass="debug-log-add-filter"
+            <Button CssClass="debug-log-add-filter"
                 IconClass="bi bi-plus-circle"
                 OnClick="AddFilter"
+                aria-label="Add filter"
                 @ref="_addButton"
                 title="Add filter">
                 Add Filter
             </Button>
 
-            <Button aria-label="Clear all filters"
-                CssClass="debug-log-clear-filters"
+            <Button CssClass="debug-log-clear-filters"
                 Disabled="@(_rows.Count == 0)"
                 IconClass="bi bi-x-circle"
                 OnClick="ClearFilters"
+                aria-label="Clear all filters"
                 title="Clear all filters">
                 Clear Filters
             </Button>
         </div>
         <div aria-busy="@(_hasLoaded ? "false" : "true")" aria-label="Debug log entries" class="debug-log-viewport" role="region" tabindex="0">
-            <Virtualize Context="line" Items="_displayed" ItemSize="@RowHeightPx" OverscanCount="20">
+            <Virtualize Context="line" ItemSize="@RowHeightPx" Items="_displayed" OverscanCount="20">
                 <ItemContent>
                     <div class="debug-log-row" title="@line">@line</div>
                 </ItemContent>
@@ -74,7 +74,7 @@
                     Copy
                 </Button>
             </div>
-            <span aria-atomic="true" aria-live="polite" class="debug-log-footer-counter" role="status">
+            <span aria-atomic="true" aria-live="polite" class="debug-log-footer-counter vcenter-text" role="status">
                 @($"{_filteredEntryCount:N0} of {_entries.Count:N0} {(_entries.Count == 1 ? "entry" : "entries")}")
             </span>
             <div class="debug-log-footer-actions debug-log-footer-right">

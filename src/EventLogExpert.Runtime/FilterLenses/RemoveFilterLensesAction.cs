@@ -1,6 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using System.Collections.Immutable;
+
 namespace EventLogExpert.Runtime.FilterLenses;
 
-public sealed record FilterLensSummary(FilterLensId Id, FilterLensLabel Label, LensKind Kind = LensKind.Property);
+internal sealed record RemoveFilterLensesAction(ImmutableList<FilterLensId> Ids);

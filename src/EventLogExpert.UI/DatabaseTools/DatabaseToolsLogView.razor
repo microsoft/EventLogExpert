@@ -7,7 +7,7 @@
             <div class="toolbar-leading">@ToolbarLeadingContent</div>
         }
 
-        <span class="entry-count">@Entries.Count @(Entries.Count == 1 ? "entry" : "entries")</span>
+        <span class="entry-count vcenter-text">@Entries.Count @(Entries.Count == 1 ? "entry" : "entries")</span>
 
         <span aria-atomic="true" aria-live="@OutcomeChipAriaLive" role="@OutcomeChipRole">
             @if (Outcome is not null)

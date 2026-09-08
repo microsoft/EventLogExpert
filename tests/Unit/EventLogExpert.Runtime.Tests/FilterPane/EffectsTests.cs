@@ -124,6 +124,55 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleCommitPromotedLenses_AnyWindowCommit_RaisesDateResyncOnce()
+    {
+        // One resync for the batch even though only one commit carries an enabled window; still one promote + one apply.
+        var window = new DateFilter
+        {
+            After = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            Before = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc),
+            IsEnabled = true
+        };
+        var (effects, dispatcher, promotedRaised, dateResyncRaised) = CreateCommitPromotedEffects(
+            new FilterPaneState { FilteredDateRange = window },
+            appliedFilter: new Filter(null, []));
+
+        await effects.HandleCommitPromotedLenses(
+            new CommitPromotedLensesAction(
+                [
+                    new PromotedLensCommit(FilterLensId.Create(), [], null),
+                    new PromotedLensCommit(FilterLensId.Create(), [], window)
+                ]),
+            dispatcher);
+
+        Assert.Equal(1, dateResyncRaised());
+        Assert.Equal(1, promotedRaised());
+        dispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
+    }
+
+    [Fact]
+    public async Task HandleCommitPromotedLenses_MultipleCommits_AppliesOnceUnconditionally_RaisesPromotedOnce()
+    {
+        // The whole batch applies the filter exactly ONCE (not once per commit) and raises FilterPromoted once. The
+        // empty candidate equals the empty applied filter, so the apply must be unconditional to land last and win.
+        var (effects, dispatcher, promotedRaised, dateResyncRaised) = CreateCommitPromotedEffects(
+            new FilterPaneState(),
+            appliedFilter: new Filter(null, []));
+
+        await effects.HandleCommitPromotedLenses(
+            new CommitPromotedLensesAction(
+                [
+                    new PromotedLensCommit(FilterLensId.Create(), [], null),
+                    new PromotedLensCommit(FilterLensId.Create(), [], null)
+                ]),
+            dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
+        Assert.Equal(1, promotedRaised());
+        Assert.Equal(0, dateResyncRaised());
+    }
+
+    [Fact]
     public async Task HandleCommitPromoted_AppliesEvenWhenFilteringUnchanged()
     {
         // The empty candidate equals the empty applied filter, so the guarded path would suppress. The unconditional

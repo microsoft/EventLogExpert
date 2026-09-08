@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
@@ -36,7 +37,9 @@ public sealed class PromptModalTests : BunitContext
         component.Find("input").Input("renamed value");
         component.Find(".footer-group .button-green").Click();
 
-        _modalService.Received(1).Complete(Arg.Any<ModalId>(), "renamed value");
+        _modalService.Received(1).Complete(
+            Arg.Any<ModalId>(),
+            new PromptOutcome(PromptChoice.Primary, "renamed value"));
     }
 
     [Fact]
@@ -90,6 +93,36 @@ public sealed class PromptModalTests : BunitContext
     }
 
     [Fact]
+    public void Render_WithSecondaryActionLabel_RendersSecondaryButtonAndCompletesWithSecondaryChoice()
+    {
+        var component = Render<PromptModal>(parameters => parameters
+            .Add(p => p.Title, "Rename")
+            .Add(p => p.Message, "New name:")
+            .Add(p => p.PrimaryLabel, "Save")
+            .Add(p => p.SecondaryActionLabel, "Save and clear")
+            .Add(p => p.CancelLabel, "Cancel"));
+
+        component.Find("input").Input("group name");
+        component.FindAll(".footer-group button").Single(button => button.TextContent.Trim() == "Save and clear").Click();
+
+        _modalService.Received(1).Complete(
+            Arg.Any<ModalId>(),
+            new PromptOutcome(PromptChoice.Secondary, "group name"));
+    }
+
+    [Fact]
+    public void Render_WithoutSecondaryActionLabel_RendersNoSecondaryButton()
+    {
+        var component = Render<PromptModal>(parameters => parameters
+            .Add(p => p.Title, "Rename")
+            .Add(p => p.Message, "New name:"));
+
+        Assert.DoesNotContain(
+            component.FindAll(".footer-group button"),
+            button => button.TextContent.Trim() == "Save and clear");
+    }
+
+    [Fact]
     public void Validation_AcceptingInvalidValue_DoesNotComplete()
     {
         Func<string, string?> validate = value =>
@@ -102,7 +135,7 @@ public sealed class PromptModalTests : BunitContext
 
         component.FindAll(".footer-group button")[0].Click();
 
-        _modalService.DidNotReceive().Complete(Arg.Any<ModalId>(), Arg.Any<string>());
+        _modalService.DidNotReceive().Complete(Arg.Any<ModalId>(), Arg.Any<PromptOutcome>());
     }
 
     [Fact]
@@ -158,6 +191,8 @@ public sealed class PromptModalTests : BunitContext
 
         component.FindAll(".footer-group button")[0].Click();
 
-        _modalService.Received(1).Complete(Arg.Any<ModalId>(), "valid name");
+        _modalService.Received(1).Complete(
+            Arg.Any<ModalId>(),
+            new PromptOutcome(PromptChoice.Primary, "valid name"));
     }
 }

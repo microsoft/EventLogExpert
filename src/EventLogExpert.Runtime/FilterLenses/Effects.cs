@@ -1,10 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.FilterLenses;
 
@@ -57,22 +60,34 @@ internal sealed class Effects(
     {
         var lens = _lensState.Value.Lenses.FirstOrDefault(candidate => candidate.Id == action.Id);
 
-        if (lens is null) { return Task.CompletedTask; }
-
-        // Persist the lens's natural promote form (a positive include for keep-only lenses), falling back to the
-        // transient exclude-of-complement for hide lenses, whose exclude form is already the natural one.
-        var filters = lens.PromoteFilters.IsEmpty ? lens.ExcludeFilters : lens.PromoteFilters;
-
         // An absent (already removed) or degenerate (nothing to keep) lens neither announces nor commits. The factory
         // never produces a degenerate lens; this is a defensive gate.
-        if (filters.IsEmpty && lens.Window is not { IsEnabled: true })
-        {
-            return Task.CompletedTask;
-        }
+        if (lens is null || !IsPromotable(lens)) { return Task.CompletedTask; }
 
         _announcementService.AnnounceLensKept(lens.Label);
 
-        dispatcher.Dispatch(new CommitPromotedLensAction(lens.Id, filters, lens.Window));
+        dispatcher.Dispatch(new CommitPromotedLensAction(lens.Id, PromoteForm(lens), lens.Window));
+
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod(typeof(PromoteAllFilterLensesAction))]
+    public Task HandlePromoteAll(IDispatcher dispatcher)
+    {
+        var commits = ImmutableList.CreateBuilder<PromotedLensCommit>();
+
+        foreach (var lens in _lensState.Value.Lenses)
+        {
+            if (lens.ExcludeFilters.IsEmpty && lens.Window is not { IsEnabled: true }) { continue; }
+
+            commits.Add(new PromotedLensCommit(lens.Id, lens.ExcludeFilters, lens.Window));
+        }
+
+        if (commits.Count == 0) { return Task.CompletedTask; }
+
+        dispatcher.Dispatch(new CommitPromotedLensesAction(commits.ToImmutable()));
+
+        _announcementService.AnnounceLensesSavedAll();
 
         return Task.CompletedTask;
     }
@@ -85,6 +100,60 @@ internal sealed class Effects(
 
     [EffectMethod]
     public Task HandleRemoveForLog(RemoveLensesForLogAction action, IDispatcher dispatcher) => Reapply(dispatcher);
+
+    [EffectMethod]
+    public Task HandleRemoveLenses(RemoveFilterLensesAction action, IDispatcher dispatcher) => Reapply(dispatcher);
+
+    [EffectMethod]
+    public Task HandleSaveFilterSetSucceeded(SaveFilterSetSucceededAction action, IDispatcher dispatcher)
+    {
+        if (action.Origin == SaveFilterSetOrigin.Lens)
+        {
+            _announcementService.AnnounceLensGroupSaved(action.Name);
+        }
+
+        // Save-and-clear removes only the lenses that were actually saved (captured before the persist began), so any
+        // lens the user added while the write was in flight survives. The removal rides the confirmed-persist signal,
+        // so a failed save never removes anything.
+        if (action.LensesToClearOnSuccess is { Count: > 0 } lensesToClear)
+        {
+            dispatcher.Dispatch(new RemoveFilterLensesAction(lensesToClear));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod]
+    public Task HandleSaveLensesAsGroup(SaveLensesAsGroupAction action, IDispatcher dispatcher)
+    {
+        if (string.IsNullOrWhiteSpace(action.Name)) { return Task.CompletedTask; }
+
+        var contributingLenses = _lensState.Value.Lenses.Where(lens => !lens.ExcludeFilters.IsEmpty).ToImmutableList();
+
+        // Dedupe by the same case-insensitive (ComparisonText, Mode, IsExcluded) identity the library apply path uses
+        // (ReduceMergeFilters / the FilterLibrary store dedup), so the saved group round-trips faithfully - applying it
+        // never silently drops a case-variant the save kept.
+        var filters = contributingLenses
+            .SelectMany(lens => lens.ExcludeFilters)
+            .DistinctBy(filter => (filter.ComparisonText.ToLowerInvariant(), filter.Mode, filter.IsExcluded))
+            .ToImmutableList();
+
+        if (filters.IsEmpty) { return Task.CompletedTask; }
+
+        var lensesToClearOnSuccess = action.ClearAfterSave ?
+            contributingLenses.Select(lens => lens.Id).ToImmutableList() :
+            null;
+
+        dispatcher.Dispatch(new SaveFilterSetAction(action.Name, filters, SaveFilterSetOrigin.Lens, lensesToClearOnSuccess));
+
+        return Task.CompletedTask;
+    }
+
+    private static bool IsPromotable(FilterLens lens) =>
+        !PromoteForm(lens).IsEmpty || lens.Window is { IsEnabled: true };
+
+    private static ImmutableList<SavedFilter> PromoteForm(FilterLens lens) =>
+        lens.PromoteFilters.IsEmpty ? lens.ExcludeFilters : lens.PromoteFilters;
 
     private Task Reapply(IDispatcher dispatcher)
     {
