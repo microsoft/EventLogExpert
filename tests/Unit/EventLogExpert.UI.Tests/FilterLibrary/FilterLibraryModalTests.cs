@@ -229,6 +229,26 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public void BuildPreflightSummary_AllTagUpdatesCoalescedIntoReplacements_OmitsTagUpdateBullet()
+    {
+        // When every tag-update targets an entry that is also being replaced, the standalone tag-update count is 0, so
+        // the "will be updated with tag changes" bullet must be omitted rather than shown as "0 entries" - the
+        // overwrite bullet already covers the coalesced write.
+        var existing = BuildSavedFilter("Shared");
+        var preflight = new ImportPreflight(
+            [],
+            [(existing, BuildFilterEntry("Shared", "Level == 5"))],
+            [],
+            [(existing, BuildSavedFilter("SharedRelaxed"))],
+            []);
+
+        var summary = FilterLibraryModal.BuildPreflightSummary(preflight);
+
+        Assert.DoesNotContain("will be updated with tag changes", summary);
+        Assert.Contains("WILL BE OVERWRITTEN", summary);
+    }
+
+    [Fact]
     public void BuildPreflightSummary_AmbiguousMatches_SaysEntriesWillBeImportedAsNew()
     {
         var existing = BuildSavedFilter("Existing");
@@ -256,6 +276,22 @@ public sealed class FilterLibraryModalTests : BunitContext
         Assert.Contains("cannot be imported", summary);
         Assert.Contains(@"Network\DNS", summary);
         Assert.Contains(@"Mail\SMTP", summary);
+    }
+
+    [Fact]
+    public void BuildPreflightSummary_StandaloneTagUpdate_ShowsTagUpdateBullet()
+    {
+        var existing = BuildSavedFilter("Existing");
+        var preflight = new ImportPreflight(
+            [],
+            [],
+            [],
+            [(existing, BuildSavedFilter("Incoming"))],
+            []);
+
+        var summary = FilterLibraryModal.BuildPreflightSummary(preflight);
+
+        Assert.Contains("1 entries will be updated with tag changes", summary);
     }
 
     [Fact]

@@ -284,8 +284,17 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
         if (preflight.ToUpdate.Count > 0)
         {
+            // Count only entries updated by tags alone; an entry that is also being replaced is already covered by the
+            // overwrite bullet above (its tag-update was coalesced into the replacement), so omit the bullet when the
+            // standalone count is zero rather than showing "0 entries will be updated with tag changes".
+            var standaloneTagUpdates = CountStandaloneTagUpdates(preflight);
+
+            if (standaloneTagUpdates > 0)
+            {
+                lines.Add($"  \u2022 {standaloneTagUpdates} entries will be updated with tag changes");
+            }
+
             var renameCount = preflight.ToUpdate.Count(t => t.Existing.Name.Contains('\\'));
-            lines.Add($"  \u2022 {CountStandaloneTagUpdates(preflight)} entries will be updated with tag changes");
             if (renameCount > 0)
             {
                 lines.Add($"  \u2022 {renameCount} existing entries will also be renamed (folder paths \u2192 tags)");
