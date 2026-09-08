@@ -462,7 +462,7 @@
   </data>
   <data name="Banner_Db_Import_FailureSummary" xml:space="preserve">
     <value>failed: {0}</value>
-    <comment>Import failure summary wrapper. {0} is the comma-separated failure detail list.</comment>
+    <comment>Import failure summary wrapper. {0} is the failure detail list joined with Banner_List_Separator.</comment>
   </data>
   <data name="Banner_Db_Import_FailurePart" xml:space="preserve">
     <value>{0} ({1})</value>
@@ -595,7 +595,11 @@
   </data>
   <data name="Banner_EmptyLog_Many" xml:space="preserve">
     <value>{0} logs contained no events: {1}</value>
-    <comment>Message for multiple empty logs. {0} is the raw log count; {1} is the comma-separated display names.</comment>
+    <comment>Message for multiple empty logs. {0} is the raw log count; {1} is the display-name list joined with Banner_List_Separator.</comment>
+  </data>
+  <data name="Banner_List_Separator" xml:space="preserve">
+    <value>, </value>
+    <comment>Separator inserted between items when a banner joins a list (e.g. multiple empty-log names or import failure details). Include any trailing space the locale needs.</comment>
   </data>
   <!-- Recovery banner messages. -->
   <data name="Banner_Recovery_Needed_Title" xml:space="preserve">

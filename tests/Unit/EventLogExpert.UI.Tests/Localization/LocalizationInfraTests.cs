@@ -268,6 +268,7 @@ public sealed class LocalizationInfraTests
             ("Banner_Filter_TagBulkFailed_Message", 0),
             ("Banner_Filter_TagBulkFailed_Title", 0),
             ("Banner_Info_DismissAria", 0),
+            ("Banner_List_Separator", 0),
             ("Banner_Nav_NextAria", 0),
             ("Banner_Nav_PreviousAria", 0),
             ("Banner_Pagination", 2),

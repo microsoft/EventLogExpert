@@ -27,7 +27,7 @@ internal static partial class BannerContentLocalizer
             parts.Add(localizer["Banner_Db_Import_UpgradeFailurePart", failure.FileName, failure.Reason]);
         }
 
-        return localizer["Banner_Db_Import_FailureSummary", string.Join(", ", parts)];
+        return localizer["Banner_Db_Import_FailureSummary", JoinLocalizedList(localizer, parts)];
     }
 
     private static string ResolveDatabaseOperationNoun(

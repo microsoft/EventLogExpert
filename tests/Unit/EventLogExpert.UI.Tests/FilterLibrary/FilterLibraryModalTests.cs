@@ -103,26 +103,30 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
-    public void ApplyImportPreflight_ToAddAndAmbiguousShareOriginalId_ProducesDistinctIdsInAddBatch()
+    public void ApplyImportPreflight_ReplaceAndUpdate_OrdersReplacementsBeforeTagUpdates()
     {
-        // The shared knownIds set must thread through ToAdd THEN AmbiguousMatches so a colliding id is regenerated;
-        // otherwise the single AddRangeAsync transaction would hit a duplicate PK and roll back the whole add batch.
-        var existing = BuildSavedFilter("Existing");
-        var toAddEntry = BuildSavedFilter("ToAdd");
-        var ambiguousIncoming = BuildSavedFilter("Ambiguous") with { Id = toAddEntry.Id };
+        // FilterLibrary Effects.HandleImportLibraryEntries attributes persisted rows to the replaced vs tag-update
+        // counts by assuming ToUpdate is [replacements, then tag-updates] with Summary.Replaced as the boundary. Lock
+        // that ordering contract so a future reorder here cannot silently mis-attribute the import announcement.
+        var replaceExisting = BuildSavedFilter("ReplaceExisting") with { Tags = ["old"] };
+        var replaceIncoming = BuildFilterEntry("ReplaceIncoming", "Level == 3");
+        var updateExisting = BuildSavedFilter("UpdateExisting") with { Tags = ["keep"] };
+        var updateIncoming = BuildSavedFilter("UpdateIncoming") with { Tags = ["Beta"] };
         var preflight = new ImportPreflight(
-            [toAddEntry],
             [],
+            [(replaceExisting, replaceIncoming)],
             [],
-            [],
-            [([existing], ambiguousIncoming)]);
+            [(updateExisting, updateIncoming)],
+            []);
 
-        FilterLibraryModal.ApplyImportPreflight(preflight, _commands, [existing]);
+        FilterLibraryModal.ApplyImportPreflight(preflight, _commands, [replaceExisting, updateExisting]);
 
         _commands.Received(1).ImportEntries(
-            Arg.Is<ImmutableList<LibraryEntry>>(list => MatchesTwoDistinctIds(list)),
             Arg.Is<ImmutableList<LibraryEntry>>(list => MatchesEmptyList(list)),
-            Arg.Is<ImportSummary>(summary => MatchesImportSummary(summary, 1, 0, 0, 0, 1)));
+            Arg.Is<ImmutableList<LibraryEntry>>(list =>
+                list != null && list.Count == 2 &&
+                list[0].Id == replaceExisting.Id && list[1].Id == updateExisting.Id),
+            Arg.Is<ImportSummary>(summary => MatchesImportSummary(summary, 0, 1, 1, 0, 0)));
     }
 
     [Fact]
@@ -153,6 +157,29 @@ public sealed class FilterLibraryModalTests : BunitContext
             Arg.Is<ImmutableList<LibraryEntry>>(list => MatchesEmptyList(list)),
             Arg.Is<ImmutableList<LibraryEntry>>(list => MatchesReplaceUpdateList(list, existing.Id, lastUsed)),
             Arg.Is<ImportSummary>(summary => MatchesImportSummary(summary, 0, 1, 0, 0, 0)));
+    }
+
+    [Fact]
+    public void ApplyImportPreflight_ToAddAndAmbiguousShareOriginalId_ProducesDistinctIdsInAddBatch()
+    {
+        // The shared knownIds set must thread through ToAdd THEN AmbiguousMatches so a colliding id is regenerated;
+        // otherwise the single AddRangeAsync transaction would hit a duplicate PK and roll back the whole add batch.
+        var existing = BuildSavedFilter("Existing");
+        var toAddEntry = BuildSavedFilter("ToAdd");
+        var ambiguousIncoming = BuildSavedFilter("Ambiguous") with { Id = toAddEntry.Id };
+        var preflight = new ImportPreflight(
+            [toAddEntry],
+            [],
+            [],
+            [],
+            [([existing], ambiguousIncoming)]);
+
+        FilterLibraryModal.ApplyImportPreflight(preflight, _commands, [existing]);
+
+        _commands.Received(1).ImportEntries(
+            Arg.Is<ImmutableList<LibraryEntry>>(list => MatchesTwoDistinctIds(list)),
+            Arg.Is<ImmutableList<LibraryEntry>>(list => MatchesEmptyList(list)),
+            Arg.Is<ImportSummary>(summary => MatchesImportSummary(summary, 1, 0, 0, 0, 1)));
     }
 
     [Fact]
@@ -1082,42 +1109,6 @@ public sealed class FilterLibraryModalTests : BunitContext
     private static LibraryEntrySavedFilter BuildSavedFilter(string name) =>
         BuildFilterEntry(name) with { Origin = LibraryEntryOrigin.UserSaved };
 
-    private static bool MatchesTwoDistinctIds(ImmutableList<LibraryEntry>? entries) =>
-        entries is { Count: 2 } && entries[0].Id != entries[1].Id;
-
-    private static bool MatchesAmbiguousAddList(ImmutableList<LibraryEntry>? entries, LibraryEntryId existingId) =>
-        entries is { Count: 1 } &&
-        entries[0].Id != existingId &&
-        entries[0].Tags.SequenceEqual(["alpha", "beta"]);
-
-    private static bool MatchesCoalescedTagUpdateList(ImmutableList<LibraryEntry>? entries, LibraryEntryId existingId) =>
-        entries is { Count: 1 } &&
-        entries[0].Id == existingId &&
-        entries[0].Tags.SequenceEqual(["old", "alpha", "beta"]);
-
-    private static bool MatchesImportSummary(ImportSummary? summary, int added, int replaced, int updatedTags, int skipped, int ambiguous) =>
-        summary is not null &&
-        summary.Added == added &&
-        summary.Replaced == replaced &&
-        summary.UpdatedTags == updatedTags &&
-        summary.Skipped == skipped &&
-        summary.Ambiguous == ambiguous;
-
-    private static bool MatchesEmptyList(ImmutableList<LibraryEntry>? entries) => entries is { IsEmpty: true };
-
-    private static bool MatchesReplaceUpdateList(ImmutableList<LibraryEntry>? entries, LibraryEntryId existingId, DateTimeOffset lastUsed)
-    {
-        if (entries is not { Count: 1 } || entries[0] is not LibraryEntrySavedFilter savedFilter) { return false; }
-
-        return savedFilter.Id == existingId &&
-            savedFilter.Name == "Imported" &&
-            savedFilter.Filter.ComparisonText == "Level == 3" &&
-            savedFilter.Origin == LibraryEntryOrigin.UserSaved &&
-            savedFilter.IsFavorite &&
-            savedFilter.LastUsedUtc == lastUsed &&
-            savedFilter.Tags.SequenceEqual(["alpha", "beta"]);
-    }
-
     private static ImmutableList<string> GetSelectedTagsForTab(IRenderedComponent<FilterLibraryModal> component, LibraryTab tab)
     {
         var dict = (IDictionary<LibraryTab, ImmutableList<string>>?)component.Instance
@@ -1137,6 +1128,42 @@ public sealed class FilterLibraryModalTests : BunitContext
         Assert.NotNull(task);
         await task;
     }
+
+    private static bool MatchesAmbiguousAddList(ImmutableList<LibraryEntry>? entries, LibraryEntryId existingId) =>
+        entries is { Count: 1 } &&
+        entries[0].Id != existingId &&
+        entries[0].Tags.SequenceEqual(["alpha", "beta"]);
+
+    private static bool MatchesCoalescedTagUpdateList(ImmutableList<LibraryEntry>? entries, LibraryEntryId existingId) =>
+        entries is { Count: 1 } &&
+        entries[0].Id == existingId &&
+        entries[0].Tags.SequenceEqual(["old", "alpha", "beta"]);
+
+    private static bool MatchesEmptyList(ImmutableList<LibraryEntry>? entries) => entries is { IsEmpty: true };
+
+    private static bool MatchesImportSummary(ImportSummary? summary, int added, int replaced, int updatedTags, int skipped, int ambiguous) =>
+        summary is not null &&
+        summary.Added == added &&
+        summary.Replaced == replaced &&
+        summary.UpdatedTags == updatedTags &&
+        summary.Skipped == skipped &&
+        summary.Ambiguous == ambiguous;
+
+    private static bool MatchesReplaceUpdateList(ImmutableList<LibraryEntry>? entries, LibraryEntryId existingId, DateTimeOffset lastUsed)
+    {
+        if (entries is not { Count: 1 } || entries[0] is not LibraryEntrySavedFilter savedFilter) { return false; }
+
+        return savedFilter.Id == existingId &&
+            savedFilter.Name == "Imported" &&
+            savedFilter.Filter.ComparisonText == "Level == 3" &&
+            savedFilter.Origin == LibraryEntryOrigin.UserSaved &&
+            savedFilter.IsFavorite &&
+            savedFilter.LastUsedUtc == lastUsed &&
+            savedFilter.Tags.SequenceEqual(["alpha", "beta"]);
+    }
+
+    private static bool MatchesTwoDistinctIds(ImmutableList<LibraryEntry>? entries) =>
+        entries is { Count: 2 } && entries[0].Id != entries[1].Id;
 
     private void SetState(FilterLibraryState state)
     {

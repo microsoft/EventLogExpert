@@ -197,12 +197,26 @@ internal sealed class Effects(
 
             var updatedIdSet = updatedIds.ToHashSet();
 
+            // The store skips rows that vanished between preflight and commit (a concurrent delete), so the persisted
+            // set can be smaller than the preflight totals. Re-derive the replaced / tag-update counts from what
+            // actually persisted so the announcement never claims more than happened. action.ToUpdate is the
+            // replacement entries (Summary.Replaced of them) followed by the tag-update entries - see
+            // FilterLibraryModal.ApplyImportPreflight, whose ordering this boundary relies on.
+            var persistedReplaced = 0;
+            var persistedUpdatedTags = 0;
+            var updateIndex = 0;
+
             foreach (var entry in action.ToUpdate)
             {
                 if (updatedIdSet.Contains(entry.Id))
                 {
                     dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(entry));
+
+                    if (updateIndex < action.Summary.Replaced) { persistedReplaced++; }
+                    else { persistedUpdatedTags++; }
                 }
+
+                updateIndex++;
             }
 
             if (action.ToUpdate.Count > 0 && updatedIds.Count < action.ToUpdate.Count)
@@ -210,7 +224,9 @@ internal sealed class Effects(
                 dispatcher.Dispatch(new LoadLibraryAction());
             }
 
-            announcementService.Announce(FormatImportSummary(action.Summary));
+            var persistedSummary = action.Summary with { Replaced = persistedReplaced, UpdatedTags = persistedUpdatedTags };
+
+            announcementService.Announce(FormatImportSummary(persistedSummary));
         }
         finally
         {
