@@ -81,11 +81,14 @@ internal static partial class BannerContentLocalizer
                 localizer["Banner_EmptyLog_Title"],
                 emptyLogs.DisplayNames.Count == 1
                     ? localizer["Banner_EmptyLog_One", emptyLogs.DisplayNames[0]]
-                    : localizer["Banner_EmptyLog_Many", emptyLogs.DisplayNames.Count, string.Join(", ", emptyLogs.DisplayNames)]),
+                    : localizer["Banner_EmptyLog_Many", emptyLogs.DisplayNames.Count, JoinLocalizedList(localizer, emptyLogs.DisplayNames)]),
             Preformatted preformatted => new BannerContentText(
                 preformatted.Title,
                 preformatted.Message,
                 preformatted.ActionLabel),
             _ => throw new ArgumentOutOfRangeException(nameof(content), content.GetType(), "Unknown banner content type.")
         };
+
+    private static string JoinLocalizedList(IStringLocalizer<SharedResource> localizer, IEnumerable<string> items) =>
+        string.Join(localizer["Banner_List_Separator"].Value, items);
 }

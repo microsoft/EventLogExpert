@@ -181,6 +181,9 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             toAdd.Add(PrepareEntryForAdd(entry, knownIds));
         }
 
+        // Append replacements before tag-updates: FilterLibrary Effects.HandleImportLibraryEntries relies on this
+        // ordering (the first Summary.Replaced entries of ToUpdate are the replacements) to attribute which persisted
+        // rows were replacements vs tag-updates when the store skips a vanished row.
         foreach (var (existing, incoming) in preflight.ToReplace)
         {
             var updated = incoming with

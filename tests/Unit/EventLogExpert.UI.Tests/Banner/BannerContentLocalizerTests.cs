@@ -101,7 +101,7 @@ public sealed class BannerContentLocalizerTests
                 [new ImportFailure("A.db", "bad"), new ImportFailure("C.db", "io")],
                 [new ImportFailure("B.db", "schema")]),
             "[[Banner_Db_Import_Partial_Title]]",
-            "[[Banner_Db_Import_Partial_Message([[Banner_Db_Import_Partial_Many(2)]]|[[Banner_Db_Import_FailureSummary([[Banner_Db_Import_FailurePart(A.db|bad)]], [[Banner_Db_Import_FailurePart(C.db|io)]], [[Banner_Db_Import_UpgradeFailurePart(B.db|schema)]])]])]]",
+            "[[Banner_Db_Import_Partial_Message([[Banner_Db_Import_Partial_Many(2)]]|[[Banner_Db_Import_FailureSummary([[Banner_Db_Import_FailurePart(A.db|bad)]][[Banner_List_Separator]][[Banner_Db_Import_FailurePart(C.db|io)]][[Banner_List_Separator]][[Banner_Db_Import_UpgradeFailurePart(B.db|schema)]])]])]]",
             "Import Completed with Errors",
             "2 databases imported; failed: A.db (bad), C.db (io), B.db upgrade (schema)");
     }
@@ -302,7 +302,7 @@ public sealed class BannerContentLocalizerTests
         AssertResolved(
             new EmptyLogs(["A.evtx", "B.evtx"]),
             "[[Banner_EmptyLog_Title]]",
-            "[[Banner_EmptyLog_Many(2|A.evtx, B.evtx)]]",
+            "[[Banner_EmptyLog_Many(2|A.evtx[[Banner_List_Separator]]B.evtx)]]",
             "Empty log",
             "2 logs contained no events: A.evtx, B.evtx");
     }
