@@ -2,11 +2,27 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.Banner;
+using EventLogExpert.Runtime.Database;
 
 namespace EventLogExpert.Runtime.Tests.Banner;
 
 public sealed class BannerMessageTests
 {
+    [Fact]
+    public void DatabaseImportSummary_SnapshotsFailures_SoLaterCallerMutationCannotChangeDetailsOrSeverity()
+    {
+        var failures = new List<ImportFailure> { new("A.db", "bad") };
+        var upgradeFailures = new List<ImportFailure> { new("B.db", "schema") };
+        var summary = new DatabaseImportSummary(2, failures, upgradeFailures);
+
+        failures.Clear();
+        upgradeFailures.Clear();
+
+        Assert.Single(summary.Failures);
+        Assert.Single(summary.UpgradeFailures);
+        Assert.Equal(DatabaseImportSeverity.Warning, summary.Severity);
+    }
+
     [Fact]
     public void EmptyLogs_CopiesDisplayNames_SoLaterCallerMutationCannotViolateInvariant()
     {

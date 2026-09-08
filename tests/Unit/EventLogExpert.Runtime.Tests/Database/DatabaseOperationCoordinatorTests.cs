@@ -96,7 +96,7 @@ public sealed class DatabaseOperationCoordinatorTests
         var summary = DatabaseOperationCoordinator.BuildImportSummary(result);
 
         Assert.Equal(0, summary.Imported);
-        Assert.Same(failures, summary.Failures);
+        Assert.Equal(failures, summary.Failures);
         Assert.Empty(summary.UpgradeFailures);
         Assert.Equal(DatabaseImportSeverity.Error, summary.Severity);
     }
