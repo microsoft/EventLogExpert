@@ -5,14 +5,17 @@ namespace EventLogExpert.Runtime.Banner;
 
 public sealed record EmptyLogs(IReadOnlyList<string> DisplayNames) : BannerMessage
 {
-    public IReadOnlyList<string> DisplayNames { get; init; } = Validate(DisplayNames);
+    public IReadOnlyList<string> DisplayNames { get; } = Validate(DisplayNames);
 
     private static IReadOnlyList<string> Validate(IReadOnlyList<string> displayNames)
     {
         ArgumentNullException.ThrowIfNull(displayNames);
 
-        return displayNames.Count == 0 ?
-            throw new ArgumentException("At least one display name is required.", nameof(displayNames)) :
-            displayNames;
+        if (displayNames.Count == 0)
+        {
+            throw new ArgumentException("At least one display name is required.", nameof(displayNames));
+        }
+
+        return [.. displayNames];
     }
 }
