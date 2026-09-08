@@ -103,6 +103,31 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public void ApplyImportPreflight_EntryReplacedAndTagUpdated_CoalescesIntoSingleReplacementWithMergedTags()
+    {
+        // The same existing entry can be both replaced (name match) and tag-updated (relaxed-content match) by two
+        // different incoming items. Emitting two rows with the same Id would let the tag-update clobber the
+        // replacement's new content on the second write, so the tag-update's tags fold into the single replacement
+        // payload: one row, the replacement content (Level == 5), and both sets of tags - counted as one replacement.
+        var existing = BuildSavedFilter("Shared") with { Tags = ["existingonly"] };
+        var replaceIncoming = BuildFilterEntry("Shared", "Level == 5") with { Tags = ["replacetag"] };
+        var updateIncoming = BuildSavedFilter("SharedRelaxed") with { Tags = ["updatetag"] };
+        var preflight = new ImportPreflight(
+            [],
+            [(existing, replaceIncoming)],
+            [],
+            [(existing, updateIncoming)],
+            []);
+
+        FilterLibraryModal.ApplyImportPreflight(preflight, _commands, [existing]);
+
+        _commands.Received(1).ImportEntries(
+            Arg.Is<ImmutableList<LibraryEntry>>(list => MatchesEmptyList(list)),
+            Arg.Is<ImmutableList<LibraryEntry>>(list => MatchesCoalescedReplacement(list, existing.Id)),
+            Arg.Is<ImportSummary>(summary => MatchesImportSummary(summary, 0, 1, 0, 0, 0)));
+    }
+
+    [Fact]
     public void ApplyImportPreflight_ReplaceAndUpdate_OrdersReplacementsBeforeTagUpdates()
     {
         // FilterLibrary Effects.HandleImportLibraryEntries attributes persisted rows to the replaced vs tag-update
@@ -1133,6 +1158,15 @@ public sealed class FilterLibraryModalTests : BunitContext
         entries is { Count: 1 } &&
         entries[0].Id != existingId &&
         entries[0].Tags.SequenceEqual(["alpha", "beta"]);
+
+    private static bool MatchesCoalescedReplacement(ImmutableList<LibraryEntry>? entries, LibraryEntryId existingId)
+    {
+        if (entries is not { Count: 1 } || entries[0] is not LibraryEntrySavedFilter savedFilter) { return false; }
+
+        return savedFilter.Id == existingId &&
+            savedFilter.Filter.ComparisonText == "Level == 5" &&
+            savedFilter.Tags.SequenceEqual(["replacetag", "updatetag"]);
+    }
 
     private static bool MatchesCoalescedTagUpdateList(ImmutableList<LibraryEntry>? entries, LibraryEntryId existingId) =>
         entries is { Count: 1 } &&
