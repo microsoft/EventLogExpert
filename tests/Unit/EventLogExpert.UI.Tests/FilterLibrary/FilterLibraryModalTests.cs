@@ -262,7 +262,7 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var summary = FilterLibraryModal.BuildPreflightSummary(preflight);
 
-        Assert.Contains("ambiguous entries will be imported as new", summary);
+        Assert.Contains("1 ambiguous entry will be imported as new", summary);
         Assert.DoesNotContain("manual", summary, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -279,6 +279,23 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public void BuildPreflightSummary_MultipleTagUpdates_UsePluralNoun()
+    {
+        var e1 = BuildSavedFilter("E1");
+        var e2 = BuildSavedFilter("E2");
+        var preflight = new ImportPreflight(
+            [],
+            [],
+            [],
+            [(e1, BuildSavedFilter("I1")), (e2, BuildSavedFilter("I2"))],
+            []);
+
+        var summary = FilterLibraryModal.BuildPreflightSummary(preflight);
+
+        Assert.Contains("2 entries will be updated with tag changes", summary);
+    }
+
+    [Fact]
     public void BuildPreflightSummary_StandaloneTagUpdate_ShowsTagUpdateBullet()
     {
         var existing = BuildSavedFilter("Existing");
@@ -291,7 +308,7 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var summary = FilterLibraryModal.BuildPreflightSummary(preflight);
 
-        Assert.Contains("1 entries will be updated with tag changes", summary);
+        Assert.Contains("1 entry will be updated with tag changes", summary);
     }
 
     [Fact]

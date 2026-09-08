@@ -642,7 +642,7 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(action => action != null && ReferenceEquals(action.Entry, updateA)));
         dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(action => action != null && ReferenceEquals(action.Entry, updateB)));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryAction>());
-        announcer.Received(1).Announce("Imported 1 new, replaced 1, updated 1 tags, skipped 2");
+        announcer.Received(1).Announce("Imported 1 new, replaced 1, updated 1 tag, skipped 2");
         errorBanner.DidNotReceiveWithAnyArgs().ReportError(default!);
     }
 

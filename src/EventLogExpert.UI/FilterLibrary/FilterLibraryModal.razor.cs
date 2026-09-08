@@ -268,18 +268,18 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
         var lines = new List<string>
         {
-            $"  \u2022 {preflight.ToAdd.Count} new entries will be added",
+            $"  \u2022 {Plural(preflight.ToAdd.Count, "new entry", "new entries")} will be added",
         };
 
         if (preflight.ToReplace.Count > 0)
         {
             var conflictList = "\nNames being overwritten:\n  \u2022 " +
                 string.Join("\n  \u2022 ", preflight.ToReplace.Select(p => p.Incoming.Name).Take(MaxPreviewedImportNames)) +
-                (preflight.ToReplace.Count > MaxPreviewedImportNames
-                    ? $"\n  \u2022 ...and {preflight.ToReplace.Count - MaxPreviewedImportNames} more"
-                    : string.Empty);
+                (preflight.ToReplace.Count > MaxPreviewedImportNames ?
+                    $"\n  \u2022 ...and {preflight.ToReplace.Count - MaxPreviewedImportNames} more" :
+                    string.Empty);
 
-            lines.Add($"  \u2022 {preflight.ToReplace.Count} existing entries WILL BE OVERWRITTEN (current filter content will be lost){conflictList}");
+            lines.Add($"  \u2022 {Plural(preflight.ToReplace.Count, "existing entry", "existing entries")} WILL BE OVERWRITTEN (current filter content will be lost){conflictList}");
         }
 
         if (preflight.ToUpdate.Count > 0)
@@ -291,22 +291,23 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
             if (standaloneTagUpdates > 0)
             {
-                lines.Add($"  \u2022 {standaloneTagUpdates} entries will be updated with tag changes");
+                lines.Add($"  \u2022 {Plural(standaloneTagUpdates, "entry", "entries")} will be updated with tag changes");
             }
 
             var renameCount = preflight.ToUpdate.Count(t => t.Existing.Name.Contains('\\'));
+
             if (renameCount > 0)
             {
-                lines.Add($"  \u2022 {renameCount} existing entries will also be renamed (folder paths \u2192 tags)");
+                lines.Add($"  \u2022 {Plural(renameCount, "existing entry", "existing entries")} will also be renamed (folder paths \u2192 tags)");
             }
         }
 
         if (preflight.AmbiguousMatches.Count > 0)
         {
-            lines.Add($"  \u2022 {preflight.AmbiguousMatches.Count} ambiguous entries will be imported as new");
+            lines.Add($"  \u2022 {Plural(preflight.AmbiguousMatches.Count, "ambiguous entry", "ambiguous entries")} will be imported as new");
         }
 
-        lines.Add($"  \u2022 {preflight.SkippedDuplicates.Count} exact duplicates will be skipped");
+        lines.Add($"  \u2022 {Plural(preflight.SkippedDuplicates.Count, "exact duplicate", "exact duplicates")} will be skipped");
 
         return "Import preview:\n" + string.Join('\n', lines);
     }
@@ -324,6 +325,9 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             .Distinct()
             .Count();
     }
+
+    private static string Plural(int count, string singular, string plural) =>
+        $"{count} {(count == 1 ? singular : plural)}";
 
     internal static (LibraryEntryId? TargetId, bool FallbackToActiveTab) DecidePendingFocusAfterRemoval(
         IReadOnlyList<LibraryEntry> snapshot,
@@ -436,7 +440,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             if (string.IsNullOrEmpty(path)) { return; }
 
             await File.WriteAllTextAsync(path, json);
-            AnnouncementService.Announce($"Exported {entries.Count} entries");
+            AnnouncementService.Announce($"Exported {Plural(entries.Count, "entry", "entries")}");
         }
         catch (Exception ex) when (
             ex is UnauthorizedAccessException or SecurityException or

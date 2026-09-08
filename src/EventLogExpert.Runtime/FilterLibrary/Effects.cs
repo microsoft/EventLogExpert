@@ -800,9 +800,13 @@ internal sealed class Effects(
             _ => throw new InvalidOperationException($"Unhandled LibraryEntry type '{entry.GetType().FullName}'."),
         };
 
-    private static string FormatImportSummary(ImportSummary summary) =>
-        $"Imported {summary.Added} new, replaced {summary.Replaced}, updated {summary.UpdatedTags} tags, skipped {summary.Skipped}" +
-        (summary.Ambiguous > 0 ? $", imported {summary.Ambiguous} ambiguous as new" : string.Empty);
+    private static string FormatImportSummary(ImportSummary summary)
+    {
+        var tags = summary.UpdatedTags == 1 ? "1 tag" : $"{summary.UpdatedTags} tags";
+
+        return $"Imported {summary.Added} new, replaced {summary.Replaced}, updated {tags}, skipped {summary.Skipped}" +
+            (summary.Ambiguous > 0 ? $", imported {summary.Ambiguous} ambiguous as new" : string.Empty);
+    }
 
     private static bool NonTagFieldsDiffer(LibraryEntry latest, LibraryEntry bulkEntry) => (latest, bulkEntry) switch
     {
