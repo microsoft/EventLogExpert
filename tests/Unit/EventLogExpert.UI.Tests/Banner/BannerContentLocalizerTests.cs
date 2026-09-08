@@ -210,9 +210,15 @@ public sealed class BannerContentLocalizerTests
     public void Resolve_FilterAndEmptyLogs_SelectExpectedOutput()
     {
         AssertResolved(
+            new FilterLibraryNotFullyLoaded(1),
+            "[[Banner_Filter_NotLoaded_Title]]",
+            "[[Banner_Filter_NotLoaded_Message_One]]",
+            "Filter library not fully loaded",
+            "1 library entry couldn't be read and was left in place to avoid data loss. This usually means the library was written by a newer version of the app.");
+        AssertResolved(
             new FilterLibraryNotFullyLoaded(3),
             "[[Banner_Filter_NotLoaded_Title]]",
-            "[[Banner_Filter_NotLoaded_Message(3)]]",
+            "[[Banner_Filter_NotLoaded_Message_Many(3)]]",
             "Filter library not fully loaded",
             "3 library entries couldn't be read and were left in place to avoid data loss. This usually means the library was written by a newer version of the app.");
         AssertResolved(
