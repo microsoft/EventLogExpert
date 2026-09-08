@@ -11,11 +11,8 @@ public sealed record EmptyLogs(IReadOnlyList<string> DisplayNames) : BannerMessa
     {
         ArgumentNullException.ThrowIfNull(displayNames);
 
-        if (displayNames.Count == 0)
-        {
-            throw new ArgumentException("At least one display name is required.", nameof(displayNames));
-        }
-
-        return [.. displayNames];
+        return displayNames.Count == 0 ?
+            throw new ArgumentException("At least one display name is required.", nameof(displayNames)) :
+            [.. displayNames];
     }
 }
