@@ -174,7 +174,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     {
         var knownIds = existingEntries.Select(e => e.Id).ToHashSet();
         var toAdd = new List<LibraryEntry>(preflight.ToAdd.Count + preflight.AmbiguousMatches.Count);
-        var toUpdate = new List<LibraryEntry>(preflight.ToReplace.Count + CountDistinctUpdates(preflight));
+        var toUpdate = new List<LibraryEntry>(preflight.ToReplace.Count + CountStandaloneTagUpdates(preflight));
 
         foreach (var entry in preflight.ToAdd)
         {
@@ -184,6 +184,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         // Append replacements before tag-updates: FilterLibrary Effects.HandleImportLibraryEntries relies on this
         // ordering (the first Summary.Replaced entries of ToUpdate are the replacements) to attribute which persisted
         // rows were replacements vs tag-updates when the store skips a vanished row.
+        var replacementIndexById = new Dictionary<LibraryEntryId, int>();
+
         foreach (var (existing, incoming) in preflight.ToReplace)
         {
             var updated = incoming with
@@ -195,14 +197,35 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
                 Tags = LibraryEntryTagNormalizer.Normalize(incoming.Tags),
             };
 
+            replacementIndexById[existing.Id] = toUpdate.Count;
             toUpdate.Add(updated);
         }
 
         foreach (var group in preflight.ToUpdate.GroupBy(t => t.Existing.Id))
         {
             var existing = group.First().Existing;
-            var existingMigrated = LibraryEntryTagNormalizer.MigrateBackslashName(existing);
             var incomingTags = group.SelectMany(t => t.Incoming.Tags);
+
+            // The same existing entry can be both replaced (name match) and tag-updated (relaxed-content match) by two
+            // different incoming items. Writing its Id twice would let this tag-update - rebuilt from the ORIGINAL
+            // entry - overwrite the replacement's new content on the second write. Fold the tag-update's tags into the
+            // already-built replacement payload instead of emitting a second row with the same Id.
+            if (replacementIndexById.TryGetValue(existing.Id, out var replacementIndex))
+            {
+                var replacement = toUpdate[replacementIndex];
+                var mergedReplacementTags = LibraryEntryTagNormalizer.Normalize(replacement.Tags.Concat(incomingTags));
+
+                toUpdate[replacementIndex] = replacement switch
+                {
+                    LibraryEntrySavedFilter savedFilter => savedFilter with { Tags = mergedReplacementTags },
+                    LibraryEntryFilterSet filterSet => filterSet with { Tags = mergedReplacementTags },
+                    _ => replacement,
+                };
+
+                continue;
+            }
+
+            var existingMigrated = LibraryEntryTagNormalizer.MigrateBackslashName(existing);
             var unionedTags = LibraryEntryTagNormalizer.Normalize(existingMigrated.Tags.Concat(incomingTags));
 
             var updated = existing switch
@@ -223,7 +246,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         var summary = new ImportSummary(
             preflight.ToAdd.Count,
             preflight.ToReplace.Count,
-            CountDistinctUpdates(preflight),
+            CountStandaloneTagUpdates(preflight),
             preflight.SkippedDuplicates.Count,
             preflight.AmbiguousMatches.Count);
 
@@ -262,7 +285,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         if (preflight.ToUpdate.Count > 0)
         {
             var renameCount = preflight.ToUpdate.Count(t => t.Existing.Name.Contains('\\'));
-            lines.Add($"  \u2022 {CountDistinctUpdates(preflight)} entries will be updated with tag changes");
+            lines.Add($"  \u2022 {CountStandaloneTagUpdates(preflight)} entries will be updated with tag changes");
             if (renameCount > 0)
             {
                 lines.Add($"  \u2022 {renameCount} existing entries will also be renamed (folder paths \u2192 tags)");
@@ -279,8 +302,19 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         return "Import preview:\n" + string.Join('\n', lines);
     }
 
-    internal static int CountDistinctUpdates(ImportPreflight preflight) =>
-        preflight.ToUpdate.Select(t => t.Existing.Id).Distinct().Count();
+    // Tag-updates whose existing entry is NOT also being replaced. A replaced-and-tag-updated entry is folded into its
+    // single replacement row (see ApplyImportPreflight), so it must not be counted as a separate tag-update here - that
+    // keeps ToUpdate row count == Replaced + UpdatedTags, which the import announcement attribution relies on.
+    internal static int CountStandaloneTagUpdates(ImportPreflight preflight)
+    {
+        var replacedIds = preflight.ToReplace.Select(t => t.Existing.Id).ToHashSet();
+
+        return preflight.ToUpdate
+            .Select(t => t.Existing.Id)
+            .Where(id => !replacedIds.Contains(id))
+            .Distinct()
+            .Count();
+    }
 
     internal static (LibraryEntryId? TargetId, bool FallbackToActiveTab) DecidePendingFocusAfterRemoval(
         IReadOnlyList<LibraryEntry> snapshot,
