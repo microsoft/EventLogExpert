@@ -26,6 +26,7 @@ let pointerOverTip = false;
 let hideTimer = 0;
 let hoverEndTimer = 0;
 let attributeObserver = null;
+let escapeConsumed = false;
 
 // The control whose tooltip should show right now: a hovered control takes precedence, falling back to the
 // focused control.
@@ -188,7 +189,11 @@ export function registerFocusTooltip() {
 
     document.addEventListener("mouseover", (e) => {
         const anchor = e.target.closest?.("[data-tooltip]");
-        if (anchor) { cancelHoverEnd(); hoveredAnchor = anchor; update(); }
+        // Ignore movement WITHIN the same control (e.g. the button <-> its icon child): a genuine enter
+        // comes from outside the anchor, so relatedTarget is not already inside it. Without this guard an
+        // Escape dismissal would reopen on the next internal transition even though the pointer never left
+        // the trigger (WCAG 1.4.13 dismissable).
+        if (anchor && !anchor.contains(e.relatedTarget)) { cancelHoverEnd(); hoveredAnchor = anchor; update(); }
     }, true);
 
     document.addEventListener("mouseout", (e) => {
@@ -205,9 +210,31 @@ export function registerFocusTooltip() {
     }, true);
 
     document.addEventListener("keydown", (e) => {
-        // Dismiss on Escape without moving focus (WCAG 1.4.13); no stopPropagation so a host modal still gets it.
-        if (e.key === "Escape" && tip && !tip.hidden) { hide(); }
+        if (e.key !== "Escape") { return; }
+
+        // Dismiss on Escape without moving focus (WCAG 1.4.13). Consume the key while a tooltip is visible so
+        // the dismissal is standalone - for a control inside a dialog, an unconsumed Escape would also run the
+        // host's cancel and close it. Keep consuming the auto-repeat keydowns from the SAME held press (the
+        // tooltip is already hidden after the first) via the latch, so a held Escape can't fall through and
+        // close the host too. The latch clears on keyup, so a fresh Escape press reaches the host as usual.
+        if (tip && !tip.hidden) {
+            hide();
+            escapeConsumed = true;
+        }
+
+        if (escapeConsumed) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
     }, true);
+
+    document.addEventListener("keyup", (e) => {
+        if (e.key === "Escape") { escapeConsumed = false; }
+    }, true);
+
+    // Also clear the latch if focus leaves the window mid-hold (e.g. Alt+Tab while Escape is held), since the
+    // matching keyup may then be delivered elsewhere and never seen here.
+    window.addEventListener("blur", () => { escapeConsumed = false; });
 
     // Keep the pinned bubble aligned with its control while a trigger is active; only drop it once nothing is
     // focused/hovered, so a still-focused tooltip stays put (WCAG 1.4.13 persistent).
