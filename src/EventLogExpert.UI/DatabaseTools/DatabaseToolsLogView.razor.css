@@ -4,15 +4,16 @@
     flex: 1 1 0;
     min-width: 0;
     max-width: 100%;
-    /* Floor height so extreme text zoom (which squeezes this flex column) can't collapse the output
-       to zero and clip its toolbar (Copy / Export / Run / Jump to latest)
-       Normal layouts are already far taller, so this only engages under heavy zoom. */
-    min-height: 7rem;
+    /* Size to at least the toolbar's own (possibly multi-row) height so heavy text zoom can't squeeze the
+       container below the toolbar and clip its actions; the log view (its own overflow, down to a one-row
+       floor) absorbs the remaining squeeze and scrolls. overflow stays visible on purpose - an
+       overflow:hidden flex item reports a zero automatic minimum and would let the toolbar be clipped
+       again - so the toolbar and log view carry the rounded corners instead. */
+    min-height: auto;
     border: 1px solid var(--clr-statusbar);
     border-radius: 4px;
     background: var(--background-dark);
     color: var(--text-primary);
-    overflow: hidden;
 }
 
 .database-tools-log-toolbar {
@@ -23,6 +24,7 @@
     padding: 4px 8px;
     background: var(--background-darkgray);
     border-bottom: 1px solid var(--clr-statusbar);
+    border-radius: 4px 4px 0 0;
     flex: 0 0 auto;
 }
 
@@ -94,9 +96,13 @@
 
 .database-tools-log-view {
     flex: 1 1 0;
-    min-height: 0;
+    /* Keep at least one log row (plus padding) visible so a heavy-zoom squeeze - which grows the container
+       to fit the toolbar - can't collapse the log / empty-state area to zero; content beyond this scrolls,
+       and the .db-tab wrapper scrolls when the toolbar plus this floor exceed the dialog. */
+    min-height: 2.5rem;
     overflow-y: auto;
     overflow-x: hidden;
+    border-radius: 0 0 4px 4px;
     padding: 6px 8px;
     font-family: Consolas, 'Courier New', monospace;
     font-size: 0.85em;
