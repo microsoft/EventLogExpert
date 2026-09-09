@@ -163,8 +163,19 @@ export function registerFocusTooltip() {
     registered = true;
 
     document.addEventListener("focusin", (e) => {
-        focusedAnchor = e.target.closest?.("[data-tooltip]") ?? null;
+        const anchor = e.target.closest?.("[data-tooltip]");
+        // Only KEYBOARD focus should surface the tooltip. A pointer click also focuses the control, and that
+        // focus would otherwise leave the bubble stuck open after the pointer moved away. :focus-visible is
+        // the browser's keyboard-focus signal, which is keyboard-only for these buttons in WebView2.
+        focusedAnchor = anchor && anchor.matches(":focus-visible") ? anchor : null;
         update();
+    }, true);
+
+    document.addEventListener("pointerdown", () => {
+        // A pointer interaction supersedes a keyboard-focus tooltip: pointer users are governed by hover
+        // alone, so a control that was tabbed to and then clicked doesn't keep its bubble after the pointer
+        // leaves.
+        if (focusedAnchor) { focusedAnchor = null; update(); }
     }, true);
 
     document.addEventListener("focusout", (e) => {
