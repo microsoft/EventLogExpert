@@ -4,38 +4,38 @@
     overflow-wrap: anywhere;
 }
 
-.release-notes-content h1 {
+.release-notes-content ::deep h1 {
     font-size: 1.4rem;
     margin: 0 0 1rem 0;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid var(--clr-statusbar);
 }
 
-.release-notes-content h2 {
+.release-notes-content ::deep h2 {
     font-size: 1.2rem;
     margin: 1.25rem 0 0.5rem 0;
     color: var(--clr-lightblue);
 }
 
-.release-notes-content h3 {
+.release-notes-content ::deep h3 {
     font-size: 1.05rem;
     margin: 1rem 0 0.4rem 0;
 }
 
-.release-notes-content ul {
+.release-notes-content ::deep ul {
     margin: 0.25rem 0 0.75rem 0;
     padding-left: 1.5rem;
 }
 
-.release-notes-content li {
+.release-notes-content ::deep li {
     margin-bottom: 0.25rem;
 }
 
-.release-notes-content p {
+.release-notes-content ::deep p {
     margin: 0.5rem 0;
 }
 
-.release-notes-content code {
+.release-notes-content ::deep code {
     padding: 0.1rem 0.3rem;
     background-color: var(--clr-statusbar);
     color: var(--text-on-statusbar);

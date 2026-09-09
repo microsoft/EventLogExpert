@@ -157,7 +157,7 @@
     flex: 0 0 auto;
     width: 0.85rem;
     height: 0.85rem;
-    border: 1px solid var(--border-divider);
+    border: 1px solid var(--text-secondary);
     border-radius: 3px;
     background-color: var(--hl-bg);
 }

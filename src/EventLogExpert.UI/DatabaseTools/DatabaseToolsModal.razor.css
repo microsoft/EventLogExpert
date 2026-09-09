@@ -155,6 +155,13 @@
     .db-tabs-container ::deep .db-tab-form .direction-row {
         grid-column: 1;
     }
+
+    /* Under narrow width / high text zoom the stacked form + floored output can exceed the tab
+       height; let the tab scroll so the form fields and output controls stay reachable instead of
+       being clipped */
+    .db-tabs-container ::deep .db-tab {
+        overflow-y: auto;
+    }
 }
 
 /* Narrow reflow (WCAG 1.4.10): below the width where the 200px sidebar and the tab panel can both
