@@ -39,10 +39,14 @@
 
 .toolbar-trailing {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     align-items: center;
     gap: 6px;
     margin-left: auto;
-    flex: 0 0 auto;
+    min-width: 0;
+    max-width: 100%;
+    flex: 0 1 auto;
 }
 
 .database-tools-log-toolbar .entry-count {
