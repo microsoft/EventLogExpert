@@ -42,8 +42,13 @@ function ensureTip() {
 
     // Let the pointer move onto the bubble to read it without it vanishing (WCAG 1.4.13 hoverable). Leaving
     // the bubble re-derives the hovered control from where the pointer went (back onto a control, or nothing).
-    tip.addEventListener("mouseenter", () => { pointerOverTip = true; cancelHide(); cancelHoverEnd(); });
-    tip.addEventListener("mouseleave", (e) => {
+    // Touch has no hover and its tap-compatibility events would pin the bubble open, so only mouse/pen count.
+    tip.addEventListener("pointerenter", (e) => {
+        if (e.pointerType === "touch") { return; }
+        pointerOverTip = true; cancelHide(); cancelHoverEnd();
+    });
+    tip.addEventListener("pointerleave", (e) => {
+        if (e.pointerType === "touch") { return; }
         pointerOverTip = false;
         hoveredAnchor = e.relatedTarget?.closest?.("[data-tooltip]") ?? null;
         update();
@@ -82,7 +87,7 @@ function scheduleHoverEnd() {
     // Keep showing the just-left hovered control through the bridge delay so the pointer can still reach its
     // tooltip; without this, when another control holds keyboard focus, activeAnchor() would fall back to the
     // focused control the instant the pointer leaves and the hovered control's tooltip could never be hovered
-    // (WCAG 1.4.13 hoverable). Reaching the bubble (pointerOverTip) or another control (mouseover) cancels it.
+    // (WCAG 1.4.13 hoverable). Reaching the bubble (pointerOverTip) or another control (pointerover) cancels it.
     cancelHoverEnd();
     hoverEndTimer = setTimeout(() => {
         hoverEndTimer = 0;
@@ -195,7 +200,11 @@ export function registerFocusTooltip() {
         }
     }, true);
 
-    document.addEventListener("mouseover", (e) => {
+    document.addEventListener("pointerover", (e) => {
+        // Ignore touch: it has no hover, and a tap's compatibility events would open the tooltip during
+        // activation and leave it lingering (touch delivers no reliable pointerout on lift). Mouse and pen
+        // keep hover support (pointerType is "mouse", "pen", or "touch").
+        if (e.pointerType === "touch") { return; }
         const anchor = e.target.closest?.("[data-tooltip]");
         // Ignore movement WITHIN the same control (e.g. the button <-> its icon child): a genuine enter
         // comes from outside the anchor, so relatedTarget is not already inside it. Without this guard an
@@ -204,9 +213,10 @@ export function registerFocusTooltip() {
         if (anchor && !anchor.contains(e.relatedTarget)) { cancelHoverEnd(); hoveredAnchor = anchor; update(); }
     }, true);
 
-    document.addEventListener("mouseout", (e) => {
+    document.addEventListener("pointerout", (e) => {
+        if (e.pointerType === "touch") { return; }
         // Left the hovered control - but not when moving between its children or onto the bubble (the bubble's
-        // own mouseleave handles that handoff). Defer clearing it through the bridge delay so its tooltip stays
+        // own pointerleave handles that handoff). Defer clearing it through the bridge delay so its tooltip stays
         // reachable even when another control holds keyboard focus (which activeAnchor() would otherwise fall
         // back to immediately).
         if (hoveredAnchor
