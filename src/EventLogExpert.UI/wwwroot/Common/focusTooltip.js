@@ -95,10 +95,17 @@ function scheduleHoverEnd() {
 
 function position(anchor, element) {
     const rect = anchor.getBoundingClientRect();
-    const gap = 4;
+    // The bubble sits flush against the control (no gap) so the pointer path from control to bubble is
+    // continuous and staying hovered is not pointer-speed-dependent (WCAG 1.4.13): a gap would leave a
+    // non-hit-testable strip that a slow crossing could dwell in past the hover-end delay, losing the bubble.
+    // Measure with fractional (sub-pixel) geometry and leave the trigger-facing edge unrounded so the two
+    // border-boxes share an exact coordinate at every device-pixel ratio; rounding it would reopen a
+    // sub-pixel seam (or a click-stealing overlap) at fractional zoom levels such as WCAG's 400%.
+    const gap = 0;
     const margin = 4;
-    const width = element.offsetWidth;
-    const height = element.offsetHeight;
+    const tipRect = element.getBoundingClientRect();
+    const width = tipRect.width;
+    const height = tipRect.height;
     const viewportWidth = document.documentElement.clientWidth;
     const viewportHeight = document.documentElement.clientHeight;
 
@@ -108,12 +115,13 @@ function position(anchor, element) {
         top = rect.top - gap - height;
     }
 
-    // Align the tooltip's right edge to the control's, then clamp into the viewport.
+    // Align the tooltip's right edge to the control's, then clamp into the viewport. The horizontal edge has
+    // no flush neighbor, so it stays pixel-snapped to keep the label text crisp.
     let left = rect.right - width;
     left = Math.max(margin, Math.min(left, viewportWidth - margin - width));
 
     element.style.left = `${Math.round(left)}px`;
-    element.style.top = `${Math.round(top)}px`;
+    element.style.top = `${top}px`;
 }
 
 function reposition() {
