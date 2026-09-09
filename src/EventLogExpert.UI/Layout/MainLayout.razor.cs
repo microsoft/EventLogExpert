@@ -14,6 +14,7 @@ public sealed partial class MainLayout : IAsyncDisposable
 {
     private bool _disposed;
     private Task<IJSObjectReference>? _focusRingModuleLoad;
+    private Task<IJSObjectReference>? _focusTooltipModuleLoad;
     private Task<IJSObjectReference>? _themeModuleLoad;
 
     [Inject] private IAppTitleService AppTitleService { get; init; } = null!;
@@ -62,6 +63,21 @@ public sealed partial class MainLayout : IAsyncDisposable
 
             _focusRingModuleLoad = null;
         }
+
+        if (_focusTooltipModuleLoad is not null)
+        {
+            try
+            {
+                var module = await _focusTooltipModuleLoad;
+                await module.DisposeAsync();
+            }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+            catch (ObjectDisposedException) { }
+            catch (TaskCanceledException) { }
+
+            _focusTooltipModuleLoad = null;
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -71,6 +87,7 @@ public sealed partial class MainLayout : IAsyncDisposable
             await ApplyThemeAsync();
             await KeyboardShortcutService.EnsureRegisteredAsync(JSRuntime);
             await RegisterKeyboardFocusRingAsync();
+            await RegisterFocusTooltipAsync();
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -90,7 +107,9 @@ public sealed partial class MainLayout : IAsyncDisposable
     {
         if (_disposed) { return; }
 
-        var load = _themeModuleLoad ??= JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/EventLogExpert.UI/Layout/MainLayout.razor.js").AsTask();
+        var load = _themeModuleLoad ??= JSRuntime
+            .InvokeAsync<IJSObjectReference>("import", "./_content/EventLogExpert.UI/Layout/MainLayout.razor.js")
+            .AsTask();
 
         try
         {
@@ -112,6 +131,28 @@ public sealed partial class MainLayout : IAsyncDisposable
     }
 
     private void OnThemeChanged() => _ = InvokeAsync(ApplyThemeAsync);
+
+    private async Task RegisterFocusTooltipAsync()
+    {
+        if (_disposed) { return; }
+
+        var load = _focusTooltipModuleLoad ??= JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import",
+            "./_content/EventLogExpert.UI/Common/focusTooltip.js").AsTask();
+
+        try
+        {
+            var module = await load;
+            await module.InvokeVoidAsync("registerFocusTooltip");
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or JSException or ObjectDisposedException or TaskCanceledException)
+        {
+            if (!load.IsCompletedSuccessfully && ReferenceEquals(_focusTooltipModuleLoad, load))
+            {
+                _focusTooltipModuleLoad = null;
+            }
+        }
+    }
 
     private async Task RegisterKeyboardFocusRingAsync()
     {

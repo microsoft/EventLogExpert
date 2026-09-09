@@ -235,6 +235,29 @@ input[type="search"]:focus-visible,
 
 ::placeholder { color: var(--clr-placeholder); }
 
+/* Shared visual tooltip surfaced on keyboard focus AND pointer hover for icon-only controls that opt in
+   with data-tooltip="..." (native `title` shows on mouse hover only). The element is
+   position:fixed and appended to <body> by focusTooltip.js so it escapes the overflow clip of scroll panes
+   such as the filter pane (a CSS ::after bubble anchored to the button would be clipped there). Its left/top
+   are set inline from the control's viewport rect; the accessible name stays on the control's aria-label. */
+.focus-tooltip {
+    position: fixed;
+    z-index: var(--z-menu-overlay);
+
+    max-width: 15rem;
+    padding: 2px 6px;
+
+    background-color: var(--background-darkgray);
+    color: var(--text-primary);
+    border: 1px solid var(--border-divider);
+    border-radius: 3px;
+    box-shadow: var(--shadow-menu);
+
+    font-size: var(--font-size-sm);
+}
+
+.focus-tooltip[hidden] { display: none; }
+
 html, body {
     height: 100%;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'HelveticaNeue-Light', 'Ubuntu', 'Droid Sans', sans-serif;

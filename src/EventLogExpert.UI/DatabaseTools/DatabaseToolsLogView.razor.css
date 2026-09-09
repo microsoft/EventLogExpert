@@ -4,7 +4,10 @@
     flex: 1 1 0;
     min-width: 0;
     max-width: 100%;
-    min-height: 0;
+    /* Floor height so extreme text zoom (which squeezes this flex column) can't collapse the output
+       to zero and clip its toolbar (Copy / Export / Run / Jump to latest)
+       Normal layouts are already far taller, so this only engages under heavy zoom. */
+    min-height: 7rem;
     border: 1px solid var(--clr-statusbar);
     border-radius: 4px;
     background: var(--background-dark);

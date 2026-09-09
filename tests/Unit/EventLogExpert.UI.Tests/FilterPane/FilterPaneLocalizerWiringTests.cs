@@ -236,11 +236,11 @@ public sealed class FilterPaneLocalizerWiringTests : BunitContext
         Assert.Contains("[[FilterPane_Action_ApplyFilterSet]]", component.Markup);
         Assert.Contains("[[FilterPane_Action_ApplyScenario]]", component.Markup);
         Assert.Contains("[[FilterPane_ActiveFilters(1)]]", component.Markup);
-        Assert.Equal("[[FilterPane_SaveAsFilterSet_Aria]]", component.Find("button[title='[[FilterPane_SaveAsFilterSet_TitleEnabled]]']").GetAttribute("aria-label"));
-        Assert.Equal("[[FilterPane_ClearAll_Aria]]", component.Find("button[title='[[FilterPane_ClearAll_TitleEnabled]]']").GetAttribute("aria-label"));
-        Assert.Equal("[[FilterPane_OpenLibrary_Aria]]", component.Find("button[title='[[FilterPane_OpenLibrary_Title]]']").GetAttribute("aria-label"));
-        Assert.Equal("[[FilterPane_CopyScenarioJson_Aria]]", component.Find("button[title='[[FilterPane_CopyScenarioJson_Title]]']").GetAttribute("aria-label"));
-        Assert.Equal("[[FilterPane_SaveScenarioJson_Aria]]", component.Find("button[title='[[FilterPane_SaveScenarioJson_Title]]']").GetAttribute("aria-label"));
+        Assert.Equal("[[FilterPane_SaveAsFilterSet_Aria]]", component.Find("button[data-tooltip='[[FilterPane_SaveAsFilterSet_TitleEnabled]]']").GetAttribute("aria-label"));
+        Assert.Equal("[[FilterPane_ClearAll_Aria]]", component.Find("button[data-tooltip='[[FilterPane_ClearAll_TitleEnabled]]']").GetAttribute("aria-label"));
+        Assert.Equal("[[FilterPane_OpenLibrary_Aria]]", component.Find("button[data-tooltip='[[FilterPane_OpenLibrary_Title]]']").GetAttribute("aria-label"));
+        Assert.Equal("[[FilterPane_CopyScenarioJson_Aria]]", component.Find("button[data-tooltip='[[FilterPane_CopyScenarioJson_Title]]']").GetAttribute("aria-label"));
+        Assert.Equal("[[FilterPane_SaveScenarioJson_Aria]]", component.Find("button[data-tooltip='[[FilterPane_SaveScenarioJson_Title]]']").GetAttribute("aria-label"));
         Assert.Contains("[[FilterPane_ScenarioExport_HintDisabled]]", component.Markup);
         Assert.Contains("[[FilterPane_SaveFilterSet_HintDisabled]]", component.Markup);
         Assert.Contains("[[FilterPane_ClearFilters_HintDisabled]]", component.Markup);
@@ -252,9 +252,9 @@ public sealed class FilterPaneLocalizerWiringTests : BunitContext
         var component = Render<UI.FilterPane.FilterPane>();
 
         Assert.True(component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").HasAttribute("disabled"));
-        Assert.Equal("[[FilterPane_SaveAsFilterSet_TitleDisabled]]", component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").GetAttribute("title"));
+        Assert.Equal("[[FilterPane_SaveAsFilterSet_TitleDisabled]]", component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").GetAttribute("data-tooltip"));
         Assert.True(component.Find("button[aria-label='[[FilterPane_ClearAll_Aria]]']").HasAttribute("disabled"));
-        Assert.Equal("[[FilterPane_ClearAll_TitleDisabled]]", component.Find("button[aria-label='[[FilterPane_ClearAll_Aria]]']").GetAttribute("title"));
+        Assert.Equal("[[FilterPane_ClearAll_TitleDisabled]]", component.Find("button[aria-label='[[FilterPane_ClearAll_Aria]]']").GetAttribute("data-tooltip"));
 
         _dateFilter = new DateFilter { IsEnabled = false };
         _filteredDateRange.Changed += Raise.Event<Action>();
@@ -263,14 +263,14 @@ public sealed class FilterPaneLocalizerWiringTests : BunitContext
         Assert.True(component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").HasAttribute("disabled"));
         Assert.Equal("save-filters-empty-hint", component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").GetAttribute("aria-describedby"));
         Assert.False(component.Find("button[aria-label='[[FilterPane_ClearAll_Aria]]']").HasAttribute("disabled"));
-        Assert.Equal("[[FilterPane_ClearAll_TitleEnabled]]", component.Find("button[aria-label='[[FilterPane_ClearAll_Aria]]']").GetAttribute("title"));
+        Assert.Equal("[[FilterPane_ClearAll_TitleEnabled]]", component.Find("button[aria-label='[[FilterPane_ClearAll_Aria]]']").GetAttribute("data-tooltip"));
 
         _filters = [SavedFilter.TryCreate("Level == 4")! with { IsEnabled = true }];
         _activeFilters.Changed += Raise.Event<Action>();
         component.Render();
 
         Assert.False(component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").HasAttribute("disabled"));
-        Assert.Equal("[[FilterPane_SaveAsFilterSet_TitleEnabled]]", component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").GetAttribute("title"));
+        Assert.Equal("[[FilterPane_SaveAsFilterSet_TitleEnabled]]", component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").GetAttribute("data-tooltip"));
     }
 
     [Fact]
