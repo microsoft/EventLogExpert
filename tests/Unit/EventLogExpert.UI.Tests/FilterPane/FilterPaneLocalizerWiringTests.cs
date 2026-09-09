@@ -252,9 +252,10 @@ public sealed class FilterPaneLocalizerWiringTests : BunitContext
         var component = Render<UI.FilterPane.FilterPane>();
 
         Assert.True(component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").HasAttribute("disabled"));
-        Assert.Equal("[[FilterPane_SaveAsFilterSet_TitleDisabled]]", component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").GetAttribute("data-tooltip"));
+        Assert.Equal("[[FilterPane_SaveAsFilterSet_TitleDisabled]]", component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").GetAttribute("title"));
+        Assert.False(component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").HasAttribute("data-tooltip"));
         Assert.True(component.Find("button[aria-label='[[FilterPane_ClearAll_Aria]]']").HasAttribute("disabled"));
-        Assert.Equal("[[FilterPane_ClearAll_TitleDisabled]]", component.Find("button[aria-label='[[FilterPane_ClearAll_Aria]]']").GetAttribute("data-tooltip"));
+        Assert.Equal("[[FilterPane_ClearAll_TitleDisabled]]", component.Find("button[aria-label='[[FilterPane_ClearAll_Aria]]']").GetAttribute("title"));
 
         _dateFilter = new DateFilter { IsEnabled = false };
         _filteredDateRange.Changed += Raise.Event<Action>();
@@ -271,6 +272,7 @@ public sealed class FilterPaneLocalizerWiringTests : BunitContext
 
         Assert.False(component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").HasAttribute("disabled"));
         Assert.Equal("[[FilterPane_SaveAsFilterSet_TitleEnabled]]", component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").GetAttribute("data-tooltip"));
+        Assert.False(component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").HasAttribute("title"));
     }
 
     [Fact]

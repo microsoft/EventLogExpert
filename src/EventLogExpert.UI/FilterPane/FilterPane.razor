@@ -61,7 +61,8 @@
             OnClick="SaveFiltersAsFilterSetAsync"
             aria-describedby="@(HasSavableFilters ? null : "save-filters-empty-hint")"
             aria-label="@Localizer["FilterPane_SaveAsFilterSet_Aria"]"
-            data-tooltip="@(HasSavableFilters ? Localizer["FilterPane_SaveAsFilterSet_TitleEnabled"] : Localizer["FilterPane_SaveAsFilterSet_TitleDisabled"])" />
+            data-tooltip="@(HasSavableFilters ? Localizer["FilterPane_SaveAsFilterSet_TitleEnabled"] : null)"
+            title="@(HasSavableFilters ? null : Localizer["FilterPane_SaveAsFilterSet_TitleDisabled"])" />
 
         <Button Disabled="@(!HasClearableFilters)"
             IconClass="bi bi-trash"
@@ -69,7 +70,8 @@
             OnClick="ClearAllFiltersAsync"
             aria-describedby="@(HasClearableFilters ? null : "clear-filters-empty-hint")"
             aria-label="@Localizer["FilterPane_ClearAll_Aria"]"
-            data-tooltip="@(HasClearableFilters ? Localizer["FilterPane_ClearAll_TitleEnabled"] : Localizer["FilterPane_ClearAll_TitleDisabled"])" />
+            data-tooltip="@(HasClearableFilters ? Localizer["FilterPane_ClearAll_TitleEnabled"] : null)"
+            title="@(HasClearableFilters ? null : Localizer["FilterPane_ClearAll_TitleDisabled"])" />
 
         <Button IconClass="bi bi-bookmarks"
             IconOnly
@@ -87,7 +89,8 @@
                 OnClick="CopyScenarioJsonAsync"
                 aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
                 aria-label="@Localizer["FilterPane_CopyScenarioJson_Aria"]"
-                data-tooltip="@Localizer["FilterPane_CopyScenarioJson_Title"]" />
+                data-tooltip="@(hasEnabledFilters ? Localizer["FilterPane_CopyScenarioJson_Title"] : null)"
+                title="@(hasEnabledFilters ? null : Localizer["FilterPane_CopyScenarioJson_Title"])" />
 
             <Button Disabled="@(!hasEnabledFilters)"
                 IconClass="bi bi-filetype-json"
@@ -95,7 +98,8 @@
                 OnClick="SaveScenarioJsonAsync"
                 aria-describedby="@(hasEnabledFilters ? null : "scenario-export-empty-hint")"
                 aria-label="@Localizer["FilterPane_SaveScenarioJson_Aria"]"
-                data-tooltip="@Localizer["FilterPane_SaveScenarioJson_Title"]" />
+                data-tooltip="@(hasEnabledFilters ? Localizer["FilterPane_SaveScenarioJson_Title"] : null)"
+                title="@(hasEnabledFilters ? null : Localizer["FilterPane_SaveScenarioJson_Title"])" />
 
             <span class="visually-hidden" id="scenario-export-empty-hint">
                 @Localizer["FilterPane_ScenarioExport_HintDisabled"]
