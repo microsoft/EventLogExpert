@@ -124,7 +124,7 @@
 .db-entry-upgrading-status {
     display: inline-flex;
     align-items: center;
-    gap: .35rem;
+    gap: .5rem;
     min-width: 0;
 }
 

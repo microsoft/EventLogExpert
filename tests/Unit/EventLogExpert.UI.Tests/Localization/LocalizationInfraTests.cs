@@ -11,6 +11,8 @@ using EventLogExpert.Localization;
 using EventLogExpert.Runtime.ActivityCorrelation;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Display;
+using EventLogExpert.Runtime.Database;
+using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
@@ -61,6 +63,8 @@ public sealed class LocalizationInfraTests
             ("Dashboard_Enablement_", typeof(ChannelEnablement)),
             ("Details_Placeholder_", typeof(PlaceholderKind)),
             ("Details_Property_", typeof(DetailsPropertyLabel)),
+            ("Db_Status_", typeof(DatabaseStatus)),
+            ("Db_UpgradePhase_", typeof(UpgradePhase)),
             ("Explain_", typeof(GlossaryTerm)),
             ("ResolutionStatus_", typeof(EventResolutionStatus)),
             ("Correlation_Role_", typeof(ActivityNodeRole)),
@@ -406,6 +410,65 @@ public sealed class LocalizationInfraTests
             Assert.True(neutralValues.TryGetValue(key, out var neutral), $"Missing neutral RESX value for {key}.");
             Assert.Equal(DetailsPropertyText.Invariant(label), neutral);
         }
+    }
+
+    [Fact]
+    public void NeutralProviderDatabaseValues_HaveExpectedPlaceholderArity()
+    {
+        var neutralValues = ResxValues();
+        (string Key, int Arity)[] expected =
+        [
+            ("Db_Badge_RecoveryRequired", 0),
+            ("Db_Entry_Aria_Restore", 1),
+            ("Db_Entry_Aria_RetryClassification", 1),
+            ("Db_Entry_Aria_RetryUpgrade", 1),
+            ("Db_Entry_Aria_Select", 1),
+            ("Db_Entry_Aria_Upgrade", 1),
+            ("Db_Entry_MixedOs_Capped", 0),
+            ("Db_Entry_MixedOs_Count", 1),
+            ("Db_Entry_PendingToggle", 0),
+            ("Db_Entry_PhaseProgress", 3),
+            ("Db_Entry_ProgressAria", 2),
+            ("Db_Entry_Remove", 0),
+            ("Db_Entry_Restore", 0),
+            ("Db_Entry_RetryClassification", 0),
+            ("Db_Entry_RetryUpgrade", 0),
+            ("Db_Entry_SourceOs", 1),
+            ("Db_Entry_UnknownOs", 0),
+            ("Db_Entry_Upgrade", 0),
+            ("Db_Entry_Upgrading", 0),
+            ("Db_Fail_CancellationRollbackFailed", 1),
+            ("Db_Fail_CannotUpgradeStatus", 1),
+            ("Db_Fail_EntryNotFound", 0),
+            ("Db_Fail_ImportOpenArchiveFailed", 1),
+            ("Db_Fail_MigrationRollbackFailed", 2),
+            ("Db_Fail_RecoveryRequiredBakAlreadyPresent", 0),
+            ("Db_Fail_RecoveryRequiredBakAppearedDuringBackup", 0),
+            ("Db_Fail_RecoveryRequiredBackupExists", 0),
+            ("Db_Fail_RecoveryRequiredResolveFirst", 0),
+            ("Db_Fail_UpgradeCleanupFailed", 0),
+            ("Db_Fail_UpgradeVerificationFailed", 0),
+            ("Db_Fail_VerificationOrCleanupRollbackFailed", 1),
+            ("Db_Picker_ImportPrompt", 0),
+            ("DatabaseRecoveryModal_Delete", 0),
+            ("DatabaseRecoveryModal_DeleteAll", 0),
+            ("DatabaseRecoveryModal_Description_Many", 0),
+            ("DatabaseRecoveryModal_Description_One", 0),
+            ("DatabaseRecoveryModal_Explanation", 0),
+            ("DatabaseRecoveryModal_Restore", 0),
+            ("DatabaseRecoveryModal_RestoreAll", 0),
+            ("Modal_Apply", 0)
+        ];
+
+        foreach ((string key, int arity) in expected)
+        {
+            Assert.True(neutralValues.TryGetValue(key, out string? value), $"Missing neutral RESX value for {key}.");
+            Assert.Equal(arity, PlaceholderArity(value));
+        }
+
+        Assert.Equal(7, neutralValues.Keys.Count(key => key.StartsWith("Db_Status_", StringComparison.Ordinal)));
+        Assert.Equal(3, neutralValues.Keys.Count(key => key.StartsWith("Db_UpgradePhase_", StringComparison.Ordinal)));
+        Assert.Equal(12, neutralValues.Keys.Count(key => key.StartsWith("Db_Fail_", StringComparison.Ordinal)));
     }
 
     [Fact]

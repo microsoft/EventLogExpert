@@ -11,8 +11,8 @@ public sealed class BannerMessageTests
     [Fact]
     public void DatabaseImportSummary_SnapshotsFailures_SoLaterCallerMutationCannotChangeDetailsOrSeverity()
     {
-        var failures = new List<ImportFailure> { new("A.db", "bad") };
-        var upgradeFailures = new List<ImportFailure> { new("B.db", "schema") };
+        var failures = new List<ImportFailure> { new("A.db", new DatabaseFailureReason.NativeDetail("bad")) };
+        var upgradeFailures = new List<ImportFailure> { new("B.db", new DatabaseFailureReason.NativeDetail("schema")) };
         var summary = new DatabaseImportSummary(2, failures, upgradeFailures);
 
         failures.Clear();

@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Banner;
@@ -15,6 +16,7 @@ using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Frozen;
 using System.Reflection;
@@ -47,6 +49,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         Services.AddSingleton(_logReloadCoordinator);
         Services.AddSingleton(_progressBannerService);
         Services.AddSingleton(_traceLogger);
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
         Services.AddMenuServiceMock();
 
         JSInterop.Mode = JSRuntimeMode.Loose;
@@ -463,7 +466,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
             .Returns(new UpgradeBatchResult(
                 Succeeded: ["a.db"],
                 Cancelled: [],
-                Failed: [new UpgradeFailure("b.db", "boom")]));
+                Failed: [new UpgradeFailure("b.db", new DatabaseFailureReason.NativeDetail("boom"))]));
 
         var component = Render<ManageDatabasesTab>();
         await EnterSelectionModeAsync(component);
@@ -796,6 +799,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
     {
         _databaseService.Entries = [Entry("a.db", isEnabled: true, status: DatabaseStatus.Ready)];
         _coordinator.ImportAsync(
+                Arg.Any<string>(),
                 Arg.Any<Func<string, CancellationToken, Task<bool>>>(),
                 Arg.Any<CancellationToken>())
             .Returns(ImportOutcome.None);
@@ -812,6 +816,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
     {
         _databaseService.Entries = [Entry("a.db", isEnabled: true, status: DatabaseStatus.Ready)];
         _coordinator.ImportAsync(
+                Arg.Any<string>(),
                 Arg.Any<Func<string, CancellationToken, Task<bool>>>(),
                 Arg.Any<CancellationToken>())
             .Returns(new ImportOutcome(ImportedCount: 1, Failures: [], UpgradeFailures: []));
@@ -844,7 +849,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         _databaseService.RaiseUpgradeBatchCompleted(
             new UpgradeBatchCompletedEventArgs(
                 UpgradeBatchId.Create(),
-                new UpgradeBatchResult([], [], [new UpgradeFailure("a.db", "boom")]),
+                new UpgradeBatchResult([], [], [new UpgradeFailure("a.db", new DatabaseFailureReason.NativeDetail("boom"))]),
                 wasCancelled: false));
 
         Assert.False(component.Instance.HasDatabaseStateChanged);
@@ -1185,7 +1190,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var component = Render<ManageDatabasesTab>();
 
         var text = component.Find(".db-entry-upgrading-text");
-        Assert.Contains("Migrating schema 2 of 3", text.TextContent);
+        Assert.Equal("[[Db_Entry_PhaseProgress([[Db_UpgradePhase_MigratingSchema]]|2|3)]]", text.TextContent);
     }
 
     [Fact]
@@ -1202,7 +1207,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var component = Render<ManageDatabasesTab>();
 
         var text = component.Find(".db-entry-upgrading-text");
-        Assert.Contains("Migrating schema 1 of 2", text.TextContent);
+        Assert.Equal("[[Db_Entry_PhaseProgress([[Db_UpgradePhase_MigratingSchema]]|1|2)]]", text.TextContent);
     }
 
     [Fact]

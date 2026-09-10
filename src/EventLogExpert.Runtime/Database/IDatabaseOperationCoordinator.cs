@@ -16,6 +16,7 @@ public interface IDatabaseOperationCoordinator
         CancellationToken cancellationToken = default);
 
     Task<ImportOutcome> ImportAsync(
+        string pickerPrompt,
         Func<string, CancellationToken, Task<bool>>? askOverwriteAsync = null,
         CancellationToken cancellationToken = default);
 

@@ -144,7 +144,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
         {
             if (!byName.TryGetValue(fileName, out var entry))
             {
-                rejected.Add(new UpgradeFailure(fileName, "Entry not found"));
+                rejected.Add(new UpgradeFailure(fileName, new DatabaseFailureReason.EntryNotFound()));
                 continue;
             }
 
@@ -152,7 +152,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
             {
                 rejected.Add(new UpgradeFailure(
                     fileName,
-                    "Recovery required — resolve via Settings or recovery prompt first"));
+                    new DatabaseFailureReason.RecoveryRequiredResolveFirst()));
 
                 continue;
             }
@@ -161,7 +161,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
             {
                 rejected.Add(new UpgradeFailure(
                     fileName,
-                    $"Cannot upgrade entry in status '{entry.Status}'"));
+                    new DatabaseFailureReason.CannotUpgradeStatus(entry.Status)));
 
                 continue;
             }
@@ -323,9 +323,12 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
 
                     break;
                 }
-                catch (UpgradeRollbackFailedException ex)
+                catch (UpgradeFailedException ex)
                 {
-                    failed.Add(new UpgradeFailure(entry.FileName, ex.Message));
+                    failed.Add(new UpgradeFailure(entry.FileName, ex.Reason));
+
+                    DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
+                        $"{nameof(DatabaseUpgradeService)}.{nameof(ProcessBatchAsync)}: '{entry.FileName}' upgrade failed: {ex}"));
 
                     if (!batch.BatchCts.Token.IsCancellationRequested)
                     {
@@ -343,8 +346,10 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
                 }
                 catch (Exception ex)
                 {
-                    var message = ex is DatabaseUpgradeException dbEx ? dbEx.Reason : ex.Message;
-                    failed.Add(new UpgradeFailure(entry.FileName, message));
+                    var reason = ex is DatabaseUpgradeException dbEx ?
+                        new DatabaseFailureReason.NativeDetail(dbEx.Reason) :
+                        new DatabaseFailureReason.NativeDetail(ex.Message);
+                    failed.Add(new UpgradeFailure(entry.FileName, reason));
 
                     DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
                         $"{nameof(DatabaseUpgradeService)}.{nameof(ProcessBatchAsync)}: '{entry.FileName}' upgrade threw: {ex}"));
@@ -391,12 +396,12 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
 
         if (entry.Status is not (DatabaseStatus.UpgradeRequired or DatabaseStatus.UpgradeFailed))
         {
-            throw new InvalidOperationException($"Cannot upgrade entry in status '{entry.Status}'");
+            throw new UpgradeFailedException(new DatabaseFailureReason.CannotUpgradeStatus(entry.Status));
         }
 
         if (entry.BackupExists)
         {
-            throw new InvalidOperationException("Recovery required — backup exists");
+            throw new UpgradeFailedException(new DatabaseFailureReason.RecoveryRequiredBackupExists());
         }
 
         var backupPath = entry.FullPath + DatabaseFileOperations.UpgradeBackupSuffix;
@@ -405,7 +410,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
         {
             _registry.UpdateEntryStatusAndBackup(fileName, entry.Status, true);
 
-            throw new InvalidOperationException("Recovery required — .upgrade.bak already present");
+            throw new UpgradeFailedException(new DatabaseFailureReason.RecoveryRequiredBakAlreadyPresent());
         }
 
         await Task.Run(
@@ -436,8 +441,8 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
                         {
                             _registry.UpdateEntryStatusAndBackup(fileName, entry.Status, true);
 
-                            throw new InvalidOperationException(
-                                "Recovery required — .upgrade.bak appeared during backup",
+                            throw new UpgradeFailedException(
+                                new DatabaseFailureReason.RecoveryRequiredBakAppearedDuringBackup(),
                                 ex);
                         }
 
@@ -468,20 +473,19 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
 
                         if (!DatabaseFileOperations.VerifyEntryReady(entry.FullPath, _maintenance, _traceLogger))
                         {
-                            throw new InvalidOperationException("Upgrade verification failed");
+                            throw new UpgradeFailedException(new DatabaseFailureReason.UpgradeVerificationFailed());
                         }
 
                         if (!DatabaseFileOperations.TryDeleteFile(backupPath, _traceLogger, nameof(UpgradeAsync)))
                         {
                             _registry.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.Ready, true);
 
-                            throw new UpgradeCleanupFailedException(
-                                "Upgrade succeeded but backup cleanup failed; .upgrade.bak remains on disk");
+                            throw new UpgradeFailedException(new DatabaseFailureReason.UpgradeCleanupFailed(), skipRollback: true);
                         }
 
                         _registry.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.Ready, false);
                     }
-                    catch (UpgradeCleanupFailedException)
+                    catch (UpgradeFailedException ex) when (ex.SkipRollback)
                     {
                         throw;
                     }
@@ -497,8 +501,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
                         {
                             _registry.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, true);
 
-                            throw new UpgradeRollbackFailedException(
-                                $"Cancellation rollback failed for '{fileName}'; .upgrade.bak remains on disk");
+                            throw new UpgradeFailedException(new DatabaseFailureReason.CancellationRollbackFailed(fileName));
                         }
 
                         throw;
@@ -511,8 +514,9 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
                             {
                                 _registry.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, true);
 
-                                throw new UpgradeRollbackFailedException(
-                                    $"Migration failed and rollback also failed for '{fileName}': {(ex is DatabaseUpgradeException dbEx ? dbEx.Reason : ex.Message)}");
+                                var detail = ex is DatabaseUpgradeException dbEx ? dbEx.Reason : ex.Message;
+
+                                throw new UpgradeFailedException(new DatabaseFailureReason.MigrationRollbackFailed(fileName, detail));
                             }
 
                             _registry.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, false);
@@ -523,8 +527,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
                             {
                                 _registry.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, true);
 
-                                throw new UpgradeRollbackFailedException(
-                                    $"Verification or cleanup failed and rollback also failed for '{fileName}'");
+                                throw new UpgradeFailedException(new DatabaseFailureReason.VerificationOrCleanupRollbackFailed(fileName));
                             }
 
                             _registry.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, false);
@@ -541,9 +544,16 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
             .ConfigureAwait(false);
     }
 
-    private sealed class UpgradeCleanupFailedException(string message) : Exception(message);
+    private sealed class UpgradeFailedException(
+        DatabaseFailureReason reason,
+        Exception? innerException = null,
+        bool skipRollback = false) :
+        Exception(reason.ToString(), innerException)
+    {
+        public DatabaseFailureReason Reason { get; } = reason;
 
-    private sealed class UpgradeRollbackFailedException(string message) : Exception(message);
+        public bool SkipRollback { get; } = skipRollback;
+    }
 
     private sealed record UpgradeBatch(
         UpgradeBatchId Id,

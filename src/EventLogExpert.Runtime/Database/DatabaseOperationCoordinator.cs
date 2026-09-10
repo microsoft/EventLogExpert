@@ -57,9 +57,11 @@ internal sealed class DatabaseOperationCoordinator(
     }
 
     public async Task<ImportOutcome> ImportAsync(
+        string pickerPrompt,
         Func<string, CancellationToken, Task<bool>>? askOverwriteAsync = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrEmpty(pickerPrompt);
         cancellationToken.ThrowIfCancellationRequested();
 
         return await RunOperationAsync(
@@ -69,7 +71,7 @@ internal sealed class DatabaseOperationCoordinator(
             body: async () =>
             {
                 var sourcePaths = await _filePicker.PickMultipleAsync(
-                    "Please select database files to import",
+                    pickerPrompt,
                     FilePickerFileTypes.Database);
 
                 if (sourcePaths.Count == 0) { return ImportOutcome.None; }
@@ -201,7 +203,7 @@ internal sealed class DatabaseOperationCoordinator(
 
                     foreach (var failure in result.Failed)
                     {
-                        _errorBanners.ReportError(new DatabaseUpgradeFailed(failure.FileName, failure.Message));
+                        _errorBanners.ReportError(new DatabaseUpgradeFailed(failure.FileName, failure.Reason));
                     }
                 });
         }
@@ -250,7 +252,7 @@ internal sealed class DatabaseOperationCoordinator(
 
                     foreach (var failure in batchResult.Failed)
                     {
-                        _errorBanners.ReportError(new DatabaseUpgradeFailed(failure.FileName, failure.Message));
+                        _errorBanners.ReportError(new DatabaseUpgradeFailed(failure.FileName, failure.Reason));
                     }
 
                     return batchResult;

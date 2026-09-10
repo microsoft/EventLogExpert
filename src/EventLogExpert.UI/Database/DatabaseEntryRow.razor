@@ -3,7 +3,7 @@
     @oncontextmenu:preventDefault="true">
     <div @attributes="CheckboxHiddenAttributes"
         class="db-entry-checkbox @(IsSelectionModeActive ? "db-entry-checkbox--visible" : null)">
-        <Checkbox AriaLabel="@($"Select {Entry.FileName}")"
+        <Checkbox AriaLabel="@Localizer["Db_Entry_Aria_Select", Entry.FileName]"
             Disabled="@(!IsSelectionModeActive)"
             Value="IsSelected"
             ValueChanged="@(_ => OnSelectionToggle.InvokeAsync())" />
@@ -27,7 +27,7 @@
         <div class="db-entry-actions @(ShowPendingIndicator ? "db-entry-actions--pending" : null)">
             @if (ShowPendingIndicator)
             {
-                <span class="visually-hidden" id="@_pendingStatusId">(pending toggle, unsaved)</span>
+                <span class="visually-hidden" id="@_pendingStatusId">@Localizer["Db_Entry_PendingToggle"]</span>
             }
 
             @switch (PrimaryAction)
@@ -46,80 +46,85 @@
                 case ActionKind.Spinner:
                     @if (UpgradeProgress is { } progress)
                     {
-                        var verb = PhaseVerb(progress.CurrentPhase);
+                        var verb = UpgradePhaseLocalizer.Describe(Localizer, progress.CurrentPhase);
                         var hasFile = !string.IsNullOrEmpty(progress.CurrentEntryName);
                         var hasPosition = progress.CurrentBatchSize > 1;
 
-                        var displayText = hasFile
-                            ? (hasPosition ? $"{verb} {progress.CurrentBatchPosition} of {progress.CurrentBatchSize}" : verb)
-                            : $"Preparing upgrade of {progress.CurrentBatchSize} {(progress.CurrentBatchSize == 1 ? "database" : "databases")}\u2026";
+                        var displayText = hasFile ?
+                            (hasPosition ?
+                                Localizer["Db_Entry_PhaseProgress", verb, progress.CurrentBatchPosition, progress.CurrentBatchSize] :
+                                verb) :
+                            Localizer[progress.CurrentBatchSize == 1 ?
+                                "Banner_Upgrade_Preparing_One" :
+                                "Banner_Upgrade_Preparing_Many", progress.CurrentBatchSize];
+                        var statusAriaLabel = hasFile ? Localizer["Db_Entry_ProgressAria", displayText, Entry.FileName] : displayText;
 
                         <span class="db-entry-upgrading">
                             <span class="db-entry-upgrading-status" role="status">
+                                <span class="visually-hidden">@statusAriaLabel</span>
                                 <i aria-hidden="true" class="bi bi-arrow-repeat db-entry-spinner loader-spin"></i>
-                                <span class="db-entry-upgrading-text" @key="verb">@displayText</span>
-                                @if (hasFile)
-                                {
-                                    <span class="visually-hidden"> for @Entry.FileName</span>
-                                }
+                                <span aria-hidden="true" class="db-entry-upgrading-text" @key="verb">@displayText</span>
                             </span>
                             <Button CssClass="db-entry-cancel-btn" OnClick="OnCancelClick">
-                                Cancel
+                                @Localizer["Modal_Cancel"]
                             </Button>
                         </span>
                     }
                     else
                     {
-                        <span class="db-entry-upgrading" role="status">
-                            <i aria-hidden="true" class="bi bi-arrow-repeat db-entry-spinner loader-spin"></i>
-                            <span>Upgrading&hellip;</span>
+                        <span class="db-entry-upgrading">
+                            <span class="db-entry-upgrading-status" role="status">
+                                <span class="visually-hidden">@Localizer["Db_Entry_Upgrading"]</span>
+                                <i aria-hidden="true" class="bi bi-arrow-repeat db-entry-spinner loader-spin"></i>
+                                <span aria-hidden="true">@Localizer["Db_Entry_Upgrading"]</span>
+                            </span>
                         </span>
                     }
 
                     break;
 
                 case ActionKind.Upgrade:
-                    <Button aria-label="@($"Upgrade database {Entry.FileName}")"
-                        CssClass="db-entry-upgrade-btn"
+                    <Button CssClass="db-entry-upgrade-btn"
                         Disabled="@IsUpgradeBlocked"
                         IconClass="bi bi-arrow-up-circle"
-                        OnClick="@(() => OnUpgrade.InvokeAsync())">
-                        Upgrade
+                        OnClick="@(() => OnUpgrade.InvokeAsync())"
+                        aria-label="@Localizer["Db_Entry_Aria_Upgrade", Entry.FileName]">
+                        @Localizer["Db_Entry_Upgrade"]
                     </Button>
 
                     break;
 
                 case ActionKind.Retry:
-                    <DangerButton aria-label="@($"Retry upgrade of database {Entry.FileName}")"
-                        CssClass="db-entry-upgrade-btn"
+                    <DangerButton CssClass="db-entry-upgrade-btn"
                         Disabled="@IsUpgradeBlocked"
                         IconClass="bi bi-arrow-clockwise"
-                        OnClick="@(() => OnUpgrade.InvokeAsync())">
-                        Retry Upgrade
+                        OnClick="@(() => OnUpgrade.InvokeAsync())"
+                        aria-label="@Localizer["Db_Entry_Aria_RetryUpgrade", Entry.FileName]">
+                        @Localizer["Db_Entry_RetryUpgrade"]
                     </DangerButton>
 
                     break;
 
                 case ActionKind.RestoreFromBackup:
-                    <Button aria-label="@($"Restore database {Entry.FileName} from backup")"
-                        CssClass="db-entry-restore-btn"
+                    <Button CssClass="db-entry-restore-btn"
                         Disabled="@IsRestoreBlocked"
                         IconClass="bi bi-arrow-counterclockwise"
                         OnClick="@(async () =>
                                  {
                                      if (!IsRestoreBlocked) { await OnRestoreFromBackup.InvokeAsync(); }
-                                 })">
-                        Restore
+                                 })"
+                        aria-label="@Localizer["Db_Entry_Aria_Restore", Entry.FileName]">
+                        @Localizer["Db_Entry_Restore"]
                     </Button>
 
                     break;
 
                 case ActionKind.RetryClassification:
-                    <Button aria-label="@($"Retry classification of database {Entry.FileName}")"
-                        CssClass="db-entry-retry-classification-btn"
+                    <Button CssClass="db-entry-retry-classification-btn"
                         IconClass="bi bi-arrow-repeat"
-                        OnClick="@(async () => await OnRetryClassification.InvokeAsync())">
-                        Retry classification
+                        OnClick="@(async () => await OnRetryClassification.InvokeAsync())"
+                        aria-label="@Localizer["Db_Entry_Aria_RetryClassification", Entry.FileName]">
+                        @Localizer["Db_Entry_RetryClassification"]
                     </Button>
 
                     break;

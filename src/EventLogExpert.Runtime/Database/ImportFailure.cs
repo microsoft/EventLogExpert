@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.Runtime.Database;
 
-public sealed record ImportFailure(string FileName, string Reason);
+public sealed record ImportFailure(string FileName, DatabaseFailureReason Reason);

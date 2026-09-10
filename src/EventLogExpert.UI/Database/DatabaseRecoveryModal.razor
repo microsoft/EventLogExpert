@@ -2,8 +2,8 @@
 
 @if (_entries.Count > 0)
 {
-    <ModalChrome AcceptLabel="Apply"
-        CancelLabel="Cancel"
+    <ModalChrome AcceptLabel="@Localizer["Modal_Apply"]"
+        CancelLabel="@Localizer["Modal_Cancel"]"
         Footer="FooterPreset.AcceptCancel"
         FooterDisabled="@_isApplying"
         InlineAlert="@CurrentInlineAlert"
@@ -13,21 +13,21 @@
         OnCancel="HandleCancelButtonClickAsync"
         OnDialogClosedByUser="HandleDialogClosedByUserAsync"
         OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
-        @ref="ChromeRef"
-        Title="Database upgrade recovery">
+        Title="@Localizer["Banner_Recovery_Needed_Title"]"
+        @ref="ChromeRef">
         <p class="recovery-description">
-            @(_entries.Count == 1
-                ? "The following database had its upgrade interrupted."
-                : "The following databases had their upgrade interrupted.")
-            Restore from backup keeps the V3 data; Delete removes both the partial entry and its backup.
+            @(_entries.Count == 1 ?
+                Localizer["DatabaseRecoveryModal_Description_One"] :
+                Localizer["DatabaseRecoveryModal_Description_Many"])
+            @Localizer["DatabaseRecoveryModal_Explanation"]
         </p>
 
         <div class="recovery-batch-actions">
             <Button Disabled="@_isApplying" OnClick="RestoreAll">
-                Restore all
+                @Localizer["DatabaseRecoveryModal_RestoreAll"]
             </Button>
             <Button Disabled="@_isApplying" OnClick="DeleteAll">
-                Delete all
+                @Localizer["DatabaseRecoveryModal_DeleteAll"]
             </Button>
         </div>
 
@@ -45,7 +45,7 @@
                             name="@radioGroup"
                             @onchange="@(() => SelectAction(entry.FileName, RecoveryAction.Restore))"
                             type="radio" />
-                        Restore
+                        @Localizer["DatabaseRecoveryModal_Restore"]
                     </label>
                     <label class="recovery-row-option">
                         <input checked="@(_selectedActions.GetValueOrDefault(entry.FileName) == RecoveryAction.Delete)"
@@ -53,7 +53,7 @@
                             name="@radioGroup"
                             @onchange="@(() => SelectAction(entry.FileName, RecoveryAction.Delete))"
                             type="radio" />
-                        Delete
+                        @Localizer["DatabaseRecoveryModal_Delete"]
                     </label>
                 </li>
             }

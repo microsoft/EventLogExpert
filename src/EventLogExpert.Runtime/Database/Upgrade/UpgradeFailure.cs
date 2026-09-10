@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.Runtime.Database.Upgrade;
 
-public sealed record UpgradeFailure(string FileName, string Message);
+public sealed record UpgradeFailure(string FileName, DatabaseFailureReason Reason);

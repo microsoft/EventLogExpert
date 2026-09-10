@@ -143,7 +143,7 @@ internal sealed class DatabaseImportService(
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    failures.Add(new ImportFailure(fileName, ex.Message));
+                    failures.Add(new ImportFailure(fileName, new DatabaseFailureReason.NativeDetail(ex.Message)));
 
                     _traceLogger.Warning(
                         $"{nameof(DatabaseImportService)}.{nameof(ImportAsync)} failed to copy '{fileName}': {ex}");
@@ -190,9 +190,11 @@ internal sealed class DatabaseImportService(
                 cancellationToken)
             .ConfigureAwait(false);
 
-        upgradeFailures = batchResult.Failed
-            .Select(failure => new ImportFailure(failure.FileName, failure.Message))
-            .ToList();
+        upgradeFailures =
+        [
+            .. batchResult.Failed
+                .Select(failure => new ImportFailure(failure.FileName, failure.Reason))
+        ];
 
         return new ImportResult(importedCount, importedNames, failures, upgradeFailures);
     }
@@ -219,7 +221,7 @@ internal sealed class DatabaseImportService(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            failures.Add(new ImportFailure(zipFileName, $"Could not open archive: {ex.Message}"));
+            failures.Add(new ImportFailure(zipFileName, new DatabaseFailureReason.ImportOpenArchiveFailed(ex.Message)));
 
             _traceLogger.Warning(
                 $"{nameof(DatabaseImportService)}.{nameof(ImportZipAsync)} failed to open '{zipFileName}': {ex}");
@@ -264,7 +266,7 @@ internal sealed class DatabaseImportService(
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    failures.Add(new ImportFailure(entry.Name, ex.Message));
+                    failures.Add(new ImportFailure(entry.Name, new DatabaseFailureReason.NativeDetail(ex.Message)));
 
                     _traceLogger.Warning(
                         $"{nameof(DatabaseImportService)}.{nameof(ImportZipAsync)} failed to extract '{entry.Name}' from '{zipFileName}': {ex}");

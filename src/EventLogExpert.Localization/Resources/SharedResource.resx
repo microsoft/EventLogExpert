@@ -214,6 +214,9 @@
   <data name="Modal_Accept" xml:space="preserve">
     <value>OK</value>
   </data>
+  <data name="Modal_Apply" xml:space="preserve">
+    <value>Apply</value>
+  </data>
   <data name="Modal_Exit" xml:space="preserve">
     <value>Exit</value>
   </data>
@@ -471,6 +474,203 @@
   <data name="Banner_Db_Import_UpgradeFailurePart" xml:space="preserve">
     <value>{0} upgrade ({1})</value>
     <comment>Import upgrade failure detail. {0} is the file name; {1} is the reason.</comment>
+  </data>
+  <!-- Provider database management strings. -->
+  <data name="Db_Status_NotClassified" xml:space="preserve">
+    <value>Classifying…</value>
+    <comment>Provider database status label for DatabaseStatus.NotClassified.</comment>
+  </data>
+  <data name="Db_Status_Ready" xml:space="preserve">
+    <value>Ready</value>
+    <comment>Provider database status label for DatabaseStatus.Ready.</comment>
+  </data>
+  <data name="Db_Status_UpgradeRequired" xml:space="preserve">
+    <value>Upgrade required</value>
+    <comment>Provider database status label for DatabaseStatus.UpgradeRequired.</comment>
+  </data>
+  <data name="Db_Status_UpgradeFailed" xml:space="preserve">
+    <value>Upgrade failed</value>
+    <comment>Provider database status label for DatabaseStatus.UpgradeFailed.</comment>
+  </data>
+  <data name="Db_Status_UnrecognizedSchema" xml:space="preserve">
+    <value>Unrecognized</value>
+    <comment>Provider database status label for DatabaseStatus.UnrecognizedSchema.</comment>
+  </data>
+  <data name="Db_Status_ObsoleteSchema" xml:space="preserve">
+    <value>Obsolete</value>
+    <comment>Provider database status label for DatabaseStatus.ObsoleteSchema.</comment>
+  </data>
+  <data name="Db_Status_ClassificationFailed" xml:space="preserve">
+    <value>Classification failed</value>
+    <comment>Provider database status label for DatabaseStatus.ClassificationFailed.</comment>
+  </data>
+  <data name="Db_Badge_RecoveryRequired" xml:space="preserve">
+    <value>Recovery required</value>
+    <comment>Provider database row badge shown when an upgrade backup exists.</comment>
+  </data>
+  <data name="Db_UpgradePhase_BackingUp" xml:space="preserve">
+    <value>Backing up</value>
+    <comment>Provider database upgrade phase label.</comment>
+  </data>
+  <data name="Db_UpgradePhase_MigratingSchema" xml:space="preserve">
+    <value>Migrating schema</value>
+    <comment>Provider database upgrade phase label.</comment>
+  </data>
+  <data name="Db_UpgradePhase_Verifying" xml:space="preserve">
+    <value>Verifying</value>
+    <comment>Provider database upgrade phase label.</comment>
+  </data>
+  <data name="Db_Entry_Upgrading" xml:space="preserve">
+    <value>Upgrading…</value>
+    <comment>Provider database row spinner text.</comment>
+  </data>
+  <data name="Db_Entry_PhaseProgress" xml:space="preserve">
+    <value>{0} {1} of {2}</value>
+    <comment>Upgrade row progress. {0} is the localized phase verb; {1} and {2} are raw position and size.</comment>
+  </data>
+  <data name="Db_Entry_ProgressAria" xml:space="preserve">
+    <value>{0} for {1}</value>
+    <comment>Upgrade row status accessible text. {0} is visible progress text; {1} is the file name.</comment>
+  </data>
+  <data name="Db_Entry_PendingToggle" xml:space="preserve">
+    <value>(pending toggle, unsaved)</value>
+    <comment>Screen-reader text for a pending provider database toggle.</comment>
+  </data>
+  <data name="Db_Entry_Upgrade" xml:space="preserve">
+    <value>Upgrade</value>
+    <comment>Provider database row upgrade button text.</comment>
+  </data>
+  <data name="Db_Entry_RetryUpgrade" xml:space="preserve">
+    <value>Retry Upgrade</value>
+    <comment>Provider database row retry-upgrade button text.</comment>
+  </data>
+  <data name="Db_Entry_Restore" xml:space="preserve">
+    <value>Restore</value>
+    <comment>Provider database row restore button text.</comment>
+  </data>
+  <data name="Db_Entry_RetryClassification" xml:space="preserve">
+    <value>Retry classification</value>
+    <comment>Provider database row retry-classification button text.</comment>
+  </data>
+  <data name="Db_Entry_Remove" xml:space="preserve">
+    <value>Remove</value>
+    <comment>Provider database row remove action text.</comment>
+  </data>
+  <data name="Db_Entry_Aria_Select" xml:space="preserve">
+    <value>Select {0}</value>
+    <comment>Provider database row select checkbox accessible name. {0} is the file name.</comment>
+  </data>
+  <data name="Db_Entry_Aria_Upgrade" xml:space="preserve">
+    <value>Upgrade database {0}</value>
+    <comment>Provider database row upgrade button accessible name. {0} is the file name.</comment>
+  </data>
+  <data name="Db_Entry_Aria_RetryUpgrade" xml:space="preserve">
+    <value>Retry upgrade of database {0}</value>
+    <comment>Provider database row retry-upgrade button accessible name. {0} is the file name.</comment>
+  </data>
+  <data name="Db_Entry_Aria_Restore" xml:space="preserve">
+    <value>Restore database {0} from backup</value>
+    <comment>Provider database row restore button accessible name. {0} is the file name.</comment>
+  </data>
+  <data name="Db_Entry_Aria_RetryClassification" xml:space="preserve">
+    <value>Retry classification of database {0}</value>
+    <comment>Provider database row retry-classification button accessible name. {0} is the file name.</comment>
+  </data>
+  <data name="Db_Entry_SourceOs" xml:space="preserve">
+    <value>Source OS: {0}</value>
+    <comment>Provider database OS stamp accessible label. {0} is the OS stamp detail.</comment>
+  </data>
+  <data name="Db_Entry_UnknownOs" xml:space="preserve">
+    <value>Unknown OS</value>
+    <comment>Provider database OS stamp fallback.</comment>
+  </data>
+  <data name="Db_Entry_MixedOs_Count" xml:space="preserve">
+    <value>Mixed ({0} OS versions)</value>
+    <comment>Provider database OS stamp summary for multiple versions. {0} is the raw count from 2 through 9.</comment>
+  </data>
+  <data name="Db_Entry_MixedOs_Capped" xml:space="preserve">
+    <value>Mixed (9+ OS versions)</value>
+    <comment>Provider database OS stamp summary when more than 9 OS versions are present.</comment>
+  </data>
+  <data name="DatabaseRecoveryModal_Description_One" xml:space="preserve">
+    <value>The following database had its upgrade interrupted.</value>
+    <comment>Recovery modal description for one provider database.</comment>
+  </data>
+  <data name="DatabaseRecoveryModal_Description_Many" xml:space="preserve">
+    <value>The following databases had their upgrade interrupted.</value>
+    <comment>Recovery modal description for multiple provider databases.</comment>
+  </data>
+  <data name="DatabaseRecoveryModal_Explanation" xml:space="preserve">
+    <value>Restore from backup keeps the V3 data; Delete removes both the partial entry and its backup.</value>
+    <comment>Recovery modal explanation. V3 is a provider database schema name; keep V3 literal.</comment>
+  </data>
+  <data name="DatabaseRecoveryModal_RestoreAll" xml:space="preserve">
+    <value>Restore all</value>
+    <comment>Recovery modal batch restore button text.</comment>
+  </data>
+  <data name="DatabaseRecoveryModal_DeleteAll" xml:space="preserve">
+    <value>Delete all</value>
+    <comment>Recovery modal batch delete button text.</comment>
+  </data>
+  <data name="DatabaseRecoveryModal_Restore" xml:space="preserve">
+    <value>Restore</value>
+    <comment>Recovery modal restore radio label.</comment>
+  </data>
+  <data name="DatabaseRecoveryModal_Delete" xml:space="preserve">
+    <value>Delete</value>
+    <comment>Recovery modal delete radio label.</comment>
+  </data>
+  <data name="Db_Picker_ImportPrompt" xml:space="preserve">
+    <value>Please select database files to import</value>
+    <comment>Provider database import file picker prompt.</comment>
+  </data>
+  <data name="Db_Fail_EntryNotFound" xml:space="preserve">
+    <value>Entry not found</value>
+    <comment>Provider database upgrade failure reason.</comment>
+  </data>
+  <data name="Db_Fail_RecoveryRequiredResolveFirst" xml:space="preserve">
+    <value>Recovery required — resolve via Settings or recovery prompt first</value>
+    <comment>Provider database upgrade failure reason.</comment>
+  </data>
+  <data name="Db_Fail_CannotUpgradeStatus" xml:space="preserve">
+    <value>Cannot upgrade entry in status '{0}'</value>
+    <comment>Provider database upgrade failure reason. {0} is the raw DatabaseStatus member name.</comment>
+  </data>
+  <data name="Db_Fail_RecoveryRequiredBackupExists" xml:space="preserve">
+    <value>Recovery required — backup exists</value>
+    <comment>Provider database upgrade failure reason.</comment>
+  </data>
+  <data name="Db_Fail_RecoveryRequiredBakAlreadyPresent" xml:space="preserve">
+    <value>Recovery required — .upgrade.bak already present</value>
+    <comment>Provider database upgrade failure reason. Keep .upgrade.bak literal.</comment>
+  </data>
+  <data name="Db_Fail_RecoveryRequiredBakAppearedDuringBackup" xml:space="preserve">
+    <value>Recovery required — .upgrade.bak appeared during backup</value>
+    <comment>Provider database upgrade failure reason. Keep .upgrade.bak literal.</comment>
+  </data>
+  <data name="Db_Fail_UpgradeVerificationFailed" xml:space="preserve">
+    <value>Upgrade verification failed</value>
+    <comment>Provider database upgrade failure reason.</comment>
+  </data>
+  <data name="Db_Fail_UpgradeCleanupFailed" xml:space="preserve">
+    <value>Upgrade succeeded but backup cleanup failed; .upgrade.bak remains on disk</value>
+    <comment>Provider database upgrade failure reason. Keep .upgrade.bak literal.</comment>
+  </data>
+  <data name="Db_Fail_CancellationRollbackFailed" xml:space="preserve">
+    <value>Cancellation rollback failed for '{0}'; .upgrade.bak remains on disk</value>
+    <comment>Provider database upgrade failure reason. {0} is the file name; keep .upgrade.bak literal.</comment>
+  </data>
+  <data name="Db_Fail_MigrationRollbackFailed" xml:space="preserve">
+    <value>Migration failed and rollback also failed for '{0}': {1}</value>
+    <comment>Provider database upgrade failure reason. {0} is the file name; {1} is native or provider detail.</comment>
+  </data>
+  <data name="Db_Fail_VerificationOrCleanupRollbackFailed" xml:space="preserve">
+    <value>Verification or cleanup failed and rollback also failed for '{0}'</value>
+    <comment>Provider database upgrade failure reason. {0} is the file name.</comment>
+  </data>
+  <data name="Db_Fail_ImportOpenArchiveFailed" xml:space="preserve">
+    <value>Could not open archive: {0}</value>
+    <comment>Provider database import failure reason. {0} is native archive-open detail.</comment>
   </data>
   <!-- Filter and empty-log banner messages. -->
   <data name="Banner_Filter_NotLoaded_Title" xml:space="preserve">
