@@ -263,8 +263,10 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         if (result.Cancelled.Count > 0 && result.Failed.Count == 0)
         {
             AnnouncementService.Announce(
-                $"Upgraded {result.Succeeded.Count} database{(result.Succeeded.Count == 1 ? "" : "s")}; "
-                + $"{result.Cancelled.Count} cancelled.");
+                Localizer[
+                    result.Succeeded.Count == 1 ? "Db_Manage_Upgrade_Cancelled_One" : "Db_Manage_Upgrade_Cancelled_Many",
+                    result.Succeeded.Count,
+                    result.Cancelled.Count]);
 
             return;
         }
@@ -273,17 +275,26 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         {
             var first = result.Failed[0];
             string firstReason = DatabaseFailureReasonLocalizer.Describe(Localizer, first.Reason);
-            var summary = result.Failed.Count == 1 ?
-                $"Upgrade of '{first.FileName}' failed: {firstReason}" :
-                $"Upgraded {result.Succeeded.Count} of {attempted} databases; "
-                    + $"{result.Failed.Count} failed. First failure: '{first.FileName}' \u2014 {firstReason}";
+            string summary = result.Failed.Count == 1 ?
+                Localizer["Db_Manage_Upgrade_SingleFailure", first.FileName, firstReason] :
+                Localizer[
+                    "Db_Manage_Upgrade_MultipleFailure",
+                    result.Succeeded.Count,
+                    attempted,
+                    result.Failed.Count,
+                    first.FileName,
+                    firstReason];
             AnnouncementService.Announce(summary);
 
             return;
         }
 
         AnnouncementService.Announce(
-            $"Upgraded {result.Succeeded.Count} database{(result.Succeeded.Count == 1 ? "" : "s")}.");
+            LocalizedCount.OneOrManyRaw(
+                Localizer,
+                result.Succeeded.Count,
+                "Db_Manage_Upgrade_Success_One",
+                "Db_Manage_Upgrade_Success_Many"));
     }
 
     private string AppendCloseReopenWarningIfNeeded(string baseMessage, IReadOnlyList<string> fileNames)

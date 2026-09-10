@@ -25,6 +25,18 @@ public sealed class DatabaseStatusLocalizerTests
         return data;
     }
 
+    public static TheoryData<DatabaseStatus, string> TokenKeys()
+    {
+        TheoryData<DatabaseStatus, string> data = new();
+
+        foreach (DatabaseStatus status in Enum.GetValues<DatabaseStatus>())
+        {
+            data.Add(status, $"Db_StatusToken_{status}");
+        }
+
+        return data;
+    }
+
     [Theory]
     [MemberData(nameof(StatusKeys))]
     public void Describe_RoutesEveryDatabaseStatusToMemberNamedKey(DatabaseStatus status, string expectedKey) =>
@@ -33,6 +45,11 @@ public sealed class DatabaseStatusLocalizerTests
     [Fact]
     public void Describe_UnknownStatus_Throws() =>
         Assert.Throws<ArgumentOutOfRangeException>(() => DatabaseStatusLocalizer.Describe(_localizer, (DatabaseStatus)999));
+
+    [Theory]
+    [MemberData(nameof(TokenKeys))]
+    public void NeutralStatusToken_KeepsEnumNameByteIdentity(DatabaseStatus status, string expectedKey) =>
+        Assert.Equal(status.ToString(), NeutralValue(expectedKey));
 
     [Fact]
     public void NeutralStatusValue_KeepClassifyingEllipsisByteIdentity() =>
@@ -64,6 +81,15 @@ public sealed class DatabaseStatusLocalizerTests
 
         Assert.Equal($"[[{expectedKey}]]", DatabaseStatusLocalizer.RowBadge(_localizer, entry));
     }
+
+    [Theory]
+    [MemberData(nameof(TokenKeys))]
+    public void Token_RoutesEveryDatabaseStatusToTokenKey(DatabaseStatus status, string expectedKey) =>
+        Assert.Equal($"[[{expectedKey}]]", DatabaseStatusLocalizer.Token(_localizer, status));
+
+    [Fact]
+    public void Token_UnknownStatus_Throws() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => DatabaseStatusLocalizer.Token(_localizer, (DatabaseStatus)999));
 
     private static string NeutralValue(string key) =>
         XDocument.Load(LocalizationSourceScan.ResxPath)

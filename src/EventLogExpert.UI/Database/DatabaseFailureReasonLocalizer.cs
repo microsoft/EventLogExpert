@@ -14,7 +14,7 @@ internal static class DatabaseFailureReasonLocalizer
         DatabaseFailureReason.EntryNotFound => localizer["Db_Fail_EntryNotFound"],
         DatabaseFailureReason.RecoveryRequiredResolveFirst => localizer["Db_Fail_RecoveryRequiredResolveFirst"],
         DatabaseFailureReason.CannotUpgradeStatus cannotUpgradeStatus =>
-            localizer["Db_Fail_CannotUpgradeStatus", cannotUpgradeStatus.Status.ToString()],
+            localizer["Db_Fail_CannotUpgradeStatus", DatabaseStatusLocalizer.Token(localizer, cannotUpgradeStatus.Status)],
         DatabaseFailureReason.RecoveryRequiredBackupExists => localizer["Db_Fail_RecoveryRequiredBackupExists"],
         DatabaseFailureReason.RecoveryRequiredBakAlreadyPresent => localizer["Db_Fail_RecoveryRequiredBakAlreadyPresent"],
         DatabaseFailureReason.RecoveryRequiredBakAppearedDuringBackup => localizer["Db_Fail_RecoveryRequiredBakAppearedDuringBackup"],
