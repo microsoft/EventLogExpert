@@ -1,20 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.Eventing.Common.EventLogs;
-using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
-using EventLogExpert.Runtime.Tests.TestUtils;
-using System.Diagnostics;
 using static EventLogExpert.Runtime.Tests.LogTable.TestSupport.DisplayIndicatorTestFactory;
 
 namespace EventLogExpert.Runtime.Tests.LogTable;
 
 public sealed class DisplayIndicatorStateTests
 {
-    private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(5);
-
     [Fact]
     public void AConditionBecomingWorthShowing_AsksForARender_BecauseNoPublicationSaysSo()
     {
@@ -26,7 +19,7 @@ public sealed class DisplayIndicatorStateTests
 
         surface.ElapseOnset();
 
-        WaitUntil(() => surface.RenderRequests > before);
+        Assert.True(surface.RenderRequests > before, "a condition becoming worth showing must ask for a render");
     }
 
     [Fact]
@@ -196,18 +189,6 @@ public sealed class DisplayIndicatorStateTests
         Assert.Equal(DisplayIndicatorKind.None, surface.Paint(DisplayIndicatorKind.None).Sentence);
     }
 
-    private static void WaitUntil(Func<bool> condition)
-    {
-        var deadline = Stopwatch.StartNew();
-
-        while (!condition())
-        {
-            Assert.True(deadline.Elapsed < s_testTimeout, "the surface never reached the expected state");
-
-            Thread.Sleep(1);
-        }
-    }
-
     private sealed class ControllableDelay
     {
         private readonly List<Pending> _pending = [];
@@ -217,7 +198,10 @@ public sealed class DisplayIndicatorStateTests
 
         public Task Delay(TimeSpan duration, CancellationToken token)
         {
-            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            // Default (synchronous) continuations: completing this in Elapse() runs the awaiting onset/floor
+            // logic inline on the caller, so a test can assert the resulting state directly instead of polling for
+            // a thread-pool continuation (whose scheduling slipped past the old real-clock deadline under CI load).
+            var completion = new TaskCompletionSource();
 
             lock (_sync)
             {
@@ -230,6 +214,8 @@ public sealed class DisplayIndicatorStateTests
 
         public void Elapse()
         {
+            RequireInlineContinuations();
+
             Pending[] outstanding;
 
             lock (_sync)
@@ -250,6 +236,16 @@ public sealed class DisplayIndicatorStateTests
                     pending.Completion.TrySetResult();
                 }
             }
+        }
+
+        // Completing a delay's TaskCompletionSource (see Delay) only runs the awaiting onset/floor continuation
+        // inline when the ambient host leaves no SynchronizationContext and the default TaskScheduler in place -
+        // which the xUnit v3 test host does. Assert it here so any future host change fails loudly at the point
+        // of reliance instead of silently reintroducing the timing flakiness this design replaced.
+        private static void RequireInlineContinuations()
+        {
+            Assert.Null(SynchronizationContext.Current);
+            Assert.Same(TaskScheduler.Default, TaskScheduler.Current);
         }
 
         private sealed record Pending(TaskCompletionSource Completion, CancellationToken Token);
@@ -307,7 +303,7 @@ public sealed class DisplayIndicatorStateTests
 
             _floorDelay.Elapse();
 
-            WaitUntil(() => RenderRequests > before);
+            Assert.True(RenderRequests > before, "the floor's expiry must ask for the paint that ends it");
         }
 
         public void ElapseOnset()
@@ -322,7 +318,7 @@ public sealed class DisplayIndicatorStateTests
             {
                 _onsetDelay.Elapse();
 
-                WaitUntil(() => announced);
+                Assert.True(announced, "the onset must fire once its delay elapses");
             }
             finally { _gate.OnsetElapsed -= OnElapsed; }
         }

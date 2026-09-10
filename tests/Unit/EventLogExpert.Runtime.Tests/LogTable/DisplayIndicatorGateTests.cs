@@ -1,20 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.Eventing.Common.EventLogs;
-using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
-using EventLogExpert.Runtime.Tests.TestUtils;
-using System.Diagnostics;
 using static EventLogExpert.Runtime.Tests.LogTable.TestSupport.DisplayIndicatorTestFactory;
 
 namespace EventLogExpert.Runtime.Tests.LogTable;
 
 public sealed class DisplayIndicatorGateTests
 {
-    private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(5);
-
     [Fact]
     public void AFaultLandingMidSort_ReArms_BecauseItIsADifferentKindEvenThoughSomethingWasAlreadyOwed()
     {
@@ -45,7 +38,7 @@ public sealed class DisplayIndicatorGateTests
         Assert.Single(delay.Requested);
 
         delay.Elapse();
-        WaitUntil(() => gate.IsFiredFor(DisplayIndicatorKind.EmptyPending, 7));
+        Assert.True(gate.IsFiredFor(DisplayIndicatorKind.EmptyPending, 7), "the onset must fire once its delay elapses");
     }
 
     [Fact]
@@ -159,18 +152,6 @@ public sealed class DisplayIndicatorGateTests
         Assert.Equal(TimeSpan.FromMilliseconds(200), Assert.Single(world.RequestedDelays));
     }
 
-    private static void WaitUntil(Func<bool> condition)
-    {
-        var deadline = Stopwatch.StartNew();
-
-        while (!condition())
-        {
-            Assert.True(deadline.Elapsed < s_testTimeout, "the gate never reached the expected state");
-
-            Thread.Sleep(1);
-        }
-    }
-
     private sealed class ControllableDelay
     {
         private readonly List<Pending> _pending = [];
@@ -180,7 +161,10 @@ public sealed class DisplayIndicatorGateTests
 
         public Task Delay(TimeSpan duration, CancellationToken token)
         {
-            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            // Default (synchronous) continuations: completing this in Elapse() runs the gate's post-await onset
+            // logic inline on the caller, so a test can assert the fired state directly instead of polling for a
+            // thread-pool continuation (whose scheduling slipped past the old real-clock deadline under CI load).
+            var completion = new TaskCompletionSource();
 
             lock (_sync)
             {
@@ -193,6 +177,8 @@ public sealed class DisplayIndicatorGateTests
 
         public void Elapse()
         {
+            RequireInlineContinuations();
+
             foreach (var pending in Take())
             {
                 if (pending.Token.IsCancellationRequested)
@@ -208,7 +194,19 @@ public sealed class DisplayIndicatorGateTests
 
         public void ElapseIgnoringCancellation()
         {
+            RequireInlineContinuations();
+
             foreach (var pending in Take()) { pending.Completion.TrySetResult(); }
+        }
+
+        // Completing a delay's TaskCompletionSource (see Delay) only runs the awaiting gate continuation inline
+        // when the ambient host leaves no SynchronizationContext and the default TaskScheduler in place - which
+        // the xUnit v3 test host does. Assert it here so any future host change fails loudly at the point of
+        // reliance instead of silently reintroducing the timing flakiness this design replaced.
+        private static void RequireInlineContinuations()
+        {
+            Assert.Null(SynchronizationContext.Current);
+            Assert.Same(TaskScheduler.Default, TaskScheduler.Current);
         }
 
         private Pending[] Take()
@@ -242,8 +240,6 @@ public sealed class DisplayIndicatorGateTests
 
     private sealed class Gate : IDisposable
     {
-        private static readonly TimeSpan SettleWindow = TimeSpan.FromMilliseconds(100);
-
         private readonly ControllableDelay _delay = new();
         private readonly DisplayIndicatorGate _gate;
         private readonly FakeSource _source;
@@ -271,8 +267,6 @@ public sealed class DisplayIndicatorGateTests
 
             _delay.Elapse();
 
-            Thread.Sleep(SettleWindow);
-
             Assert.Equal(before, Announcements);
         }
 
@@ -281,10 +275,6 @@ public sealed class DisplayIndicatorGateTests
             int before = Announcements;
 
             _delay.ElapseIgnoringCancellation();
-
-            WaitUntil(() => Announcements >= before + expectedAnnouncements);
-
-            Thread.Sleep(SettleWindow);
 
             Assert.Equal(before + expectedAnnouncements, Announcements);
         }
@@ -295,7 +285,7 @@ public sealed class DisplayIndicatorGateTests
 
             _delay.Elapse();
 
-            WaitUntil(() => Announcements > before);
+            Assert.True(Announcements > before, "the onset must fire once its delay elapses");
         }
 
         public bool IsFired(DisplayIndicatorKind kind) => IsFired(kind, Revision);
