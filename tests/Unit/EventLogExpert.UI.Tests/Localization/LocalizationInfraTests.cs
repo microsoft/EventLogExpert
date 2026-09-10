@@ -64,6 +64,7 @@ public sealed class LocalizationInfraTests
             ("Details_Placeholder_", typeof(PlaceholderKind)),
             ("Details_Property_", typeof(DetailsPropertyLabel)),
             ("Db_Status_", typeof(DatabaseStatus)),
+            ("Db_StatusToken_", typeof(DatabaseStatus)),
             ("Db_UpgradePhase_", typeof(UpgradePhase)),
             ("Explain_", typeof(GlossaryTerm)),
             ("ResolutionStatus_", typeof(EventResolutionStatus)),
@@ -449,6 +450,12 @@ public sealed class LocalizationInfraTests
             ("Db_Fail_UpgradeCleanupFailed", 0),
             ("Db_Fail_UpgradeVerificationFailed", 0),
             ("Db_Fail_VerificationOrCleanupRollbackFailed", 1),
+            ("Db_Manage_Upgrade_Cancelled_Many", 2),
+            ("Db_Manage_Upgrade_Cancelled_One", 2),
+            ("Db_Manage_Upgrade_MultipleFailure", 5),
+            ("Db_Manage_Upgrade_SingleFailure", 2),
+            ("Db_Manage_Upgrade_Success_Many", 1),
+            ("Db_Manage_Upgrade_Success_One", 1),
             ("Db_Picker_ImportPrompt", 0),
             ("DatabaseRecoveryModal_Delete", 0),
             ("DatabaseRecoveryModal_DeleteAll", 0),
@@ -469,6 +476,8 @@ public sealed class LocalizationInfraTests
         Assert.Equal(7, neutralValues.Keys.Count(key => key.StartsWith("Db_Status_", StringComparison.Ordinal)));
         Assert.Equal(3, neutralValues.Keys.Count(key => key.StartsWith("Db_UpgradePhase_", StringComparison.Ordinal)));
         Assert.Equal(12, neutralValues.Keys.Count(key => key.StartsWith("Db_Fail_", StringComparison.Ordinal)));
+        Assert.Equal(7, neutralValues.Keys.Count(key => key.StartsWith("Db_StatusToken_", StringComparison.Ordinal)));
+        Assert.Equal(6, neutralValues.Keys.Count(key => key.StartsWith("Db_Manage_Upgrade_", StringComparison.Ordinal)));
     }
 
     [Fact]

@@ -504,6 +504,58 @@
     <value>Classification failed</value>
     <comment>Provider database status label for DatabaseStatus.ClassificationFailed.</comment>
   </data>
+  <data name="Db_StatusToken_NotClassified" xml:space="preserve">
+    <value>NotClassified</value>
+    <comment>Database status token shown inside a provider-database failure message.</comment>
+  </data>
+  <data name="Db_StatusToken_Ready" xml:space="preserve">
+    <value>Ready</value>
+    <comment>Database status token shown inside a provider-database failure message.</comment>
+  </data>
+  <data name="Db_StatusToken_UpgradeRequired" xml:space="preserve">
+    <value>UpgradeRequired</value>
+    <comment>Database status token shown inside a provider-database failure message.</comment>
+  </data>
+  <data name="Db_StatusToken_UpgradeFailed" xml:space="preserve">
+    <value>UpgradeFailed</value>
+    <comment>Database status token shown inside a provider-database failure message.</comment>
+  </data>
+  <data name="Db_StatusToken_UnrecognizedSchema" xml:space="preserve">
+    <value>UnrecognizedSchema</value>
+    <comment>Database status token shown inside a provider-database failure message.</comment>
+  </data>
+  <data name="Db_StatusToken_ObsoleteSchema" xml:space="preserve">
+    <value>ObsoleteSchema</value>
+    <comment>Database status token shown inside a provider-database failure message.</comment>
+  </data>
+  <data name="Db_StatusToken_ClassificationFailed" xml:space="preserve">
+    <value>ClassificationFailed</value>
+    <comment>Database status token shown inside a provider-database failure message.</comment>
+  </data>
+  <data name="Db_Manage_Upgrade_Cancelled_One" xml:space="preserve">
+    <value>Upgraded {0} database; {1} cancelled.</value>
+    <comment>Upgrade announcement when some upgrades were cancelled (one upgraded). {0} upgraded count; {1} cancelled count.</comment>
+  </data>
+  <data name="Db_Manage_Upgrade_Cancelled_Many" xml:space="preserve">
+    <value>Upgraded {0} databases; {1} cancelled.</value>
+    <comment>Upgrade announcement when some upgrades were cancelled (multiple upgraded). {0} upgraded count; {1} cancelled count.</comment>
+  </data>
+  <data name="Db_Manage_Upgrade_SingleFailure" xml:space="preserve">
+    <value>Upgrade of '{0}' failed: {1}</value>
+    <comment>Upgrade announcement for a single failure. {0} is the file name; {1} is the failure reason.</comment>
+  </data>
+  <data name="Db_Manage_Upgrade_MultipleFailure" xml:space="preserve">
+    <value>Upgraded {0} of {1} databases; {2} failed. First failure: '{3}' — {4}</value>
+    <comment>Upgrade announcement for multiple failures. {0} succeeded; {1} attempted; {2} failed; {3} first failed file name; {4} first failure reason.</comment>
+  </data>
+  <data name="Db_Manage_Upgrade_Success_One" xml:space="preserve">
+    <value>Upgraded {0} database.</value>
+    <comment>Upgrade announcement when all upgrades succeeded (one). {0} is the upgraded count.</comment>
+  </data>
+  <data name="Db_Manage_Upgrade_Success_Many" xml:space="preserve">
+    <value>Upgraded {0} databases.</value>
+    <comment>Upgrade announcement when all upgrades succeeded (multiple). {0} is the upgraded count.</comment>
+  </data>
   <data name="Db_Badge_RecoveryRequired" xml:space="preserve">
     <value>Recovery required</value>
     <comment>Provider database row badge shown when an upgrade backup exists.</comment>

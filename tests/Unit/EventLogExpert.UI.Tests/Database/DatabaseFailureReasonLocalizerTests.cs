@@ -17,7 +17,7 @@ public sealed class DatabaseFailureReasonLocalizerTests
     {
         { new DatabaseFailureReason.EntryNotFound(), "[[Db_Fail_EntryNotFound]]" },
         { new DatabaseFailureReason.RecoveryRequiredResolveFirst(), "[[Db_Fail_RecoveryRequiredResolveFirst]]" },
-        { new DatabaseFailureReason.CannotUpgradeStatus(DatabaseStatus.ObsoleteSchema), "[[Db_Fail_CannotUpgradeStatus(ObsoleteSchema)]]" },
+        { new DatabaseFailureReason.CannotUpgradeStatus(DatabaseStatus.ObsoleteSchema), "[[Db_Fail_CannotUpgradeStatus([[Db_StatusToken_ObsoleteSchema]])]]" },
         { new DatabaseFailureReason.RecoveryRequiredBackupExists(), "[[Db_Fail_RecoveryRequiredBackupExists]]" },
         { new DatabaseFailureReason.RecoveryRequiredBakAlreadyPresent(), "[[Db_Fail_RecoveryRequiredBakAlreadyPresent]]" },
         { new DatabaseFailureReason.RecoveryRequiredBakAppearedDuringBackup(), "[[Db_Fail_RecoveryRequiredBakAppearedDuringBackup]]" },
