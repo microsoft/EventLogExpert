@@ -793,7 +793,7 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var failure = Assert.Single(result.UpgradeFailures);
         Assert.Equal(Constants.TestDb1, failure.FileName);
-        Assert.Contains("Recovery required", failure.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.IsType<DatabaseFailureReason.RecoveryRequiredResolveFirst>(failure.Reason);
 
         var entry = Assert.Single(service.Entries);
         Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
@@ -1143,7 +1143,7 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Equal(0, result.Imported);
         var failure = Assert.Single(result.Failures);
         Assert.Equal("malformed.zip", failure.FileName);
-        Assert.Contains("Could not open archive", failure.Reason, StringComparison.Ordinal);
+        Assert.IsType<DatabaseFailureReason.ImportOpenArchiveFailed>(failure.Reason);
         Assert.Empty(Directory.GetFiles(databasePath));
     }
 
@@ -2014,7 +2014,7 @@ public sealed class DatabaseServiceTests : IDisposable
             TestContext.Current.CancellationToken);
 
         Assert.Single(result.Failed);
-        Assert.Contains("Recovery required", result.Failed[0].Message, StringComparison.OrdinalIgnoreCase);
+        Assert.IsType<DatabaseFailureReason.RecoveryRequiredBakAlreadyPresent>(result.Failed[0].Reason);
 
         Assert.Equal(stalePayload, File.ReadAllBytes(dbPath + ".upgrade.bak"));
 
@@ -2051,7 +2051,7 @@ public sealed class DatabaseServiceTests : IDisposable
             Assert.Empty(result.Succeeded);
             Assert.Empty(result.Cancelled);
             Assert.Single(result.Failed);
-            Assert.Contains("backup cleanup failed", result.Failed[0].Message, StringComparison.OrdinalIgnoreCase);
+            Assert.IsType<DatabaseFailureReason.UpgradeCleanupFailed>(result.Failed[0].Reason);
 
             var entry = service.Entries[0];
             Assert.Equal(DatabaseStatus.Ready, entry.Status);
@@ -2134,7 +2134,7 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Empty(result.Succeeded);
         Assert.Empty(result.Cancelled);
         Assert.Single(result.Failed);
-        Assert.Contains("Recovery required", result.Failed[0].Message, StringComparison.OrdinalIgnoreCase);
+        Assert.IsType<DatabaseFailureReason.RecoveryRequiredResolveFirst>(result.Failed[0].Reason);
     }
 
     [Fact]

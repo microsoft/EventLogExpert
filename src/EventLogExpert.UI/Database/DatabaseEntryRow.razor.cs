@@ -1,17 +1,18 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Schema;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
-using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Localization;
 using System.Globalization;
 
 namespace EventLogExpert.UI.Database;
@@ -76,7 +77,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     private string BadgeKind => Entry.BackupExists ? "Recovery" : Entry.Status.ToString();
 
-    private string BadgeLabel => DatabaseStatusLabels.GetRowBadgeLabel(Entry);
+    private string BadgeLabel => DatabaseStatusLocalizer.RowBadge(Localizer, Entry);
 
     private IReadOnlyDictionary<string, object>? CheckboxHiddenAttributes =>
         IsSelectionModeActive ? null : s_ariaHiddenTrueAttributes;
@@ -85,11 +86,13 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     private bool IsRestoreBlocked => IsUpgradeBlocked || IsUpgrading || UpgradeProgress is not null;
 
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
+
     private IReadOnlyList<ProviderDatabaseOsStamp> MeaningfulOsStamps => _meaningfulOsStamps;
 
     [Inject] private IMenuService MenuService { get; init; } = null!;
 
-    private string OsStampAriaLabel => $"Source OS: {OsStampDetail}";
+    private string OsStampAriaLabel => Localizer["Db_Entry_SourceOs", OsStampDetail];
 
     private string OsStampDetail => _osStampDetail;
 
@@ -150,8 +153,8 @@ public sealed partial class DatabaseEntryRow : ComponentBase
         {
             0 => string.Empty,
             1 => FormatStamp(_meaningfulOsStamps[0]),
-            > OsStampDisplayCap => $"Mixed ({OsStampDisplayCap}+ OS versions)",
-            _ => $"Mixed ({_meaningfulOsStamps.Count} OS versions)"
+            > OsStampDisplayCap => Localizer["Db_Entry_MixedOs_Capped"],
+            _ => Localizer["Db_Entry_MixedOs_Count", _meaningfulOsStamps.Count]
         };
     }
 
@@ -159,12 +162,17 @@ public sealed partial class DatabaseEntryRow : ComponentBase
     {
         if (build is not > 0) { return null; }
 
-        return revision is not null
-            ? string.Create(CultureInfo.InvariantCulture, $"{build.Value}.{revision.Value}")
-            : build.Value.ToString(CultureInfo.InvariantCulture);
+        return revision is not null ?
+            string.Create(CultureInfo.InvariantCulture, $"{build.Value}.{revision.Value}") :
+            build.Value.ToString(CultureInfo.InvariantCulture);
     }
 
-    private static string FormatStamp(ProviderDatabaseOsStamp stamp)
+    private static bool HasAnyField(ProviderDatabaseOsStamp stamp) =>
+        stamp.Build is > 0 ||
+        !string.IsNullOrEmpty(stamp.Edition) ||
+        !string.IsNullOrEmpty(stamp.DisplayVersion);
+
+    private string FormatStamp(ProviderDatabaseOsStamp stamp)
     {
         var parts = new List<string>(3);
 
@@ -174,21 +182,8 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
         if (FormatBuildRevision(stamp.Build, stamp.Revision) is { } buildRevision) { parts.Add(buildRevision); }
 
-        return parts.Count > 0 ? string.Join(" \u00B7 ", parts) : "Unknown OS";
+        return parts.Count > 0 ? string.Join(" \u00B7 ", parts) : Localizer["Db_Entry_UnknownOs"];
     }
-
-    private static bool HasAnyField(ProviderDatabaseOsStamp stamp) =>
-        stamp.Build is > 0 ||
-        !string.IsNullOrEmpty(stamp.Edition) ||
-        !string.IsNullOrEmpty(stamp.DisplayVersion);
-
-    private static string PhaseVerb(UpgradePhase phase) => phase switch
-    {
-        UpgradePhase.BackingUp => "Backing up",
-        UpgradePhase.MigratingSchema => "Migrating schema",
-        UpgradePhase.Verifying => "Verifying",
-        _ => "Upgrading"
-    };
 
     private void HandleContextMenu(MouseEventArgs args)
     {
@@ -196,7 +191,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
         var items = new List<MenuItem>
         {
-            MenuItem.Item("Remove", () => OnRemove.InvokeAsync()),
+            MenuItem.Item(Localizer["Db_Entry_Remove"], () => OnRemove.InvokeAsync()),
         };
 
         MenuService.OpenAt(args.ClientX, args.ClientY, items, openedByKeyboard: ContextMenuInvocation.WasKeyboardTriggered(args));

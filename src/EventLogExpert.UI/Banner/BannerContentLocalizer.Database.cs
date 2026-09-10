@@ -4,6 +4,7 @@
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.UI.Database;
 using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.Banner;
@@ -19,35 +20,20 @@ internal static partial class BannerContentLocalizer
 
         foreach (var failure in failures)
         {
-            parts.Add(localizer["Banner_Db_Import_FailurePart", failure.FileName, failure.Reason]);
+            parts.Add(localizer["Banner_Db_Import_FailurePart",
+                failure.FileName,
+                DatabaseFailureReasonLocalizer.Describe(localizer, failure.Reason)]);
         }
 
         foreach (var failure in upgradeFailures)
         {
-            parts.Add(localizer["Banner_Db_Import_UpgradeFailurePart", failure.FileName, failure.Reason]);
+            parts.Add(localizer["Banner_Db_Import_UpgradeFailurePart",
+                failure.FileName,
+                DatabaseFailureReasonLocalizer.Describe(localizer, failure.Reason)]);
         }
 
         return localizer["Banner_Db_Import_FailureSummary", JoinLocalizedList(localizer, parts)];
     }
-
-    private static string ResolveDatabaseOperationNoun(
-        IStringLocalizer<SharedResource> localizer,
-        DatabaseOperation operation) =>
-        operation switch
-        {
-            DatabaseOperation.Toggle toggle => localizer["Banner_Db_OperationNoun_Toggle", toggle.FileName],
-            DatabaseOperation.Import => localizer["Banner_Db_OperationNoun_Import"],
-            DatabaseOperation.UpgradeSingle upgradeSingle => localizer[
-                "Banner_Db_OperationNoun_UpgradeSingle",
-                upgradeSingle.FileName],
-            DatabaseOperation.UpgradeBatch { Count: 1 } upgradeBatch => localizer[
-                "Banner_Db_OperationNoun_UpgradeBatch_One",
-                upgradeBatch.Count],
-            DatabaseOperation.UpgradeBatch upgradeBatch => localizer[
-                "Banner_Db_OperationNoun_UpgradeBatch_Many",
-                upgradeBatch.Count],
-            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation.GetType(), "Unknown database operation.")
-        };
 
     private static BannerContentText ResolveDatabaseImportSummary(
         IStringLocalizer<SharedResource> localizer,
@@ -99,4 +85,23 @@ internal static partial class BannerContentLocalizer
             title,
             localizer["Banner_Db_OperationFailed_Message", ResolveDatabaseOperationNoun(localizer, content.Operation), content.Detail]);
     }
+
+    private static string ResolveDatabaseOperationNoun(
+        IStringLocalizer<SharedResource> localizer,
+        DatabaseOperation operation) =>
+        operation switch
+        {
+            DatabaseOperation.Toggle toggle => localizer["Banner_Db_OperationNoun_Toggle", toggle.FileName],
+            DatabaseOperation.Import => localizer["Banner_Db_OperationNoun_Import"],
+            DatabaseOperation.UpgradeSingle upgradeSingle => localizer[
+                "Banner_Db_OperationNoun_UpgradeSingle",
+                upgradeSingle.FileName],
+            DatabaseOperation.UpgradeBatch { Count: 1 } upgradeBatch => localizer[
+                "Banner_Db_OperationNoun_UpgradeBatch_One",
+                upgradeBatch.Count],
+            DatabaseOperation.UpgradeBatch upgradeBatch => localizer[
+                "Banner_Db_OperationNoun_UpgradeBatch_Many",
+                upgradeBatch.Count],
+            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation.GetType(), "Unknown database operation.")
+        };
 }

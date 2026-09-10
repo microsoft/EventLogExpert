@@ -70,7 +70,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         var component = Render<DatabaseRecoveryModal>();
 
-        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
+        await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
 
         _databaseService.Entries.Returns([]);
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
@@ -90,8 +90,8 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         var component = Render<DatabaseRecoveryModal>();
 
-        await component.Find("button.button:contains('Delete all')").ClickAsync(new MouseEventArgs());
-        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
+        await component.Find("button.button:contains('[[DatabaseRecoveryModal_DeleteAll]]')").ClickAsync(new MouseEventArgs());
+        await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
 
         _errorBannerService.Received(1).ReportError(
             Arg.Is<BannerMessage>(message =>
@@ -112,12 +112,12 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         var component = Render<DatabaseRecoveryModal>();
 
-        var applyClick = component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
+        var applyClick = component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
 
-        Assert.True(((IHtmlButtonElement)component.Find("button:contains('Apply')")).IsDisabled);
-        Assert.True(((IHtmlButtonElement)component.Find("button:contains('Cancel')")).IsDisabled);
-        Assert.True(((IHtmlButtonElement)component.Find("button.button:contains('Restore all')")).IsDisabled);
-        Assert.True(((IHtmlButtonElement)component.Find("button.button:contains('Delete all')")).IsDisabled);
+        Assert.True(((IHtmlButtonElement)component.Find("button:contains('[[Modal_Apply]]')")).IsDisabled);
+        Assert.True(((IHtmlButtonElement)component.Find("button:contains('[[Modal_Cancel]]')")).IsDisabled);
+        Assert.True(((IHtmlButtonElement)component.Find("button.button:contains('[[DatabaseRecoveryModal_RestoreAll]]')")).IsDisabled);
+        Assert.True(((IHtmlButtonElement)component.Find("button.button:contains('[[DatabaseRecoveryModal_DeleteAll]]')")).IsDisabled);
 
         foreach (var radio in component.FindAll("li.recovery-row input[type=radio]"))
         {
@@ -144,7 +144,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
         var bDeleteRadio = bRow.QuerySelectorAll("input[type=radio]")[1];
         await bDeleteRadio.ChangeAsync(new ChangeEventArgs { Value = "on" });
 
-        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
+        await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
 
         await _databaseService.Received(1).RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>());
         await _databaseService.Received(1).DeleteEntryWithBackupAsync("b.db", Arg.Any<CancellationToken>());
@@ -161,7 +161,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         var component = Render<DatabaseRecoveryModal>();
 
-        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
+        await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
 
         _errorBannerService.Received(1).ReportError(
             Arg.Is<BannerMessage>(message =>
@@ -181,7 +181,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         var component = Render<DatabaseRecoveryModal>();
 
-        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
+        await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
 
         _errorBannerService.DidNotReceive().ReportError(Arg.Any<BannerMessage>());
 
@@ -198,7 +198,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         var component = Render<DatabaseRecoveryModal>();
 
-        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
+        await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
 
         _errorBannerService.Received(1).ReportError(
             Arg.Is<BannerMessage>(message =>
@@ -217,8 +217,8 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         var component = Render<DatabaseRecoveryModal>();
 
-        await component.Find("button.button:contains('Delete all')").ClickAsync(new MouseEventArgs());
-        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
+        await component.Find("button.button:contains('[[DatabaseRecoveryModal_DeleteAll]]')").ClickAsync(new MouseEventArgs());
+        await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
 
         await _databaseService.Received(1).DeleteEntryWithBackupAsync(
             Arg.Is<string>(name => name == "a.db"),
@@ -237,7 +237,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         var component = Render<DatabaseRecoveryModal>();
 
-        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
+        await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
 
         await _databaseService.Received(1).RestoreFromBackupAsync(
             Arg.Is<string>(name => name == "a.db"),
@@ -254,7 +254,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         var component = Render<DatabaseRecoveryModal>();
 
-        await component.Find("button:contains('Cancel')").ClickAsync(new MouseEventArgs());
+        await component.Find("button:contains('[[Modal_Cancel]]')").ClickAsync(new MouseEventArgs());
 
         await _modalCoordinator.Received(1).RequestCloseActiveAsync(ModalCloseReason.UserDismiss);
         await _databaseService.DidNotReceive().RestoreFromBackupAsync(
@@ -290,7 +290,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         var component = Render<DatabaseRecoveryModal>();
 
-        await component.Find("button.button:contains('Delete all')").ClickAsync(new MouseEventArgs());
+        await component.Find("button.button:contains('[[DatabaseRecoveryModal_DeleteAll]]')").ClickAsync(new MouseEventArgs());
 
         foreach (var row in component.FindAll("li.recovery-row"))
         {
@@ -375,7 +375,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         var component = Render<DatabaseRecoveryModal>();
 
-        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
+        await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
 
         Assert.Contains(
             "recovery-row-failed",
@@ -387,7 +387,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(true));
 
-        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
+        await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
 
         Assert.DoesNotContain(
             "recovery-row-failed",
@@ -433,7 +433,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
         var component = Render<DatabaseRecoveryModal>();
         Assert.NotNull(_capturedRegistration);
 
-        var applyClick = component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
+        var applyClick = component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
 
         bool accepted = await _capturedRegistration!.RequestClose(
             new ModalCloseRequest(ModalCloseReason.UserDismiss));
@@ -489,7 +489,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
             await deleteRadio.ChangeAsync(new ChangeEventArgs { Value = "on" });
         }
 
-        await component.Find("button.button:contains('Restore all')").ClickAsync(new MouseEventArgs());
+        await component.Find("button.button:contains('[[DatabaseRecoveryModal_RestoreAll]]')").ClickAsync(new MouseEventArgs());
 
         foreach (var row in component.FindAll("li.recovery-row"))
         {
@@ -522,7 +522,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         _databaseService.Entries.Returns(entriesAfter);
 
-        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
+        await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
 
         await _databaseService.Received(1).RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>());
         await _databaseService.DidNotReceive().RestoreFromBackupAsync("b.db", Arg.Any<CancellationToken>());

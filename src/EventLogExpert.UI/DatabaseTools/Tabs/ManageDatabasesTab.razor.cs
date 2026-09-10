@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Banner;
@@ -13,6 +14,7 @@ using EventLogExpert.UI.Database;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using System.Collections.Immutable;
 using System.Text;
 
@@ -82,22 +84,24 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     private bool IsUpgradeBlocked => IsUpgradeInFlight;
 
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
+
     [Inject] private ILogReloadCoordinator LogReloadCoordinator { get; init; } = null!;
 
     private string MasterCheckboxAriaChecked =>
-        _selectedForBulk.Count == 0 ? "false"
-        : _selectedForBulk.Count >= DatabaseService.Entries.Count ? "true"
-        : "mixed";
+        _selectedForBulk.Count == 0 ?
+        "false" :
+        _selectedForBulk.Count >= DatabaseService.Entries.Count ? "true" : "mixed";
 
     private string MasterCheckboxAriaLabel =>
-        _selectedForBulk.Count >= DatabaseService.Entries.Count && _selectedForBulk.Count > 0
-            ? "Clear selection"
-            : "Select all";
+        _selectedForBulk.Count >= DatabaseService.Entries.Count && _selectedForBulk.Count > 0 ?
+            "Clear selection" :
+            "Select all";
 
     private string MasterCheckboxIconClass =>
-        _selectedForBulk.Count == 0 ? "bi-square"
-        : _selectedForBulk.Count >= DatabaseService.Entries.Count ? "bi-check-square-fill"
-        : "bi-dash-square-fill";
+        _selectedForBulk.Count == 0 ?
+        "bi-square" :
+        _selectedForBulk.Count >= DatabaseService.Entries.Count ? "bi-check-square-fill" : "bi-dash-square-fill";
 
     [Inject] private IProgressBannerService ProgressBannerService { get; init; } = null!;
 
@@ -261,17 +265,20 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             AnnouncementService.Announce(
                 $"Upgraded {result.Succeeded.Count} database{(result.Succeeded.Count == 1 ? "" : "s")}; "
                 + $"{result.Cancelled.Count} cancelled.");
+
             return;
         }
 
         if (result.Failed.Count > 0)
         {
             var first = result.Failed[0];
-            var summary = result.Failed.Count == 1
-                ? $"Upgrade of '{first.FileName}' failed: {first.Message}"
-                : $"Upgraded {result.Succeeded.Count} of {attempted} databases; "
-                    + $"{result.Failed.Count} failed. First failure: '{first.FileName}' \u2014 {first.Message}";
+            string firstReason = DatabaseFailureReasonLocalizer.Describe(Localizer, first.Reason);
+            var summary = result.Failed.Count == 1 ?
+                $"Upgrade of '{first.FileName}' failed: {firstReason}" :
+                $"Upgraded {result.Succeeded.Count} of {attempted} databases; "
+                    + $"{result.Failed.Count} failed. First failure: '{first.FileName}' \u2014 {firstReason}";
             AnnouncementService.Announce(summary);
+
             return;
         }
 
@@ -290,9 +297,9 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         if (!anyRemovalAffectsActiveLog) { return baseMessage; }
 
-        string warning = fileNames.Count == 1
-            ? "Removing will close and reopen any affected log views."
-            : "Removing these databases will close and reopen any affected log views.";
+        string warning = fileNames.Count == 1 ?
+            "Removing will close and reopen any affected log views." :
+            "Removing these databases will close and reopen any affected log views.";
 
         return $"{baseMessage} {warning}";
     }
@@ -334,9 +341,9 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     private string BuildPlainRemoveMessage(IReadOnlyList<string> fileNames)
     {
-        string baseMessage = fileNames.Count == 1
-            ? $"Are you sure you want to remove {fileNames[0]}?"
-            : BuildBulkPlainMessage(fileNames);
+        string baseMessage = fileNames.Count == 1 ?
+            $"Are you sure you want to remove {fileNames[0]}?" :
+            BuildBulkPlainMessage(fileNames);
 
         return AppendCloseReopenWarningIfNeeded(baseMessage, fileNames);
     }
@@ -376,22 +383,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         }
 
         var coordinatorSettleTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        void CompletionHandler(object? sender, UpgradeBatchCompletedEventArgs args)
-        {
-            if (pendingBatches.TryGetValue(args.BatchId, out var tcs))
-            {
-                tcs.TrySetResult();
-            }
-        }
-
-        void StateChangedHandler()
-        {
-            if (!fileNames.Any(f => Coordinator.IsUpgradeInFlight(f)))
-            {
-                coordinatorSettleTcs.TrySetResult();
-            }
-        }
 
         DatabaseService.UpgradeBatchCompleted += CompletionHandler;
         Coordinator.UpgradeStateChanged += StateChangedHandler;
@@ -443,6 +434,24 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             DatabaseService.UpgradeBatchCompleted -= CompletionHandler;
             Coordinator.UpgradeStateChanged -= StateChangedHandler;
         }
+
+        return;
+
+        void StateChangedHandler()
+        {
+            if (!fileNames.Any(f => Coordinator.IsUpgradeInFlight(f)))
+            {
+                coordinatorSettleTcs.TrySetResult();
+            }
+        }
+
+        void CompletionHandler(object? sender, UpgradeBatchCompletedEventArgs args)
+        {
+            if (pendingBatches.TryGetValue(args.BatchId, out var tcs))
+            {
+                tcs.TrySetResult();
+            }
+        }
     }
 
     private ImmutableHashSet<string> ComputeActiveSet() =>
@@ -466,17 +475,17 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         bool requiresCancelFirst = IsAnyFileUpgrading(validFileNames, out var upgradingFiles);
 
-        string title = validFileNames.Count == 1
-            ? "Remove Database"
-            : $"Remove {validFileNames.Count} Databases";
+        string title = validFileNames.Count == 1 ?
+            "Remove Database" :
+            $"Remove {validFileNames.Count} Databases";
 
-        string acceptLabel = requiresCancelFirst
-            ? $"Cancel {upgradingFiles.Count} upgrade{(upgradingFiles.Count == 1 ? "" : "s")} and remove {validFileNames.Count} database{(validFileNames.Count == 1 ? "" : "s")}"
-            : "Remove";
+        string acceptLabel = requiresCancelFirst ?
+            $"Cancel {upgradingFiles.Count} upgrade{(upgradingFiles.Count == 1 ? "" : "s")} and remove {validFileNames.Count} database{(validFileNames.Count == 1 ? "" : "s")}" :
+            "Remove";
 
-        string message = requiresCancelFirst
-            ? BuildCancelThenRemoveMessage(validFileNames, upgradingFiles)
-            : BuildPlainRemoveMessage(validFileNames);
+        string message = requiresCancelFirst ?
+            BuildCancelThenRemoveMessage(validFileNames, upgradingFiles) :
+            BuildPlainRemoveMessage(validFileNames);
 
         InlineAlertResult result;
         try
@@ -623,7 +632,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     private async Task ImportDatabase()
     {
-        var outcome = await Coordinator.ImportAsync(AskOverwriteAsync);
+        var outcome = await Coordinator.ImportAsync(Localizer["Db_Picker_ImportPrompt"], AskOverwriteAsync);
 
         if (_disposed) { return; }
 

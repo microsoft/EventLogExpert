@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Schema;
 using EventLogExpert.Runtime.Banner;
@@ -9,9 +10,11 @@ using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.Menu;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Database;
@@ -25,6 +28,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddSingleton(Substitute.For<ITraceLogger>());
         Services.AddSingleton(_menuService);
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
     }
 
     [Fact]
@@ -101,7 +105,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry);
 
         var checkbox = component.Find(".db-entry-row input[type='checkbox']");
-        Assert.Equal("Select MyDb.evtx", checkbox.GetAttribute("aria-label"));
+        Assert.Equal("[[Db_Entry_Aria_Select(MyDb.evtx)]]", checkbox.GetAttribute("aria-label"));
     }
 
     [Fact]
@@ -151,7 +155,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         Assert.NotNull(capturedItems);
         var item = Assert.Single(capturedItems!);
-        Assert.Equal("Remove", item.Label);
+        Assert.Equal("[[Db_Entry_Remove]]", item.Label);
     }
 
     [Fact]
@@ -161,7 +165,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         var component = RenderRow(entry);
 
-        Assert.Equal("Mixed (9+ OS versions)", component.Find(".db-entry-osstamp").TextContent.Trim());
+        Assert.Equal("[[Db_Entry_MixedOs_Capped]]", component.Find(".db-entry-osstamp").TextContent.Trim());
     }
 
     [Fact]
@@ -184,7 +188,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         var component = RenderRow(entry);
 
-        Assert.Equal("Mixed (9 OS versions)", component.Find(".db-entry-osstamp").TextContent.Trim());
+        Assert.Equal("[[Db_Entry_MixedOs_Count(9)]]", component.Find(".db-entry-osstamp").TextContent.Trim());
     }
 
     [Fact]
@@ -201,7 +205,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         var component = RenderRow(entry);
 
-        Assert.Equal("Mixed (2 OS versions)", component.Find(".db-entry-osstamp").TextContent.Trim());
+        Assert.Equal("[[Db_Entry_MixedOs_Count(2)]]", component.Find(".db-entry-osstamp").TextContent.Trim());
     }
 
     [Fact]
@@ -239,7 +243,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         var stamp = component.Find(".db-entry-osstamp");
         Assert.Equal("ServerDatacenter \u00B7 24H2 \u00B7 26100.1234", stamp.TextContent.Trim());
-        Assert.Equal("Source OS: ServerDatacenter \u00B7 24H2 \u00B7 26100.1234", stamp.GetAttribute("aria-label"));
+        Assert.Equal("[[Db_Entry_SourceOs(ServerDatacenter \u00B7 24H2 \u00B7 26100.1234)]]", stamp.GetAttribute("aria-label"));
     }
 
     [Fact]
@@ -262,7 +266,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry, isUpgrading: true);
 
         var badge = component.Find(".db-entry-badge");
-        Assert.Equal("Recovery required", badge.TextContent);
+        Assert.Equal("[[Db_Badge_RecoveryRequired]]", badge.TextContent);
         Assert.Equal("Recovery", badge.GetAttribute("data-badge"));
 
         Assert.Empty(component.FindAll(".db-entry-upgrading"));
@@ -279,7 +283,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry);
 
         var badge = component.Find(".db-entry-badge");
-        Assert.Equal("Recovery required", badge.TextContent);
+        Assert.Equal("[[Db_Badge_RecoveryRequired]]", badge.TextContent);
         Assert.Empty(component.FindAll(".option-select"));
         Assert.Empty(component.FindAll(".db-entry-remove-btn"));
     }
@@ -303,7 +307,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry);
 
         var badge = component.Find(".db-entry-badge");
-        Assert.Equal("Recovery required", badge.TextContent);
+        Assert.Equal("[[Db_Badge_RecoveryRequired]]", badge.TextContent);
         Assert.Equal("Recovery", badge.GetAttribute("data-badge"));
 
         Assert.Empty(component.FindAll(".db-entry-upgrade-btn"));
@@ -321,8 +325,8 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry);
 
         var restoreBtn = component.Find(".db-entry-restore-btn");
-        Assert.Equal("Restore database a.db from backup", restoreBtn.GetAttribute("aria-label"));
-        Assert.Contains("Restore", restoreBtn.TextContent);
+        Assert.Equal("[[Db_Entry_Aria_Restore(a.db)]]", restoreBtn.GetAttribute("aria-label"));
+        Assert.Contains("[[Db_Entry_Restore]]", restoreBtn.TextContent);
     }
 
     [Fact]
@@ -346,8 +350,8 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry);
 
         var retryBtn = component.Find(".db-entry-retry-classification-btn");
-        Assert.Equal("Retry classification of database a.db", retryBtn.GetAttribute("aria-label"));
-        Assert.Contains("Retry classification", retryBtn.TextContent);
+        Assert.Equal("[[Db_Entry_Aria_RetryClassification(a.db)]]", retryBtn.GetAttribute("aria-label"));
+        Assert.Contains("[[Db_Entry_RetryClassification]]", retryBtn.TextContent);
     }
 
     [Fact]
@@ -440,9 +444,13 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         var component = RenderRow(entry, isUpgrading: true);
 
-        var upgrading = component.Find(".db-entry-upgrading");
-        Assert.Equal("status", upgrading.GetAttribute("role"));
-        Assert.Contains("Upgrading", upgrading.TextContent);
+        var statusSpan = component.Find(".db-entry-upgrading-status");
+        Assert.Equal("status", statusSpan.GetAttribute("role"));
+        Assert.False(statusSpan.HasAttribute("aria-label"));
+        var liveText = statusSpan.QuerySelector(".visually-hidden");
+        Assert.NotNull(liveText);
+        Assert.Equal("[[Db_Entry_Upgrading]]", liveText!.TextContent);
+        Assert.Contains("[[Db_Entry_Upgrading]]", statusSpan.TextContent);
     }
 
     [Fact]
@@ -467,7 +475,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.All(radios, r => Assert.True(r.HasAttribute("disabled")));
 
         var badge = component.Find(".db-entry-badge");
-        Assert.Equal("Classifying\u2026", badge.TextContent);
+        Assert.Equal("[[Db_Status_NotClassified]]", badge.TextContent);
         Assert.Equal("NotClassified", badge.GetAttribute("data-badge"));
     }
 
@@ -500,7 +508,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
             "Pending toggle must have aria-describedby pointing at the pending-status span.");
 
         var pendingSpan = component.Find($"#{describedById}");
-        Assert.Equal("(pending toggle, unsaved)", pendingSpan.TextContent.Trim());
+        Assert.Equal("[[Db_Entry_PendingToggle]]", pendingSpan.TextContent.Trim());
         Assert.Contains("visually-hidden", pendingSpan.GetAttribute("class") ?? string.Empty);
     }
 
@@ -561,8 +569,8 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Theory]
-    [InlineData(DatabaseStatus.UnrecognizedSchema, "Unrecognized")]
-    [InlineData(DatabaseStatus.ObsoleteSchema, "Obsolete")]
+    [InlineData(DatabaseStatus.UnrecognizedSchema, "[[Db_Status_UnrecognizedSchema]]")]
+    [InlineData(DatabaseStatus.ObsoleteSchema, "[[Db_Status_ObsoleteSchema]]")]
     public void Render_TerminalStatus_ShowsBadge_NoTrash(DatabaseStatus status, string expectedLabel)
     {
         var entry = MakeEntry(status);
@@ -606,23 +614,29 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry);
 
         var button = component.Find(".db-entry-upgrade-btn");
-        Assert.Equal("Retry Upgrade", button.TextContent.Trim());
+        Assert.Equal("[[Db_Entry_RetryUpgrade]]", button.TextContent.Trim());
         Assert.Contains("button-red", button.GetAttribute("class") ?? string.Empty);
 
         var badge = component.Find(".db-entry-badge");
-        Assert.Equal("Upgrade failed", badge.TextContent);
+        Assert.Equal("[[Db_Status_UpgradeFailed]]", badge.TextContent);
         Assert.Equal("UpgradeFailed", badge.GetAttribute("data-badge"));
     }
 
     [Fact]
-    public void Render_UpgradeProgress_EmptyEntryName_DoesNotEmitFilenameSrSuffix()
+    public void Render_UpgradeProgress_EmptyEntryName_DoesNotEmitFilenameInVisibleCopy()
     {
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
         var progress = MakeProgress(currentEntryName: string.Empty, currentBatchSize: 2);
 
         var component = RenderRow(entry, upgradeProgress: progress);
 
-        Assert.Empty(component.FindAll(".db-entry-upgrading .visually-hidden"));
+        var text = component.Find(".db-entry-upgrading-text");
+        Assert.DoesNotContain(entry.FileName, text.TextContent);
+
+        var statusSpan = component.Find(".db-entry-upgrading-status");
+        var liveText = statusSpan.QuerySelector(".visually-hidden");
+        Assert.NotNull(liveText);
+        Assert.Equal("[[Banner_Upgrade_Preparing_Many(2)]]", liveText!.TextContent);
     }
 
     [Fact]
@@ -636,7 +650,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry, upgradeProgress: progress);
 
         var text = component.Find(".db-entry-upgrading-text");
-        Assert.Contains("Preparing upgrade of 3 databases", text.TextContent);
+        Assert.Equal("[[Banner_Upgrade_Preparing_Many(3)]]", text.TextContent);
     }
 
     [Fact]
@@ -648,8 +662,8 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry, upgradeProgress: progress);
 
         var text = component.Find(".db-entry-upgrading-text");
-        Assert.Contains("Preparing upgrade of 1 database", text.TextContent);
-        Assert.DoesNotContain("databases", text.TextContent);
+        Assert.Equal("[[Banner_Upgrade_Preparing_One(1)]]", text.TextContent);
+        Assert.DoesNotContain("Many", text.TextContent);
     }
 
     [Fact]
@@ -665,22 +679,28 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry, upgradeProgress: progress);
 
         var text = component.Find(".db-entry-upgrading-text");
-        Assert.Equal("Migrating schema 2 of 5", text.TextContent);
+        Assert.Equal("[[Db_Entry_PhaseProgress([[Db_UpgradePhase_MigratingSchema]]|2|5)]]", text.TextContent);
     }
 
     [Fact]
     public void Render_UpgradeProgress_RoleStatusOnInnerSpan_WithFilenameSrSuffix()
     {
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired, "MyProvider.db");
-        var progress = MakeProgress(currentEntryName: "MyProvider.db");
+        var progress = MakeProgress(
+            currentEntryName: "MyProvider.db",
+            currentPhase: UpgradePhase.MigratingSchema,
+            currentBatchPosition: 2,
+            currentBatchSize: 5);
 
         var component = RenderRow(entry, upgradeProgress: progress);
 
         var statusSpan = component.Find(".db-entry-upgrading-status");
         Assert.Equal("status", statusSpan.GetAttribute("role"));
 
-        var srSuffix = component.Find(".db-entry-upgrading .visually-hidden");
-        Assert.Contains("MyProvider.db", srSuffix.TextContent);
+        var liveText = statusSpan.QuerySelector(".visually-hidden");
+        Assert.NotNull(liveText);
+        Assert.Equal("[[Db_Entry_ProgressAria([[Db_Entry_PhaseProgress([[Db_UpgradePhase_MigratingSchema]]|2|5)]]|MyProvider.db)]]", liveText!.TextContent);
+        Assert.Equal("true", statusSpan.QuerySelector(".db-entry-upgrading-text")?.GetAttribute("aria-hidden"));
     }
 
     [Fact]
@@ -696,13 +716,13 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry, upgradeProgress: progress);
 
         var text = component.Find(".db-entry-upgrading-text");
-        Assert.Equal("Verifying", text.TextContent);
+        Assert.Equal("[[Db_UpgradePhase_Verifying]]", text.TextContent);
     }
 
     [Theory]
-    [InlineData(UpgradePhase.BackingUp, "Backing up")]
-    [InlineData(UpgradePhase.MigratingSchema, "Migrating schema")]
-    [InlineData(UpgradePhase.Verifying, "Verifying")]
+    [InlineData(UpgradePhase.BackingUp, "[[Db_UpgradePhase_BackingUp]]")]
+    [InlineData(UpgradePhase.MigratingSchema, "[[Db_UpgradePhase_MigratingSchema]]")]
+    [InlineData(UpgradePhase.Verifying, "[[Db_UpgradePhase_Verifying]]")]
     public void Render_UpgradeProgress_VerbPerPhase(UpgradePhase phase, string expectedVerb)
     {
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
@@ -732,7 +752,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry);
 
         var button = component.Find(".db-entry-upgrade-btn");
-        Assert.Equal("Upgrade", button.TextContent.Trim());
+        Assert.Equal("[[Db_Entry_Upgrade]]", button.TextContent.Trim());
         Assert.False(button.HasAttribute("disabled"));
         Assert.DoesNotContain("button-red", button.GetAttribute("class") ?? string.Empty);
 

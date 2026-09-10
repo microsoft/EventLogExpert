@@ -25,7 +25,7 @@ public abstract record DatabaseOperation
 
 public sealed record DatabaseRemoveFailed(string FileName, string Detail) : BannerMessage;
 
-public sealed record DatabaseUpgradeFailed(string FileName, string Reason) : BannerMessage;
+public sealed record DatabaseUpgradeFailed(string FileName, DatabaseFailureReason Reason) : BannerMessage;
 
 public sealed record DatabaseOperationFailed(DatabaseOperation Operation, string Detail) : BannerMessage;
 

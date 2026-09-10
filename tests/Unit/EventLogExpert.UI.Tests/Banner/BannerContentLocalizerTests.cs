@@ -2,14 +2,20 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Localization;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Maintenance;
+using EventLogExpert.Provider.Schema;
 using EventLogExpert.Runtime.Banner;
+using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 using System.Globalization;
 
 namespace EventLogExpert.UI.Tests.Banner;
@@ -73,19 +79,19 @@ public sealed class BannerContentLocalizerTests
             "Import Successful",
             "3 databases have successfully been imported");
         AssertResolved(
-            new DatabaseImportSummary(0, [new ImportFailure("A.db", "bad")], []),
+            new DatabaseImportSummary(0, [new ImportFailure("A.db", new DatabaseFailureReason.NativeDetail("bad"))], []),
             "[[Banner_Db_Import_Failed_Title]]",
             "[[Banner_Db_Import_Failed_Message([[Banner_Db_Import_FailureSummary([[Banner_Db_Import_FailurePart(A.db|bad)]])]])]]",
             "Import Failed",
             "No databases were imported; failed: A.db (bad)");
         AssertResolved(
-            new DatabaseImportSummary(1, [new ImportFailure("A.db", "bad")], []),
+            new DatabaseImportSummary(1, [new ImportFailure("A.db", new DatabaseFailureReason.NativeDetail("bad"))], []),
             "[[Banner_Db_Import_Partial_Title]]",
             "[[Banner_Db_Import_Partial_Message([[Banner_Db_Import_Partial_One]]|[[Banner_Db_Import_FailureSummary([[Banner_Db_Import_FailurePart(A.db|bad)]])]])]]",
             "Import Completed with Errors",
             "1 database imported; failed: A.db (bad)");
         AssertResolved(
-            new DatabaseImportSummary(2, [], [new ImportFailure("B.db", "schema")]),
+            new DatabaseImportSummary(2, [], [new ImportFailure("B.db", new DatabaseFailureReason.NativeDetail("schema"))]),
             "[[Banner_Db_Import_Partial_Title]]",
             "[[Banner_Db_Import_Partial_Message([[Banner_Db_Import_Partial_Many(2)]]|[[Banner_Db_Import_FailureSummary([[Banner_Db_Import_UpgradeFailurePart(B.db|schema)]])]])]]",
             "Import Completed with Errors",
@@ -98,12 +104,41 @@ public sealed class BannerContentLocalizerTests
         AssertResolved(
             new DatabaseImportSummary(
                 2,
-                [new ImportFailure("A.db", "bad"), new ImportFailure("C.db", "io")],
-                [new ImportFailure("B.db", "schema")]),
+                [new ImportFailure("A.db", new DatabaseFailureReason.NativeDetail("bad")), new ImportFailure("C.db", new DatabaseFailureReason.NativeDetail("io"))],
+                [new ImportFailure("B.db", new DatabaseFailureReason.NativeDetail("schema"))]),
             "[[Banner_Db_Import_Partial_Title]]",
             "[[Banner_Db_Import_Partial_Message([[Banner_Db_Import_Partial_Many(2)]]|[[Banner_Db_Import_FailureSummary([[Banner_Db_Import_FailurePart(A.db|bad)]][[Banner_List_Separator]][[Banner_Db_Import_FailurePart(C.db|io)]][[Banner_List_Separator]][[Banner_Db_Import_UpgradeFailurePart(B.db|schema)]])]])]]",
             "Import Completed with Errors",
             "2 databases imported; failed: A.db (bad), C.db (io), B.db upgrade (schema)");
+    }
+
+    [Fact]
+    public async Task Resolve_DatabaseImportSummary_RealMissingFileImportNativeDetail_RendersOpaqueReasonByteIdentical()
+    {
+        var testDirectory = Path.Combine(Path.GetTempPath(), $"BannerContentLocalizerTests_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(testDirectory);
+
+        try
+        {
+            await using var service = CreateDatabaseServiceForBannerTest(testDirectory);
+            var missingPath = Path.Combine(testDirectory, "missing.db");
+
+            var result = await service.ImportAsync([missingPath], CancellationToken.None);
+
+            var failure = Assert.Single(result.Failures);
+            Assert.Equal("missing.db", failure.FileName);
+            var nativeDetail = Assert.IsType<DatabaseFailureReason.NativeDetail>(failure.Reason);
+
+            var banner = BannerContentLocalizer.Resolve(
+                BuildLocalizer(),
+                new DatabaseImportSummary(result.Imported, result.Failures, result.UpgradeFailures));
+
+            Assert.Equal($"No databases were imported; failed: missing.db ({nativeDetail.Detail})", banner.Message);
+        }
+        finally
+        {
+            Directory.Delete(testDirectory, recursive: true);
+        }
     }
 
     [Fact]
@@ -151,11 +186,49 @@ public sealed class BannerContentLocalizerTests
             "Failed to Remove Database",
             "An exception occurred while removing 'a.db': denied");
         AssertResolved(
-            new DatabaseUpgradeFailed("b.db", "schema"),
+            new DatabaseUpgradeFailed("b.db", new DatabaseFailureReason.NativeDetail("schema")),
             "[[Banner_Db_UpgradeFailed_Title]]",
             "[[Banner_Db_UpgradeFailed_Message(b.db|schema)]]",
             "Database Upgrade Failed",
             "Failed to upgrade 'b.db': schema");
+    }
+
+    [Fact]
+    public async Task Resolve_DatabaseUpgradeFailed_RealServiceProviderFailureNativeDetail_RendersOpaqueReasonByteIdentical()
+    {
+        const string fileName = "provider-fails.db";
+        const string providerReason = "provider upgrade detail";
+        var testDirectory = Path.Combine(Path.GetTempPath(), $"BannerContentLocalizerTests_{Guid.NewGuid():N}");
+        var databaseDirectory = Path.Combine(testDirectory, "Databases");
+        Directory.CreateDirectory(databaseDirectory);
+        File.WriteAllText(Path.Combine(databaseDirectory, fileName), "seed");
+
+        try
+        {
+            await using var service = CreateDatabaseServiceForBannerTest(
+                testDirectory,
+                new ProviderUpgradeFailureMaintenance(providerReason));
+
+            var result = await service.UpgradeBatchAsync(
+                [fileName],
+                UpgradeProgressScope.Background,
+                CancellationToken.None);
+
+            var failure = Assert.Single(result.Failed);
+            Assert.Equal(fileName, failure.FileName);
+            var nativeDetail = Assert.IsType<DatabaseFailureReason.NativeDetail>(failure.Reason);
+            Assert.Equal(providerReason, nativeDetail.Detail);
+
+            var banner = BannerContentLocalizer.Resolve(
+                BuildLocalizer(),
+                new DatabaseUpgradeFailed(failure.FileName, failure.Reason));
+
+            Assert.Equal($"Failed to upgrade '{fileName}': {nativeDetail.Detail}", banner.Message);
+        }
+        finally
+        {
+            Directory.Delete(testDirectory, recursive: true);
+        }
     }
 
     [Theory]
@@ -335,7 +408,7 @@ public sealed class BannerContentLocalizerTests
             [typeof(ExportFailed)] = new ExportFailed("failure"),
             [typeof(ExportComplete)] = new ExportComplete(2, @"C:\events.csv"),
             [typeof(DatabaseRemoveFailed)] = new DatabaseRemoveFailed("a.db", "denied"),
-            [typeof(DatabaseUpgradeFailed)] = new DatabaseUpgradeFailed("a.db", "schema"),
+            [typeof(DatabaseUpgradeFailed)] = new DatabaseUpgradeFailed("a.db", new DatabaseFailureReason.NativeDetail("schema")),
             [typeof(DatabaseOperationFailed)] = new DatabaseOperationFailed(new DatabaseOperation.Import(), "failure"),
             [typeof(DatabaseImportSummary)] = new DatabaseImportSummary(1, [], []),
             [typeof(FilterLibraryNotFullyLoaded)] = new FilterLibraryNotFullyLoaded(1),
@@ -400,6 +473,25 @@ public sealed class BannerContentLocalizerTests
             .BuildServiceProvider()
             .GetRequiredService<IStringLocalizer<SharedResource>>();
 
+    private static DatabaseService CreateDatabaseServiceForBannerTest(
+        string testDirectory,
+        IProviderDatabaseMaintenance? maintenanceOverride = null)
+    {
+        var fileLocationOptions = new FileLocationOptions(testDirectory);
+        var preferences = Substitute.For<IDatabasePreferencesProvider>();
+        preferences.DisabledDatabasesPreference.Returns([]);
+        var logger = Substitute.For<ITraceLogger>();
+        var maintenance = maintenanceOverride ?? Substitute.For<IProviderDatabaseMaintenance>();
+        var registry = new DatabaseRegistry(fileLocationOptions, preferences, logger);
+        registry.Refresh();
+        var classification = new DatabaseClassificationService(registry, fileLocationOptions, maintenance, logger);
+        var upgrade = new DatabaseUpgradeService(registry, classification.InitialClassificationTask, maintenance, logger);
+        var import = new DatabaseImportService(registry, classification, upgrade, fileLocationOptions, logger);
+        var recovery = new DatabaseRecoveryService(registry, classification, fileLocationOptions, maintenance, logger);
+
+        return new DatabaseService(registry, classification, upgrade, import, recovery);
+    }
+
     private static BannerContentText ResolveWithEnUs(BannerMessage content)
     {
         CultureInfo priorCulture = CultureInfo.CurrentCulture;
@@ -421,4 +513,20 @@ public sealed class BannerContentLocalizerTests
 
     private static BannerContentText ResolveWithMarker(BannerMessage content) =>
         BannerContentLocalizer.Resolve(new MarkerLocalizer(), content);
+
+    private sealed class ProviderUpgradeFailureMaintenance(string reason) : IProviderDatabaseMaintenance
+    {
+        public DatabaseSchemaState CheckSchemaState(string databasePath, bool readOnly = false) =>
+            new(3);
+
+        public void PerformUpgrade(string databasePath) =>
+            throw new DatabaseUpgradeException(databasePath, reason);
+
+        public void PrepareForFileDeletion() { }
+
+        public IReadOnlyList<ProviderDatabaseOsStamp> ReadDistinctSourceOsStamps(string databasePath, int limit) =>
+            [];
+
+        public void WalCheckpoint(string databasePath) { }
+    }
 }

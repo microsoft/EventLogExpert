@@ -3,6 +3,7 @@
 
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Banner;
+using EventLogExpert.UI.Database;
 using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.Banner;
@@ -30,7 +31,10 @@ internal static partial class BannerContentLocalizer
                 localizer["Banner_Db_RemoveFailed_Message", databaseRemoveFailed.FileName, databaseRemoveFailed.Detail]),
             DatabaseUpgradeFailed databaseUpgradeFailed => new BannerContentText(
                 localizer["Banner_Db_UpgradeFailed_Title"],
-                localizer["Banner_Db_UpgradeFailed_Message", databaseUpgradeFailed.FileName, databaseUpgradeFailed.Reason]),
+                localizer[
+                    "Banner_Db_UpgradeFailed_Message",
+                    databaseUpgradeFailed.FileName,
+                    DatabaseFailureReasonLocalizer.Describe(localizer, databaseUpgradeFailed.Reason)]),
             DatabaseOperationFailed databaseOperationFailed => ResolveDatabaseOperationFailed(
                 localizer,
                 databaseOperationFailed),
