@@ -206,6 +206,18 @@ public sealed class DatabaseOperationCoordinatorTests
     }
 
     [Fact]
+    public async Task ImportAsync_ForwardsCallerPromptAndDatabaseFileTypesToPicker()
+    {
+        _filePicker.PickMultipleAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>())
+            .Returns([]);
+
+        var sut = CreateSut();
+        await sut.ImportAsync(ImportPrompt, cancellationToken: Ct);
+
+        await _filePicker.Received(1).PickMultipleAsync(ImportPrompt, FilePickerFileTypes.Database);
+    }
+
+    [Fact]
     public async Task ImportAsync_LongRunningImport_PostOpRoutesDirectlyToInfoBannerRegardlessOfCallerLifetime()
     {
         // Post-import info routes directly to the banner so modal lifetime cannot suppress the summary.
