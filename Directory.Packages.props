@@ -1,41 +1,27 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <!-- Required so the SQLitePCLRaw.lib.e_sqlite3 security override below can pin a
-         transitively-resolved package without adding a direct PackageReference. -->
-    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageVersion Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />
-    <PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="10.0.12" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
     <!-- Pinned to the version transitively resolved through Microsoft.Maui.Controls (per
              dotnet list package, include-transitive) so the ExplorerExtension companion exe and
              the MAUI head share a single Microsoft.WindowsAppSDK version. -->
     <PackageVersion Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.Extensions.Localization" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
-    <PackageVersion Include="System.CommandLine" Version="2.0.10" />
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
-    <!-- TEMPORARY security override for CVE-2025-6965 (GHSA-2m69-gcr7-jv3q, High).
-         Microsoft.Data.Sqlite / Microsoft.EntityFrameworkCore.Sqlite 10.0.10 transitively pull
-         SQLitePCLRaw.bundle_e_sqlite3 2.1.11 -> SQLitePCLRaw.lib.e_sqlite3 2.1.11 (SQLite < 3.50.2).
-         The upstream fix (SQLitePCLRaw 3.x) ships only in the 11.0.0-preview line; latest stable
-         Microsoft.Data.Sqlite 10.0.10 still references the vulnerable bundle 2.1.11. lib.e_sqlite3
-         3.53.3 is a native-only package (no managed deps) that satisfies the bundle's [2.1.11, )
-         range, so this swaps in the patched SQLite 3.53.3 binary while keeping the SQLitePCLRaw 2.x
-         managed core. Remove once Microsoft.Data.Sqlite ships the fix on a stable channel
-         (dotnet/efcore PR 38402, milestone 11.0-preview6). Tracked by:
-         https://github.com/microsoft/EventLogExpert/issues/604 -->
-    <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
-    <PackageVersion Include="Fluxor" Version="6.10.0" />
-    <PackageVersion Include="Fluxor.Blazor.Web" Version="6.10.0" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
-    <PackageVersion Include="NSubstitute" Version="6.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Localization" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="System.CommandLine" Version="2.0.12" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
+    <PackageVersion Include="Fluxor" Version="6.11.0" />
+    <PackageVersion Include="Fluxor.Blazor.Web" Version="6.11.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
+    <PackageVersion Include="NSubstitute" Version="6.2.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
