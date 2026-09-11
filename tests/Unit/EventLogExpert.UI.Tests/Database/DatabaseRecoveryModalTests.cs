@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using NSubstitute;
+using System.Text.RegularExpressions;
 
 namespace EventLogExpert.UI.Tests.Database;
 
@@ -298,6 +299,30 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
             Assert.False(((IHtmlInputElement)radios[0]).IsChecked);
             Assert.True(((IHtmlInputElement)radios[1]).IsChecked);
         }
+    }
+
+    [Theory]
+    [InlineData(1, "[[DatabaseRecoveryModal_Description_One]] [[DatabaseRecoveryModal_Explanation]]")]
+    [InlineData(2, "[[DatabaseRecoveryModal_Description_Many]] [[DatabaseRecoveryModal_Explanation]]")]
+    public void DatabaseRecoveryModal_Description_RendersSentencesSeparatedBySingleSpace(int entryCount, string expected)
+    {
+        var entries = new DatabaseEntry[entryCount];
+
+        for (int index = 0; index < entryCount; index++)
+        {
+            entries[index] = BuildEntry($"db{index}.db", true);
+        }
+
+        _databaseService.Entries.Returns(entries);
+
+        var component = Render<DatabaseRecoveryModal>();
+
+        string text = Regex.Replace(
+            component.Find("p.recovery-description").TextContent,
+            @"\s+",
+            " ").Trim();
+
+        Assert.Equal(expected, text);
     }
 
     [Fact]
