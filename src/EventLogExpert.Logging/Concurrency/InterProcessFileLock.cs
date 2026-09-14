@@ -41,7 +41,14 @@ public sealed class InterProcessFileLock
         }
     }
 
-    public bool TryRun(TimeSpan timeout, Action action)
+    public bool TryRun(TimeSpan timeout, Action action) => TryRun(timeout, action, onContended: null);
+
+    /// <summary>
+    ///     Test seam. <paramref name="onContended" /> is invoked once per contended (lock-held) retry, just before the
+    ///     backoff sleep, so a test can observe that acquisition was refused because another holder has the lock. It is always
+    ///     <c>null</c> in production; the public <see cref="TryRun(TimeSpan, Action)" /> overload supplies none.
+    /// </summary>
+    internal bool TryRun(TimeSpan timeout, Action action, Action? onContended)
     {
         ArgumentNullException.ThrowIfNull(action);
 
@@ -69,6 +76,8 @@ public sealed class InterProcessFileLock
                 // Held by another process. Retry with capped exponential backoff + jitter until the deadline;
                 // Timeout.InfiniteTimeSpan waits indefinitely.
                 if (!infinite && Environment.TickCount64 >= deadline) { return false; }
+
+                onContended?.Invoke();
 
                 Thread.Sleep(NextBackoff(ref backoff));
 

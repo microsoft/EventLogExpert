@@ -81,25 +81,21 @@ public sealed class InterProcessFileLockTests : IDisposable
 
         using var acquired = new ManualResetEventSlim(false);
         using var release = new ManualResetEventSlim(false);
-        using var runnerStarted = new ManualResetEventSlim(false);
+        using var contended = new ManualResetEventSlim(false);
 
         var holder = StartHolder(first, acquired, release, cancellationToken);
+        var ranAgain = false;
+        Task<bool>? runner = null;
 
         try
         {
             Assert.True(acquired.Wait(s_testTimeout, cancellationToken));
 
-            var ranAgain = false;
-            var runner = Task.Run(
-                () =>
-                {
-                    runnerStarted.Set();
-                    return second.TryRun(Timeout.InfiniteTimeSpan, () => ranAgain = true);
-                },
+            runner = Task.Run(
+                () => second.TryRun(Timeout.InfiniteTimeSpan, () => ranAgain = true, onContended: () => contended.Set()),
                 cancellationToken);
 
-            Assert.True(runnerStarted.Wait(s_testTimeout, cancellationToken));
-            await Task.Delay(s_contendedTimeout, cancellationToken);
+            Assert.True(contended.Wait(s_testTimeout, cancellationToken));
             Assert.False(runner.IsCompleted);
 
             release.Set();
@@ -110,6 +106,9 @@ public sealed class InterProcessFileLockTests : IDisposable
         finally
         {
             release.Set();
+
+            if (runner is not null) { await Task.WhenAny(runner, Task.Delay(s_testTimeout, CancellationToken.None)); }
+
             holder.Join();
         }
     }
