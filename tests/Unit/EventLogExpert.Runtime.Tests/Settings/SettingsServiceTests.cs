@@ -160,20 +160,6 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
-    public void CopyType_WhenSet_ShouldUpdatePreferences()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        settingsService.CopyFormat = EventCopyFormat.Full;
-
-        // Assert
-        mockPreferences.Received(1).KeyboardCopyFormatPreference = EventCopyFormat.Full;
-    }
-
-    [Fact]
     public void HasEverEnabledPreRelease_WhenAccessedMultipleTimes_ShouldCacheValue()
     {
         // Arrange

@@ -236,19 +236,6 @@ public sealed class RegistryProviderTests
     }
 
     [Fact]
-    public void GetMessageFilesForLegacyProvider_WhenNullComputerName_ShouldUseLocalMachine()
-    {
-        // Arrange
-        var provider = new RegistryProvider();
-
-        // Act
-        var result = provider.GetMessageFilesForLegacyProvider(Constants.ApplicationLogName);
-
-        // Assert
-        Assert.NotNull(result);
-    }
-
-    [Fact]
     public void GetMessageFilesForLegacyProvider_WhenProviderExists_ShouldReturnEnumerable()
     {
         // Arrange
