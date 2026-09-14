@@ -72,34 +72,46 @@ public sealed class InterProcessFileLockTests : IDisposable
     }
 
     [Fact]
-    public void TryRun_InfiniteTimeout_WaitsForHeldLockThenAcquires()
+    public async Task TryRun_InfiniteTimeout_WaitsForHeldLockThenAcquires()
     {
-        const int ReleaseDelayMilliseconds = 300;
-
+        var cancellationToken = TestContext.Current.CancellationToken;
         var target = TargetPath();
         var first = new InterProcessFileLock("ProviderDbSchema", target);
         var second = new InterProcessFileLock("ProviderDbSchema", target);
 
         using var acquired = new ManualResetEventSlim(false);
         using var release = new ManualResetEventSlim(false);
+        using var runnerStarted = new ManualResetEventSlim(false);
 
-        var holder = StartHolder(first, acquired, release, TestContext.Current.CancellationToken);
+        var holder = StartHolder(first, acquired, release, cancellationToken);
 
-        Assert.True(acquired.Wait(s_testTimeout, TestContext.Current.CancellationToken));
-
-        var releaser = new Thread(() =>
+        try
         {
-            Thread.Sleep(ReleaseDelayMilliseconds);
+            Assert.True(acquired.Wait(s_testTimeout, cancellationToken));
+
+            var ranAgain = false;
+            var runner = Task.Run(
+                () =>
+                {
+                    runnerStarted.Set();
+                    return second.TryRun(Timeout.InfiniteTimeSpan, () => ranAgain = true);
+                },
+                cancellationToken);
+
+            Assert.True(runnerStarted.Wait(s_testTimeout, cancellationToken));
+            await Task.Delay(s_contendedTimeout, cancellationToken);
+            Assert.False(runner.IsCompleted);
+
             release.Set();
-        });
-        releaser.Start();
 
-        var ranAgain = false;
-        Assert.True(second.TryRun(Timeout.InfiniteTimeSpan, () => ranAgain = true));
-        Assert.True(ranAgain);
-
-        holder.Join();
-        releaser.Join();
+            Assert.True(await runner.WaitAsync(s_testTimeout, cancellationToken));
+            Assert.True(ranAgain);
+        }
+        finally
+        {
+            release.Set();
+            holder.Join();
+        }
     }
 
     [Theory]
