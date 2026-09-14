@@ -34,16 +34,6 @@ public sealed class FilterPaneStateTests
     }
 
     [Fact]
-    public void FilterPaneState_DefaultState_ShouldHaveEmptyFilters()
-    {
-        // Arrange + Act
-        var state = new FilterPaneState();
-
-        // Assert
-        Assert.Empty(state.Filters);
-    }
-
-    [Fact]
     public void FilterPaneState_DefaultState_ShouldHaveNullFilteredDateRange()
     {
         // Arrange + Act

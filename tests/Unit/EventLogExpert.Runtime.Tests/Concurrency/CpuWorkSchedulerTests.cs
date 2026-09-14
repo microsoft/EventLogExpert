@@ -12,6 +12,8 @@ public sealed class CpuWorkSchedulerTests
     [Fact(Timeout = 30000)]
     public async Task Constructor_ClampsReserveBelowBudget_LeavingOneNonInteractiveSlot()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
         // reserve 5 on budget 2 clamps to 1; without the clamp the non-interactive cap would go negative and admit none.
         var scheduler = new CpuWorkScheduler(totalBudget: 2, reserve: 5);
         var gates = new List<Gate>();
@@ -20,7 +22,7 @@ public sealed class CpuWorkSchedulerTests
         {
             Gate interactive = Submit(scheduler, CpuWorkPriority.Interactive);
             gates.Add(interactive);
-            await interactive.Started;
+            await interactive.Started.WaitAsync(cancellationToken);
 
             gates.Add(Submit(scheduler, CpuWorkPriority.Bulk));
             gates.Add(Submit(scheduler, CpuWorkPriority.Bulk));
@@ -28,12 +30,13 @@ public sealed class CpuWorkSchedulerTests
             Assert.Equal(2, scheduler.Running);
             Assert.Equal(1, scheduler.WaiterCounts.Bulk);
         }
-        finally { await ReleaseAllAsync(gates); }
+        finally { await ReleaseAllAsync(gates, cancellationToken); }
     }
 
     [Fact(Timeout = 30000)]
     public async Task RunAsync_AdmitsUpToBudget_AndQueuesTheRest()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var scheduler = new CpuWorkScheduler(totalBudget: 2, reserve: 0);
         var gates = new List<Gate>();
 
@@ -45,12 +48,13 @@ public sealed class CpuWorkSchedulerTests
             Assert.Equal(2, scheduler.WaiterCounts.Bulk);
             Assert.Equal(2, scheduler.MaxObserved);
         }
-        finally { await ReleaseAllAsync(gates); }
+        finally { await ReleaseAllAsync(gates, cancellationToken); }
     }
 
     [Fact(Timeout = 30000)]
     public async Task RunAsync_CancelingQueuedWaiter_DropsItWithoutRunningWork_AndConservesBudget()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var scheduler = new CpuWorkScheduler(totalBudget: 1, reserve: 0);
         var gates = new List<Gate>();
         int queuedRan = 0;
@@ -59,7 +63,7 @@ public sealed class CpuWorkSchedulerTests
         {
             Gate running = Submit(scheduler, CpuWorkPriority.Bulk);
             gates.Add(running);
-            await running.Started;
+            await running.Started.WaitAsync(cancellationToken);
 
             using var cts = new CancellationTokenSource();
             Task queued = scheduler.RunAsync(_ => Interlocked.Exchange(ref queuedRan, 1), CpuWorkPriority.Bulk, cts.Token);
@@ -74,15 +78,16 @@ public sealed class CpuWorkSchedulerTests
             running.Release();
             Gate next = Submit(scheduler, CpuWorkPriority.Bulk);
             gates.Add(next);
-            await next.Started;
+            await next.Started.WaitAsync(cancellationToken);
             Assert.Equal(1, scheduler.Running);
         }
-        finally { await ReleaseAllAsync(gates); }
+        finally { await ReleaseAllAsync(gates, cancellationToken); }
     }
 
     [Fact(Timeout = 30000)]
     public async Task RunAsync_InteractiveWork_MayUseTheReservedSlot()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var scheduler = new CpuWorkScheduler(totalBudget: 4, reserve: 2);
         var gates = new List<Gate>();
 
@@ -90,7 +95,7 @@ public sealed class CpuWorkSchedulerTests
         {
             Gate firstInteractive = Submit(scheduler, CpuWorkPriority.Interactive);
             gates.Add(firstInteractive);
-            await firstInteractive.Started;
+            await firstInteractive.Started.WaitAsync(cancellationToken);
 
             for (int i = 0; i < 2; i++) { gates.Add(Submit(scheduler, CpuWorkPriority.Bulk)); }
 
@@ -98,18 +103,19 @@ public sealed class CpuWorkSchedulerTests
 
             Gate secondInteractive = Submit(scheduler, CpuWorkPriority.Interactive);
             gates.Add(secondInteractive);
-            await secondInteractive.Started;
+            await secondInteractive.Started.WaitAsync(cancellationToken);
 
             // Interactive is only bounded by the total budget, so it takes the reserved slot rather than queuing.
             Assert.Equal(4, scheduler.Running);
             Assert.Equal((0, 0, 0), scheduler.WaiterCounts);
         }
-        finally { await ReleaseAllAsync(gates); }
+        finally { await ReleaseAllAsync(gates, cancellationToken); }
     }
 
     [Fact(Timeout = 30000)]
     public async Task RunAsync_OnRelease_AdmitsQueuedInteractiveBeforeQueuedBulk()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var scheduler = new CpuWorkScheduler(totalBudget: 2, reserve: 0);
         var gates = new List<Gate>();
 
@@ -119,7 +125,7 @@ public sealed class CpuWorkSchedulerTests
             Gate runningB = Submit(scheduler, CpuWorkPriority.Bulk);
             gates.Add(runningA);
             gates.Add(runningB);
-            await Task.WhenAll(runningA.Started, runningB.Started);
+            await Task.WhenAll(runningA.Started, runningB.Started).WaitAsync(cancellationToken);
 
             Gate queuedBulk = Submit(scheduler, CpuWorkPriority.Bulk);
             Gate queuedInteractive = Submit(scheduler, CpuWorkPriority.Interactive);
@@ -128,19 +134,20 @@ public sealed class CpuWorkSchedulerTests
             Assert.Equal((1, 0, 1), scheduler.WaiterCounts);
 
             runningA.Release();
-            await queuedInteractive.Started;
+            await queuedInteractive.Started.WaitAsync(cancellationToken);
 
             // The freed slot went to the interactive waiter; the bulk waiter is still queued.
             Assert.Equal(2, scheduler.Running);
             Assert.Equal(1, scheduler.WaiterCounts.Bulk);
             Assert.False(queuedBulk.Started.IsCompleted);
         }
-        finally { await ReleaseAllAsync(gates); }
+        finally { await ReleaseAllAsync(gates, cancellationToken); }
     }
 
     [Fact(Timeout = 30000)]
     public async Task RunAsync_OnRelease_AdmitsQueuedUserInitiatedBeforeBulk()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var scheduler = new CpuWorkScheduler(totalBudget: 1, reserve: 0);
         var gates = new List<Gate>();
 
@@ -148,7 +155,7 @@ public sealed class CpuWorkSchedulerTests
         {
             Gate running = Submit(scheduler, CpuWorkPriority.Bulk);
             gates.Add(running);
-            await running.Started;
+            await running.Started.WaitAsync(cancellationToken);
 
             Gate queuedBulk = Submit(scheduler, CpuWorkPriority.Bulk);
             Gate queuedUserInitiated = Submit(scheduler, CpuWorkPriority.UserInitiated);
@@ -156,13 +163,13 @@ public sealed class CpuWorkSchedulerTests
             gates.Add(queuedUserInitiated);
 
             running.Release();
-            await queuedUserInitiated.Started;
+            await queuedUserInitiated.Started.WaitAsync(cancellationToken);
 
             Assert.Equal(1, scheduler.Running);
             Assert.Equal(1, scheduler.WaiterCounts.Bulk);
             Assert.False(queuedBulk.Started.IsCompleted);
         }
-        finally { await ReleaseAllAsync(gates); }
+        finally { await ReleaseAllAsync(gates, cancellationToken); }
     }
 
     [Fact(Timeout = 30000)]
@@ -199,6 +206,7 @@ public sealed class CpuWorkSchedulerTests
     [Fact(Timeout = 30000)]
     public async Task RunAsync_UserInitiated_CannotConsumeTheInteractiveReserve()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var scheduler = new CpuWorkScheduler(totalBudget: 3, reserve: 2);
         var gates = new List<Gate>();
 
@@ -206,7 +214,7 @@ public sealed class CpuWorkSchedulerTests
         {
             Gate interactive = Submit(scheduler, CpuWorkPriority.Interactive);
             gates.Add(interactive);
-            await interactive.Started;
+            await interactive.Started.WaitAsync(cancellationToken);
 
             gates.Add(Submit(scheduler, CpuWorkPriority.UserInitiated));
             gates.Add(Submit(scheduler, CpuWorkPriority.UserInitiated));
@@ -215,12 +223,13 @@ public sealed class CpuWorkSchedulerTests
             Assert.Equal(2, scheduler.Running);
             Assert.Equal(1, scheduler.WaiterCounts.UserInitiated);
         }
-        finally { await ReleaseAllAsync(gates); }
+        finally { await ReleaseAllAsync(gates, cancellationToken); }
     }
 
     [Fact(Timeout = 30000)]
     public async Task RunAsync_WhenLastInteractiveCompletes_AdmitsHeldBackBulk()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var scheduler = new CpuWorkScheduler(totalBudget: 3, reserve: 2);
         var gates = new List<Gate>();
 
@@ -228,7 +237,7 @@ public sealed class CpuWorkSchedulerTests
         {
             Gate interactive = Submit(scheduler, CpuWorkPriority.Interactive);
             gates.Add(interactive);
-            await interactive.Started;
+            await interactive.Started.WaitAsync(cancellationToken);
 
             Gate runningBulk = Submit(scheduler, CpuWorkPriority.Bulk);
             Gate heldBulkA = Submit(scheduler, CpuWorkPriority.Bulk);
@@ -236,22 +245,24 @@ public sealed class CpuWorkSchedulerTests
             gates.Add(runningBulk);
             gates.Add(heldBulkA);
             gates.Add(heldBulkB);
-            await runningBulk.Started;
+            await runningBulk.Started.WaitAsync(cancellationToken);
             Assert.Equal(2, scheduler.WaiterCounts.Bulk);
 
             // Completing the only interactive item collapses the reserve; the held-back bulk must wake.
             interactive.Release();
-            await Task.WhenAll(heldBulkA.Started, heldBulkB.Started);
+            await Task.WhenAll(heldBulkA.Started, heldBulkB.Started).WaitAsync(cancellationToken);
 
             Assert.Equal(3, scheduler.Running);
             Assert.Equal(0, scheduler.WaiterCounts.Bulk);
         }
-        finally { await ReleaseAllAsync(gates); }
+        finally { await ReleaseAllAsync(gates, cancellationToken); }
     }
 
     [Fact(Timeout = 30000)]
     public async Task RunAsync_WhenNoInteractiveWork_BulkUsesEntireBudget()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
         // Work-conserving: with no interactive work present the reserve collapses, so bulk fills the whole budget.
         var scheduler = new CpuWorkScheduler(totalBudget: 4, reserve: 2);
         var gates = new List<Gate>();
@@ -264,16 +275,17 @@ public sealed class CpuWorkSchedulerTests
             Assert.Equal(4, scheduler.MaxObserved);
             Assert.Equal(0, scheduler.WaiterCounts.Bulk);
         }
-        finally { await ReleaseAllAsync(gates); }
+        finally { await ReleaseAllAsync(gates, cancellationToken); }
     }
 
     [Fact(Timeout = 30000)]
     public async Task RunAsync_WhenWorkThrows_ReleasesBudget()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var scheduler = new CpuWorkScheduler(totalBudget: 1, reserve: 0);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            scheduler.RunAsync<int>(_ => throw new InvalidOperationException("boom"), CpuWorkPriority.Bulk, TestContext.Current.CancellationToken));
+            scheduler.RunAsync<int>(_ => throw new InvalidOperationException("boom"), CpuWorkPriority.Bulk, cancellationToken));
 
         Assert.Equal(0, scheduler.Running);
 
@@ -283,15 +295,16 @@ public sealed class CpuWorkSchedulerTests
         {
             Gate next = Submit(scheduler, CpuWorkPriority.Bulk);
             gates.Add(next);
-            await next.Started;
+            await next.Started.WaitAsync(cancellationToken);
             Assert.Equal(1, scheduler.Running);
         }
-        finally { await ReleaseAllAsync(gates); }
+        finally { await ReleaseAllAsync(gates, cancellationToken); }
     }
 
     [Fact(Timeout = 30000)]
     public async Task RunAsync_WhileInteractivePresent_HoldsReservedHeadroomForInteractive()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var scheduler = new CpuWorkScheduler(totalBudget: 4, reserve: 2);
         var gates = new List<Gate>();
 
@@ -299,7 +312,7 @@ public sealed class CpuWorkSchedulerTests
         {
             Gate interactive = Submit(scheduler, CpuWorkPriority.Interactive);
             gates.Add(interactive);
-            await interactive.Started;
+            await interactive.Started.WaitAsync(cancellationToken);
 
             for (int i = 0; i < 4; i++) { gates.Add(Submit(scheduler, CpuWorkPriority.Bulk)); }
 
@@ -307,7 +320,7 @@ public sealed class CpuWorkSchedulerTests
             Assert.Equal(3, scheduler.Running);
             Assert.Equal(2, scheduler.WaiterCounts.Bulk);
         }
-        finally { await ReleaseAllAsync(gates); }
+        finally { await ReleaseAllAsync(gates, cancellationToken); }
     }
 
     [Fact]
@@ -323,7 +336,7 @@ public sealed class CpuWorkSchedulerTests
     public async Task RunAsync_WithPreCanceledToken_DoesNotRunWork_OrConsumeBudget()
     {
         var scheduler = new CpuWorkScheduler(totalBudget: 2, reserve: 0);
-        using var canceled = new CancellationTokenSource();
+        using var canceled = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         await canceled.CancelAsync();
         int ran = 0;
 
@@ -343,12 +356,12 @@ public sealed class CpuWorkSchedulerTests
             scheduler.RunAsync(_ => 0, (CpuWorkPriority)999, TestContext.Current.CancellationToken));
     }
 
-    private static async Task ReleaseAllAsync(List<Gate> gates)
+    private static async Task ReleaseAllAsync(List<Gate> gates, CancellationToken cancellationToken)
     {
         foreach (Gate item in gates) { item.Release(); }
 
         // Await completion so blocked pool threads are freed before the next test and no permit lingers.
-        await Task.WhenAll(gates.Select(item => item.Completion)).WaitAsync(TimeSpan.FromSeconds(10));
+        await Task.WhenAll(gates.Select(item => item.Completion)).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
     }
 
     private static Gate Submit(CpuWorkScheduler scheduler, CpuWorkPriority priority)

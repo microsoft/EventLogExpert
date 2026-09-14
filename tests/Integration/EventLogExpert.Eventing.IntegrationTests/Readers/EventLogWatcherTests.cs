@@ -339,17 +339,6 @@ public sealed class EventLogWatcherTests
     }
 
     [Fact]
-    public void Enabled_WhenSetToTrueTwice_ShouldNotThrow()
-    {
-        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
-        watcher.Enabled = true;
-
-        watcher.Enabled = true;
-
-        Assert.True(watcher.Enabled);
-    }
-
-    [Fact]
     public void Enabled_WhenSetToTrueTwice_ShouldRemainEnabled()
     {
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
