@@ -12,6 +12,14 @@ public sealed class FilterLibraryExportServiceTests
     private readonly FilterLibraryExportService _service = new();
 
     [Fact]
+    public void Deserialize_BareObjectWithoutSchemaVersion_ReturnsUnsupportedShape()
+    {
+        var preflight = _service.Deserialize("""{"Name":"x"}""", []);
+
+        Assert.Equal(new ImportValidationError.UnsupportedShape(), preflight.Error);
+    }
+
+    [Fact]
     public void Deserialize_BasicFilterWithDegenerateTextButCleanBlob_ReturnsError()
     {
         var clean = BuildBasicSavedFilter("Source == \"Foo\"");
@@ -31,7 +39,7 @@ public sealed class FilterLibraryExportServiceTests
 
         var preflight = _service.Deserialize(json, []);
 
-        Assert.NotNull(preflight.Error);
+        Assert.Equal(new ImportValidationError.InvalidBasicFilters(["stale-blob"]), preflight.Error);
         Assert.Empty(preflight.ToAdd);
     }
 
@@ -54,7 +62,34 @@ public sealed class FilterLibraryExportServiceTests
     {
         var preflight = _service.Deserialize(string.Empty, []);
 
-        Assert.NotNull(preflight.Error);
+        Assert.IsType<ImportValidationError.EmptyFile>(preflight.Error);
+    }
+
+    [Fact]
+    public void Deserialize_EntryIdEmptyString_ReturnsTypedError()
+    {
+        var preflight = _service.Deserialize(VersionedEntriesJson(
+            SavedFilterEntryJson(idJson: "\"\"")), []);
+
+        Assert.Equal(new ImportValidationError.EntryIdExpectedNonEmptyString(), preflight.Error);
+    }
+
+    [Fact]
+    public void Deserialize_EntryIdInvalidGuid_ReturnsTypedError()
+    {
+        var preflight = _service.Deserialize(VersionedEntriesJson(
+            SavedFilterEntryJson(idJson: "\"not-a-guid\"")), []);
+
+        Assert.Equal(new ImportValidationError.EntryIdInvalidGuid("not-a-guid"), preflight.Error);
+    }
+
+    [Fact]
+    public void Deserialize_EntryIdNumber_ReturnsTypedError()
+    {
+        var preflight = _service.Deserialize(VersionedEntriesJson(
+            SavedFilterEntryJson(idJson: "5")), []);
+
+        Assert.Equal(new ImportValidationError.EntryIdExpectedJsonString(JsonTokenType.Number), preflight.Error);
     }
 
     [Fact]
@@ -125,7 +160,7 @@ public sealed class FilterLibraryExportServiceTests
 
         var preflight = _service.Deserialize(json, []);
 
-        Assert.NotNull(preflight.Error);
+        Assert.Equal(new ImportValidationError.InvalidBasicFilters(["non-canonical"]), preflight.Error);
         Assert.Empty(preflight.ToAdd);
     }
 
@@ -310,8 +345,16 @@ public sealed class FilterLibraryExportServiceTests
     {
         var preflight = _service.Deserialize("{this is not valid json", []);
 
-        Assert.NotNull(preflight.Error);
+        Assert.IsType<ImportValidationError.NativeDetail>(preflight.Error);
         Assert.Empty(preflight.ToAdd);
+    }
+
+    [Fact]
+    public void Deserialize_MissingEntriesProperty_ReturnsTypedError()
+    {
+        var preflight = _service.Deserialize("""{"schemaVersion": 1}""", []);
+
+        Assert.Equal(new ImportValidationError.MissingEntriesProperty(), preflight.Error);
     }
 
     [Fact]
@@ -340,6 +383,18 @@ public sealed class FilterLibraryExportServiceTests
         var json = _service.Serialize([incoming]);
 
         var preflight = _service.Deserialize(json, [existing]);
+
+        Assert.Null(preflight.Error);
+        Assert.Single(preflight.ToAdd);
+    }
+
+    [Fact]
+    public void Deserialize_NoSchemaVersion_FallsBackToBareArrayParse()
+    {
+        var entry = BuildSavedEntry("legacy");
+        var bareArrayJson = JsonSerializer.Serialize<List<LibraryEntry>>([entry]);
+
+        var preflight = _service.Deserialize(bareArrayJson, []);
 
         Assert.Null(preflight.Error);
         Assert.Single(preflight.ToAdd);
@@ -470,18 +525,6 @@ public sealed class FilterLibraryExportServiceTests
     }
 
     [Fact]
-    public void Deserialize_NoSchemaVersion_FallsBackToBareArrayParse()
-    {
-        var entry = BuildSavedEntry("legacy");
-        var bareArrayJson = JsonSerializer.Serialize<List<LibraryEntry>>([entry]);
-
-        var preflight = _service.Deserialize(bareArrayJson, []);
-
-        Assert.Null(preflight.Error);
-        Assert.Single(preflight.ToAdd);
-    }
-
-    [Fact]
     public void Deserialize_NullExisting_Throws()
     {
         Assert.Throws<ArgumentNullException>(() => _service.Deserialize("[]", null!));
@@ -508,8 +551,7 @@ public sealed class FilterLibraryExportServiceTests
 
         var preflight = _service.Deserialize(json, []);
 
-        Assert.NotNull(preflight.Error);
-        Assert.Contains("Unsupported schema version 2", preflight.Error!);
+        Assert.Equal(new ImportValidationError.UnsupportedSchemaVersion(2), preflight.Error);
         Assert.Empty(preflight.ToAdd);
     }
 
@@ -520,8 +562,43 @@ public sealed class FilterLibraryExportServiceTests
 
         var preflight = _service.Deserialize(json, []);
 
-        Assert.NotNull(preflight.Error);
-        Assert.Contains("Invalid schema version 0", preflight.Error!);
+        Assert.Equal(new ImportValidationError.InvalidSchemaVersion(0), preflight.Error);
+    }
+
+    [Fact]
+    public void Deserialize_SchemaVersionString_ReturnsTypedError()
+    {
+        var preflight = _service.Deserialize("""{"schemaVersion": "1", "entries": []}""", []);
+
+        Assert.Equal(new ImportValidationError.SchemaVersionNotInteger(), preflight.Error);
+    }
+
+    [Fact]
+    public void Deserialize_TagsElementNumber_ReturnsTypedError()
+    {
+        var preflight = _service.Deserialize(VersionedEntriesJson(
+            SavedFilterEntryJson(tagsJson: "[5]")), []);
+
+        Assert.Equal(new ImportValidationError.TagsExpectedStringElement(JsonTokenType.Number), preflight.Error);
+    }
+
+    [Fact]
+    public void Deserialize_TagsNumber_ReturnsTypedError()
+    {
+        var preflight = _service.Deserialize(VersionedEntriesJson(
+            SavedFilterEntryJson(tagsJson: "5")), []);
+
+        Assert.Equal(new ImportValidationError.TagsExpectedArrayOrNull(JsonTokenType.Number), preflight.Error);
+    }
+
+    [Fact]
+    public void Deserialize_TruncatedTagsArray_ReturnsNativeDetail()
+    {
+        var json = """[{"Kind":"Filter","Id":"11111111-1111-1111-1111-111111111111","Name":"entry","CreatedUtc":"2024-01-01T00:00:00+00:00","tags":[""";
+
+        var preflight = _service.Deserialize(json, []);
+
+        Assert.IsType<ImportValidationError.NativeDetail>(preflight.Error);
     }
 
     [Fact]
@@ -614,13 +691,23 @@ public sealed class FilterLibraryExportServiceTests
     }
 
     [Fact]
+    public void Deserialize_UnknownRuntimeEntryKind_ReturnsTypedError()
+    {
+        var preflight = _service.Deserialize(
+            VersionedEntriesJson(SavedFilterEntryJson()),
+            [new UnknownLibraryEntry { Name = "unknown", CreatedUtc = DateTimeOffset.UtcNow }]);
+
+        Assert.Equal(new ImportValidationError.UnknownLibraryEntryKind(nameof(UnknownLibraryEntry)), preflight.Error);
+    }
+
+    [Fact]
     public void Deserialize_VersionedEntryMissingKindDiscriminator_ReturnsErrorWithoutThrowing()
     {
         var json = """{"schemaVersion": 1, "entries": [{"Name": "x"}]}""";
 
         var preflight = _service.Deserialize(json, []);
 
-        Assert.NotNull(preflight.Error);
+        Assert.IsType<ImportValidationError.NativeDetail>(preflight.Error);
         Assert.Empty(preflight.ToAdd);
     }
 
@@ -631,7 +718,7 @@ public sealed class FilterLibraryExportServiceTests
 
         var preflight = _service.Deserialize(json, []);
 
-        Assert.NotNull(preflight.Error);
+        Assert.IsType<ImportValidationError.MissingEntryName>(preflight.Error);
         Assert.Empty(preflight.ToAdd);
     }
 
@@ -740,4 +827,31 @@ public sealed class FilterLibraryExportServiceTests
         Assert.NotNull(filter);
         return filter;
     }
+
+    private static string SavedFilterEntryJson(
+        string idJson = "\"11111111-1111-1111-1111-111111111111\"",
+        string tagsJson = "[]") =>
+        $$"""
+          {
+            "Kind": "Filter",
+            "Id": {{idJson}},
+            "Name": "entry",
+            "CreatedUtc": "2024-01-01T00:00:00+00:00",
+            "IsFavorite": false,
+            "LastUsedUtc": null,
+            "Origin": "UserSaved",
+            "tags": {{tagsJson}},
+            "Filter": {
+              "Color": 0,
+              "ComparisonText": "Level == 4",
+              "IsExcluded": false,
+              "Mode": "Advanced"
+            }
+          }
+          """;
+
+    private static string VersionedEntriesJson(string entryJson) =>
+        $$"""{"schemaVersion": 1, "entries": [{{entryJson}}]}""";
+
+    private sealed record UnknownLibraryEntry : LibraryEntry;
 }

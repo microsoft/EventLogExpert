@@ -13,6 +13,8 @@ public interface IAnnouncementService
 
     void Announce(string message);
 
+    void Announce(Announcement payload);
+
     void AnnounceLensGroupSaved(string name);
 
     void AnnounceLensKept(FilterLensLabel label);

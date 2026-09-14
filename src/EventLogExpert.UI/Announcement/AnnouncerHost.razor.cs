@@ -4,6 +4,7 @@
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.UI.Common;
+using EventLogExpert.UI.FilterLibrary;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Localization;
 using AnnouncementPayload = EventLogExpert.Runtime.Announcement.Announcement;
@@ -40,6 +41,12 @@ public sealed partial class AnnouncerHost : ComponentBase, IDisposable
                 Localizer["FilterLens_SavedAsGroupAnnouncement", name].Value,
             AnnouncementPayload.LensesSavedAll _ =>
                 Localizer["FilterLens_SavedAllAnnouncement"].Value,
+            AnnouncementPayload.FilterImportCompleted(var summary) =>
+                FilterImportTextComposer.Summary(Localizer, summary),
+            AnnouncementPayload.TagRemoved(var tag, var count) =>
+                FilterImportTextComposer.TagRemoved(Localizer, tag, count),
+            AnnouncementPayload.TagRenamed(var oldTag, var newTag, var count) =>
+                FilterImportTextComposer.TagRenamed(Localizer, oldTag, newTag, count),
             _ => throw new ArgumentOutOfRangeException(nameof(current.Payload), current.Payload, null)
         };
 

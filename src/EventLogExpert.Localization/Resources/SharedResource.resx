@@ -3335,4 +3335,238 @@
   </data>
   <data name="ScenarioExport_NotExportable_FilterSet_BasicOnly" xml:space="preserve">
     <value>Could not export this filter set: only Basic filters can be exported as scenarios.</value>
-  </data></root>
+  </data>
+  <!-- Filter library import typed-core strings. -->
+  <data name="FilterImport_BlockedHeader" xml:space="preserve">
+    <value>This file contains entries with names that cannot be imported:</value>
+    <comment>Filter library import blocked message header.</comment>
+  </data>
+  <data name="FilterImport_MoreNames" xml:space="preserve">
+    <value>...and {0} more</value>
+    <comment>Filter library import truncated-name list suffix. {0} is the remaining name count.</comment>
+  </data>
+  <data name="FilterImport_PreviewHeader" xml:space="preserve">
+    <value>Import preview:</value>
+    <comment>Filter library import preview header.</comment>
+  </data>
+  <data name="FilterImport_Added_One" xml:space="preserve">
+    <value>{0} new entry will be added</value>
+    <comment>Filter library import preview added-entry bullet. {0} is the entry count.</comment>
+  </data>
+  <data name="FilterImport_Added_Many" xml:space="preserve">
+    <value>{0} new entries will be added</value>
+    <comment>Filter library import preview added-entries bullet. {0} is the entry count.</comment>
+  </data>
+  <data name="FilterImport_Overwrite_One" xml:space="preserve">
+    <value>{0} existing entry WILL BE OVERWRITTEN (current filter content will be lost)</value>
+    <comment>Filter library import preview overwrite bullet. {0} is the entry count.</comment>
+  </data>
+  <data name="FilterImport_Overwrite_Many" xml:space="preserve">
+    <value>{0} existing entries WILL BE OVERWRITTEN (current filter content will be lost)</value>
+    <comment>Filter library import preview overwrites bullet. {0} is the entry count.</comment>
+  </data>
+  <data name="FilterImport_OverwriteNamesHeader" xml:space="preserve">
+    <value>Names being overwritten:</value>
+    <comment>Filter library import preview overwritten-name list header.</comment>
+  </data>
+  <data name="FilterImport_TagUpdates_One" xml:space="preserve">
+    <value>{0} entry will be updated with tag changes</value>
+    <comment>Filter library import preview tag-update bullet. {0} is the entry count.</comment>
+  </data>
+  <data name="FilterImport_TagUpdates_Many" xml:space="preserve">
+    <value>{0} entries will be updated with tag changes</value>
+    <comment>Filter library import preview tag-updates bullet. {0} is the entry count.</comment>
+  </data>
+  <data name="FilterImport_Renames_One" xml:space="preserve">
+    <value>{0} existing entry will also be renamed (folder paths → tags)</value>
+    <comment>Filter library import preview legacy-folder rename bullet. {0} is the entry count.</comment>
+  </data>
+  <data name="FilterImport_Renames_Many" xml:space="preserve">
+    <value>{0} existing entries will also be renamed (folder paths → tags)</value>
+    <comment>Filter library import preview legacy-folder renames bullet. {0} is the entry count.</comment>
+  </data>
+  <data name="FilterImport_Ambiguous_One" xml:space="preserve">
+    <value>{0} ambiguous entry will be imported as new</value>
+    <comment>Filter library import preview ambiguous-match bullet. {0} is the entry count.</comment>
+  </data>
+  <data name="FilterImport_Ambiguous_Many" xml:space="preserve">
+    <value>{0} ambiguous entries will be imported as new</value>
+    <comment>Filter library import preview ambiguous-matches bullet. {0} is the entry count.</comment>
+  </data>
+  <data name="FilterImport_Skipped_One" xml:space="preserve">
+    <value>{0} exact duplicate will be skipped</value>
+    <comment>Filter library import preview skipped-duplicate bullet. {0} is the duplicate count.</comment>
+  </data>
+  <data name="FilterImport_Skipped_Many" xml:space="preserve">
+    <value>{0} exact duplicates will be skipped</value>
+    <comment>Filter library import preview skipped-duplicates bullet. {0} is the duplicate count.</comment>
+  </data>
+  <data name="FilterImport_KeepEmpty_One" xml:space="preserve">
+    <value>Keeping {0} entry with empty values as authored. An empty Contains matches every event and an empty NotContains matches none; depending on how a filter combines its criteria, that can force the whole filter to always match or never match.</value>
+    <comment>Filter library import confirmation notice for keeping empty values. {0} is the entry count.</comment>
+  </data>
+  <data name="FilterImport_KeepEmpty_Many" xml:space="preserve">
+    <value>Keeping {0} entries with empty values as authored. An empty Contains matches every event and an empty NotContains matches none; depending on how a filter combines its criteria, that can force the whole filter to always match or never match.</value>
+    <comment>Filter library import confirmation notice for keeping empty values. {0} is the entry count.</comment>
+  </data>
+  <data name="FilterImport_RemovedEmptyNotice_One" xml:space="preserve">
+    <value>Removed empty-criterion filters from {0} library item after removing empty values.</value>
+    <comment>Filter library import confirmation notice for removed empty-criterion filters. {0} is the item count.</comment>
+  </data>
+  <data name="FilterImport_RemovedEmptyNotice_Many" xml:space="preserve">
+    <value>Removed empty-criterion filters from {0} library items after removing empty values.</value>
+    <comment>Filter library import confirmation notice for removed empty-criterion filters. {0} is the item count.</comment>
+  </data>
+  <data name="FilterImport_NothingToImport_ItemOne_DupOne" xml:space="preserve">
+    <value>Nothing to import. Removed empty-criterion filters from {0} library item, skipped {1} duplicate.</value>
+    <comment>Filter library nothing-to-import message. {0} is the removed item count; {1} is the skipped duplicate count.</comment>
+  </data>
+  <data name="FilterImport_NothingToImport_ItemOne_DupMany" xml:space="preserve">
+    <value>Nothing to import. Removed empty-criterion filters from {0} library item, skipped {1} duplicates.</value>
+    <comment>Filter library nothing-to-import message. {0} is the removed item count; {1} is the skipped duplicate count.</comment>
+  </data>
+  <data name="FilterImport_NothingToImport_ItemMany_DupOne" xml:space="preserve">
+    <value>Nothing to import. Removed empty-criterion filters from {0} library items, skipped {1} duplicate.</value>
+    <comment>Filter library nothing-to-import message. {0} is the removed item count; {1} is the skipped duplicate count.</comment>
+  </data>
+  <data name="FilterImport_NothingToImport_ItemMany_DupMany" xml:space="preserve">
+    <value>Nothing to import. Removed empty-criterion filters from {0} library items, skipped {1} duplicates.</value>
+    <comment>Filter library nothing-to-import message. {0} is the removed item count; {1} is the skipped duplicate count.</comment>
+  </data>
+  <data name="FilterImport_EmptyValueTitle" xml:space="preserve">
+    <value>Filters with an empty value</value>
+    <comment>Filter library empty-value import prompt title.</comment>
+  </data>
+  <data name="FilterImport_EmptyValueMessage_One" xml:space="preserve">
+    <value>{0} library item contains a filter with an empty value: {1}. An empty Contains matches every event; an empty NotContains matches none. Normalize removes the empty values; if that leaves a Contains/NotContains criterion with no values, the whole filter is removed (including its other criteria). Import as-is keeps them all as authored. An as-is filter may lose its empty values or need repair if you later edit it in the Basic editor.</value>
+    <comment>Filter library empty-value import prompt message. {0} is the item count; {1} is the comma-separated item-name list.</comment>
+  </data>
+  <data name="FilterImport_EmptyValueMessage_Many" xml:space="preserve">
+    <value>{0} library items contain a filter with an empty value: {1}. An empty Contains matches every event; an empty NotContains matches none. Normalize removes the empty values; if that leaves a Contains/NotContains criterion with no values, the whole filter is removed (including its other criteria). Import as-is keeps them all as authored. An as-is filter may lose its empty values or need repair if you later edit it in the Basic editor.</value>
+    <comment>Filter library empty-value import prompt message. {0} is the item count; {1} is the comma-separated item-name list.</comment>
+  </data>
+  <data name="FilterImport_Action_Normalize" xml:space="preserve">
+    <value>Normalize</value>
+    <comment>Filter library empty-value prompt normalize action label.</comment>
+  </data>
+  <data name="FilterImport_Action_ImportAsIs" xml:space="preserve">
+    <value>Import as-is</value>
+    <comment>Filter library empty-value prompt import-without-normalizing action label.</comment>
+  </data>
+  <data name="FilterImport_Summary_TagOne" xml:space="preserve">
+    <value>Imported {0} new, replaced {1}, updated {2} tag, skipped {3}</value>
+    <comment>Filter library import completion announcement. {0} added; {1} replaced; {2} tag-updated; {3} skipped.</comment>
+  </data>
+  <data name="FilterImport_Summary_TagMany" xml:space="preserve">
+    <value>Imported {0} new, replaced {1}, updated {2} tags, skipped {3}</value>
+    <comment>Filter library import completion announcement. {0} added; {1} replaced; {2} tag-updated; {3} skipped.</comment>
+  </data>
+  <data name="FilterImport_Summary_TagOne_Ambiguous" xml:space="preserve">
+    <value>Imported {0} new, replaced {1}, updated {2} tag, skipped {3}, imported {4} ambiguous as new</value>
+    <comment>Filter library import completion announcement with ambiguous imports. {0} added; {1} replaced; {2} tag-updated; {3} skipped; {4} ambiguous.</comment>
+  </data>
+  <data name="FilterImport_Summary_TagMany_Ambiguous" xml:space="preserve">
+    <value>Imported {0} new, replaced {1}, updated {2} tags, skipped {3}, imported {4} ambiguous as new</value>
+    <comment>Filter library import completion announcement with ambiguous imports. {0} added; {1} replaced; {2} tag-updated; {3} skipped; {4} ambiguous.</comment>
+  </data>
+  <data name="FilterImport_Announcement_TagRemoved_One" xml:space="preserve">
+    <value>Removed tag '{0}' from {1} entry</value>
+    <comment>Filter library bulk tag-removal announcement. {0} is the tag; {1} is the affected entry count.</comment>
+  </data>
+  <data name="FilterImport_Announcement_TagRemoved_Many" xml:space="preserve">
+    <value>Removed tag '{0}' from {1} entries</value>
+    <comment>Filter library bulk tag-removal announcement. {0} is the tag; {1} is the affected entry count.</comment>
+  </data>
+  <data name="FilterImport_Announcement_TagRenamed_One" xml:space="preserve">
+    <value>Renamed tag '{0}' to '{1}' in {2} entry</value>
+    <comment>Filter library bulk tag-rename announcement. {0} is the old tag; {1} is the new tag; {2} is the affected entry count.</comment>
+  </data>
+  <data name="FilterImport_Announcement_TagRenamed_Many" xml:space="preserve">
+    <value>Renamed tag '{0}' to '{1}' in {2} entries</value>
+    <comment>Filter library bulk tag-rename announcement. {0} is the old tag; {1} is the new tag; {2} is the affected entry count.</comment>
+  </data>
+  <data name="FilterImport_Error_EmptyFile" xml:space="preserve">
+    <value>Import file is empty.</value>
+    <comment>Filter library import validation error.</comment>
+  </data>
+  <data name="FilterImport_Error_SchemaVersionNotInteger" xml:space="preserve">
+    <value>schemaVersion property is not a valid integer.</value>
+    <comment>Filter library import validation error.</comment>
+  </data>
+  <data name="FilterImport_Error_UnsupportedSchemaVersion" xml:space="preserve">
+    <value>Unsupported schema version {0}. Please upgrade the application.</value>
+    <comment>Filter library import validation error. {0} is the schema version.</comment>
+  </data>
+  <data name="FilterImport_Error_InvalidSchemaVersion" xml:space="preserve">
+    <value>Invalid schema version {0}. Expected 1.</value>
+    <comment>Filter library import validation error. {0} is the schema version.</comment>
+  </data>
+  <data name="FilterImport_Error_MissingEntriesProperty" xml:space="preserve">
+    <value>Missing 'entries' property.</value>
+    <comment>Filter library import validation error.</comment>
+  </data>
+  <data name="FilterImport_Error_UnsupportedShape" xml:space="preserve">
+    <value>Unsupported import file shape.</value>
+    <comment>Filter library import validation error.</comment>
+  </data>
+  <data name="FilterImport_Error_MissingEntryName" xml:space="preserve">
+    <value>Import file contains an entry with a missing name.</value>
+    <comment>Filter library import validation error.</comment>
+  </data>
+  <data name="FilterImport_Error_InvalidBasicFilters_One" xml:space="preserve">
+    <value>Import file contains a Basic filter that did not parse into a valid Basic filter: {0}. Remove or fix it and re-import.</value>
+    <comment>Filter library import validation error. {0} is the comma-separated entry-name list.</comment>
+  </data>
+  <data name="FilterImport_Error_InvalidBasicFilters_Many" xml:space="preserve">
+    <value>Import file contains Basic filters that did not parse into a valid Basic filter: {0}. Remove or fix them and re-import.</value>
+    <comment>Filter library import validation error. {0} is the comma-separated entry-name list.</comment>
+  </data>
+  <data name="FilterImport_Error_EntryIdExpectedJsonString" xml:space="preserve">
+    <value>Expected JSON string for LibraryEntryId, got {0}.</value>
+    <comment>Filter library import validation error. {0} is the JSON token type.</comment>
+  </data>
+  <data name="FilterImport_Error_EntryIdExpectedNonEmptyString" xml:space="preserve">
+    <value>Expected non-empty string for LibraryEntryId.</value>
+    <comment>Filter library import validation error.</comment>
+  </data>
+  <data name="FilterImport_Error_EntryIdInvalidGuid" xml:space="preserve">
+    <value>Invalid GUID format for LibraryEntryId: '{0}'.</value>
+    <comment>Filter library import validation error. {0} is the raw identifier value.</comment>
+  </data>
+  <data name="FilterImport_Error_TagsExpectedArrayOrNull" xml:space="preserve">
+    <value>Expected JSON array or null for tags, got {0}.</value>
+    <comment>Filter library import validation error. {0} is the JSON token type.</comment>
+  </data>
+  <data name="FilterImport_Error_TagsExpectedStringElement" xml:space="preserve">
+    <value>Expected string element in tags array, got {0}.</value>
+    <comment>Filter library import validation error. {0} is the JSON token type.</comment>
+  </data>
+  <data name="FilterImport_Error_TagsUnexpectedEnd" xml:space="preserve">
+    <value>Unexpected end of JSON while reading tags array.</value>
+    <comment>Filter library import validation error.</comment>
+  </data>
+  <data name="FilterImport_Error_UnknownLibraryEntryKind" xml:space="preserve">
+    <value>Unknown LibraryEntry kind: {0}</value>
+    <comment>Filter library import validation error. {0} is the runtime entry kind.</comment>
+  </data>
+  <data name="FilterImport_Error_NormalizedBasicFilterFormatFailed" xml:space="preserve">
+    <value>Could not format the normalized Basic filter '{0}'.</value>
+    <comment>Filter library import validation error. {0} is the filter comparison text.</comment>
+  </data>
+  <data name="FilterImport_Error_NormalizedBasicFilterRebuildFailed" xml:space="preserve">
+    <value>Could not rebuild the normalized Basic filter '{0}'.</value>
+    <comment>Filter library import validation error. {0} is the filter comparison text.</comment>
+  </data>
+  <data name="LibraryTab_Saved" xml:space="preserve">
+    <value>Saved</value>
+    <comment>Filter library Saved tab label.</comment>
+  </data>
+  <data name="LibraryTab_Favorites" xml:space="preserve">
+    <value>Favorites</value>
+    <comment>Filter library Favorites tab label.</comment>
+  </data>
+  <data name="LibraryTab_PreviouslyUsed" xml:space="preserve">
+    <value>Previously Used</value>
+    <comment>Filter library Previously Used tab label.</comment>
+  </data>
+</root>

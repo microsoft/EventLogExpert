@@ -4,6 +4,7 @@
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Runtime.Announcement;
+using EventLogExpert.Runtime.FilterLibrary;
 using NSubstitute;
 using AnnouncementPayload = EventLogExpert.Runtime.Announcement.Announcement;
 
@@ -41,7 +42,25 @@ public sealed class AnnouncementServiceTests
     public void Announce_NullMessage_Throws()
     {
         var svc = new AnnouncementService(_traceLogger);
-        Assert.Throws<ArgumentNullException>(() => svc.Announce(null!));
+        Assert.Throws<ArgumentNullException>(() => svc.Announce((string)null!));
+    }
+
+    [Fact]
+    public void Announce_NullPayload_Throws()
+    {
+        var svc = new AnnouncementService(_traceLogger);
+        Assert.Throws<ArgumentNullException>(() => svc.Announce((AnnouncementPayload)null!));
+    }
+
+    [Fact]
+    public void Announce_Payload_ReflectsStructuredAnnouncement()
+    {
+        var svc = new AnnouncementService(_traceLogger);
+        var payload = new AnnouncementPayload.FilterImportCompleted(new ImportSummary(1, 2, 3, 4, 5));
+
+        svc.Announce(payload);
+
+        Assert.Equal(payload, svc.Current.Payload);
     }
 
     [Fact]

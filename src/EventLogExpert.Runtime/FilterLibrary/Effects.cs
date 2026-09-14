@@ -8,6 +8,7 @@ using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
 using System.Collections.Immutable;
+using AnnouncementPayload = EventLogExpert.Runtime.Announcement.Announcement;
 
 namespace EventLogExpert.Runtime.FilterLibrary;
 
@@ -157,7 +158,7 @@ internal sealed class Effects(
             updatedEntries.Add(ReplaceTagsOnEntry(entry, canonicalTags.RemoveAt(index)));
         }
 
-        await ApplyBulkTagUpdate(updatedEntries, dispatcher, count => $"Removed tag '{normalized}' from {count} {EntriesWord(count)}").ConfigureAwait(false);
+        await ApplyBulkTagUpdate(updatedEntries, dispatcher, count => new AnnouncementPayload.TagRemoved(normalized, count)).ConfigureAwait(false);
     }
 
     [EffectMethod]
@@ -165,7 +166,7 @@ internal sealed class Effects(
     {
         if (action.ToAdd.IsEmpty && action.ToUpdate.IsEmpty)
         {
-            announcementService.Announce(FormatImportSummary(action.Summary));
+            announcementService.Announce(new AnnouncementPayload.FilterImportCompleted(action.Summary));
 
             return;
         }
@@ -226,7 +227,7 @@ internal sealed class Effects(
 
             var persistedSummary = action.Summary with { Replaced = persistedReplaced, UpdatedTags = persistedUpdatedTags };
 
-            announcementService.Announce(FormatImportSummary(persistedSummary));
+            announcementService.Announce(new AnnouncementPayload.FilterImportCompleted(persistedSummary));
         }
         finally
         {
@@ -523,7 +524,10 @@ internal sealed class Effects(
             updatedEntries.Add(ReplaceTagsOnEntry(entry, updatedTags));
         }
 
-        await ApplyBulkTagUpdate(updatedEntries, dispatcher, count => $"Renamed tag '{oldNormalized}' to '{newNormalized}' in {count} {EntriesWord(count)}").ConfigureAwait(false);
+        await ApplyBulkTagUpdate(updatedEntries,
+                dispatcher,
+                count => new AnnouncementPayload.TagRenamed(oldNormalized, newNormalized, count))
+            .ConfigureAwait(false);
     }
 
     [EffectMethod]
@@ -790,8 +794,6 @@ internal sealed class Effects(
         dispatcher.Dispatch(new UpdateLibraryEntrySuccessAction(mutate(latest)));
     }
 
-    private static string EntriesWord(int count) => count == 1 ? "entry" : "entries";
-
     private static ImmutableList<SavedFilter> ExtractFilters(LibraryEntry entry) =>
         entry switch
         {
@@ -799,14 +801,6 @@ internal sealed class Effects(
             LibraryEntryFilterSet p => p.Filters,
             _ => throw new InvalidOperationException($"Unhandled LibraryEntry type '{entry.GetType().FullName}'."),
         };
-
-    private static string FormatImportSummary(ImportSummary summary)
-    {
-        var tags = summary.UpdatedTags == 1 ? "1 tag" : $"{summary.UpdatedTags} tags";
-
-        return $"Imported {summary.Added} new, replaced {summary.Replaced}, updated {tags}, skipped {summary.Skipped}" +
-            (summary.Ambiguous > 0 ? $", imported {summary.Ambiguous} ambiguous as new" : string.Empty);
-    }
 
     private static bool NonTagFieldsDiffer(LibraryEntry latest, LibraryEntry bulkEntry) => (latest, bulkEntry) switch
     {
@@ -844,7 +838,7 @@ internal sealed class Effects(
     private async Task ApplyBulkTagUpdate(
         IReadOnlyList<LibraryEntry> updatedEntries,
         IDispatcher dispatcher,
-        Func<int, string> buildAnnouncement)
+        Func<int, AnnouncementPayload> buildAnnouncement)
     {
         if (updatedEntries.Count == 0) { return; }
 
