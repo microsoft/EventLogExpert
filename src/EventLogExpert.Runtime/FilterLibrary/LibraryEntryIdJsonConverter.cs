@@ -12,19 +12,19 @@ internal sealed class LibraryEntryIdJsonConverter : JsonConverter<LibraryEntryId
     {
         if (reader.TokenType != JsonTokenType.String)
         {
-            throw new JsonException($"Expected JSON string for {nameof(LibraryEntryId)}, got {reader.TokenType}.");
+            throw new ImportValidationException(new ImportValidationError.EntryIdExpectedJsonString(reader.TokenType));
         }
 
         var raw = reader.GetString();
 
         if (string.IsNullOrEmpty(raw))
         {
-            throw new JsonException($"Expected non-empty string for {nameof(LibraryEntryId)}.");
+            throw new ImportValidationException(new ImportValidationError.EntryIdExpectedNonEmptyString());
         }
 
         return Guid.TryParse(raw, out var parsed) ?
             new LibraryEntryId(parsed) :
-            throw new JsonException($"Invalid GUID format for {nameof(LibraryEntryId)}: '{raw}'.");
+            throw new ImportValidationException(new ImportValidationError.EntryIdInvalidGuid(raw));
     }
 
     public override void Write(Utf8JsonWriter writer, LibraryEntryId value, JsonSerializerOptions options) =>

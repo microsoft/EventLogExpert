@@ -83,7 +83,7 @@ internal sealed class NullToEmptyImmutableStringListConverter : JsonConverter<Im
 
         if (reader.TokenType != JsonTokenType.StartArray)
         {
-            throw new JsonException($"Expected JSON array or null for tags, got {reader.TokenType}.");
+            throw new ImportValidationException(new ImportValidationError.TagsExpectedArrayOrNull(reader.TokenType));
         }
 
         var builder = ImmutableList.CreateBuilder<string>();
@@ -96,14 +96,15 @@ internal sealed class NullToEmptyImmutableStringListConverter : JsonConverter<Im
 
             if (reader.TokenType != JsonTokenType.String)
             {
-                throw new JsonException($"Expected string element in tags array, got {reader.TokenType}.");
+                throw new ImportValidationException(new ImportValidationError.TagsExpectedStringElement(reader.TokenType));
             }
 
             var value = reader.GetString();
+
             if (value is not null) { builder.Add(value); }
         }
 
-        throw new JsonException("Unexpected end of JSON while reading tags array.");
+        throw new ImportValidationException(new ImportValidationError.TagsUnexpectedEnd());
     }
 
     public override void Write(

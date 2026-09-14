@@ -34,6 +34,13 @@ public sealed class AnnouncementService : IAnnouncementService
         Publish(new Announcement.Text(message));
     }
 
+    public void Announce(Announcement payload)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+
+        Publish(payload);
+    }
+
     public void AnnounceLensGroupSaved(string name)
     {
         ArgumentNullException.ThrowIfNull(name);

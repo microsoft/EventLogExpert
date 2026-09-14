@@ -9,7 +9,7 @@ public sealed record ImportPreflight
         IReadOnlyList<LibraryEntry> toAdd,
         IReadOnlyList<(LibraryEntry Existing, LibraryEntry Incoming)> toReplace,
         IReadOnlyList<LibraryEntry> skippedDuplicates,
-        string? error = null)
+        ImportValidationError? error = null)
         : this(toAdd, toReplace, skippedDuplicates, [], [], error)
     {
     }
@@ -20,7 +20,7 @@ public sealed record ImportPreflight
         IReadOnlyList<LibraryEntry> skippedDuplicates,
         IReadOnlyList<(LibraryEntry Existing, LibraryEntry Incoming)> toUpdate,
         IReadOnlyList<(IReadOnlyList<LibraryEntry> Candidates, LibraryEntry Incoming)> ambiguousMatches,
-        string? error = null)
+        ImportValidationError? error = null)
     {
         ArgumentNullException.ThrowIfNull(toAdd);
         ArgumentNullException.ThrowIfNull(toReplace);
@@ -58,7 +58,7 @@ public sealed record ImportPreflight
 
     public IReadOnlyList<(IReadOnlyList<LibraryEntry> Candidates, LibraryEntry Incoming)> AmbiguousMatches { get; }
 
-    public string? Error { get; }
+    public ImportValidationError? Error { get; }
 
     public bool ImportBlocked { get; init; }
 

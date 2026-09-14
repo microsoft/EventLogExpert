@@ -36,7 +36,7 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
 
         if (string.IsNullOrWhiteSpace(json))
         {
-            return new ImportPreflight([], [], [], error: "Import file is empty.");
+            return new ImportPreflight([], [], [], error: new ImportValidationError.EmptyFile());
         }
 
         try
@@ -48,80 +48,55 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
             if (document.RootElement.ValueKind == JsonValueKind.Object &&
                 document.RootElement.TryGetProperty("schemaVersion", out var versionElement))
             {
-                if (!versionElement.TryGetInt32(out var version))
+                if (versionElement.ValueKind != JsonValueKind.Number ||
+                    !versionElement.TryGetInt32(out var version))
                 {
-                    return new ImportPreflight([], [], [], error: "schemaVersion property is not a valid integer.");
+                    return new ImportPreflight([], [], [], error: new ImportValidationError.SchemaVersionNotInteger());
                 }
 
                 if (version > CurrentSchemaVersion)
                 {
-                    return new ImportPreflight([], [], [], error:
-                        $"Unsupported schema version {version}. Please upgrade the application.");
+                    return new ImportPreflight([], [], [], error: new ImportValidationError.UnsupportedSchemaVersion(version));
                 }
 
                 if (version < 1)
                 {
-                    return new ImportPreflight([], [], [], error:
-                        $"Invalid schema version {version}. Expected 1.");
+                    return new ImportPreflight([], [], [], error: new ImportValidationError.InvalidSchemaVersion(version));
                 }
 
                 if (!document.RootElement.TryGetProperty("entries", out var entriesElement))
                 {
-                    return new ImportPreflight([], [], [], error: "Missing 'entries' property.");
+                    return new ImportPreflight([], [], [], error: new ImportValidationError.MissingEntriesProperty());
                 }
 
                 incoming = entriesElement.Deserialize<List<LibraryEntry>>() ?? [];
             }
             else
             {
-                incoming = ReadBareArrayWithLegacyFallback(document.RootElement)
-                    ?? throw new JsonException("Unsupported import file shape.");
-            }
-
-            if (incoming.Any(e => e?.Name is null))
-            {
-                return new ImportPreflight([], [], [], error: "Import file contains an entry with a missing name.");
-            }
-
-            var classifications = incoming
-                .Select(entry => (Entry: entry, Class: ClassifyEntry(entry)))
-                .ToList();
-
-            var nonParseableNames = classifications
-                .Where(classified => classified.Class.HasNonParseable)
-                .Select(classified => classified.Entry.Name)
-                .ToList();
-
-            if (nonParseableNames.Count > 0)
-            {
-                return new ImportPreflight([], [], [], error:
-                    "Import file contains Basic filter(s) that did not parse into a valid Basic filter: " +
-                    string.Join(", ", nonParseableNames) + ". Remove or fix them and re-import.");
-            }
-
-            if (normalizeEmptyValues)
-            {
-                var (normalizedEntries, removedFilterNames) = NormalizeEmptyValueEntries(incoming);
-
-                return ComputePreflight(normalizedEntries, existingEntries) with
+                if (document.RootElement.ValueKind != JsonValueKind.Array)
                 {
-                    NormalizeRemovedFilterNames = removedFilterNames,
-                };
+                    return new ImportPreflight([], [], [], error: new ImportValidationError.UnsupportedShape());
+                }
+
+                try
+                {
+                    incoming = document.RootElement.Deserialize<List<LibraryEntry>>() ?? [];
+                }
+                catch (NotSupportedException)
+                {
+                    incoming = ConvertLegacyGroups(document.RootElement.Deserialize<List<SavedFilterGroup>>() ?? []);
+                }
             }
 
-            var flaggedNames = classifications
-                .Where(classified => classified.Class.HasFlagged)
-                .Select(classified => classified.Entry.Name)
-                .ToList();
-
-            return ComputePreflight(incoming, existingEntries) with
-            {
-                NormalizableEmptyValueEntryNames = flaggedNames,
-            };
+            return BuildPreflight(incoming, existingEntries, normalizeEmptyValues);
+        }
+        catch (ImportValidationException ex)
+        {
+            return new ImportPreflight([], [], [], error: ex.Error);
         }
         catch (Exception ex)
         {
-            return new ImportPreflight([], [], [], error: ex.Message);
+            return new ImportPreflight([], [], [], error: new ImportValidationError.NativeDetail(ex.Message));
         }
     }
 
@@ -132,6 +107,51 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
         var envelope = new ExportEnvelope(CurrentSchemaVersion, entries);
 
         return JsonSerializer.Serialize(envelope, s_writeOptions);
+    }
+
+    private static ImportPreflight BuildPreflight(
+        IReadOnlyList<LibraryEntry> incoming,
+        IReadOnlyList<LibraryEntry> existingEntries,
+        bool normalizeEmptyValues)
+    {
+        if (incoming.Any(entry => entry?.Name is null))
+        {
+            return new ImportPreflight([], [], [], error: new ImportValidationError.MissingEntryName());
+        }
+
+        var classifications = incoming
+            .Select(entry => (Entry: entry, Class: ClassifyEntry(entry)))
+            .ToList();
+
+        var nonParseableNames = classifications
+            .Where(classified => classified.Class.HasNonParseable)
+            .Select(classified => classified.Entry.Name)
+            .ToList();
+
+        if (nonParseableNames.Count > 0)
+        {
+            return new ImportPreflight([], [], [], error: new ImportValidationError.InvalidBasicFilters(nonParseableNames));
+        }
+
+        if (normalizeEmptyValues)
+        {
+            var (normalizedEntries, removedFilterNames) = NormalizeEmptyValueEntries(incoming);
+
+            return ComputePreflight(normalizedEntries, existingEntries) with
+            {
+                NormalizeRemovedFilterNames = removedFilterNames,
+            };
+        }
+
+        var flaggedNames = classifications
+            .Where(classified => classified.Class.HasFlagged)
+            .Select(classified => classified.Entry.Name)
+            .ToList();
+
+        return ComputePreflight(incoming, existingEntries) with
+        {
+            NormalizableEmptyValueEntryNames = flaggedNames,
+        };
     }
 
     private static (EmptyValueClass Class, BasicFilter? Normalized) ClassifyBasicFilter(SavedFilter filter)
@@ -310,18 +330,40 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
         return new ImportPreflight(toAdd, toReplace, skipped, toUpdate, ambiguous);
     }
 
+    private static IReadOnlyList<LibraryEntry> ConvertLegacyGroups(IReadOnlyList<SavedFilterGroup> legacyGroups)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var converted = new List<LibraryEntry>(legacyGroups.Count);
+
+        foreach (var group in legacyGroups.Where(group => group.Filters.Count > 0))
+        {
+            converted.Add(new LibraryEntryFilterSet
+            {
+                Id = LibraryEntryId.Create(),
+                Name = string.IsNullOrWhiteSpace(group.Name) ? "(unnamed)" : group.Name,
+                CreatedUtc = now,
+                Filters = [.. group.Filters.Select(filter => filter with { Id = FilterId.Create(), IsEnabled = false })],
+                IsFavorite = false,
+                LastUsedUtc = null,
+                Origin = LibraryEntryOrigin.UserSaved,
+            });
+        }
+
+        return converted;
+    }
+
     private static string DedupKeyRelaxed(LibraryEntry entry) => entry switch
     {
         LibraryEntryFilterSet fs => FilterLibraryDedupKeys.ForFilterSetTagRelaxed(fs),
         LibraryEntrySavedFilter sf => FilterLibraryDedupKeys.ForSavedFilterTagRelaxed(sf),
-        _ => throw new NotSupportedException($"Unknown LibraryEntry kind: {entry.GetType().Name}"),
+        _ => throw new ImportValidationException(new ImportValidationError.UnknownLibraryEntryKind(entry.GetType().Name)),
     };
 
     private static string DedupKeyStrict(LibraryEntry entry) => entry switch
     {
         LibraryEntryFilterSet fs => FilterLibraryDedupKeys.ForFilterSet(fs),
         LibraryEntrySavedFilter sf => FilterLibraryDedupKeys.ForSavedFilter(sf),
-        _ => throw new NotSupportedException($"Unknown LibraryEntry kind: {entry.GetType().Name}"),
+        _ => throw new ImportValidationException(new ImportValidationError.UnknownLibraryEntryKind(entry.GetType().Name)),
     };
 
     private static bool IsFlagged(EmptyValueClass classification) =>
@@ -411,8 +453,8 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
                 if (normalized is null ||
                     !BasicFilterFormatter.TryFormat(normalized, strictPredicates: true, out var text))
                 {
-                    throw new InvalidOperationException(
-                        $"Could not format the normalized Basic filter '{filter.ComparisonText}'.");
+                    throw new ImportValidationException(
+                        new ImportValidationError.NormalizedBasicFilterFormatFailed(filter.ComparisonText));
                 }
 
                 return SavedFilter.TryCreate(
@@ -423,44 +465,11 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
                         filter.IsEnabled,
                         filter.Id,
                         FilterMode.Basic)
-                    ?? throw new InvalidOperationException(
-                        $"Could not rebuild the normalized Basic filter '{filter.ComparisonText}'.");
+                    ?? throw new ImportValidationException(
+                        new ImportValidationError.NormalizedBasicFilterRebuildFailed(filter.ComparisonText));
 
             default:
                 return filter;
-        }
-    }
-
-    private static IReadOnlyList<LibraryEntry>? ReadBareArrayWithLegacyFallback(JsonElement root)
-    {
-        try
-        {
-            return root.Deserialize<List<LibraryEntry>>() ?? [];
-        }
-        catch (NotSupportedException)
-        {
-            var legacyGroups = root.Deserialize<List<SavedFilterGroup>>();
-
-            if (legacyGroups is null) { return null; }
-
-            var now = DateTimeOffset.UtcNow;
-            var converted = new List<LibraryEntry>(legacyGroups.Count);
-
-            foreach (var group in legacyGroups.Where(g => g.Filters.Count > 0))
-            {
-                converted.Add(new LibraryEntryFilterSet
-                {
-                    Id = LibraryEntryId.Create(),
-                    Name = string.IsNullOrWhiteSpace(group.Name) ? "(unnamed)" : group.Name,
-                    CreatedUtc = now,
-                    Filters = [.. group.Filters.Select(f => f with { Id = FilterId.Create(), IsEnabled = false })],
-                    IsFavorite = false,
-                    LastUsedUtc = null,
-                    Origin = LibraryEntryOrigin.UserSaved,
-                });
-            }
-
-            return converted;
         }
     }
 

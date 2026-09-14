@@ -64,6 +64,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         Services.AddSingleton(Substitute.For<IAlertDialogService>());
         Services.AddSingleton(_scenarioAuthoring);
         Services.AddSingleton(Substitute.For<IClipboardService>());
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
         Services.AddSingleton(new ScenarioAuthoringOptions(false));
 
         JSInterop.Mode = JSRuntimeMode.Loose;
@@ -100,6 +101,32 @@ public sealed class FilterLibraryModalTests : BunitContext
             Arg.Is<ImmutableList<LibraryEntry>>(list => MatchesAmbiguousAddList(list, existing.Id)),
             Arg.Is<ImmutableList<LibraryEntry>>(list => MatchesEmptyList(list)),
             Arg.Is<ImportSummary>(summary => MatchesImportSummary(summary, 0, 0, 0, 0, 1)));
+    }
+
+    [Fact]
+    public void ApplyImportPreflight_CoalescedTagUpdate_SummaryMatchesComposerTagUpdateBullet()
+    {
+        var replacedExisting = BuildSavedFilter("Shared") with { Tags = ["old"] };
+        var replaceIncoming = BuildFilterEntry("Shared", "Level == 5") with { Tags = ["replace"] };
+        var coalescedIncoming = BuildSavedFilter("SharedRelaxed") with { Tags = ["coalesced"] };
+        var standaloneExisting = BuildSavedFilter("Standalone") with { Tags = ["old"] };
+        var standaloneIncoming = BuildSavedFilter("StandaloneIncoming") with { Tags = ["standalone"] };
+        var preflight = new ImportPreflight(
+            [],
+            [(replacedExisting, replaceIncoming)],
+            [],
+            [(replacedExisting, coalescedIncoming), (standaloneExisting, standaloneIncoming)],
+            []);
+
+        FilterLibraryModal.ApplyImportPreflight(preflight, _commands, [replacedExisting, standaloneExisting]);
+
+        var summary = (ImportSummary)_commands.ReceivedCalls()
+            .Single(call => call.GetMethodInfo().Name == nameof(IFilterLibraryCommands.ImportEntries))
+            .GetArguments()[2]!;
+        var preview = FilterImportTextComposer.Preview(new MarkerLocalizer(), preflight);
+
+        Assert.Equal(1, summary.UpdatedTags);
+        Assert.Contains("[[FilterImport_TagUpdates_One(1)]]", preview);
     }
 
     [Fact]
@@ -242,10 +269,10 @@ public sealed class FilterLibraryModalTests : BunitContext
             [(existing, BuildSavedFilter("SharedRelaxed"))],
             []);
 
-        var summary = FilterLibraryModal.BuildPreflightSummary(preflight);
+        var summary = FilterImportTextComposer.Preview(new MarkerLocalizer(), preflight);
 
-        Assert.DoesNotContain("will be updated with tag changes", summary);
-        Assert.Contains("WILL BE OVERWRITTEN", summary);
+        Assert.DoesNotContain("FilterImport_TagUpdates", summary);
+        Assert.Contains("[[FilterImport_Overwrite_One(1)]]", summary);
     }
 
     [Fact]
@@ -260,9 +287,9 @@ public sealed class FilterLibraryModalTests : BunitContext
             [],
             [([existing], incoming)]);
 
-        var summary = FilterLibraryModal.BuildPreflightSummary(preflight);
+        var summary = FilterImportTextComposer.Preview(new MarkerLocalizer(), preflight);
 
-        Assert.Contains("1 ambiguous entry will be imported as new", summary);
+        Assert.Contains("[[FilterImport_Ambiguous_One(1)]]", summary);
         Assert.DoesNotContain("manual", summary, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -271,9 +298,9 @@ public sealed class FilterLibraryModalTests : BunitContext
     {
         var preflight = ImportPreflight.Blocked([@"Network\DNS", @"Mail\SMTP"]);
 
-        var summary = FilterLibraryModal.BuildPreflightSummary(preflight);
+        var summary = FilterImportTextComposer.Preview(new MarkerLocalizer(), preflight);
 
-        Assert.Contains("cannot be imported", summary);
+        Assert.Contains("[[FilterImport_BlockedHeader]]", summary);
         Assert.Contains(@"Network\DNS", summary);
         Assert.Contains(@"Mail\SMTP", summary);
     }
@@ -290,9 +317,9 @@ public sealed class FilterLibraryModalTests : BunitContext
             [(e1, BuildSavedFilter("I1")), (e2, BuildSavedFilter("I2"))],
             []);
 
-        var summary = FilterLibraryModal.BuildPreflightSummary(preflight);
+        var summary = FilterImportTextComposer.Preview(new MarkerLocalizer(), preflight);
 
-        Assert.Contains("2 entries will be updated with tag changes", summary);
+        Assert.Contains("[[FilterImport_TagUpdates_Many(2)]]", summary);
     }
 
     [Fact]
@@ -306,9 +333,9 @@ public sealed class FilterLibraryModalTests : BunitContext
             [(existing, BuildSavedFilter("Incoming"))],
             []);
 
-        var summary = FilterLibraryModal.BuildPreflightSummary(preflight);
+        var summary = FilterImportTextComposer.Preview(new MarkerLocalizer(), preflight);
 
-        Assert.Contains("1 entry will be updated with tag changes", summary);
+        Assert.Contains("[[FilterImport_TagUpdates_One(1)]]", summary);
     }
 
     [Fact]
@@ -459,6 +486,70 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public async Task OnImportAsync_InitialPreflightError_RoutesTypedErrorThroughLocalizer()
+    {
+        const string json = "{}";
+        var path = WriteImportJson(json);
+
+        try
+        {
+            SetState(new FilterLibraryState { IsLoaded = true });
+            _filePicker.PickAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>()).Returns(path);
+            _exportService.Deserialize(json, Arg.Any<IReadOnlyList<LibraryEntry>>())
+                .Returns(new ImportPreflight([], [], [], error: new ImportValidationError.UnsupportedShape()));
+            var component = Render<FilterLibraryModal>();
+
+            var importTask = InvokePrivateTask(component.Instance, "OnImportAsync");
+
+            component.WaitForAssertion(() =>
+                Assert.Equal("[[FilterImport_Error_UnsupportedShape]]", component.Find(".inline-alert-message").TextContent));
+            await component.Find(".inline-alert button").ClickAsync(new MouseEventArgs());
+            await importTask;
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task OnImportAsync_NormalizePreflightError_RoutesTypedErrorThroughLocalizer()
+    {
+        const string json = "{}";
+        var path = WriteImportJson(json);
+
+        try
+        {
+            SetState(new FilterLibraryState { IsLoaded = true });
+            var initial = new ImportPreflight([BuildSavedFilter("Incoming")], [], [])
+            {
+                NormalizableEmptyValueEntryNames = ["Incoming"],
+            };
+            _filePicker.PickAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>()).Returns(path);
+            _exportService.Deserialize(json, Arg.Any<IReadOnlyList<LibraryEntry>>()).Returns(initial);
+            _exportService.Deserialize(json, Arg.Any<IReadOnlyList<LibraryEntry>>(), normalizeEmptyValues: true)
+                .Returns(new ImportPreflight([], [], [], error: new ImportValidationError.SchemaVersionNotInteger()));
+            var component = Render<FilterLibraryModal>();
+
+            var importTask = InvokePrivateTask(component.Instance, "OnImportAsync");
+
+            component.WaitForAssertion(() =>
+                Assert.Equal("[[FilterImport_EmptyValueMessage_One(1|Incoming)]]", component.Find(".inline-alert-message").TextContent));
+            var normalizeButton = component.FindAll(".inline-alert button")
+                .Single(button => button.TextContent.Contains("[[FilterImport_Action_Normalize]]", StringComparison.Ordinal));
+            await normalizeButton.ClickAsync(new MouseEventArgs());
+            component.WaitForAssertion(() =>
+                Assert.Equal("[[FilterImport_Error_SchemaVersionNotInteger]]", component.Find(".inline-alert-message").TextContent));
+            await component.Find(".inline-alert button").ClickAsync(new MouseEventArgs());
+            await importTask;
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void OnInitialized_DispatchesLoadLibrary_WhenLoadError()
     {
         SetState(new FilterLibraryState { IsLoaded = true, LoadError = true });
@@ -582,7 +673,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         var component = Render<FilterLibraryModal>();
 
         var tabs = component.FindAll("[role='tab']");
-        Assert.Contains("Favorites (1)", tabs[1].TextContent);
+        Assert.Contains("[[LibraryTab_Favorites]] (1)", tabs[1].TextContent);
     }
 
     [Fact]
@@ -616,7 +707,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         var component = Render<FilterLibraryModal>();
 
         var tabs = component.FindAll("[role='tab']");
-        Assert.Contains("Previously Used (1)", tabs[2].TextContent);
+        Assert.Contains("[[LibraryTab_PreviouslyUsed]] (1)", tabs[2].TextContent);
     }
 
     [Fact]
@@ -631,9 +722,9 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var tabs = component.FindAll("[role='tab']");
         Assert.Equal(3, tabs.Count);
-        Assert.Contains("Saved (1)", tabs[0].TextContent);
-        Assert.Contains("Favorites (1)", tabs[1].TextContent);
-        Assert.Contains("Previously Used (1)", tabs[2].TextContent);
+        Assert.Contains("[[LibraryTab_Saved]] (1)", tabs[0].TextContent);
+        Assert.Contains("[[LibraryTab_Favorites]] (1)", tabs[1].TextContent);
+        Assert.Contains("[[LibraryTab_PreviouslyUsed]] (1)", tabs[2].TextContent);
     }
 
     [Fact]
@@ -1251,6 +1342,15 @@ public sealed class FilterLibraryModalTests : BunitContext
 
     private static bool MatchesTwoDistinctIds(ImmutableList<LibraryEntry>? entries) =>
         entries is { Count: 2 } && entries[0].Id != entries[1].Id;
+
+    private static string WriteImportJson(string json)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, $"filter-library-import-{Guid.NewGuid():N}.json");
+
+        File.WriteAllText(path, json);
+
+        return path;
+    }
 
     private void SetState(FilterLibraryState state)
     {

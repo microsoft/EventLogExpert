@@ -27,6 +27,7 @@ using EventLogExpert.Runtime.StatusBar;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.FilterEditor.Comparison;
+using EventLogExpert.UI.FilterLibrary;
 using EventLogExpert.UI.Globalization;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
@@ -79,6 +80,7 @@ public sealed class LocalizationInfraTests
             ("StatusBar_Memory_Announce_", typeof(MemoryUsageLevel)),
             ("StatusBar_Memory_Tooltip_", typeof(MemoryUsageLevel)),
             ("FilterLens_Property_", typeof(EventProperty)),
+            ("LibraryTab_", typeof(LibraryTab)),
             ("FilterEditor_Comparison_", typeof(ComparisonOperatorSelect.ComparisonKind))
         ];
 
@@ -117,7 +119,7 @@ public sealed class LocalizationInfraTests
             RegexOptions.Compiled);
         var keyLiteralPattern = new Regex(@"""([A-Za-z0-9_]+)""", RegexOptions.Compiled);
         var oneOrManyPattern = new Regex(
-            @"OneOrMany(?:Raw)?\([^;{}]*?""([A-Za-z0-9_]+)""\s*,\s*""([A-Za-z0-9_]+)""\s*\)",
+            @"OneOrMany(?:Raw)?\([^;{}]*?""([A-Za-z0-9_]+)""\s*,\s*""([A-Za-z0-9_]+)""(?:\s*,\s*""([A-Za-z0-9_]+)""\s*,\s*""([A-Za-z0-9_]+)"")?",
             RegexOptions.Compiled);
 
         var sources = LocalizationSourceScan.EnumerateProductionSource()
@@ -130,7 +132,9 @@ public sealed class LocalizationInfraTests
             .Select(match => match.Groups[1].Value)
             .Concat(sources
                 .SelectMany(source => oneOrManyPattern.Matches(source))
-                .SelectMany(call => new[] { call.Groups[1].Value, call.Groups[2].Value }))
+                .SelectMany(call => Enumerable.Range(1, 4)
+                    .Select(index => call.Groups[index].Value)
+                    .Where(value => value.Length > 0)))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(key => key, StringComparer.Ordinal)
             .ToList();
@@ -318,6 +322,86 @@ public sealed class LocalizationInfraTests
             Assert.True(neutralValues.TryGetValue(key, out var neutral), $"Missing neutral RESX value for {key}.");
             Assert.Equal(CoverageStatusText.Label(status), neutral);
         }
+    }
+
+    [Fact]
+    public void NeutralFilterImportValues_HaveExpectedPlaceholderArity()
+    {
+        var neutralValues = ResxValues();
+        (string Key, int Arity)[] expected =
+        [
+            ("FilterImport_Action_ImportAsIs", 0),
+            ("FilterImport_Action_Normalize", 0),
+            ("FilterImport_Added_Many", 1),
+            ("FilterImport_Added_One", 1),
+            ("FilterImport_Ambiguous_Many", 1),
+            ("FilterImport_Ambiguous_One", 1),
+            ("FilterImport_Announcement_TagRemoved_Many", 2),
+            ("FilterImport_Announcement_TagRemoved_One", 2),
+            ("FilterImport_Announcement_TagRenamed_Many", 3),
+            ("FilterImport_Announcement_TagRenamed_One", 3),
+            ("FilterImport_BlockedHeader", 0),
+            ("FilterImport_EmptyValueMessage_Many", 2),
+            ("FilterImport_EmptyValueMessage_One", 2),
+            ("FilterImport_EmptyValueTitle", 0),
+            ("FilterImport_Error_EmptyFile", 0),
+            ("FilterImport_Error_EntryIdExpectedJsonString", 1),
+            ("FilterImport_Error_EntryIdExpectedNonEmptyString", 0),
+            ("FilterImport_Error_EntryIdInvalidGuid", 1),
+            ("FilterImport_Error_InvalidBasicFilters_Many", 1),
+            ("FilterImport_Error_InvalidBasicFilters_One", 1),
+            ("FilterImport_Error_InvalidSchemaVersion", 1),
+            ("FilterImport_Error_MissingEntriesProperty", 0),
+            ("FilterImport_Error_MissingEntryName", 0),
+            ("FilterImport_Error_NormalizedBasicFilterFormatFailed", 1),
+            ("FilterImport_Error_NormalizedBasicFilterRebuildFailed", 1),
+            ("FilterImport_Error_SchemaVersionNotInteger", 0),
+            ("FilterImport_Error_TagsExpectedArrayOrNull", 1),
+            ("FilterImport_Error_TagsExpectedStringElement", 1),
+            ("FilterImport_Error_TagsUnexpectedEnd", 0),
+            ("FilterImport_Error_UnknownLibraryEntryKind", 1),
+            ("FilterImport_Error_UnsupportedSchemaVersion", 1),
+            ("FilterImport_Error_UnsupportedShape", 0),
+            ("FilterImport_KeepEmpty_Many", 1),
+            ("FilterImport_KeepEmpty_One", 1),
+            ("FilterImport_MoreNames", 1),
+            ("FilterImport_NothingToImport_ItemMany_DupMany", 2),
+            ("FilterImport_NothingToImport_ItemMany_DupOne", 2),
+            ("FilterImport_NothingToImport_ItemOne_DupMany", 2),
+            ("FilterImport_NothingToImport_ItemOne_DupOne", 2),
+            ("FilterImport_Overwrite_Many", 1),
+            ("FilterImport_Overwrite_One", 1),
+            ("FilterImport_OverwriteNamesHeader", 0),
+            ("FilterImport_PreviewHeader", 0),
+            ("FilterImport_RemovedEmptyNotice_Many", 1),
+            ("FilterImport_RemovedEmptyNotice_One", 1),
+            ("FilterImport_Renames_Many", 1),
+            ("FilterImport_Renames_One", 1),
+            ("FilterImport_Skipped_Many", 1),
+            ("FilterImport_Skipped_One", 1),
+            ("FilterImport_Summary_TagMany", 4),
+            ("FilterImport_Summary_TagMany_Ambiguous", 5),
+            ("FilterImport_Summary_TagOne", 4),
+            ("FilterImport_Summary_TagOne_Ambiguous", 5),
+            ("FilterImport_TagUpdates_Many", 1),
+            ("FilterImport_TagUpdates_One", 1),
+            ("LibraryTab_Favorites", 0),
+            ("LibraryTab_PreviouslyUsed", 0),
+            ("LibraryTab_Saved", 0)
+        ];
+
+        foreach ((string key, int arity) in expected)
+        {
+            Assert.True(neutralValues.TryGetValue(key, out string? value), $"Missing neutral RESX value for {key}.");
+            Assert.Equal(arity, PlaceholderArity(value));
+        }
+
+        Assert.Equal(
+            expected.Select(entry => entry.Key).OrderBy(key => key, StringComparer.Ordinal),
+            neutralValues.Keys
+                .Where(key => key.StartsWith("FilterImport_", StringComparison.Ordinal) ||
+                    key.StartsWith("LibraryTab_", StringComparison.Ordinal))
+                .OrderBy(key => key, StringComparer.Ordinal));
     }
 
     [Fact]

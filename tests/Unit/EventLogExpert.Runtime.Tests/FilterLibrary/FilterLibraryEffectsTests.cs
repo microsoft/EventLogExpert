@@ -12,6 +12,7 @@ using Fluxor;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using System.Collections.Immutable;
+using AnnouncementPayload = EventLogExpert.Runtime.Announcement.Announcement;
 using Effects = EventLogExpert.Runtime.FilterLibrary.Effects;
 
 namespace EventLogExpert.Runtime.Tests.FilterLibrary;
@@ -60,7 +61,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
         dispatcher.Received(1).Dispatch(Arg.Any<TagBulkUpdateFailedAction>());
         errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsLibraryTagsBulkUpdateFailed(message)));
-        announcer.DidNotReceiveWithAnyArgs().Announce(default!);
+        announcer.DidNotReceive().Announce(Arg.Any<string>());
+        announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
     }
 
     [Fact]
@@ -426,7 +428,8 @@ public sealed class FilterLibraryEffectsTests
         await effects.HandleDeleteTag(new DeleteTagAction("bug"), dispatcher);
 
         await store.DidNotReceiveWithAnyArgs().UpdateRangeAsync(Arg.Any<IReadOnlyList<LibraryEntry>>(), Arg.Any<CancellationToken>());
-        announcer.DidNotReceiveWithAnyArgs().Announce(default!);
+        announcer.DidNotReceive().Announce(Arg.Any<string>());
+        announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
     }
 
     [Fact]
@@ -464,7 +467,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
         dispatcher.Received(1).Dispatch(Arg.Any<TagBulkUpdateFailedAction>());
         errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsLibraryTagsBulkUpdateFailed(message)));
-        announcer.DidNotReceiveWithAnyArgs().Announce(default!);
+        announcer.DidNotReceive().Announce(Arg.Any<string>());
+        announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
     }
 
     [Fact]
@@ -482,7 +486,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s != null && s.Entry.Id == a.Id));
         dispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s != null && s.Entry.Id == b.Id));
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
-        announcer.Received(1).Announce("Removed tag 'bug' from 1 entry");
+        announcer.Received(1).Announce(Arg.Is<AnnouncementPayload>(payload =>
+            payload == new AnnouncementPayload.TagRemoved("bug", 1)));
     }
 
     [Fact]
@@ -504,7 +509,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
         dispatcher.Received(1).Dispatch(Arg.Any<TagBulkUpdateFailedAction>());
         errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsLibraryTagsBulkUpdateFailed(message)));
-        announcer.DidNotReceiveWithAnyArgs().Announce(default!);
+        announcer.DidNotReceive().Announce(Arg.Any<string>());
+        announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
 
@@ -519,7 +525,8 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleDeleteTag(new DeleteTagAction("bug"), dispatcher);
 
-        announcer.Received(1).Announce("Removed tag 'bug' from 2 entries");
+        announcer.Received(1).Announce(Arg.Is<AnnouncementPayload>(payload =>
+            payload == new AnnouncementPayload.TagRemoved("bug", 2)));
         dispatcher.Received(2).Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
     }
 
@@ -546,7 +553,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
-        announcer.DidNotReceiveWithAnyArgs().Announce(default!);
+        announcer.DidNotReceive().Announce(Arg.Any<string>());
+        announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
 
@@ -567,7 +575,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.Received(1).Dispatch(Arg.Is<AddLibraryEntrySuccessAction>(action => action != null && ReferenceEquals(action.Entry, add)));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryAction>());
-        announcer.Received(1).Announce("Imported 1 new, replaced 0, updated 0 tags, skipped 0");
+        announcer.Received(1).Announce(Arg.Is<AnnouncementPayload>(payload =>
+            payload == new AnnouncementPayload.FilterImportCompleted(new ImportSummary(1, 0, 0, 0, 0))));
         errorBanner.DidNotReceiveWithAnyArgs().ReportError(default!);
     }
 
@@ -587,7 +596,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryAction>());
-        announcer.Received(1).Announce("Imported 0 new, replaced 0, updated 0 tags, skipped 3");
+        announcer.Received(1).Announce(Arg.Is<AnnouncementPayload>(payload =>
+            payload == new AnnouncementPayload.FilterImportCompleted(new ImportSummary(0, 0, 0, 3, 0))));
         errorBanner.DidNotReceiveWithAnyArgs().ReportError(default!);
     }
 
@@ -612,7 +622,8 @@ public sealed class FilterLibraryEffectsTests
 
         // Only updateA persisted (updateB vanished), so the announcement reflects the actual replaced count (1), not
         // the preflight total (2).
-        announcer.Received(1).Announce("Imported 0 new, replaced 1, updated 0 tags, skipped 0, imported 1 ambiguous as new");
+        announcer.Received(1).Announce(Arg.Is<AnnouncementPayload>(payload =>
+            payload == new AnnouncementPayload.FilterImportCompleted(new ImportSummary(0, 1, 0, 0, 1))));
         errorBanner.DidNotReceiveWithAnyArgs().ReportError(default!);
     }
 
@@ -642,7 +653,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(action => action != null && ReferenceEquals(action.Entry, updateA)));
         dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(action => action != null && ReferenceEquals(action.Entry, updateB)));
         dispatcher.DidNotReceive().Dispatch(Arg.Any<LoadLibraryAction>());
-        announcer.Received(1).Announce("Imported 1 new, replaced 1, updated 1 tag, skipped 2");
+        announcer.Received(1).Announce(Arg.Is<AnnouncementPayload>(payload =>
+            payload == new AnnouncementPayload.FilterImportCompleted(new ImportSummary(1, 1, 1, 2, 0))));
         errorBanner.DidNotReceiveWithAnyArgs().ReportError(default!);
     }
 
@@ -667,7 +679,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(action => action != null && ReferenceEquals(action.Entry, replaced)));
         dispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(action => action != null && ReferenceEquals(action.Entry, tagUpdate)));
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
-        announcer.Received(1).Announce("Imported 0 new, replaced 1, updated 0 tags, skipped 0");
+        announcer.Received(1).Announce(Arg.Is<AnnouncementPayload>(payload =>
+            payload == new AnnouncementPayload.FilterImportCompleted(new ImportSummary(0, 1, 0, 0, 0))));
         errorBanner.DidNotReceiveWithAnyArgs().ReportError(default!);
     }
 
@@ -689,7 +702,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<AddLibraryEntrySuccessAction>());
         dispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateLibraryEntrySuccessAction>());
-        announcer.DidNotReceiveWithAnyArgs().Announce(default!);
+        announcer.DidNotReceive().Announce(Arg.Any<string>());
+        announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
 
@@ -1693,7 +1707,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.Received(1).Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s != null && s.Entry.Id == a.Id));
         dispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateLibraryEntrySuccessAction>(s => s != null && s.Entry.Id == b.Id));
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
-        announcer.Received(1).Announce("Renamed tag 'bug' to 'defect' in 1 entry");
+        announcer.Received(1).Announce(Arg.Is<AnnouncementPayload>(payload =>
+            payload == new AnnouncementPayload.TagRenamed("bug", "defect", 1)));
     }
 
     [Fact]
@@ -1715,7 +1730,8 @@ public sealed class FilterLibraryEffectsTests
         dispatcher.Received(1).Dispatch(Arg.Any<LoadLibraryAction>());
         dispatcher.Received(1).Dispatch(Arg.Any<TagBulkUpdateFailedAction>());
         errorBanner.Received(1).ReportError(Arg.Is<BannerMessage>(message => IsLibraryTagsBulkUpdateFailed(message)));
-        announcer.DidNotReceiveWithAnyArgs().Announce(default!);
+        announcer.DidNotReceive().Announce(Arg.Any<string>());
+        announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
         logger.ReceivedWithAnyArgs(1).Warning(default);
     }
 
@@ -1730,7 +1746,8 @@ public sealed class FilterLibraryEffectsTests
 
         await effects.HandleRenameTag(new RenameTagAction("bug", "defect"), dispatcher);
 
-        announcer.Received(1).Announce("Renamed tag 'bug' to 'defect' in 2 entries");
+        announcer.Received(1).Announce(Arg.Is<AnnouncementPayload>(payload =>
+            payload == new AnnouncementPayload.TagRenamed("bug", "defect", 2)));
     }
 
     [Fact]

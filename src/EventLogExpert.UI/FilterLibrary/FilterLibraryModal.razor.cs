@@ -23,16 +23,8 @@ namespace EventLogExpert.UI.FilterLibrary;
 
 public sealed partial class FilterLibraryModal : ModalBase<bool>
 {
-    private const int MaxPreviewedImportNames = 10;
     private const int MaxPreviouslyUsedEntries = 50;
     private const int TagFilterBarMaxVisible = 10;
-
-    private static readonly (LibraryTab Tab, string Label)[] s_tabs =
-    [
-        (LibraryTab.Saved, "Saved"),
-        (LibraryTab.Favorites, "Favorites"),
-        (LibraryTab.PreviouslyUsed, "Previously Used"),
-    ];
 
     private readonly Dictionary<(LibraryTab Tab, LibraryEntryId Id), LibraryEntryRow?> _rowRefs = new();
 
@@ -90,9 +82,9 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private IReadOnlyList<(LibraryTab Tab, string Label)> CurrentTabLabels =>
     [
-        (LibraryTab.Saved, $"Saved ({SavedEntries.Count})"),
-        (LibraryTab.Favorites, $"Favorites ({FavoriteEntries.Count})"),
-        (LibraryTab.PreviouslyUsed, $"Previously Used ({PreviouslyUsedEntries.Count})"),
+        (LibraryTab.Saved, $"{LibraryTabLocalizer.Label(Localizer, LibraryTab.Saved)} ({SavedEntries.Count})"),
+        (LibraryTab.Favorites, $"{LibraryTabLocalizer.Label(Localizer, LibraryTab.Favorites)} ({FavoriteEntries.Count})"),
+        (LibraryTab.PreviouslyUsed, $"{LibraryTabLocalizer.Label(Localizer, LibraryTab.PreviouslyUsed)} ({PreviouslyUsedEntries.Count})"),
     ];
 
     [Inject] private IFilterLibraryExportService ExportService { get; init; } = null!;
@@ -253,81 +245,19 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         commands.ImportEntries([.. toAdd], [.. toUpdate], summary);
     }
 
-    internal static string BuildPreflightSummary(ImportPreflight preflight)
-    {
-        if (preflight.ImportBlocked)
-        {
-            var preview = string.Join("\n  \u2022 ", preflight.InvalidLegacyNames.Take(MaxPreviewedImportNames));
-            var more = preflight.InvalidLegacyNames.Count > MaxPreviewedImportNames
-                ? $"\n  \u2022 ...and {preflight.InvalidLegacyNames.Count - MaxPreviewedImportNames} more"
-                : string.Empty;
-
-            return "This file contains entries with names that cannot be imported:\n  \u2022 " +
-                preview + more;
-        }
-
-        var lines = new List<string>
-        {
-            $"  \u2022 {Plural(preflight.ToAdd.Count, "new entry", "new entries")} will be added",
-        };
-
-        if (preflight.ToReplace.Count > 0)
-        {
-            var conflictList = "\nNames being overwritten:\n  \u2022 " +
-                string.Join("\n  \u2022 ", preflight.ToReplace.Select(p => p.Incoming.Name).Take(MaxPreviewedImportNames)) +
-                (preflight.ToReplace.Count > MaxPreviewedImportNames ?
-                    $"\n  \u2022 ...and {preflight.ToReplace.Count - MaxPreviewedImportNames} more" :
-                    string.Empty);
-
-            lines.Add($"  \u2022 {Plural(preflight.ToReplace.Count, "existing entry", "existing entries")} WILL BE OVERWRITTEN (current filter content will be lost){conflictList}");
-        }
-
-        if (preflight.ToUpdate.Count > 0)
-        {
-            // Count only entries updated by tags alone; an entry that is also being replaced is already covered by the
-            // overwrite bullet above (its tag-update was coalesced into the replacement), so omit the bullet when the
-            // standalone count is zero rather than showing "0 entries will be updated with tag changes".
-            var standaloneTagUpdates = CountStandaloneTagUpdates(preflight);
-
-            if (standaloneTagUpdates > 0)
-            {
-                lines.Add($"  \u2022 {Plural(standaloneTagUpdates, "entry", "entries")} will be updated with tag changes");
-            }
-
-            var renameCount = preflight.ToUpdate.Count(t => t.Existing.Name.Contains('\\'));
-
-            if (renameCount > 0)
-            {
-                lines.Add($"  \u2022 {Plural(renameCount, "existing entry", "existing entries")} will also be renamed (folder paths \u2192 tags)");
-            }
-        }
-
-        if (preflight.AmbiguousMatches.Count > 0)
-        {
-            lines.Add($"  \u2022 {Plural(preflight.AmbiguousMatches.Count, "ambiguous entry", "ambiguous entries")} will be imported as new");
-        }
-
-        lines.Add($"  \u2022 {Plural(preflight.SkippedDuplicates.Count, "exact duplicate", "exact duplicates")} will be skipped");
-
-        return "Import preview:\n" + string.Join('\n', lines);
-    }
-
     // Tag-updates whose existing entry is NOT also being replaced. A replaced-and-tag-updated entry is folded into its
     // single replacement row (see ApplyImportPreflight), so it must not be counted as a separate tag-update here - that
     // keeps ToUpdate row count == Replaced + UpdatedTags, which the import announcement attribution relies on.
     internal static int CountStandaloneTagUpdates(ImportPreflight preflight)
     {
-        var replacedIds = preflight.ToReplace.Select(t => t.Existing.Id).ToHashSet();
+        var replacedIds = preflight.ToReplace.Select(pair => pair.Existing.Id).ToHashSet();
 
         return preflight.ToUpdate
-            .Select(t => t.Existing.Id)
+            .Select(pair => pair.Existing.Id)
             .Where(id => !replacedIds.Contains(id))
             .Distinct()
             .Count();
     }
-
-    private static string Plural(int count, string singular, string plural) =>
-        $"{count} {(count == 1 ? singular : plural)}";
 
     internal static (LibraryEntryId? TargetId, bool FallbackToActiveTab) DecidePendingFocusAfterRemoval(
         IReadOnlyList<LibraryEntry> snapshot,
@@ -474,7 +404,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
         if (preflight.Error is not null)
         {
-            await ShowImportExportErrorAsync("Import error", preflight.Error);
+            await ShowImportExportErrorAsync("Import error", ImportValidationErrorLocalizer.Describe(Localizer, preflight.Error));
+
             return;
         }
 
@@ -495,13 +426,15 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
                     if (preflight.Error is not null)
                     {
-                        await ShowImportExportErrorAsync("Import error", preflight.Error);
+                        await ShowImportExportErrorAsync("Import error", ImportValidationErrorLocalizer.Describe(Localizer, preflight.Error));
+
                         return;
                     }
 
                     if (!preflight.ImportBlocked && !HasApplicableImportChanges(preflight))
                     {
-                        await ShowImportExportErrorAsync("Import", BuildNothingToImportMessage(preflight));
+                        await ShowImportExportErrorAsync("Import", FilterImportTextComposer.NothingToImport(Localizer, preflight));
+
                         return;
                     }
 
@@ -550,9 +483,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             ClipboardService,
             Localizer);
 
-        _authoringContext = ScenarioAuthoringOptions.Enabled
-            ? new ScenarioAuthoringRowContext(Enabled: true, CopyLibraryRowAsync)
-            : null;
+        _authoringContext = ScenarioAuthoringOptions.Enabled ?
+            new ScenarioAuthoringRowContext(Enabled: true, CopyLibraryRowAsync) : null;
     }
 
     protected override Task<bool> OnRequestCloseAsync(ModalCloseRequest request)
@@ -567,36 +499,6 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         return Task.FromResult(false);
     }
 
-    private static string BuildImportConfirmationMessage(ImportPreflight preflight, bool keptEmptyValuesAsIs)
-    {
-        var notices = new List<string>();
-
-        if (keptEmptyValuesAsIs && preflight.NormalizableEmptyValueEntryNames.Count > 0)
-        {
-            var count = preflight.NormalizableEmptyValueEntryNames.Count;
-
-            notices.Add(
-                $"Keeping {count} {(count == 1 ? "entry" : "entries")} with empty values as authored. " +
-                "An empty Contains matches every event and an empty NotContains matches none; " +
-                "depending on how a filter combines its criteria, that can force the whole filter to always match or never match.");
-        }
-
-        if (preflight.NormalizeRemovedFilterNames.Count > 0)
-        {
-            notices.Add(
-                $"Removed empty-criterion filters from {preflight.NormalizeRemovedFilterNames.Count} library item(s) " +
-                "after removing empty values.");
-        }
-
-        var summary = BuildPreflightSummary(preflight);
-
-        return notices.Count > 0 ? string.Join("\n", notices) + "\n\n" + summary : summary;
-    }
-
-    private static string BuildNothingToImportMessage(ImportPreflight preflight) =>
-        $"Nothing to import. Removed empty-criterion filters from {preflight.NormalizeRemovedFilterNames.Count} " +
-        $"library item(s), skipped {preflight.SkippedDuplicates.Count} duplicate(s).";
-
     private static bool HasApplicableImportChanges(ImportPreflight preflight) =>
         preflight.ToAdd.Count > 0 ||
         preflight.ToReplace.Count > 0 ||
@@ -606,10 +508,14 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private static bool MatchesTagFilter(LibraryEntry entry, ImmutableList<string> selectedTags) =>
         selectedTags.Count == 0 || selectedTags.All(t => entry.Tags.Contains(t, StringComparer.OrdinalIgnoreCase));
 
+    private static string Plural(int count, string singular, string plural) =>
+        $"{count} {(count == 1 ? singular : plural)}";
+
     private static string SanitizeForFileName(string name)
     {
         var invalid = Path.GetInvalidFileNameChars();
         var sanitized = new string(name.Select(c => invalid.Contains(c) ? '-' : c).ToArray());
+
         return sanitized.Length > 100 ? sanitized[..100] : sanitized;
     }
 
@@ -810,12 +716,12 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     {
         if (preflight.ImportBlocked)
         {
-            await ShowImportExportErrorAsync("Import blocked", BuildPreflightSummary(preflight));
+            await ShowImportExportErrorAsync("Import blocked", FilterImportTextComposer.Preview(Localizer, preflight));
 
             return;
         }
 
-        var summary = BuildImportConfirmationMessage(preflight, keptEmptyValuesAsIs);
+        var summary = FilterImportTextComposer.ImportConfirmation(Localizer, preflight, keptEmptyValuesAsIs);
         var request = new InlineAlertRequest(
             Title: "Confirm import",
             Message: summary,
@@ -843,20 +749,14 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private async Task<EmptyValueChoice> PromptEmptyValueChoiceAsync(IReadOnlyList<string> entryNames)
     {
         var request = new InlineAlertRequest(
-            Title: "Filters with an empty value",
-            Message:
-                $"{entryNames.Count} library item(s) contain a filter with an empty value: " +
-                $"{string.Join(", ", entryNames)}. An empty Contains matches every event; an empty NotContains " +
-                "matches none. Normalize removes the empty values; if that leaves a Contains/NotContains criterion " +
-                "with no values, the whole filter is removed (including its other criteria). Import as-is keeps them " +
-                "all as authored. An as-is filter may lose its empty values or need repair if you later edit it in " +
-                "the Basic editor.",
-            AcceptLabel: "Normalize",
-            CancelLabel: "Cancel",
+            Title: FilterImportTextComposer.EmptyValueTitle(Localizer),
+            Message: FilterImportTextComposer.EmptyValueMessage(Localizer, entryNames),
+            AcceptLabel: FilterImportTextComposer.NormalizeAction(Localizer),
+            CancelLabel: Localizer["Modal_Cancel"],
             IsPrompt: false,
             PromptInitialValue: null)
         {
-            SecondaryActionLabel = "Import as-is",
+            SecondaryActionLabel = FilterImportTextComposer.ImportAsIsAction(Localizer),
         };
 
         InlineAlertResult result;
@@ -941,9 +841,10 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private void ToggleTagFilter(string tag)
     {
         var current = _selectedTagsByTab[_activeTab];
-        _selectedTagsByTab[_activeTab] = current.Contains(tag, StringComparer.OrdinalIgnoreCase)
-            ? current.Remove(tag, StringComparer.OrdinalIgnoreCase)
-            : current.Add(tag);
+
+        _selectedTagsByTab[_activeTab] = current.Contains(tag, StringComparer.OrdinalIgnoreCase) ?
+            current.Remove(tag, StringComparer.OrdinalIgnoreCase) :
+            current.Add(tag);
 
         StateHasChanged();
     }

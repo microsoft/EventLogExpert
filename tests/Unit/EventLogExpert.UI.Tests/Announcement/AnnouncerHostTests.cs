@@ -6,6 +6,7 @@ using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLenses;
+using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.UI.Announcement;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,6 +38,20 @@ public sealed class AnnouncerHostTests : BunitContext
         // component's handler was unsubscribed, no exception is thrown and the test passes.
         _announcementService.StateChanged += Raise.Event<Action>();
         Assert.True(true);
+    }
+
+    [Fact]
+    public void AnnouncerHost_FilterImportCompleted_RoutesThroughImportComposer()
+    {
+        _announcementService.Current.Returns(new CurrentAnnouncement(
+            new AnnouncementPayload.FilterImportCompleted(new ImportSummary(2, 1, 1, 3, 0)),
+            2));
+
+        var component = Render<AnnouncerHost>();
+
+        Assert.Equal(
+            "[[FilterImport_Summary_TagOne(2|1|1|3)]]",
+            component.Find("#app-announcer").TextContent);
     }
 
     [Fact]
@@ -115,6 +130,19 @@ public sealed class AnnouncerHostTests : BunitContext
     }
 
     [Fact]
+    public void AnnouncerHost_RendersEveryAnnouncementLeafWithoutThrowing()
+    {
+        foreach (var leafType in typeof(AnnouncementPayload).GetNestedTypes().Where(type => !type.IsAbstract))
+        {
+            _announcementService.Current.Returns(new CurrentAnnouncement(CreateAnnouncementPayload(leafType), 2));
+
+            var component = Render<AnnouncerHost>();
+
+            Assert.NotNull(component.Find("#app-announcer").TextContent);
+        }
+    }
+
+    [Fact]
     public void AnnouncerHost_RendersLiveRegionWithPolitePoliteness()
     {
         var component = Render<AnnouncerHost>();
@@ -123,6 +151,30 @@ public sealed class AnnouncerHostTests : BunitContext
         Assert.Equal("status", region.GetAttribute("role"));
         Assert.Equal("polite", region.GetAttribute("aria-live"));
         Assert.Equal("true", region.GetAttribute("aria-atomic"));
+    }
+
+    [Fact]
+    public void AnnouncerHost_TagRemoved_RoutesThroughImportComposer()
+    {
+        _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TagRemoved("bug", 2), 2));
+
+        var component = Render<AnnouncerHost>();
+
+        Assert.Equal(
+            "[[FilterImport_Announcement_TagRemoved_Many(bug|2)]]",
+            component.Find("#app-announcer").TextContent);
+    }
+
+    [Fact]
+    public void AnnouncerHost_TagRenamed_RoutesThroughImportComposer()
+    {
+        _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TagRenamed("bug", "defect", 1), 2));
+
+        var component = Render<AnnouncerHost>();
+
+        Assert.Equal(
+            "[[FilterImport_Announcement_TagRenamed_One(bug|defect|1)]]",
+            component.Find("#app-announcer").TextContent);
     }
 
     [Fact]
@@ -145,4 +197,15 @@ public sealed class AnnouncerHostTests : BunitContext
         Assert.Contains("Database imported", first);
         Assert.Contains("Database imported", second);
     }
+
+    private static AnnouncementPayload CreateAnnouncementPayload(Type leafType) =>
+        leafType == typeof(AnnouncementPayload.Text) ? new AnnouncementPayload.Text("message") :
+        leafType == typeof(AnnouncementPayload.LensKept) ? new AnnouncementPayload.LensKept(
+            new FilterLensLabel.PropertyComparison(EventProperty.ActivityId, IsEqual: true, "abc")) :
+        leafType == typeof(AnnouncementPayload.LensGroupSaved) ? new AnnouncementPayload.LensGroupSaved("group") :
+        leafType == typeof(AnnouncementPayload.LensesSavedAll) ? new AnnouncementPayload.LensesSavedAll() :
+        leafType == typeof(AnnouncementPayload.FilterImportCompleted) ? new AnnouncementPayload.FilterImportCompleted(new ImportSummary(1, 2, 3, 4, 5)) :
+        leafType == typeof(AnnouncementPayload.TagRemoved) ? new AnnouncementPayload.TagRemoved("tag", 2) :
+        leafType == typeof(AnnouncementPayload.TagRenamed) ? new AnnouncementPayload.TagRenamed("old", "new", 2) :
+        throw new InvalidOperationException($"No test fixture for {leafType.FullName}.");
 }

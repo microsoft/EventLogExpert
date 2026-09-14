@@ -262,7 +262,7 @@ public sealed class FilterPaneTests : BunitContext
         component.Instance.ApplyFilterSetSelection();
 
         _filterLibraryCommands.Received(1).ApplyEntry(filterSet.Id);
-        _announcements.DidNotReceiveWithAnyArgs().Announce(null!);
+        _announcements.DidNotReceiveWithAnyArgs().Announce((string)null!);
     }
 
     [Fact]
@@ -691,7 +691,7 @@ public sealed class FilterPaneTests : BunitContext
 
         Assert.True(component.Instance.IsFilterSetPickerVisible);
         Assert.Equal(default(LibraryEntryId), component.Instance.SelectedFilterSetId);
-        _announcements.DidNotReceiveWithAnyArgs().Announce(null!);
+        _announcements.DidNotReceiveWithAnyArgs().Announce((string)null!);
     }
 
     [Fact]
@@ -1037,7 +1037,7 @@ public sealed class FilterPaneTests : BunitContext
         component.Instance.ReplaceFilterSetSelection();
 
         _filterLibraryCommands.Received(1).ReplaceWithEntry(filterSet.Id);
-        _announcements.DidNotReceiveWithAnyArgs().Announce(null!);
+        _announcements.DidNotReceiveWithAnyArgs().Announce((string)null!);
     }
 
     [Fact]

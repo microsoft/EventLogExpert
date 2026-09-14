@@ -34,13 +34,14 @@ public sealed class LibraryEntryPolymorphicJsonTests
     }
 
     [Fact]
-    public void Deserialize_TagsNonStringArrayElement_ThrowsJsonException()
+    public void Deserialize_TagsNonStringArrayElement_ThrowsImportValidationException()
     {
         var json = """
             {"Kind":"Filter","Id":"00000000-0000-0000-0000-000000000013","Name":"BadTags","CreatedUtc":"2026-05-31T12:00:00+00:00","tags":["valid",42],"Filter":{"Color":0,"ComparisonText":"Level == 4","IsExcluded":false,"Mode":"Advanced"}}
             """;
 
-        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<LibraryEntry>(json));
+        var exception = Assert.Throws<ImportValidationException>(() => JsonSerializer.Deserialize<LibraryEntry>(json));
+        Assert.Equal(new ImportValidationError.TagsExpectedStringElement(JsonTokenType.Number), exception.Error);
     }
 
     [Fact]
@@ -68,28 +69,31 @@ public sealed class LibraryEntryPolymorphicJsonTests
     }
 
     [Fact]
-    public void LibraryEntryIdJsonConverter_EmptyString_ThrowsJsonException()
+    public void LibraryEntryIdJsonConverter_EmptyString_ThrowsImportValidationException()
     {
         var json = """{"Kind":"Filter","Id":"","Name":"x","CreatedUtc":"2026-05-31T12:00:00+00:00","Filter":{"Color":0,"ComparisonText":"Level == 4","IsExcluded":false,"Mode":"Advanced"}}""";
 
-        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<LibraryEntry>(json));
+        var exception = Assert.Throws<ImportValidationException>(() => JsonSerializer.Deserialize<LibraryEntry>(json));
+        Assert.Equal(new ImportValidationError.EntryIdExpectedNonEmptyString(), exception.Error);
     }
 
     [Fact]
-    public void LibraryEntryIdJsonConverter_MalformedGuid_ThrowsJsonException()
+    public void LibraryEntryIdJsonConverter_MalformedGuid_ThrowsImportValidationException()
     {
         var json = """{"Kind":"Filter","Id":"not-a-guid","Name":"x","CreatedUtc":"2026-05-31T12:00:00+00:00","Filter":{"Color":0,"ComparisonText":"Level == 4","IsExcluded":false,"Mode":"Advanced"}}""";
 
-        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<LibraryEntry>(json));
+        var exception = Assert.Throws<ImportValidationException>(() => JsonSerializer.Deserialize<LibraryEntry>(json));
+        Assert.Equal(new ImportValidationError.EntryIdInvalidGuid("not-a-guid"), exception.Error);
     }
 
     [Fact]
-    public void LibraryEntryIdJsonConverter_NonStringToken_ThrowsJsonException()
+    public void LibraryEntryIdJsonConverter_NonStringToken_ThrowsImportValidationException()
     {
         // GUID written as JSON number, not string.
         var json = """{"Kind":"Filter","Id":12345,"Name":"x","CreatedUtc":"2026-05-31T12:00:00+00:00","Filter":{"Color":0,"ComparisonText":"Level == 4","IsExcluded":false,"Mode":"Advanced"}}""";
 
-        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<LibraryEntry>(json));
+        var exception = Assert.Throws<ImportValidationException>(() => JsonSerializer.Deserialize<LibraryEntry>(json));
+        Assert.Equal(new ImportValidationError.EntryIdExpectedJsonString(JsonTokenType.Number), exception.Error);
     }
 
     [Fact]
