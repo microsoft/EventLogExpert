@@ -23,9 +23,9 @@
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
     <PackageVersion Include="NSubstitute" Version="6.2.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
-    <PackageVersion Include="xunit.v3.mtp-off" Version="3.2.2" />
+    <PackageVersion Include="xunit.v3.mtp-off" Version="4.0.0" />
     <PackageVersion Include="bunit" Version="2.9.0" />
   </ItemGroup>
 </Project>

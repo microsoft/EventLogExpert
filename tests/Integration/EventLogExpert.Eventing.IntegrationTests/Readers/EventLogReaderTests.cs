@@ -281,7 +281,7 @@ public sealed class EventLogReaderTests
         using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
-        bool success = reader.TryGetEvents(out var events);
+        bool success = reader.TryGetEvents(out var events, 30);
 
         // Assert
         Assert.True(success);

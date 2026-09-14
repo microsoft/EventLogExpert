@@ -337,6 +337,12 @@ public sealed class FilterEditorCoreTests : BunitContext
             .Add(p => p.PendingDraft, draft));
 
         Assert.True(component.Instance.IsEditing);
+
+        var adoptedFilter = typeof(FilterEditorCore)
+            .GetProperty("Filter", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(component.Instance);
+
+        Assert.Same(draft, adoptedFilter);
     }
 
     [Fact]
@@ -348,6 +354,9 @@ public sealed class FilterEditorCoreTests : BunitContext
             .Add(p => p.Value, saved));
 
         Assert.False(component.Instance.IsEditing);
+
+        var savedHeaderText = component.Find(".filter-row-header-text");
+        Assert.Equal("Id == 1000", savedHeaderText.TextContent);
     }
 
     [Fact]

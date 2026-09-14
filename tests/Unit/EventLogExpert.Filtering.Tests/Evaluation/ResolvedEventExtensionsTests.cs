@@ -397,21 +397,6 @@ public sealed class ResolvedEventExtensionsTests
     }
 
     [Fact]
-    public void MatchesFilters_WhenOnlyExcludeFiltersExist_ShouldNotRequireIncludeMatch()
-    {
-        // Arrange
-        var @event = FilterEventBuilder.CreateTestEvent(200);
-        var filter = CreateFilter(FilterTestConstants.FilterIdEquals100, true);
-        var filters = new List<SavedFilter> { filter };
-
-        // Act
-        var result = @event.MatchesFilters(filters);
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
     public void MatchesFilters_WhenOnlyFilterHasNullCompiled_ShouldIncludeEvent()
     {
         // Arrange

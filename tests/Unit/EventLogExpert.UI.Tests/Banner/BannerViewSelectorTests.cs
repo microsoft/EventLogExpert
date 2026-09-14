@@ -107,9 +107,11 @@ public sealed class BannerViewSelectorTests
     [Fact]
     public void BuildCycle_AttentionEntriesEmpty_AttentionExcluded_RegardlessOfDismissedFlag()
     {
-        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+        ErrorBannerEntry error = BuildError();
+
+        IReadOnlyList<BannerCycleItem> notDismissed = BannerViewSelector
             .BuildCycle(currentCritical: null,
-                errorBanners: [],
+                errorBanners: [error],
                 attentionEntries: [],
                 attentionDismissed: false,
                 attentionSuppressedByModalContext: false,
@@ -117,7 +119,22 @@ public sealed class BannerViewSelectorTests
                 exportProgress: null,
                 infoBanners: []);
 
-        Assert.Empty(result);
+        IReadOnlyList<BannerCycleItem> dismissed = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [error],
+                attentionEntries: [],
+                attentionDismissed: true,
+                attentionSuppressedByModalContext: false,
+                backgroundProgress: null,
+                exportProgress: null,
+                infoBanners: []);
+
+        Assert.DoesNotContain(notDismissed, item => item.View == BannerView.Attention);
+        Assert.DoesNotContain(dismissed, item => item.View == BannerView.Attention);
+        Assert.Single(notDismissed);
+        Assert.Equal(new BannerCycleItem(BannerView.Error, 0, error.Id), notDismissed[0]);
+        Assert.Single(dismissed);
+        Assert.Equal(new BannerCycleItem(BannerView.Error, 0, error.Id), dismissed[0]);
     }
 
     [Fact]

@@ -174,12 +174,12 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void LoadProviderDetails_WhenProviderNotFound_ShouldReturnDetailsWithProviderName()
     {
-        EventMessageProvider provider = new(Constants.TestProviderName);
+        EventMessageProvider provider = new(Constants.NonExistentProviderName);
 
         var details = provider.LoadProviderDetails();
 
         Assert.NotNull(details);
-        Assert.Equal(Constants.TestProviderName, details.ProviderName);
+        Assert.Equal(Constants.NonExistentProviderName, details.ProviderName);
     }
 
     [Fact]
