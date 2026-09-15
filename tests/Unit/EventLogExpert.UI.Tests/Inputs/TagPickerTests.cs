@@ -146,6 +146,18 @@ public sealed class TagPickerTests : BunitContext
     }
 
     [Fact]
+    public void Placeholder_WhenProvided_RendersOnEmptyInput()
+    {
+        var component = Render<TagPicker>(parameters => parameters
+            .Add(p => p.Value, ImmutableList<string>.Empty)
+            .Add(p => p.SuggestionSource, [])
+            .Add(p => p.Placeholder, "Localized placeholder"));
+
+        var input = component.Find(".tag-picker-input");
+        Assert.Equal("Localized placeholder", input.GetAttribute("placeholder"));
+    }
+
+    [Fact]
     public void RemoveButton_RemovesTagAndInvokesValueChanged()
     {
         ImmutableList<string>? lastValue = null;
@@ -160,6 +172,18 @@ public sealed class TagPickerTests : BunitContext
 
         Assert.NotNull(lastValue);
         Assert.Equal(["beta"], lastValue);
+    }
+
+    [Fact]
+    public void RemoveTagAriaLabelFormat_WhenProvided_FormatsChipAriaPerTag()
+    {
+        var component = Render<TagPicker>(parameters => parameters
+            .Add(p => p.Value, ImmutableList.Create("exchange"))
+            .Add(p => p.SuggestionSource, [])
+            .Add(p => p.RemoveTagAriaLabelFormat, "Quitar {0}"));
+
+        var removeButton = component.Find(".tag-picker-chip-remove");
+        Assert.Equal("Quitar exchange", removeButton.GetAttribute("aria-label"));
     }
 
     [Fact]

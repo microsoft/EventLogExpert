@@ -614,6 +614,24 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
+    public async Task TagEditor_RoutesTagPickerPlaceholderAndRemoveChipAriaThroughLocalizer()
+    {
+        var empty = RenderRow(BuildSavedFilter("Entry"));
+        await empty.Find(".library-entry-tag-add-inline").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal(
+            "[[FilterLibrary_Entry_TagInputPlaceholder]]",
+            empty.Find(".tag-picker-input").GetAttribute("placeholder"));
+
+        var tagged = RenderRow(BuildSavedFilter("Entry") with { Tags = ["alpha"] });
+        await tagged.Find(".library-entry-tag-add-inline").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal(
+            "[[FilterLibrary_Entry_RemoveTagChipAria]]",
+            tagged.Find(".tag-picker-chip-remove").GetAttribute("aria-label"));
+    }
+
+    [Fact]
     public async Task UnfavoriteOnFavoritesTab_InvokesPendingFocusBeforeToggle()
     {
         var entry = BuildSavedFilter("X") with { IsFavorite = true };

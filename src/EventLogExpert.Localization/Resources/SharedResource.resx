@@ -3719,6 +3719,14 @@
     <value>Remove tag {0}</value>
     <comment>Filter library row remove tag button accessible name. {0} is the tag name.</comment>
   </data>
+  <data name="FilterLibrary_Entry_TagInputPlaceholder" xml:space="preserve">
+    <value>Add tag…</value>
+    <comment>Filter library tag input placeholder shown when no tags have been entered.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_RemoveTagChipAria" xml:space="preserve">
+    <value>Remove {0}</value>
+    <comment>Filter library tag input chip remove button accessible name. {0} is the tag name.</comment>
+  </data>
   <data name="FilterLibrary_Entry_ShowAllTagsAria" xml:space="preserve">
     <value>Show all {0} tags</value>
     <comment>Filter library row show all tags button accessible name. {0} is the tag count.</comment>

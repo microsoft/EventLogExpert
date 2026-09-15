@@ -32,6 +32,8 @@ else
 
         <div class="library-saved-tab-new-draft-tags">
             <TagPicker AriaLabel="@Localizer["FilterLibrary_Entry_NewSavedFilterTagsAria"]"
+                Placeholder="@Localizer["FilterLibrary_Entry_TagInputPlaceholder"]"
+                RemoveTagAriaLabelFormat="@Localizer["FilterLibrary_Entry_RemoveTagChipAria"]"
                 SuggestionSource="@AllLibraryTags"
                 Value="@_draftTags"
                 ValueChanged="@OnDraftTagsChangedAsync" />
