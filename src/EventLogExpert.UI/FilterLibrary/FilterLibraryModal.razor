@@ -1,6 +1,6 @@
 @inherits ModalBase<bool>
 
-<ModalChrome AriaLabel="Filter Library"
+<ModalChrome AriaLabel="@Localizer["FilterLibrary_ModalAria"]"
     BodyLayout="ModalBodyLayout.Flex"
     Footer="FooterPreset.ImportExportClose"
     Height="80%"
@@ -17,20 +17,20 @@
         @if (LibraryLoadStatus.Current.LoadError)
         {
             <div class="filter-library-error" role="alert">
-                <p>Could not load saved filters or filter sets. See trace log for details.</p>
-                <Button OnClick="RetryLoad">Retry</Button>
+                <p>@Localizer["FilterLibrary_LoadError"]</p>
+                <Button OnClick="RetryLoad">@Localizer["FilterLibrary_Retry"]</Button>
             </div>
         }
         else if (!LibraryLoadStatus.Current.IsLoaded)
         {
-            <p aria-busy="true" class="filter-library-loading">Loading filter library&hellip;</p>
+            <p aria-busy="true" class="filter-library-loading">@Localizer["FilterLibrary_Loading"]</p>
         }
         else
         {
             <CascadingValue IsFixed="true" Value="_authoringContext">
                 <SidebarTabs IsTabpanelFocusable="@IsTabpanelEmpty"
                     TTab="LibraryTab"
-                    TablistAriaLabel="Filter library views"
+                    TablistAriaLabel="@Localizer["FilterLibrary_ViewsAria"]"
                     Tabs="@CurrentTabLabels"
                     @bind-ActiveTab="_activeTab"
                     @ref="_sidebarTabsRef">
@@ -41,19 +41,19 @@
                         }
                         @if (AllLibraryTags.Count > 0)
                         {
-                            <div aria-label="Filter by tag"
+                            <div aria-label="@Localizer["FilterLibrary_TagFilterAria"]"
                                 class="library-tag-filter-bar"
                                 @onkeydown="HandleTagFilterBarKeyDown"
                                 role="group">
-                                <span class="library-tag-filter-bar-label">Tags:</span>
+                                <span class="library-tag-filter-bar-label">@Localizer["FilterLibrary_TagsLabel"]</span>
                                 <Button CssClass="library-tag-management-trigger"
                                     IconClass="bi bi-gear"
                                     IconOnly
                                     OnClick="ToggleTagManagement"
                                     aria-controls="@(_isTagManagementExpanded ? tagManagementPanelId : null)"
                                     aria-expanded="@(_isTagManagementExpanded ? "true" : "false")"
-                                    aria-label="@(_isTagManagementExpanded ? "Hide tag management" : "Manage tags")"
-                                    title="Manage tags" />
+                                    aria-label="@(_isTagManagementExpanded ? Localizer["FilterLibrary_HideTagManagementAria"] : Localizer["FilterLibrary_ManageTagsAria"])"
+                                    title="@Localizer["FilterLibrary_ManageTagsTitle"]" />
                                 @{
                                     var visibleTags = AllLibraryTags.Take(TagFilterBarMaxVisible).ToList();
                                     var hiddenTagsCount = AllLibraryTags.Count - visibleTags.Count;
@@ -74,8 +74,8 @@
                                         OnClick="ToggleTagOverflowExpanded"
                                         aria-controls="@(_isTagOverflowExpanded ? tagOverflowRegionId : null)"
                                         aria-expanded="@(_isTagOverflowExpanded ? "true" : "false")"
-                                        aria-label="@(_isTagOverflowExpanded ? "Hide additional tags" : $"Show {hiddenTagsCount} additional tags")">
-                                        @(_isTagOverflowExpanded ? "- less" : $"+{hiddenTagsCount} more")
+                                        aria-label="@(_isTagOverflowExpanded ? Localizer["FilterLibrary_HideAdditionalTagsAria"] : ShowAdditionalTagsAria(hiddenTagsCount))">
+                                        @(_isTagOverflowExpanded ? Localizer["FilterLibrary_ShowLess"] : Localizer["FilterLibrary_ShowMore", hiddenTagsCount])
                                     </ChromelessButton>
                                 }
                                 @if (_isTagOverflowExpanded && hiddenTagsCount > 0)

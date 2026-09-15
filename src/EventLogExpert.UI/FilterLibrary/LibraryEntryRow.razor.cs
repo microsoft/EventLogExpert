@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
@@ -12,6 +13,7 @@ using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
 
@@ -70,13 +72,15 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
-    private string FavoriteAriaLabel => Entry.IsFavorite
-        ? $"Remove {Entry.Name} from favorites"
-        : $"Add {Entry.Name} to favorites";
+    private string FavoriteAriaLabel => Entry.IsFavorite ?
+        Localizer["FilterLibrary_Entry_RemoveFavoriteAria", Entry.Name] :
+        Localizer["FilterLibrary_Entry_AddFavoriteAria", Entry.Name];
 
     private string FavoriteIconClass => Entry.IsFavorite ? "bi bi-star-fill" : "bi bi-star";
 
-    private string FavoriteTitle => Entry.IsFavorite ? "Remove from favorites" : "Add to favorites";
+    private string FavoriteTitle => Entry.IsFavorite ?
+        Localizer["FilterLibrary_Entry_RemoveFavoriteTitle"] :
+        Localizer["FilterLibrary_Entry_AddFavoriteTitle"];
 
     [Inject] private IFilterLibraryCommands FilterLibraryCommands { get; init; } = null!;
 
@@ -87,7 +91,9 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
-    private string KindAriaLabel => Entry is LibraryEntryFilterSet ? "Filter set" : "Filter";
+    private string KindAriaLabel => Entry is LibraryEntryFilterSet ?
+        Localizer["FilterLibrary_Entry_FilterSetKindAria"] :
+        Localizer["FilterLibrary_Entry_FilterKindAria"];
 
     private string KindIconClass =>
         Entry is LibraryEntryFilterSet ?
@@ -95,6 +101,8 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
             "bi bi-funnel library-entry-kind-icon";
 
     [Inject] private ILibraryEntriesSource LibraryEntries { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private IMenuService MenuService { get; init; } = null!;
 
@@ -153,31 +161,16 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         base.OnInitialized();
     }
 
-    private static string FormatRelativeTime(DateTimeOffset lastUsed)
-    {
-        var diff = DateTimeOffset.UtcNow - lastUsed;
-
-        if (diff.TotalSeconds < 60) { return "just now"; }
-
-        if (diff.TotalMinutes < 60) { return $"{(int)diff.TotalMinutes}m ago"; }
-
-        if (diff.TotalHours < 24) { return $"{(int)diff.TotalHours}h ago"; }
-
-        return diff.TotalDays < 7 ?
-            $"{(int)diff.TotalDays}d ago" :
-            lastUsed.ToLocalTime().ToString("yyyy-MM-dd");
-    }
-
     private MenuItem BuildAddToFilterSetItem(LibraryEntrySavedFilter filterEntry)
     {
         var children = new List<MenuItem>
         {
-            MenuItem.Item("+ New filter set...", () => OnNewFilterSetSelectedAsync(filterEntry)),
+            MenuItem.Item(Localizer["FilterLibrary_Entry_NewFilterSetMenu"], () => OnNewFilterSetSelectedAsync(filterEntry)),
         };
 
         if (AllFilterSets.Count <= 0)
         {
-            return MenuItem.SubMenu("Add to filter set...", children);
+            return MenuItem.SubMenu(Localizer["FilterLibrary_Entry_AddToFilterSetMenu"], children);
         }
 
         children.Add(MenuItem.Separator());
@@ -189,19 +182,19 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
             children.Add(MenuItem.Item(pname, () => OnExistingFilterSetSelectedAsync(filterEntry, pid, pname)));
         }
 
-        return MenuItem.SubMenu("Add to filter set...", children);
+        return MenuItem.SubMenu(Localizer["FilterLibrary_Entry_AddToFilterSetMenu"], children);
     }
 
     private IReadOnlyList<MenuItem> BuildMoreMenu()
     {
         var items = new List<MenuItem>
         {
-            MenuItem.Item("Replace current filters", OnReplaceAsync),
+            MenuItem.Item(Localizer["FilterLibrary_Entry_ReplaceCurrentMenu"], OnReplaceAsync),
         };
 
         if (ShowSaveToLibraryItem)
         {
-            items.Add(MenuItem.Item("Save to Library", OnSaveToLibraryAsync));
+            items.Add(MenuItem.Item(Localizer["FilterLibrary_Entry_SaveToLibraryMenu"], OnSaveToLibraryAsync));
         }
 
         if (Entry is LibraryEntrySavedFilter filterEntry)
@@ -211,28 +204,43 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
         if (Entry.Origin == LibraryEntryOrigin.UserSaved)
         {
-            items.Add(MenuItem.Item("Rename...", OnRenameAsync));
+            items.Add(MenuItem.Item(Localizer["FilterLibrary_Entry_RenameMenu"], OnRenameAsync));
         }
 
         if (Entry is LibraryEntryFilterSet && OnExportEntry.HasDelegate)
         {
-            items.Add(MenuItem.Item("Export...", OnExportEntryAsync));
+            items.Add(MenuItem.Item(Localizer["FilterLibrary_Entry_ExportMenu"], OnExportEntryAsync));
         }
 
         if (Entry is LibraryEntryFilterSet && OnCopyScenario.HasDelegate)
         {
-            items.Add(MenuItem.Item("Copy as scenario JSON", OnCopyScenarioAsync));
+            items.Add(MenuItem.Item(Localizer["FilterEditor_RowAction_CopyScenarioTitle"], OnCopyScenarioAsync));
         }
 
         if (Entry is LibraryEntryFilterSet && OnSaveScenario.HasDelegate)
         {
-            items.Add(MenuItem.Item("Save as scenario JSON", OnSaveScenarioAsync));
+            items.Add(MenuItem.Item(Localizer["FilterLibrary_Entry_SaveScenarioMenu"], OnSaveScenarioAsync));
         }
 
         items.Add(MenuItem.Separator());
-        items.Add(MenuItem.Item("Delete", OnDeleteAsync, isDanger: true));
+        items.Add(MenuItem.Item(Localizer["FilterLibrary_Entry_DeleteMenu"], OnDeleteAsync, isDanger: true));
 
         return items;
+    }
+
+    private string FormatRelativeTime(DateTimeOffset lastUsed)
+    {
+        var diff = DateTimeOffset.UtcNow - lastUsed;
+
+        if (diff.TotalSeconds < 60) { return Localizer["FilterLibrary_Entry_RelativeTime_JustNow"]; }
+
+        if (diff.TotalMinutes < 60) { return Localizer["FilterLibrary_Entry_RelativeTime_Minutes", (int)diff.TotalMinutes]; }
+
+        if (diff.TotalHours < 24) { return Localizer["FilterLibrary_Entry_RelativeTime_Hours", (int)diff.TotalHours]; }
+
+        return diff.TotalDays < 7 ?
+            Localizer["FilterLibrary_Entry_RelativeTime_Days", (int)diff.TotalDays] :
+            lastUsed.ToLocalTime().ToString("yyyy-MM-dd");
     }
 
     private bool HasDuplicateNameOfSameKind(string candidateName)
@@ -260,28 +268,36 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
         if (needsConfirm)
         {
-            var entryKind = Entry is LibraryEntryFilterSet p
-                ? $"filter set '{Entry.Name}' with {p.Filters.Count} filter{(p.Filters.Count == 1 ? "" : "s")}"
-                : $"filter '{Entry.Name}'";
+            var message = Entry is LibraryEntryFilterSet filterSet ?
+                LocalizedCount.OneOrManyRaw(
+                    Localizer,
+                    filterSet.Filters.Count,
+                    "FilterLibrary_Entry_DeleteFilterSetMessage_One",
+                    "FilterLibrary_Entry_DeleteFilterSetMessage_Many",
+                    Entry.Name,
+                    filterSet.Filters.Count) :
+                Localizer["FilterLibrary_Entry_DeleteFilterMessage", Entry.Name];
 
             var confirmed = await AlertDialogService.ShowAlert(
-                "Delete from library?",
-                $"This will permanently delete the {entryKind}. This cannot be undone.",
-                "Delete",
-                "Cancel");
+                Localizer["FilterLibrary_Entry_DeleteTitle"],
+                message,
+                Localizer["FilterLibrary_Entry_DeleteMenu"],
+                Localizer["Modal_Cancel"]);
 
             if (!confirmed) { return; }
         }
 
         await OnRequestPendingFocus.InvokeAsync(Entry.Id);
         await OnDelete.InvokeAsync(Entry.Id);
-        AnnouncementService.Announce($"Deleted {Entry.Name} from library");
+
+        AnnouncementService.Announce(Localizer["FilterLibrary_Entry_DeletedAnnouncement", Entry.Name]);
     }
 
     private async Task OnExistingFilterSetSelectedAsync(LibraryEntrySavedFilter filterEntry, LibraryEntryId filterSetId, string filterSetName)
     {
         await OnAddToFilterSet.InvokeAsync(new AddToFilterSetIntent(filterEntry.Filter, filterSetId, null, filterEntry.Id));
-        AnnouncementService.Announce($"Added filter to filter set '{filterSetName}'");
+
+        AnnouncementService.Announce(Localizer["FilterLibrary_Entry_AddedToFilterSetAnnouncement", filterSetName]);
     }
 
     private Task OnExportEntryAsync() => OnExportEntry.InvokeAsync(Entry.Id);
@@ -291,17 +307,17 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     private async Task OnNewFilterSetSelectedAsync(LibraryEntrySavedFilter filterEntry)
     {
         var name = await AlertDialogService.DisplayPrompt(
-            "Filter set name",
-            "What would you like to name this filter set?",
-            "New Filter Set",
+            Localizer["FilterLibrary_Entry_NewFilterSetPromptTitle"],
+            Localizer["FilterLibrary_Entry_NewFilterSetPromptMessage"],
+            Localizer["FilterLibrary_Entry_NewFilterSetPromptInitialValue"],
             candidate =>
             {
                 var trimmed = candidate?.Trim() ?? string.Empty;
 
-                if (string.IsNullOrEmpty(trimmed)) { return "Name cannot be empty."; }
+                if (string.IsNullOrEmpty(trimmed)) { return Localizer["FilterLibrary_Entry_NameEmptyValidation"].Value; }
 
                 return AllFilterSets.Any(fs => string.Equals(fs.Name, trimmed, StringComparison.OrdinalIgnoreCase)) ?
-                    $"A filter set named '{trimmed}' already exists." : null;
+                    Localizer["FilterLibrary_Entry_FilterSetExistsValidation", trimmed].Value : null;
             });
 
         _pendingFocusMoreButton = true;
@@ -309,7 +325,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         if (string.IsNullOrWhiteSpace(name)) { return; }
 
         await OnAddToFilterSet.InvokeAsync(new AddToFilterSetIntent(filterEntry.Filter, null, name, filterEntry.Id));
-        AnnouncementService.Announce($"Added filter to new filter set '{name}'");
+        AnnouncementService.Announce(Localizer["FilterLibrary_Entry_AddedToNewFilterSetAnnouncement", name]);
     }
 
     private Task OnRemoveTagAsync(string tag)
@@ -319,7 +335,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         if (newTags.Count == Entry.Tags.Count) { return Task.CompletedTask; }
 
         FilterLibraryCommands.SetEntryTags(Entry.Id, newTags);
-        AnnouncementService.Announce($"Removed tag '{tag}' from {Entry.Name}");
+        AnnouncementService.Announce(Localizer["FilterLibrary_Entry_TagRemovedAnnouncement", tag, Entry.Name]);
 
         return Task.CompletedTask;
     }
@@ -327,18 +343,18 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     private async Task OnRenameAsync()
     {
         var newName = await AlertDialogService.DisplayPrompt(
-            "Rename entry",
-            "What would you like to rename this entry to?",
+            Localizer["FilterLibrary_Entry_RenamePromptTitle"],
+            Localizer["FilterLibrary_Entry_RenamePromptMessage"],
             Entry.Name,
             candidate =>
             {
                 var trimmed = candidate?.Trim() ?? string.Empty;
 
-                if (string.IsNullOrEmpty(trimmed)) { return "Name cannot be empty."; }
+                if (string.IsNullOrEmpty(trimmed)) { return Localizer["FilterLibrary_Entry_NameEmptyValidation"].Value; }
 
                 if (string.Equals(trimmed, Entry.Name, StringComparison.Ordinal)) { return null; }
 
-                return HasDuplicateNameOfSameKind(trimmed) ? $"An entry named '{trimmed}' already exists." : null;
+                return HasDuplicateNameOfSameKind(trimmed) ? Localizer["FilterLibrary_Entry_EntryExistsValidation", trimmed].Value : null;
             });
 
         _pendingFocusMoreButton = true;
@@ -350,7 +366,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         if (string.Equals(trimmed, Entry.Name, StringComparison.Ordinal)) { return; }
 
         FilterLibraryCommands.SetEntryName(Entry.Id, trimmed);
-        AnnouncementService.Announce($"Renamed entry to '{trimmed}'");
+        AnnouncementService.Announce(Localizer["FilterLibrary_Entry_RenamedAnnouncement", trimmed]);
     }
 
     private async Task OnReplaceAsync()
@@ -358,11 +374,10 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         if (!ActiveFilters.Current.IsEmpty)
         {
             var confirmed = await AlertDialogService.ShowAlert(
-                "Replace current filters?",
-                $"This will replace your current filter list with the filters from '{Entry.Name}'. " +
-                "Your date filter and any in-progress filter drafts will be kept.",
-                "Replace",
-                "Cancel");
+                Localizer["FilterLibrary_Entry_ReplacePromptTitle"],
+                Localizer["FilterLibrary_Entry_ReplacePromptMessage", Entry.Name],
+                Localizer["FilterPane_Action_Replace"],
+                Localizer["Modal_Cancel"]);
 
             if (!confirmed) { return; }
         }
@@ -375,7 +390,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
     private async Task OnSaveToLibraryAsync()
     {
         await OnSaveToLibrary.InvokeAsync(Entry.Id);
-        AnnouncementService.Announce($"Saved {Entry.Name} to library");
+        AnnouncementService.Announce(Localizer["FilterLibrary_Entry_SavedToLibraryAnnouncement", Entry.Name]);
     }
 
     private async Task OnTagsChangedAsync(ImmutableList<string> tags)
@@ -397,9 +412,10 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         if (willLeaveActiveTab) { await OnRequestPendingFocus.InvokeAsync(Entry.Id); }
 
         await OnToggleFavorite.InvokeAsync(new FavoriteToggleIntent(Entry.Id, newIsFavorite));
-        AnnouncementService.Announce(newIsFavorite
-            ? $"Marked {Entry.Name} as favorite"
-            : $"Removed {Entry.Name} from favorites");
+
+        AnnouncementService.Announce(newIsFavorite ?
+            Localizer["FilterLibrary_Entry_MarkedFavoriteAnnouncement", Entry.Name] :
+            Localizer["FilterLibrary_Entry_RemovedFavoriteAnnouncement", Entry.Name]);
     }
 
     private void ToggleEditTagsMode()

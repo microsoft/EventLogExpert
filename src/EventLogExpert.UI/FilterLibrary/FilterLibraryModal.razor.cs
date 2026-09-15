@@ -363,31 +363,37 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             var entries = LibraryEntries.Current;
             var json = ExportService.Serialize(entries);
             var path = await FilePickerService.PickSaveAsync(
-                "Export Filter Library",
+                Localizer["FilterLibrary_ExportLibraryTitle"],
                 [".json"],
                 suggestedFileName: $"filter-library-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.json");
 
             if (string.IsNullOrEmpty(path)) { return; }
 
             await File.WriteAllTextAsync(path, json);
-            AnnouncementService.Announce($"Exported {Plural(entries.Count, "entry", "entries")}");
+
+            AnnouncementService.Announce(LocalizedCount.OneOrManyRaw(
+                Localizer,
+                entries.Count,
+                "FilterLibrary_ExportedEntries_One",
+                "FilterLibrary_ExportedEntries_Many",
+                entries.Count));
         }
         catch (Exception ex) when (
             ex is UnauthorizedAccessException or SecurityException or
                 PathTooLongException or DirectoryNotFoundException or IOException)
         {
-            await ShowImportExportErrorAsync("Export failed", ex.Message);
+            await ShowImportExportErrorAsync(Localizer["FilterPane_ExportFailed_Title"], ex.Message);
         }
     }
 
     protected override async Task OnImportAsync()
     {
-        string? path;
         string json;
 
         try
         {
-            path = await FilePickerService.PickAsync("Import Filter Library", [".json"]);
+            string? path = await FilePickerService.PickAsync(Localizer["FilterLibrary_ImportLibraryTitle"], [".json"]);
+
             if (string.IsNullOrEmpty(path)) { return; }
 
             json = await File.ReadAllTextAsync(path);
@@ -396,7 +402,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             ex is UnauthorizedAccessException or SecurityException or
                 PathTooLongException or DirectoryNotFoundException or IOException)
         {
-            await ShowImportExportErrorAsync("Import failed", ex.Message);
+            await ShowImportExportErrorAsync(Localizer["FilterLibrary_ImportFailedTitle"], ex.Message);
+
             return;
         }
 
@@ -404,7 +411,8 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
         if (preflight.Error is not null)
         {
-            await ShowImportExportErrorAsync("Import error", ImportValidationErrorLocalizer.Describe(Localizer, preflight.Error));
+            await ShowImportExportErrorAsync(Localizer["FilterLibrary_ImportErrorTitle"],
+                ImportValidationErrorLocalizer.Describe(Localizer, preflight.Error));
 
             return;
         }
@@ -426,14 +434,15 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
                     if (preflight.Error is not null)
                     {
-                        await ShowImportExportErrorAsync("Import error", ImportValidationErrorLocalizer.Describe(Localizer, preflight.Error));
+                        await ShowImportExportErrorAsync(Localizer["FilterLibrary_ImportErrorTitle"],
+                            ImportValidationErrorLocalizer.Describe(Localizer, preflight.Error));
 
                         return;
                     }
 
                     if (!preflight.ImportBlocked && !HasApplicableImportChanges(preflight))
                     {
-                        await ShowImportExportErrorAsync("Import", FilterImportTextComposer.NothingToImport(Localizer, preflight));
+                        await ShowImportExportErrorAsync(Localizer["Modal_Import"], FilterImportTextComposer.NothingToImport(Localizer, preflight));
 
                         return;
                     }
@@ -508,9 +517,6 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private static bool MatchesTagFilter(LibraryEntry entry, ImmutableList<string> selectedTags) =>
         selectedTags.Count == 0 || selectedTags.All(t => entry.Tags.Contains(t, StringComparer.OrdinalIgnoreCase));
 
-    private static string Plural(int count, string singular, string plural) =>
-        $"{count} {(count == 1 ? singular : plural)}";
-
     private static string SanitizeForFileName(string name)
     {
         var invalid = Path.GetInvalidFileNameChars();
@@ -522,7 +528,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     private Task CopyLibraryRowAsync(SavedFilter filter) =>
         _clipboardExporter.CopyAsync(
             ScenarioAuthoringService.ExportRows([filter], []),
-            "Filter copied to the clipboard as scenario JSON.",
+            Localizer["FilterPane_CopyFilterSuccess"],
             ScenarioExportSubject.SingleFilter);
 
     private LibraryEntryFilterSet? FindFilterSet(LibraryEntryId entryId) =>
@@ -530,13 +536,13 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private string GetEmptyStateMessage(LibraryTab tab)
     {
-        if (SelectedTagsInLibrary(tab).Count > 0) { return "No entries match the selected tags."; }
+        if (SelectedTagsInLibrary(tab).Count > 0) { return Localizer["FilterLibrary_Empty_TagFilter"]; }
 
         return tab switch
         {
-            LibraryTab.Favorites => "No favorited filters or filter sets yet. Star an entry to add it here.",
-            LibraryTab.PreviouslyUsed => "No filters have been applied recently.",
-            _ => "No saved filters or filter sets yet. Use \"Save as Filter Set\" from the filter pane.",
+            LibraryTab.Favorites => Localizer["FilterLibrary_Empty_Favorites"],
+            LibraryTab.PreviouslyUsed => Localizer["FilterLibrary_Empty_PreviouslyUsed"],
+            _ => Localizer["FilterLibrary_Empty_Saved"],
         };
     }
 
@@ -570,7 +576,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         FilterLibraryCommands.ApplyEntry(id);
         var entry = LibraryEntries.Current.FirstOrDefault(e => e.Id.Equals(id));
 
-        if (entry is not null) { AnnouncementService.Announce($"Applied {entry.Name}"); }
+        if (entry is not null) { AnnouncementService.Announce(Localizer["FilterLibrary_AppliedAnnouncement", entry.Name]); }
         
         await CompleteAsync(true);
     }
@@ -581,7 +587,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
         await _clipboardExporter.CopyAsync(
             ScenarioAuthoringService.ExportRows([.. filterSet.Filters], []),
-            $"'{filterSet.Name}' copied to the clipboard as scenario JSON.",
+            Localizer["FilterLibrary_FilterSetCopiedAnnouncement", filterSet.Name],
             ScenarioExportSubject.FilterSet);
     }
 
@@ -598,20 +604,20 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             var json = ExportService.Serialize([entry]);
             var suggested = $"{SanitizeForFileName(entry.Name)}-{DateTimeOffset.Now:yyyyMMdd}.json";
             var path = await FilePickerService.PickSaveAsync(
-                "Export Filter Entry",
+                Localizer["FilterLibrary_ExportEntryTitle"],
                 [".json"],
                 suggestedFileName: suggested);
 
             if (string.IsNullOrEmpty(path)) { return; }
 
             await File.WriteAllTextAsync(path, json);
-            AnnouncementService.Announce($"Exported '{entry.Name}'");
+            AnnouncementService.Announce(Localizer["FilterLibrary_ExportedEntryAnnouncement", entry.Name]);
         }
         catch (Exception ex) when (
             ex is UnauthorizedAccessException or SecurityException or
                 PathTooLongException or DirectoryNotFoundException or IOException)
         {
-            await ShowImportExportErrorAsync("Export failed", ex.Message);
+            await ShowImportExportErrorAsync(Localizer["FilterPane_ExportFailed_Title"], ex.Message);
         }
     }
 
@@ -620,7 +626,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         FilterLibraryCommands.ReplaceWithEntry(id);
         var entry = LibraryEntries.Current.FirstOrDefault(e => e.Id.Equals(id));
 
-        if (entry is not null) { AnnouncementService.Announce($"Replaced filters with {entry.Name}"); }
+        if (entry is not null) { AnnouncementService.Announce(Localizer["FilterLibrary_ReplacedAnnouncement", entry.Name]); }
 
         await CompleteAsync(true);
     }
@@ -641,7 +647,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         if (_clipboardExporter.NotExportable(export, ScenarioExportSubject.FilterSet)) { return; }
 
         var suggested = $"{SanitizeForFileName(filterSet.Name)}-scenario-{DateTimeOffset.Now:yyyyMMdd}.json";
-        var path = await FilePickerService.PickSaveAsync("Export scenario JSON", [".json"], suggestedFileName: suggested);
+        var path = await FilePickerService.PickSaveAsync(Localizer["FilterPane_ExportScenario_Title"], [".json"], suggestedFileName: suggested);
 
         if (string.IsNullOrEmpty(path)) { return; }
 
@@ -653,12 +659,12 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
             ex is UnauthorizedAccessException or SecurityException or
                 PathTooLongException or DirectoryNotFoundException or IOException)
         {
-            await ShowImportExportErrorAsync("Export failed", ex.Message);
+            await ShowImportExportErrorAsync(Localizer["FilterPane_ExportFailed_Title"], ex.Message);
 
             return;
         }
 
-        await _clipboardExporter.AnnounceAsync($"Scenario JSON saved to {path}.", export.Warnings);
+        await _clipboardExporter.AnnounceAsync(Localizer["FilterPane_ScenarioSaved", path], export.Warnings);
     }
 
     private void HandleSaveToLibrary(LibraryEntryId id) => FilterLibraryCommands.SaveEntry(id);
@@ -682,7 +688,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
         _selectedTagsByTab[_activeTab] = ImmutableList<string>.Empty;
         _justClearedTags = true;
-        AnnouncementService.Announce("Tag filters cleared");
+        AnnouncementService.Announce(Localizer["FilterLibrary_TagFiltersClearedAnnouncement"]);
         StateHasChanged();
     }
 
@@ -716,17 +722,17 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     {
         if (preflight.ImportBlocked)
         {
-            await ShowImportExportErrorAsync("Import blocked", FilterImportTextComposer.Preview(Localizer, preflight));
+            await ShowImportExportErrorAsync(Localizer["FilterLibrary_ImportBlockedTitle"], FilterImportTextComposer.Preview(Localizer, preflight));
 
             return;
         }
 
         var summary = FilterImportTextComposer.ImportConfirmation(Localizer, preflight, keptEmptyValuesAsIs);
         var request = new InlineAlertRequest(
-            Title: "Confirm import",
+            Title: Localizer["FilterLibrary_ConfirmImportTitle"],
             Message: summary,
-            AcceptLabel: "Import",
-            CancelLabel: "Cancel",
+            AcceptLabel: Localizer["Modal_Import"],
+            CancelLabel: Localizer["Modal_Cancel"],
             IsPrompt: false,
             PromptInitialValue: null);
 
@@ -817,13 +823,21 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         return [.. _selectedTagsByTab[tab].Where(available.Contains)];
     }
 
+    private string ShowAdditionalTagsAria(int hiddenTagsCount) =>
+        LocalizedCount.OneOrManyRaw(
+            Localizer,
+            hiddenTagsCount,
+            "FilterLibrary_ShowAdditionalTagsAria_One",
+            "FilterLibrary_ShowAdditionalTagsAria_Many",
+            hiddenTagsCount);
+
     private async Task ShowImportExportErrorAsync(string title, string message)
     {
         var request = new InlineAlertRequest(
             Title: title,
             Message: message,
             AcceptLabel: null,
-            CancelLabel: "OK",
+            CancelLabel: Localizer["Modal_Accept"],
             IsPrompt: false,
             PromptInitialValue: null);
 

@@ -83,7 +83,7 @@ public sealed class LibrarySavedTabHeaderTests : BunitContext
 
         await SetNameAsync(component, "Dup");
 
-        Assert.Contains("already exists", component.Find(".library-saved-tab-new-draft-error").TextContent);
+        Assert.Contains("[[FilterLibrary_Entry_SavedFilterExistsValidation(Dup)]]", component.Find(".library-saved-tab-new-draft-error").TextContent);
 
         await SetNameAsync(component, "Unique");
 
@@ -100,7 +100,7 @@ public sealed class LibrarySavedTabHeaderTests : BunitContext
         await SetNameAsync(component, "Dup");
         await TriggerRowPendingSaveAsync(component, SavedFilter.TryCreate("Level == 4")!);
 
-        Assert.Contains("already exists", component.Find(".library-saved-tab-new-draft-error").TextContent);
+        Assert.Contains("[[FilterLibrary_Entry_SavedFilterExistsValidation(Dup)]]", component.Find(".library-saved-tab-new-draft-error").TextContent);
         _commands.DidNotReceive().AddEntry(Arg.Any<LibraryEntry>());
     }
 
