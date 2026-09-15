@@ -123,7 +123,7 @@ public sealed class MenuRendererTests : BunitContext
     }
 
     [Fact]
-    public void MenuRenderer_WithAllItemsDisabled_RendersNoFocusableItemAndDoesNotThrow()
+    public async Task MenuRenderer_WithAllItemsDisabled_RendersNoFocusableItemAndDoesNotThrow()
     {
         var items = new[]
         {
@@ -132,6 +132,10 @@ public sealed class MenuRendererTests : BunitContext
         };
 
         var component = Render<MenuRenderer>(parameters => parameters.Add(p => p.Items, items));
+
+        var list = component.Find("ul.menu-list");
+        await list.KeyDownAsync(new KeyboardEventArgs { Key = "ArrowDown" });
+        await list.KeyDownAsync(new KeyboardEventArgs { Key = "Enter" });
 
         Assert.All(
             component.FindAll("li.menu-item"),

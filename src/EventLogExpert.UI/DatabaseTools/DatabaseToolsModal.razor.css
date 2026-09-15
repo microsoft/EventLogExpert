@@ -24,7 +24,10 @@
     min-width: 0;
     min-height: 0;
     height: 100%;
-    overflow: hidden;
+    /* Resize/zoom (WCAG 1.4.4): scroll the tab when the form + floored output exceed its height
+       (tall visible help, large text, or a short/zoomed window) so the run controls stay reachable
+       instead of being clipped; renders no scrollbar while it fits. */
+    overflow: hidden auto;
     gap: .5rem;
 }
 
@@ -59,6 +62,7 @@
 
 .db-tabs-container ::deep .db-tab-form .path-input-group {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: .5rem;
 }
@@ -104,6 +108,7 @@
     display: inline-flex;
     align-items: center;
     gap: .375rem;
+    white-space: normal;
 }
 
 .db-tabs-container ::deep .db-tab-form .direction-row {
@@ -111,6 +116,22 @@
     margin: 0 .5rem;
     color: var(--text-secondary);
     font-style: italic;
+}
+
+.db-tabs-container ::deep .db-tab-form .db-tab-help {
+    grid-column: 2;
+    margin: 0 .5rem;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.35;
+}
+
+/* A help line that sits inside a path-input-group is a flex sibling of the input + Browse button;
+   push it onto its own full-width row beneath them, aligned to the input's .5rem side margin. */
+.db-tabs-container ::deep .db-tab-form .path-input-group > .db-tab-help {
+    order: 1;
+    flex-basis: 100%;
+    margin: 0 .5rem;
 }
 
 .db-tabs-container ::deep .elevation-error {
@@ -150,17 +171,19 @@
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .db-tabs-container ::deep .db-tab-form .filter-error,
-    .db-tabs-container ::deep .db-tab-form .checkbox-label,
-    .db-tabs-container ::deep .db-tab-form .direction-row {
-        grid-column: 1;
+    /* Stacked single-column labels have the full row width, so let them wrap instead of keeping the
+       side-by-side ellipsis that truncated text under zoom (WCAG 1.4.4). */
+    .db-tabs-container ::deep .db-tab-form label {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
     }
 
-    /* Under narrow width / high text zoom the stacked form + floored output can exceed the tab
-       height; let the tab scroll so the form fields and output controls stay reachable instead of
-       being clipped */
-    .db-tabs-container ::deep .db-tab {
-        overflow-y: auto;
+    .db-tabs-container ::deep .db-tab-form .filter-error,
+    .db-tabs-container ::deep .db-tab-form .checkbox-label,
+    .db-tabs-container ::deep .db-tab-form .direction-row,
+    .db-tabs-container ::deep .db-tab-form .db-tab-help {
+        grid-column: 1;
     }
 }
 
