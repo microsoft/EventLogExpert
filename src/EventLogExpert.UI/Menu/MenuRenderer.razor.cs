@@ -329,15 +329,6 @@ public sealed partial class MenuRenderer : IAsyncDisposable
     {
         if (!item.IsEnabled)
         {
-            // A disabled item performs no action, but Enter/Space is still a keyboard interaction, so
-            // re-assert the keyboard ring on the (already focused) disabled item when a prior hover
-            // cleared it. Mouse activation (fromKeyboard: false) must not force the ring on.
-            if (fromKeyboard && !_focusFromKeyboard)
-            {
-                _focusFromKeyboard = true;
-                StateHasChanged();
-            }
-
             return;
         }
 
@@ -370,18 +361,6 @@ public sealed partial class MenuRenderer : IAsyncDisposable
         _focusFromKeyboard = false;
 
         if (!item.IsFocusable) { return; }
-
-        if (!item.IsEnabled)
-        {
-            if (_focusedIndex == index) { return; }
-
-            _focusedIndex = index;
-            _focusOnNextRender = true;
-
-            StateHasChanged();
-
-            return;
-        }
 
         if (item.Children is null && item.ChildrenLoader is null)
         {

@@ -120,7 +120,7 @@
     align-items: center;
     gap: 0.3rem;
     font-size: 0.78rem;
-    color: color-mix(in srgb, var(--text-secondary) 85%, transparent);
+    color: var(--text-secondary);
 }
 
 .scenario-detail__admin-badge {
@@ -155,9 +155,9 @@
 
 .scenario-detail__swatch {
     flex: 0 0 auto;
-    width: 0.85rem;
-    height: 0.85rem;
-    border: 1px solid var(--text-secondary);
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--text-secondary);
     border-radius: 3px;
     background-color: var(--hl-bg);
 }

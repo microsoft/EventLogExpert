@@ -29,7 +29,7 @@ public sealed record MenuItem
 
     public string? StatusText { get; init; }
 
-    public bool IsFocusable => !IsSeparator && (IsEnabled || DisabledReason is not null);
+    public bool IsFocusable => !IsSeparator && IsEnabled;
 
     public static MenuItem Separator() => new() { IsSeparator = true };
 
