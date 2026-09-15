@@ -17,14 +17,18 @@ public abstract record ImportValidationError
 
     public sealed record EntryIdInvalidGuid(string Raw) : ImportValidationError;
 
-    public sealed record InvalidBasicFilters(IReadOnlyList<string> EntryNames) : ImportValidationError
+    public sealed record InvalidBasicFilters(IReadOnlyList<string> EntryNames, int InvalidFilterCount) : ImportValidationError
     {
         public bool Equals(InvalidBasicFilters? other) =>
-            other is not null && EntryNames.SequenceEqual(other.EntryNames, StringComparer.Ordinal);
+            other is not null &&
+            InvalidFilterCount == other.InvalidFilterCount &&
+            EntryNames.SequenceEqual(other.EntryNames, StringComparer.Ordinal);
 
         public override int GetHashCode()
         {
             var hash = new HashCode();
+            hash.Add(typeof(InvalidBasicFilters));
+            hash.Add(InvalidFilterCount);
 
             foreach (var entryName in EntryNames)
             {

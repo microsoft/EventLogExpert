@@ -127,10 +127,17 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
             .Where(classified => classified.Class.HasNonParseable)
             .Select(classified => classified.Entry.Name)
             .ToList();
+        var invalidFilterCount = classifications
+            .Where(classified => classified.Class.HasNonParseable)
+            .Sum(classified => classified.Class.NonParseableCount);
 
         if (nonParseableNames.Count > 0)
         {
-            return new ImportPreflight([], [], [], error: new ImportValidationError.InvalidBasicFilters(nonParseableNames));
+            return new ImportPreflight(
+                [],
+                [],
+                [],
+                error: new ImportValidationError.InvalidBasicFilters(nonParseableNames, invalidFilterCount));
         }
 
         if (normalizeEmptyValues)
@@ -172,30 +179,36 @@ internal sealed class FilterLibraryExportService : IFilterLibraryExportService
             : (EmptyValueClass.NormalizableKeep, normalized);
     }
 
-    private static (bool HasNonParseable, bool HasFlagged) ClassifyEntry(LibraryEntry entry)
+    private static (bool HasNonParseable, bool HasFlagged, int NonParseableCount) ClassifyEntry(LibraryEntry entry)
     {
         switch (entry)
         {
             case LibraryEntrySavedFilter savedEntry:
                 var savedClass = ClassifyBasicFilter(savedEntry.Filter).Class;
 
-                return (savedClass == EmptyValueClass.NonParseable, IsFlagged(savedClass));
+                return (savedClass == EmptyValueClass.NonParseable, IsFlagged(savedClass), savedClass == EmptyValueClass.NonParseable ? 1 : 0);
 
             case LibraryEntryFilterSet setEntry:
                 var hasNonParseable = false;
                 var hasFlagged = false;
+                var nonParseableCount = 0;
 
                 foreach (var member in setEntry.Filters)
                 {
                     var memberClass = ClassifyBasicFilter(member).Class;
                     hasNonParseable |= memberClass == EmptyValueClass.NonParseable;
                     hasFlagged |= IsFlagged(memberClass);
+
+                    if (memberClass == EmptyValueClass.NonParseable)
+                    {
+                        nonParseableCount++;
+                    }
                 }
 
-                return (hasNonParseable, hasFlagged);
+                return (hasNonParseable, hasFlagged, nonParseableCount);
 
             default:
-                return (false, false);
+                return (false, false, 0);
         }
     }
 

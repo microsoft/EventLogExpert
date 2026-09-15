@@ -39,7 +39,7 @@ public sealed class FilterLibraryExportServiceTests
 
         var preflight = _service.Deserialize(json, []);
 
-        Assert.Equal(new ImportValidationError.InvalidBasicFilters(["stale-blob"]), preflight.Error);
+        Assert.Equal(new ImportValidationError.InvalidBasicFilters(["stale-blob"], 1), preflight.Error);
         Assert.Empty(preflight.ToAdd);
     }
 
@@ -142,6 +142,30 @@ public sealed class FilterLibraryExportServiceTests
     }
 
     [Fact]
+    public void Deserialize_FilterSetWithTwoInvalidBasicFilters_ReturnsInvalidBasicFiltersWithFilterCount()
+    {
+        var invalidA = BuildSavedFilter("(new[] {\"\", \"mshta.exe\"}).Any(e => Source.Contains(e))") with
+        {
+            Mode = FilterMode.Basic,
+        };
+        var invalidB = BuildSavedFilter("!(new[] {\"\", \"powershell.exe\"}).Any(e => Source.Contains(e))") with
+        {
+            Mode = FilterMode.Basic,
+        };
+        var entry = new LibraryEntryFilterSet
+        {
+            Name = "bad-set",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Filters = [invalidA, invalidB],
+        };
+        var json = _service.Serialize([entry]);
+
+        var preflight = _service.Deserialize(json, []);
+
+        Assert.Equal(new ImportValidationError.InvalidBasicFilters(["bad-set"], 2), preflight.Error);
+    }
+
+    [Fact]
     public void Deserialize_IncomingBasicFilterThatDoesNotHydrate_ReturnsError()
     {
         var unhydratable = SavedFilter.TryCreate(
@@ -160,7 +184,7 @@ public sealed class FilterLibraryExportServiceTests
 
         var preflight = _service.Deserialize(json, []);
 
-        Assert.Equal(new ImportValidationError.InvalidBasicFilters(["non-canonical"]), preflight.Error);
+        Assert.Equal(new ImportValidationError.InvalidBasicFilters(["non-canonical"], 1), preflight.Error);
         Assert.Empty(preflight.ToAdd);
     }
 

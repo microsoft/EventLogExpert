@@ -24,7 +24,7 @@ internal static class ImportValidationErrorLocalizer
         ImportValidationError.InvalidBasicFilters invalidBasicFilters =>
             LocalizedCount.OneOrManyRaw(
                 localizer,
-                invalidBasicFilters.EntryNames.Count,
+                invalidBasicFilters.InvalidFilterCount,
                 "FilterImport_Error_InvalidBasicFilters_One",
                 "FilterImport_Error_InvalidBasicFilters_Many",
                 string.Join(", ", invalidBasicFilters.EntryNames)),
