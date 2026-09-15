@@ -6,7 +6,7 @@
         <div class="form-row">
             <label for="create-target-path">Target .db</label>
             <div class="path-input-group">
-                <span class="visually-hidden" id="create-target-path-help">Required. Path to a new .db file to create.</span>
+                <span class="db-tab-help" id="create-target-path-help">Required. Path to a new .db file to create.</span>
                 <input aria-describedby="create-target-path-help"
                     class="input target-path"
                     disabled="@IsRunning"
@@ -22,7 +22,7 @@
         <div class="form-row">
             <label for="create-source-path">Source path</label>
             <div class="path-input-group">
-                <span class="visually-hidden" id="create-source-path-help">
+                <span class="db-tab-help" id="create-source-path-help">
                     Optional. Leave empty to use local providers. Accepts a .db or .evtx path, a folder, or an offline image (.wim, .esd, .iso, or .vhdx/.vhd). When an image is given, providers are read from it, fully offline.
                 </span>
                 <input aria-describedby="create-source-path-help"
@@ -30,7 +30,7 @@
                     disabled="@IsRunning"
                     id="create-source-path"
                     @oninput="OnSourcePathInput"
-                    placeholder="Leave empty for local providers, or pick / paste a .db, .evtx, folder, .wim/.esd/.iso, or a .vhdx/.vhd disk"
+                    placeholder="C:\path\to\source.evtx"
                     type="text"
                     value="@_sourcePath" />
                 <Button Disabled="@IsRunning" OnClick="PickSourceAsync">Browse…</Button>
@@ -70,7 +70,7 @@
             <div class="form-row">
                 <label for="create-wim-index" id="create-wim-index-label">Image index</label>
                 <div class="path-input-group">
-                    <span class="visually-hidden" id="create-wim-index-help">Optional. 1-based image index. Type an index, or load the image's editions to pick one from the list. An ISO requires an index.</span>
+                    <span class="db-tab-help" id="create-wim-index-help">Optional. 1-based image index. Type an index, or load the image's editions to pick one from the list. An ISO requires an index.</span>
                     <ValueSelect AriaDescribedBy="@(_editionsError is null ? "create-wim-index-help" : "create-wim-index-help create-wim-index-error")"
                         AriaInvalid="@(_editionsError is null ? "false" : "true")"
                         AriaLabelledBy="create-wim-index-label"
@@ -105,7 +105,6 @@
 
         <div class="form-row">
             <label for="create-filter">Filter (regex)</label>
-            <span class="visually-hidden" id="create-filter-help">Optional regular expression. Provider names containing a match are included; anchor with ^ and $ for a full-string match.</span>
             <input aria-describedby="@(_filterError is null ? "create-filter-help" : "create-filter-help create-filter-error")"
                 aria-invalid="@(_filterError is not null ? "true" : "false")"
                 class="@FilterCssClass"
@@ -115,6 +114,7 @@
                 placeholder="e.g. ^Microsoft-.*"
                 type="text"
                 value="@_filterText" />
+            <span class="db-tab-help" id="create-filter-help">Optional regular expression. Provider names containing a match are included; anchor with ^ and $ for a full-string match.</span>
 
             @if (_filterError is not null)
             {
@@ -128,7 +128,7 @@
         <div class="form-row">
             <label for="create-skip-path">Skip providers from</label>
             <div class="path-input-group">
-                <span class="visually-hidden" id="create-skip-path-help">
+                <span class="db-tab-help" id="create-skip-path-help">
                     Optional. Path to a .db or .evtx whose providers should be excluded from the new database.
                 </span>
                 <input aria-describedby="create-skip-path-help"
@@ -136,7 +136,7 @@
                     disabled="@IsRunning"
                     id="create-skip-path"
                     @oninput="OnSkipPathInput"
-                    placeholder="Optional - path to .db or .evtx whose providers are excluded"
+                    placeholder="C:\path\to\exclude.db"
                     type="text"
                     value="@_skipPath" />
                 <Button Disabled="@IsRunning" OnClick="PickSkipAsync">Browse…</Button>

@@ -6,7 +6,7 @@
         <div class="form-row">
             <label for="merge-source-path">Source</label>
             <div class="path-input-group">
-                <span class="visually-hidden" id="merge-source-path-help">
+                <span class="db-tab-help" id="merge-source-path-help">
                     Required. Path to a .db or .evtx whose providers will be merged into the target.
                 </span>
                 <input aria-describedby="merge-source-path-help"
@@ -14,7 +14,7 @@
                     disabled="@IsRunning"
                     id="merge-source-path"
                     @oninput="OnSourcePathInput"
-                    placeholder="Path to .db or .evtx (paste a folder path to use a directory)"
+                    placeholder="C:\path\to\source.db"
                     type="text"
                     value="@_sourcePath" />
                 <Button Disabled="@IsRunning" OnClick="PickSourceAsync">Browse…</Button>
@@ -24,7 +24,7 @@
         <div class="form-row">
             <label for="merge-target-path">Target .db</label>
             <div class="path-input-group">
-                <span class="visually-hidden" id="merge-target-path-help">Required. Path to the existing target .db that will receive the merged providers.</span>
+                <span class="db-tab-help" id="merge-target-path-help">Required. Path to the existing target .db that will receive the merged providers.</span>
                 <input aria-describedby="merge-target-path-help"
                     class="input target-path"
                     disabled="@IsRunning"

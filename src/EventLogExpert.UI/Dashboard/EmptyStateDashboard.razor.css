@@ -3,7 +3,9 @@
     flex-direction: column;
     flex: 1 1 0;
     min-height: 0;
-    overflow: hidden;
+    /* Resize/zoom (WCAG 1.4.4): scroll the whole dashboard when tall content (large text, or a short
+       or zoomed window) would otherwise be clipped; renders no scrollbar while it fits. */
+    overflow: hidden auto;
 }
 
 .empty-dashboard__masthead {
@@ -230,7 +232,9 @@
 
 .empty-dashboard__catalog {
     flex: 1 1 0;
-    min-height: 0;
+    /* Floor the catalog so a grown masthead/launch bar cannot squeeze it to nothing; the surplus
+       scrolls on .empty-dashboard instead of clipping the scenario catalog. */
+    min-height: 22rem;
     padding: 1.25rem 2rem 2rem;
     overflow: hidden;
     container-type: inline-size;
@@ -287,4 +291,22 @@
     border: 0;
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
+}
+
+/* Reflow (WCAG 1.4.10): when the catalog is too narrow for the category rail and the scenario
+   panel to sit side by side, stack the rail above the panel so it spans the full width instead of
+   squeezing the scenario names into a truncated sliver. */
+@container (max-width: 40rem) {
+    .empty-dashboard__catalog ::deep .sidebar-tabs {
+        flex-direction: column;
+    }
+
+    .empty-dashboard__catalog ::deep .sidebar-tabs-list {
+        flex: 0 1 auto;
+        max-height: 30%;
+        overflow-y: auto;
+        padding-right: 0;
+        border-right: 0;
+        border-bottom: 1px solid var(--border-divider);
+    }
 }
