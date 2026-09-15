@@ -201,11 +201,13 @@ public sealed class EmptyStateDashboardTests : BunitContext
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
         var cut = Render<EmptyStateDashboard>();
-        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
-
-        Assert.Equal("true", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
-        var blockedNote = cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable");
-        Assert.Equal(Localizer["Dashboard_LiveAccessBlocked"].Value, blockedNote.TextContent.Trim());
+        cut.WaitForAssertion(() =>
+        {
+            Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch));
+            Assert.Equal("true", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
+            var blockedNote = cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable");
+            Assert.Equal(Localizer["Dashboard_LiveAccessBlocked"].Value, blockedNote.TextContent.Trim());
+        });
     }
 
     [Fact]
@@ -222,10 +224,12 @@ public sealed class EmptyStateDashboardTests : BunitContext
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
         var cut = Render<EmptyStateDashboard>();
-        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
-
-        Assert.Equal("false", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
-        Assert.Empty(cut.FindAll(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable"));
+        cut.WaitForAssertion(() =>
+        {
+            Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch));
+            Assert.Equal("false", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
+            Assert.Empty(cut.FindAll(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable"));
+        });
     }
 
     [Fact]
@@ -236,11 +240,13 @@ public sealed class EmptyStateDashboardTests : BunitContext
         _scenarioQuery.GetSplashScenarios().Returns([Scenario("application-crashes", "Application crashes")]);
 
         var cut = Render<EmptyStateDashboard>();
-        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
-
-        Assert.Equal("true", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
-        var offlineNote = cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable");
-        Assert.Equal(Localizer["Dashboard_LogsNotOnComputer"].Value, offlineNote.TextContent.Trim());
+        cut.WaitForAssertion(() =>
+        {
+            Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch));
+            Assert.Equal("true", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
+            var offlineNote = cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable");
+            Assert.Equal(Localizer["Dashboard_LogsNotOnComputer"].Value, offlineNote.TextContent.Trim());
+        });
     }
 
     [Theory]
@@ -297,11 +303,13 @@ public sealed class EmptyStateDashboardTests : BunitContext
         ]);
 
         var cut = Render<EmptyStateDashboard>();
-        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
-
-        Assert.Equal("true", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
-        var note = cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable");
-        Assert.Equal(Localizer["Dashboard_LogsNotOnComputer"].Value, note.TextContent.Trim());
+        cut.WaitForAssertion(() =>
+        {
+            Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch));
+            Assert.Equal("true", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
+            var note = cut.Find(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable");
+            Assert.Equal(Localizer["Dashboard_LogsNotOnComputer"].Value, note.TextContent.Trim());
+        });
     }
 
     [Fact]
@@ -314,11 +322,14 @@ public sealed class EmptyStateDashboardTests : BunitContext
         var cut = Render<EmptyStateDashboard>();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
 
-        var launch = cut.Find(ActiveDetailLaunch);
-        Assert.Equal("false", launch.GetAttribute("aria-disabled"));
-        Assert.Empty(cut.FindAll(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable"));
+        cut.WaitForAssertion(() =>
+        {
+            var launch = cut.Find(ActiveDetailLaunch);
+            Assert.Equal("false", launch.GetAttribute("aria-disabled"));
+            Assert.Empty(cut.FindAll(".sidebar-tabs-tabpanel.active .scenario-detail__unavailable"));
+        });
 
-        launch.Click();
+        cut.Find(ActiveDetailLaunch).Click();
 
         cut.WaitForAssertion(() => _scenarioLaunch.Received(1)
             .LaunchAsync(Arg.Is<ScenarioDefinition>(scenario => scenario != null && scenario.Id == "application-crashes"), null));
@@ -333,9 +344,11 @@ public sealed class EmptyStateDashboardTests : BunitContext
         ]);
 
         var cut = Render<EmptyStateDashboard>();
-        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch)));
-
-        Assert.Equal("false", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
+        cut.WaitForAssertion(() =>
+        {
+            Assert.NotEmpty(cut.FindAll(ActiveDetailLaunch));
+            Assert.Equal("false", cut.Find(ActiveDetailLaunch).GetAttribute("aria-disabled"));
+        });
     }
 
     [Fact]

@@ -75,13 +75,17 @@ public sealed class StatsLocalizerWiringTests : BunitContext
         var cut = Render<StatsDetailModal>(parameters => parameters
             .Add(component => component.Dimension, StatsDimension.Source)
             .Add(component => component.View, _view));
-        cut.WaitForState(() => cut.FindAll(".stats-detail-row").Count == 1, s_wait);
-
-        Assert.Contains("[[Stats_Detail_Title([[Stats_Dimension_Source]])]]", cut.Markup, StringComparison.Ordinal);
-        Assert.Equal("[[Stats_Detail_FilterValuesAria]]", cut.Find(".stats-detail-search").GetAttribute("aria-label"));
-        Assert.Equal("[[Stats_Detail_FilterValuesPlaceholder]]", cut.Find(".stats-detail-search").GetAttribute("placeholder"));
-        Assert.Equal("[[Stats_Row_IncludeAria([[Stats_Dimension_Source]]|Alpha)]]", cut.Find(".stats-detail-include").GetAttribute("aria-label"));
-        Assert.Equal("[[Stats_Row_ExcludeTitle]]", cut.Find(".stats-detail-exclude").GetAttribute("title"));
+        cut.WaitForAssertion(
+            () =>
+            {
+                Assert.Single(cut.FindAll(".stats-detail-row"));
+                Assert.Contains("[[Stats_Detail_Title([[Stats_Dimension_Source]])]]", cut.Markup, StringComparison.Ordinal);
+                Assert.Equal("[[Stats_Detail_FilterValuesAria]]", cut.Find(".stats-detail-search").GetAttribute("aria-label"));
+                Assert.Equal("[[Stats_Detail_FilterValuesPlaceholder]]", cut.Find(".stats-detail-search").GetAttribute("placeholder"));
+                Assert.Equal("[[Stats_Row_IncludeAria([[Stats_Dimension_Source]]|Alpha)]]", cut.Find(".stats-detail-include").GetAttribute("aria-label"));
+                Assert.Equal("[[Stats_Row_ExcludeTitle]]", cut.Find(".stats-detail-exclude").GetAttribute("title"));
+            },
+            s_wait);
     }
 
     [Fact]
@@ -106,21 +110,25 @@ public sealed class StatsLocalizerWiringTests : BunitContext
         SetupDimension(Dim(StatsDimension.User, total: 100, distinct: 1, ("User", 100)));
 
         var cut = Render<StatsPane>();
-        cut.WaitForState(() => cut.FindAll(".stats-coverage").Count == 4, s_wait);
-
-        Assert.Equal("[[Stats_AriaLabel]]", cut.Find(".stats-pane").GetAttribute("aria-label"));
-        Assert.Equal("[[Stats_Title]]", cut.Find(".stats-title").TextContent);
-        Assert.Equal("[[Stats_ResolutionCoverage]]", cut.Find(".stats-coverage-link").TextContent.Trim());
-        Assert.Equal("[[Stats_ResolutionCoverageAria]]", cut.Find(".stats-coverage-link").GetAttribute("aria-label"));
-        Assert.Equal(
-            "[[Stats_Headline_Events_Many(100)]][[Stats_Headline_ErrorCritical_Many(5)]][[Stats_Headline_TopSources_One(1|60)]]",
-            cut.Find(".stats-headline").TextContent);
-        Assert.Equal("[[Stats_SeverityBarLabel]]", cut.Find(".stats-severity-bar").GetAttribute("aria-label"));
-        Assert.Contains("[[Stats_SeveritySegmentTooltip", cut.Markup, StringComparison.Ordinal);
-        Assert.Contains("[[Severity_Level_Information]]", cut.Markup, StringComparison.Ordinal);
-        Assert.Contains("[[Stats_Dimension_Source]]", cut.Markup, StringComparison.Ordinal);
-        Assert.Contains("[[Stats_Row_IncludeAria([[Stats_Dimension_Source]]|Alpha)]]", cut.Markup, StringComparison.Ordinal);
-        Assert.Contains("[[Stats_Coverage_All_Source_One", cut.Markup, StringComparison.Ordinal);
+        cut.WaitForAssertion(
+            () =>
+            {
+                Assert.Equal(4, cut.FindAll(".stats-coverage").Count);
+                Assert.Equal("[[Stats_AriaLabel]]", cut.Find(".stats-pane").GetAttribute("aria-label"));
+                Assert.Equal("[[Stats_Title]]", cut.Find(".stats-title").TextContent);
+                Assert.Equal("[[Stats_ResolutionCoverage]]", cut.Find(".stats-coverage-link").TextContent.Trim());
+                Assert.Equal("[[Stats_ResolutionCoverageAria]]", cut.Find(".stats-coverage-link").GetAttribute("aria-label"));
+                Assert.Equal(
+                    "[[Stats_Headline_Events_Many(100)]][[Stats_Headline_ErrorCritical_Many(5)]][[Stats_Headline_TopSources_One(1|60)]]",
+                    cut.Find(".stats-headline").TextContent);
+                Assert.Equal("[[Stats_SeverityBarLabel]]", cut.Find(".stats-severity-bar").GetAttribute("aria-label"));
+                Assert.Contains("[[Stats_SeveritySegmentTooltip", cut.Markup, StringComparison.Ordinal);
+                Assert.Contains("[[Severity_Level_Information]]", cut.Markup, StringComparison.Ordinal);
+                Assert.Contains("[[Stats_Dimension_Source]]", cut.Markup, StringComparison.Ordinal);
+                Assert.Contains("[[Stats_Row_IncludeAria([[Stats_Dimension_Source]]|Alpha)]]", cut.Markup, StringComparison.Ordinal);
+                Assert.Contains("[[Stats_Coverage_All_Source_One", cut.Markup, StringComparison.Ordinal);
+            },
+            s_wait);
     }
 
     private static DimensionStats Dim(StatsDimension dimension, int total, int distinct, params (string Value, int Count)[] top) =>

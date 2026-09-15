@@ -374,8 +374,11 @@ public sealed class DebugLogModalTests : BunitContext
 
         await component.Find("button[aria-label='Edit filter: Message contains foo']").ClickAsync(new MouseEventArgs());
 
-        Assert.Single(component.FindAll(".debug-log-filter-editor"));
-        Assert.Empty(component.FindAll(".debug-log-filter-chip"));
+        await component.WaitForAssertionAsync(() =>
+        {
+            Assert.Single(component.FindAll(".debug-log-filter-editor"));
+            Assert.Empty(component.FindAll(".debug-log-filter-chip"));
+        });
     }
 
     [Fact]
@@ -673,10 +676,13 @@ public sealed class DebugLogModalTests : BunitContext
 
         await SaveFilterAsync(component);
 
-        await component.WaitForAssertionAsync(() => Assert.Single(component.FindAll(".debug-log-filter-chip")));
-        Assert.Empty(component.FindAll(".debug-log-filter-editor"));
-        Assert.Equal("Message contains foo", component.Find(".debug-log-filter-summary").TextContent.Trim());
-        Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim());
+        await component.WaitForAssertionAsync(() =>
+        {
+            Assert.Single(component.FindAll(".debug-log-filter-chip"));
+            Assert.Empty(component.FindAll(".debug-log-filter-editor"));
+            Assert.Equal("Message contains foo", component.Find(".debug-log-filter-summary").TextContent.Trim());
+            Assert.Equal("1 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim());
+        });
     }
 
     [Fact]

@@ -43,14 +43,17 @@ public sealed class CriticalBannerTests : BunitContext
 
         var component = Render<CriticalBanner>(p => p.Add(c => c.Critical, critical));
 
-        // Sync Click() returns at the handler's first real async point (the 2s Task.Delay) with
-        // the chip rendered; ClickAsync would block for the full delay until the chip clears.
+        // Click() dispatches the copy handler fire-and-forget; it suspends on a 2s Task.Delay after
+        // requesting the copied-feedback render, so the render can still be pending when Click() returns.
+        // Assert the chip via WaitForAssertion so the DOM read runs on the renderer's dispatcher instead
+        // of racing that render.
         component.FindAll("aside.banner-critical .banner-actions button")[2].Click();
 
         await _clipboardService.Received(1)
             .CopyTextAsync(Arg.Is<string>(s => s != null && s.Contains("InvalidOperationException") && s.Contains("kaboom")));
 
-        Assert.Single(component.FindAll("aside.banner-critical .banner-feedback .banner-chip"));
+        component.WaitForAssertion(() =>
+            Assert.Single(component.FindAll("aside.banner-critical .banner-feedback .banner-chip")));
     }
 
     [Fact]

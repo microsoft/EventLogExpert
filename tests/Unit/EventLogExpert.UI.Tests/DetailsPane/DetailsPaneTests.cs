@@ -542,8 +542,11 @@ public sealed class DetailsPaneTests : BunitContext
         firstFetch.SetResult("<FirstEventXml/>");
         cut.WaitForState(() => cut.RenderCount > renderCountBeforeStale);
 
-        Assert.Contains("SecondEventXml", cut.Markup);
-        Assert.DoesNotContain("FirstEventXml", cut.Markup);
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("SecondEventXml", cut.Markup);
+            Assert.DoesNotContain("FirstEventXml", cut.Markup);
+        });
     }
 
     [Fact]
@@ -567,7 +570,7 @@ public sealed class DetailsPaneTests : BunitContext
         fetch.SetResult("<StaleEventXml/>");
         cut.WaitForState(() => cut.RenderCount > renderCountBefore);
 
-        Assert.DoesNotContain("StaleEventXml", cut.Markup);
+        cut.WaitForAssertion(() => Assert.DoesNotContain("StaleEventXml", cut.Markup));
     }
 
     private static ResolvedEvent BaseEvent() =>

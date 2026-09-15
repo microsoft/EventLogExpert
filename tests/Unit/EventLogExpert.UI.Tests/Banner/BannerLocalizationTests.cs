@@ -176,7 +176,8 @@ public sealed class BannerLocalizationTests : BunitContext
         Assert.Equal("[[Banner_Critical_CopyDetails]]", buttons[2].TextContent.Trim());
 
         buttons[2].Click();
-        Assert.Equal("[[Banner_Critical_Copied]]", component.Find(".banner-chip").TextContent.Trim());
+        component.WaitForAssertion(() =>
+            Assert.Equal("[[Banner_Critical_Copied]]", component.Find(".banner-chip").TextContent.Trim()));
 
         await buttons[1].ClickAsync(new MouseEventArgs());
         Assert.Contains("[[Banner_Critical_RestartFailed]]", component.Markup, StringComparison.Ordinal);
