@@ -29,7 +29,6 @@ namespace EventLogExpert.UI.Tests.LogTable.Histogram;
 
 public sealed class HistogramPaneTests : BunitContext
 {
-    private static readonly TimeSpan s_settleWindow = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan s_testTimeout = TimeSpan.FromSeconds(10);
 
     private static readonly EventLogId s_tokenLog = EventLogId.Create();
@@ -175,9 +174,11 @@ public sealed class HistogramPaneTests : BunitContext
         var cut = Render<HistogramPane>();
         await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
 
-        cut.WaitForAssertion(() => Assert.Contains("No events to chart", cut.Markup));
-
-        Assert.DoesNotContain("Building the timeline", cut.Markup);
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("No events to chart", cut.Markup);
+            Assert.DoesNotContain("Building the timeline", cut.Markup);
+        });
     }
 
     [Fact]
@@ -190,9 +191,11 @@ public sealed class HistogramPaneTests : BunitContext
         var cut = Render<HistogramPane>();
         await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
 
-        cut.WaitForAssertion(() => Assert.Contains("could not be built", cut.Markup));
-
-        Assert.DoesNotContain("No events to chart", cut.Markup);
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("could not be built", cut.Markup);
+            Assert.DoesNotContain("No events to chart", cut.Markup);
+        });
     }
 
     [Fact]
@@ -508,12 +511,11 @@ public sealed class HistogramPaneTests : BunitContext
     [Fact]
     public async Task ScanThatFinishesAfterItsTabIsLeft_DoesNotPublish()
     {
-        // because the switch only schedules a THROTTLED rescan, so no supersede has happened yet when this lands.
-        //
-        // The tab moves from inside the scan's own first view read, so no thread is parked waiting for it. Completion
-        // is awaited through a signal rather than WaitForAssertion: a rejected scan renders nothing, and
-        // WaitForAssertion only re-evaluates on render, so it would wait out its whole timeout no matter what happened.
-        var scanRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        // The tab moves - the presentation swaps to a new EventLogId - from inside the scan's own first view read,
+        // so when the scan finishes it sees a different active tab and discards its result instead of publishing over
+        // the seeded data. The inline CPU scheduler runs the scan synchronously on the dispatcher, so the whole
+        // scan-and-reject completes within OnHistogramResized: the assertion is deterministic, with no settle delay.
+        Services.AddInlineCpuWorkScheduler();
 
         _scanView.TryGetTimeTicksRange(out Arg.Any<long>(), out Arg.Any<long>(), Arg.Any<CancellationToken>())
             .Returns(call =>
@@ -523,7 +525,6 @@ public sealed class HistogramPaneTests : BunitContext
 
                 call[0] = 0L;
                 call[1] = TimeSpan.TicksPerHour;
-                scanRead.TrySetResult();
 
                 return true;
             });
@@ -534,11 +535,6 @@ public sealed class HistogramPaneTests : BunitContext
 
         await PublishBaseDataAsync(cut, seeded);
         await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(500, 100));
-
-        await scanRead.Task.WaitAsync(s_testTimeout, TestContext.Current.CancellationToken);
-
-        await Task.Delay(s_settleWindow, TestContext.Current.CancellationToken);
-        await cut.InvokeAsync(() => { });
 
         Assert.Same(seeded, GetPrivateFieldOrNull<HistogramData>(cut, "_baseData"));
     }

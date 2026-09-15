@@ -85,11 +85,12 @@ public sealed class AnnouncerHostTests : BunitContext
         _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.LensKept(label), 2));
         _announcementService.StateChanged += Raise.Event<Action>();
 
-        component.WaitForState(() => component.Find("#app-announcer").TextContent != first);
-        var second = component.Find("#app-announcer").TextContent;
-
-        Assert.NotEqual(first, second);
-        Assert.Contains("[[FilterLens_KeptAnnouncement(", second);
+        component.WaitForAssertion(() =>
+        {
+            var second = component.Find("#app-announcer").TextContent;
+            Assert.NotEqual(first, second);
+            Assert.Contains("[[FilterLens_KeptAnnouncement(", second);
+        });
     }
 
     [Fact]
@@ -115,8 +116,8 @@ public sealed class AnnouncerHostTests : BunitContext
         _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.Text("Database imported"), 2));
         _announcementService.StateChanged += Raise.Event<Action>();
 
-        component.WaitForState(() => component.Find("#app-announcer").TextContent.Contains("Database imported"));
-        Assert.Contains("Database imported", component.Find("#app-announcer").TextContent);
+        component.WaitForAssertion(() =>
+            Assert.Contains("Database imported", component.Find("#app-announcer").TextContent));
     }
 
     [Fact]
@@ -190,12 +191,14 @@ public sealed class AnnouncerHostTests : BunitContext
         _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.Text("Database imported"), 2));
         _announcementService.StateChanged += Raise.Event<Action>();
 
-        component.WaitForState(() => component.Find("#app-announcer").TextContent != first);
-        var second = component.Find("#app-announcer").TextContent;
+        component.WaitForAssertion(() =>
+        {
+            var second = component.Find("#app-announcer").TextContent;
+            Assert.NotEqual(first, second);
+            Assert.Contains("Database imported", second);
+        });
 
-        Assert.NotEqual(first, second);
         Assert.Contains("Database imported", first);
-        Assert.Contains("Database imported", second);
     }
 
     private static AnnouncementPayload CreateAnnouncementPayload(Type leafType) =>

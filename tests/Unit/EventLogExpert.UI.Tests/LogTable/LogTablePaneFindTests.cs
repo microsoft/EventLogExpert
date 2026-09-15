@@ -168,7 +168,7 @@ public sealed class LogTablePaneFindTests : CultureSensitiveBunitContext
 
         OpenFind(cut);
 
-        Assert.DoesNotContain("FindBar_", cut.Markup);
+        cut.WaitForAssertion(() => Assert.DoesNotContain("FindBar_", cut.Markup));
     }
 
     [Fact]
@@ -178,7 +178,7 @@ public sealed class LogTablePaneFindTests : CultureSensitiveBunitContext
 
         OpenFind(cut);
 
-        Assert.NotEmpty(cut.FindAll(".find-bar"));
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".find-bar")));
     }
 
     [Fact]
@@ -248,8 +248,11 @@ public sealed class LogTablePaneFindTests : CultureSensitiveBunitContext
         OpenFind(cut);
         cut.Find(".find-input").Input("match");
 
-        Assert.Contains(Localizer["FindBar_Searching"].Value, cut.Find(".find-count").TextContent);
-        Assert.True(cut.FindAll(".find-nav").All(button => button.HasAttribute("disabled")));
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(Localizer["FindBar_Searching"].Value, cut.Find(".find-count").TextContent);
+            Assert.True(cut.FindAll(".find-nav").All(button => button.HasAttribute("disabled")));
+        });
     }
 
     [Fact]

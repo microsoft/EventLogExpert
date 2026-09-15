@@ -350,14 +350,18 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
             [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
-        component.WaitForState(() => component.FindAll("li.recovery-row").Count == 2);
+        component.WaitForAssertion(() =>
+        {
+            var rows = component.FindAll("li.recovery-row");
+            Assert.Equal(2, rows.Count);
 
-        var newRow = component.FindAll("li.recovery-row")[1];
-        Assert.Contains("b.db", newRow.TextContent);
+            var newRow = rows[1];
+            Assert.Contains("b.db", newRow.TextContent);
 
-        var radios = newRow.QuerySelectorAll("input[type=radio]");
-        Assert.True(((IHtmlInputElement)radios[0]).IsChecked);
-        Assert.False(((IHtmlInputElement)radios[1]).IsChecked);
+            var radios = newRow.QuerySelectorAll("input[type=radio]");
+            Assert.True(((IHtmlInputElement)radios[0]).IsChecked);
+            Assert.False(((IHtmlInputElement)radios[1]).IsChecked);
+        });
 
         await Task.CompletedTask;
     }
@@ -377,14 +381,19 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
-        component.WaitForState(() => component.FindAll("li.recovery-row").Count == 1);
+        component.WaitForAssertion(() =>
+        {
+            var remainingRows = component.FindAll("li.recovery-row");
+            Assert.Single(remainingRows);
 
-        var remainingRow = component.Find("li.recovery-row");
-        Assert.Contains("a.db", remainingRow.TextContent);
+            var remainingRow = remainingRows[0];
+            Assert.Contains("a.db", remainingRow.TextContent);
 
-        var radios = remainingRow.QuerySelectorAll("input[type=radio]");
-        Assert.True(((IHtmlInputElement)radios[0]).IsChecked);
-        Assert.False(((IHtmlInputElement)radios[1]).IsChecked);
+            var radios = remainingRow.QuerySelectorAll("input[type=radio]");
+            Assert.True(((IHtmlInputElement)radios[0]).IsChecked);
+            Assert.False(((IHtmlInputElement)radios[1]).IsChecked);
+        });
+
         _modalService.DidNotReceive().Complete(Arg.Any<ModalId>(), Arg.Any<object?>());
     }
 
