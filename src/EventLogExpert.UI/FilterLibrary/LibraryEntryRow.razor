@@ -10,21 +10,21 @@
                 OnClick="ToggleExpand"
                 aria-controls="@_filterEditorRegionId"
                 aria-expanded="@(_isExpanded ? "true" : "false")"
-                aria-label="@($"Filters for {Entry.Name}")" />
+                aria-label="@Localizer["FilterLibrary_Entry_FiltersAria", Entry.Name]" />
         }
 
         <div class="library-entry-name">
             <span class="library-entry-name-text" title="@Entry.Name">@Entry.Name</span>
             @if (Entry is LibraryEntryFilterSet filterSet)
             {
-                <span class="library-entry-detail">(@filterSet.Filters.Count filter@(filterSet.Filters.Count == 1 ? "" : "s"))</span>
+                <span class="library-entry-detail">@LocalizedCount.OneOrManyRaw(Localizer, filterSet.Filters.Count, "FilterLibrary_Entry_FilterCount_One", "FilterLibrary_Entry_FilterCount_Many", filterSet.Filters.Count)</span>
             }
             @if (ActiveTab == LibraryTab.PreviouslyUsed)
             {
-                <span aria-label="Automatically added from recent use"
+                <span aria-label="@Localizer["FilterLibrary_Entry_TrackedAria"]"
                     class="library-entry-tracked-badge"
-                    title="Automatically added from recent use">
-                    Tracked
+                    title="@Localizer["FilterLibrary_Entry_TrackedTitle"]">
+                    @Localizer["FilterLibrary_Entry_TrackedLabel"]
                 </span>
 
                 @if (Entry.LastUsedUtc is { } lastUsed)
@@ -53,7 +53,7 @@
                                     IconClass="bi bi-x-circle"
                                     OnClick="@(() => OnRemoveTagAsync(tag))"
                                     StopPropagation="true"
-                                    aria-label="@($"Remove tag {tag}")" />
+                                    aria-label="@Localizer["FilterLibrary_Entry_RemoveTagAria", tag]" />
                             </span>
                         }
                     </div>
@@ -62,9 +62,9 @@
                     {
                         <Button CssClass="library-entry-tag-chip-more"
                             OnClick="ToggleEditTagsMode"
-                            aria-label="@($"Show all {Entry.Tags.Count} tags")"
+                            aria-label="@Localizer["FilterLibrary_Entry_ShowAllTagsAria", Entry.Tags.Count]"
                             title="@string.Join(", ", Entry.Tags.Skip(inlineVisible))">
-                            +@inlineHidden more
+                            @Localizer["FilterLibrary_Entry_MoreTags", inlineHidden]
                         </Button>
                     }
                 }
@@ -72,15 +72,15 @@
                     IconClass="bi bi-plus-circle"
                     IconOnly
                     OnClick="ToggleEditTagsMode"
-                    aria-label="@(Entry.Tags.Count == 0 ? $"Add tags to {Entry.Name}" : $"Edit tags for {Entry.Name}")"
-                    title="@(Entry.Tags.Count == 0 ? "Add tags" : "Edit tags")" />
+                    aria-label="@(Entry.Tags.Count == 0 ? Localizer["FilterLibrary_Entry_AddTagsAria", Entry.Name] : Localizer["FilterLibrary_Entry_EditTagsAria", Entry.Name])"
+                    title="@(Entry.Tags.Count == 0 ? Localizer["FilterLibrary_Entry_AddTagsTitle"] : Localizer["FilterLibrary_Entry_EditTagsTitle"])" />
             </div>
         }
 
         <PrimaryButton IconClass="bi bi-plus-circle"
             OnClick="OnApplyAsync"
-            aria-label="@($"Apply {Entry.Name} additively to current filters")">
-            Apply
+            aria-label="@Localizer["FilterLibrary_Entry_ApplyAria", Entry.Name]">
+            @Localizer["Modal_Apply"]
         </PrimaryButton>
 
         @if (IsFavoritable)
@@ -98,15 +98,15 @@
             OnClick="ToggleMoreMenuAsync"
             aria-expanded="@(IsMoreMenuOpen ? "true" : "false")"
             aria-haspopup="menu"
-            aria-label="@($"More actions for {Entry.Name}")"
+            aria-label="@Localizer["FilterLibrary_Entry_MoreActionsAria", Entry.Name]"
             @ref="_moreMenuButton"
-            title="More actions" />
+            title="@Localizer["FilterLibrary_Entry_MoreActionsTitle"]" />
     </div>
 
     @if (_isEditingTags)
     {
         <div class="library-entry-row-tags-edit">
-            <TagPicker AriaLabel="@($"Tags for {Entry.Name}")"
+            <TagPicker AriaLabel="@Localizer["FilterLibrary_Entry_TagsAria", Entry.Name]"
                 SuggestionSource="@AllLibraryTags"
                 Value="@Entry.Tags"
                 ValueChanged="@OnTagsChangedAsync" />
@@ -115,8 +115,8 @@
                 IconClass="bi bi-check2"
                 IconOnly
                 OnClick="ToggleEditTagsMode"
-                aria-label="Done editing tags"
-                title="Done" />
+                aria-label="@Localizer["FilterLibrary_Entry_DoneEditingTagsAria"]"
+                title="@Localizer["FilterLibrary_Entry_DoneTitle"]" />
         </div>
     }
 

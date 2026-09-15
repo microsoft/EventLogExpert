@@ -3557,6 +3557,483 @@
     <value>Could not rebuild the normalized Basic filter '{0}'.</value>
     <comment>Filter library import validation error. {0} is the filter comparison text.</comment>
   </data>
+  <!-- Filter library modal chrome strings. -->
+  <data name="FilterLibrary_ModalAria" xml:space="preserve">
+    <value>Filter Library</value>
+    <comment>Filter library modal accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_LoadError" xml:space="preserve">
+    <value>Could not load saved filters or filter sets. See trace log for details.</value>
+    <comment>Filter library load failure message.</comment>
+  </data>
+  <data name="FilterLibrary_Retry" xml:space="preserve">
+    <value>Retry</value>
+    <comment>Filter library retry action label.</comment>
+  </data>
+  <data name="FilterLibrary_Loading" xml:space="preserve">
+    <value>Loading filter library…</value>
+    <comment>Filter library loading message.</comment>
+  </data>
+  <data name="FilterLibrary_ViewsAria" xml:space="preserve">
+    <value>Filter library views</value>
+    <comment>Filter library tab list accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_TagFilterAria" xml:space="preserve">
+    <value>Filter by tag</value>
+    <comment>Filter library tag filter bar accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_TagsLabel" xml:space="preserve">
+    <value>Tags:</value>
+    <comment>Filter library tag filter label.</comment>
+  </data>
+  <data name="FilterLibrary_HideTagManagementAria" xml:space="preserve">
+    <value>Hide tag management</value>
+    <comment>Filter library hide tag management button accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_ManageTagsAria" xml:space="preserve">
+    <value>Manage tags</value>
+    <comment>Filter library manage tags button accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_ManageTagsTitle" xml:space="preserve">
+    <value>Manage tags</value>
+    <comment>Filter library manage tags button title.</comment>
+  </data>
+  <data name="FilterLibrary_HideAdditionalTagsAria" xml:space="preserve">
+    <value>Hide additional tags</value>
+    <comment>Filter library hide extra tags button accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_ShowAdditionalTagsAria_One" xml:space="preserve">
+    <value>Show {0} additional tag</value>
+    <comment>Filter library show extra tag button accessible name. {0} is the hidden tag count.</comment>
+  </data>
+  <data name="FilterLibrary_ShowAdditionalTagsAria_Many" xml:space="preserve">
+    <value>Show {0} additional tags</value>
+    <comment>Filter library show extra tags button accessible name. {0} is the hidden tag count.</comment>
+  </data>
+  <data name="FilterLibrary_ShowLess" xml:space="preserve">
+    <value>- less</value>
+    <comment>Filter library collapse extra tags button text.</comment>
+  </data>
+  <data name="FilterLibrary_ShowMore" xml:space="preserve">
+    <value>+{0} more</value>
+    <comment>Filter library show extra tags button text. {0} is the hidden tag count.</comment>
+  </data>
+  <data name="FilterLibrary_ExportLibraryTitle" xml:space="preserve">
+    <value>Export Filter Library</value>
+    <comment>Filter library export file picker title.</comment>
+  </data>
+  <data name="FilterLibrary_ExportedEntries_One" xml:space="preserve">
+    <value>Exported {0} entry</value>
+    <comment>Filter library export success announcement. {0} is the exported entry count.</comment>
+  </data>
+  <data name="FilterLibrary_ExportedEntries_Many" xml:space="preserve">
+    <value>Exported {0} entries</value>
+    <comment>Filter library export success announcement. {0} is the exported entry count.</comment>
+  </data>
+  <data name="FilterLibrary_ImportLibraryTitle" xml:space="preserve">
+    <value>Import Filter Library</value>
+    <comment>Filter library import file picker title.</comment>
+  </data>
+  <data name="FilterLibrary_ImportFailedTitle" xml:space="preserve">
+    <value>Import failed</value>
+    <comment>Filter library import failure alert title.</comment>
+  </data>
+  <data name="FilterLibrary_ImportErrorTitle" xml:space="preserve">
+    <value>Import error</value>
+    <comment>Filter library import error alert title.</comment>
+  </data>
+  <data name="FilterLibrary_Empty_TagFilter" xml:space="preserve">
+    <value>No entries match the selected tags.</value>
+    <comment>Filter library empty state when tag filters match no entries.</comment>
+  </data>
+  <data name="FilterLibrary_Empty_Favorites" xml:space="preserve">
+    <value>No favorited filters or filter sets yet. Star an entry to add it here.</value>
+    <comment>Filter library favorites tab empty state.</comment>
+  </data>
+  <data name="FilterLibrary_Empty_PreviouslyUsed" xml:space="preserve">
+    <value>No filters have been applied recently.</value>
+    <comment>Filter library previously used tab empty state.</comment>
+  </data>
+  <data name="FilterLibrary_Empty_Saved" xml:space="preserve">
+    <value>No saved filters or filter sets yet. Use "Save as Filter Set" from the filter pane.</value>
+    <comment>Filter library saved tab empty state.</comment>
+  </data>
+  <data name="FilterLibrary_AppliedAnnouncement" xml:space="preserve">
+    <value>Applied {0}</value>
+    <comment>Filter library apply announcement. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_FilterSetCopiedAnnouncement" xml:space="preserve">
+    <value>'{0}' copied to the clipboard as scenario JSON.</value>
+    <comment>Filter library scenario copy announcement. {0} is the filter set name.</comment>
+  </data>
+  <data name="FilterLibrary_ExportEntryTitle" xml:space="preserve">
+    <value>Export Filter Entry</value>
+    <comment>Filter library entry export file picker title.</comment>
+  </data>
+  <data name="FilterLibrary_ExportedEntryAnnouncement" xml:space="preserve">
+    <value>Exported '{0}'</value>
+    <comment>Filter library entry export announcement. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_ReplacedAnnouncement" xml:space="preserve">
+    <value>Replaced filters with {0}</value>
+    <comment>Filter library replace announcement. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_TagFiltersClearedAnnouncement" xml:space="preserve">
+    <value>Tag filters cleared</value>
+    <comment>Filter library tag filter clear announcement.</comment>
+  </data>
+  <data name="FilterLibrary_ImportBlockedTitle" xml:space="preserve">
+    <value>Import blocked</value>
+    <comment>Filter library blocked import alert title.</comment>
+  </data>
+  <data name="FilterLibrary_ConfirmImportTitle" xml:space="preserve">
+    <value>Confirm import</value>
+    <comment>Filter library import confirmation title.</comment>
+  </data>
+  <!-- Filter library row strings. -->
+  <data name="FilterLibrary_Entry_FiltersAria" xml:space="preserve">
+    <value>Filters for {0}</value>
+    <comment>Filter library expand filters button accessible name. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_FilterCount_One" xml:space="preserve">
+    <value>({0} filter)</value>
+    <comment>Filter library filter set count label. {0} is the filter count.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_FilterCount_Many" xml:space="preserve">
+    <value>({0} filters)</value>
+    <comment>Filter library filter set count label. {0} is the filter count.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_TrackedAria" xml:space="preserve">
+    <value>Automatically added from recent use</value>
+    <comment>Filter library tracked badge accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_TrackedTitle" xml:space="preserve">
+    <value>Automatically added from recent use</value>
+    <comment>Filter library tracked badge title.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_TrackedLabel" xml:space="preserve">
+    <value>Tracked</value>
+    <comment>Filter library tracked badge label.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_RemoveTagAria" xml:space="preserve">
+    <value>Remove tag {0}</value>
+    <comment>Filter library row remove tag button accessible name. {0} is the tag name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_ShowAllTagsAria" xml:space="preserve">
+    <value>Show all {0} tags</value>
+    <comment>Filter library row show all tags button accessible name. {0} is the tag count.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_MoreTags" xml:space="preserve">
+    <value>+{0} more</value>
+    <comment>Filter library row more tags button text. {0} is the hidden tag count.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_AddTagsAria" xml:space="preserve">
+    <value>Add tags to {0}</value>
+    <comment>Filter library row add tags button accessible name. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_EditTagsAria" xml:space="preserve">
+    <value>Edit tags for {0}</value>
+    <comment>Filter library row edit tags button accessible name. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_AddTagsTitle" xml:space="preserve">
+    <value>Add tags</value>
+    <comment>Filter library row add tags button title.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_EditTagsTitle" xml:space="preserve">
+    <value>Edit tags</value>
+    <comment>Filter library row edit tags button title.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_ApplyAria" xml:space="preserve">
+    <value>Apply {0} additively to current filters</value>
+    <comment>Filter library row apply button accessible name. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_RemoveFavoriteAria" xml:space="preserve">
+    <value>Remove {0} from favorites</value>
+    <comment>Filter library row remove favorite button accessible name. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_AddFavoriteAria" xml:space="preserve">
+    <value>Add {0} to favorites</value>
+    <comment>Filter library row add favorite button accessible name. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_RemoveFavoriteTitle" xml:space="preserve">
+    <value>Remove from favorites</value>
+    <comment>Filter library row remove favorite button title.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_AddFavoriteTitle" xml:space="preserve">
+    <value>Add to favorites</value>
+    <comment>Filter library row add favorite button title.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_MoreActionsAria" xml:space="preserve">
+    <value>More actions for {0}</value>
+    <comment>Filter library row more actions button accessible name. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_MoreActionsTitle" xml:space="preserve">
+    <value>More actions</value>
+    <comment>Filter library row more actions button title.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_TagsAria" xml:space="preserve">
+    <value>Tags for {0}</value>
+    <comment>Filter library row tag picker accessible name. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_DoneEditingTagsAria" xml:space="preserve">
+    <value>Done editing tags</value>
+    <comment>Filter library row finish tag editing button accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_DoneTitle" xml:space="preserve">
+    <value>Done</value>
+    <comment>Filter library row finish tag editing button title.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_FilterSetKindAria" xml:space="preserve">
+    <value>Filter set</value>
+    <comment>Filter library filter set kind icon accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_FilterKindAria" xml:space="preserve">
+    <value>Filter</value>
+    <comment>Filter library filter kind icon accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_RelativeTime_JustNow" xml:space="preserve">
+    <value>just now</value>
+    <comment>Filter library relative last-used time label.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_RelativeTime_Minutes" xml:space="preserve">
+    <value>{0}m ago</value>
+    <comment>Filter library relative last-used time label. {0} is the elapsed minute count.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_RelativeTime_Hours" xml:space="preserve">
+    <value>{0}h ago</value>
+    <comment>Filter library relative last-used time label. {0} is the elapsed hour count.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_RelativeTime_Days" xml:space="preserve">
+    <value>{0}d ago</value>
+    <comment>Filter library relative last-used time label. {0} is the elapsed day count.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_NewFilterSetMenu" xml:space="preserve">
+    <value>+ New filter set...</value>
+    <comment>Filter library row new filter set menu item.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_AddToFilterSetMenu" xml:space="preserve">
+    <value>Add to filter set...</value>
+    <comment>Filter library row add to filter set submenu item.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_ReplaceCurrentMenu" xml:space="preserve">
+    <value>Replace current filters</value>
+    <comment>Filter library row replace current filters menu item.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_SaveToLibraryMenu" xml:space="preserve">
+    <value>Save to Library</value>
+    <comment>Filter library row save to library menu item.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_RenameMenu" xml:space="preserve">
+    <value>Rename...</value>
+    <comment>Filter library row rename menu item.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_ExportMenu" xml:space="preserve">
+    <value>Export...</value>
+    <comment>Filter library row export menu item.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_SaveScenarioMenu" xml:space="preserve">
+    <value>Save as scenario JSON</value>
+    <comment>Filter library row save scenario menu item.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_DeleteMenu" xml:space="preserve">
+    <value>Delete</value>
+    <comment>Filter library row delete menu item and action label.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_DeleteFilterSetMessage_One" xml:space="preserve">
+    <value>This will permanently delete the filter set '{0}' with {1} filter. This cannot be undone.</value>
+    <comment>Filter library row delete filter set confirmation message. {0} is the entry name; {1} is the filter count.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_DeleteFilterSetMessage_Many" xml:space="preserve">
+    <value>This will permanently delete the filter set '{0}' with {1} filters. This cannot be undone.</value>
+    <comment>Filter library row delete filter set confirmation message. {0} is the entry name; {1} is the filter count.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_DeleteFilterMessage" xml:space="preserve">
+    <value>This will permanently delete the filter '{0}'. This cannot be undone.</value>
+    <comment>Filter library row delete filter confirmation message. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_DeleteTitle" xml:space="preserve">
+    <value>Delete from library?</value>
+    <comment>Filter library row delete confirmation title.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_DeletedAnnouncement" xml:space="preserve">
+    <value>Deleted {0} from library</value>
+    <comment>Filter library row delete announcement. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_AddedToFilterSetAnnouncement" xml:space="preserve">
+    <value>Added filter to filter set '{0}'</value>
+    <comment>Filter library row add to filter set announcement. {0} is the filter set name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_NewFilterSetPromptTitle" xml:space="preserve">
+    <value>Filter set name</value>
+    <comment>Filter library row new filter set prompt title.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_NewFilterSetPromptMessage" xml:space="preserve">
+    <value>What would you like to name this filter set?</value>
+    <comment>Filter library row new filter set prompt message.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_NewFilterSetPromptInitialValue" xml:space="preserve">
+    <value>New Filter Set</value>
+    <comment>Filter library row new filter set prompt initial value.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_NameEmptyValidation" xml:space="preserve">
+    <value>Name cannot be empty.</value>
+    <comment>Filter library entry name validation error.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_FilterSetExistsValidation" xml:space="preserve">
+    <value>A filter set named '{0}' already exists.</value>
+    <comment>Filter library new filter set validation error. {0} is the proposed name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_AddedToNewFilterSetAnnouncement" xml:space="preserve">
+    <value>Added filter to new filter set '{0}'</value>
+    <comment>Filter library row add to new filter set announcement. {0} is the filter set name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_TagRemovedAnnouncement" xml:space="preserve">
+    <value>Removed tag '{0}' from {1}</value>
+    <comment>Filter library row single-entry tag removal announcement. {0} is the tag; {1} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_RenamePromptTitle" xml:space="preserve">
+    <value>Rename entry</value>
+    <comment>Filter library row rename prompt title.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_RenamePromptMessage" xml:space="preserve">
+    <value>What would you like to rename this entry to?</value>
+    <comment>Filter library row rename prompt message.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_EntryExistsValidation" xml:space="preserve">
+    <value>An entry named '{0}' already exists.</value>
+    <comment>Filter library row rename validation error. {0} is the proposed name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_RenamedAnnouncement" xml:space="preserve">
+    <value>Renamed entry to '{0}'</value>
+    <comment>Filter library row rename announcement. {0} is the new entry name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_ReplacePromptTitle" xml:space="preserve">
+    <value>Replace current filters?</value>
+    <comment>Filter library row replace confirmation title.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_ReplacePromptMessage" xml:space="preserve">
+    <value>This will replace your current filter list with the filters from '{0}'. Your date filter and any in-progress filter drafts will be kept.</value>
+    <comment>Filter library row replace confirmation message. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_SavedToLibraryAnnouncement" xml:space="preserve">
+    <value>Saved {0} to library</value>
+    <comment>Filter library row save to library announcement. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_MarkedFavoriteAnnouncement" xml:space="preserve">
+    <value>Marked {0} as favorite</value>
+    <comment>Filter library row favorite announcement. {0} is the entry name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_RemovedFavoriteAnnouncement" xml:space="preserve">
+    <value>Removed {0} from favorites</value>
+    <comment>Filter library row unfavorite announcement. {0} is the entry name.</comment>
+  </data>
+  <!-- Filter library saved-tab header strings. -->
+  <data name="FilterLibrary_Entry_NewSavedFilterAction" xml:space="preserve">
+    <value>New saved filter</value>
+    <comment>Filter library saved tab new saved filter action label.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_NewSavedFilterDraftAria" xml:space="preserve">
+    <value>New saved filter draft</value>
+    <comment>Filter library saved tab draft region accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_NameLabel" xml:space="preserve">
+    <value>Name</value>
+    <comment>Filter library saved tab name field label.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_NamePlaceholder" xml:space="preserve">
+    <value>Enter a name…</value>
+    <comment>Filter library saved tab name field placeholder.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_NewSavedFilterTagsAria" xml:space="preserve">
+    <value>Tags for new saved filter</value>
+    <comment>Filter library saved tab tag picker accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_SavedNewFilterAnnouncement" xml:space="preserve">
+    <value>Saved new filter '{0}' to library</value>
+    <comment>Filter library saved tab save announcement. {0} is the saved filter name.</comment>
+  </data>
+  <data name="FilterLibrary_Entry_SavedFilterExistsValidation" xml:space="preserve">
+    <value>A saved filter named '{0}' already exists.</value>
+    <comment>Filter library saved tab duplicate-name validation error. {0} is the proposed name.</comment>
+  </data>
+  <!-- Filter library tag panel strings. -->
+  <data name="FilterLibrary_Tags_RegionAria" xml:space="preserve">
+    <value>Tag management</value>
+    <comment>Filter library tag management region accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_FilterAria" xml:space="preserve">
+    <value>Filter tags</value>
+    <comment>Filter library tag management search field accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_FilterPlaceholder" xml:space="preserve">
+    <value>Filter tags…</value>
+    <comment>Filter library tag management search field placeholder.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_RenameInputAria" xml:space="preserve">
+    <value>Rename tag {0}</value>
+    <comment>Filter library tag management rename input accessible name. {0} is the tag name.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_MergeAria_One" xml:space="preserve">
+    <value>Merge tag {0} into {1}, affects {2} entry</value>
+    <comment>Filter library tag management merge action accessible name. {0} is the source tag; {1} is the target tag; {2} is the affected entry count.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_MergeAria_Many" xml:space="preserve">
+    <value>Merge tag {0} into {1}, affects {2} entries</value>
+    <comment>Filter library tag management merge action accessible name. {0} is the source tag; {1} is the target tag; {2} is the affected entry count.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_MergeAction" xml:space="preserve">
+    <value>Merge into '{0}'</value>
+    <comment>Filter library tag management merge action label. {0} is the target tag.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_SaveRenameAria" xml:space="preserve">
+    <value>Save renamed tag {0}</value>
+    <comment>Filter library tag management save rename button accessible name. {0} is the tag name.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_CancelRenameAria" xml:space="preserve">
+    <value>Cancel rename</value>
+    <comment>Filter library tag management cancel rename button accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_RemoveConfirm_One" xml:space="preserve">
+    <value>Remove from {0} entry?</value>
+    <comment>Filter library tag management delete confirmation text. {0} is the affected entry count.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_RemoveConfirm_Many" xml:space="preserve">
+    <value>Remove from {0} entries?</value>
+    <comment>Filter library tag management delete confirmation text. {0} is the affected entry count.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_ConfirmDeleteAria" xml:space="preserve">
+    <value>Confirm delete tag {0}</value>
+    <comment>Filter library tag management confirm delete button accessible name. {0} is the tag name.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_CancelDeleteAria" xml:space="preserve">
+    <value>Cancel delete</value>
+    <comment>Filter library tag management cancel delete button accessible name.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_RenameActionAria" xml:space="preserve">
+    <value>Rename tag {0}</value>
+    <comment>Filter library tag management rename action accessible name. {0} is the tag name.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_RenameTitle" xml:space="preserve">
+    <value>Rename</value>
+    <comment>Filter library tag management rename action title.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_DeleteActionAria" xml:space="preserve">
+    <value>Delete tag {0}</value>
+    <comment>Filter library tag management delete action accessible name. {0} is the tag name.</comment>
+  </data>
+  <data name="FilterLibrary_Tags_DeleteTitle" xml:space="preserve">
+    <value>Delete</value>
+    <comment>Filter library tag management delete action title.</comment>
+  </data>
+  <!-- Filter library editor wrapper strings. -->
+  <data name="FilterLibrary_Editor_Empty" xml:space="preserve">
+    <value>No filters in this set.</value>
+    <comment>Filter library filter editor empty state.</comment>
+  </data>
+  <data name="FilterLibrary_Editor_AddFilter" xml:space="preserve">
+    <value>Add filter</value>
+    <comment>Filter library filter editor add filter action label.</comment>
+  </data>
   <data name="LibraryTab_Saved" xml:space="preserve">
     <value>Saved</value>
     <comment>Filter library Saved tab label.</comment>

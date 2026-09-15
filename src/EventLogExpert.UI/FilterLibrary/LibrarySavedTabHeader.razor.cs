@@ -4,10 +4,12 @@
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterLibrary;
@@ -37,6 +39,8 @@ public sealed partial class LibrarySavedTabHeader : ComponentBase
     [Inject] private IFilterLibraryCommands FilterLibraryCommands { get; init; } = null!;
 
     [Inject] private ILibraryEntriesSource LibraryEntries { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -87,7 +91,7 @@ public sealed partial class LibrarySavedTabHeader : ComponentBase
         };
 
         FilterLibraryCommands.AddEntry(entry);
-        AnnouncementService.Announce($"Saved new filter '{entry.Name}' to library");
+        AnnouncementService.Announce(Localizer["FilterLibrary_Entry_SavedNewFilterAnnouncement", entry.Name]);
         ResetState();
 
         return Task.CompletedTask;
@@ -108,14 +112,14 @@ public sealed partial class LibrarySavedTabHeader : ComponentBase
 
         if (string.IsNullOrEmpty(trimmed))
         {
-            _validationError = "Name cannot be empty.";
+            _validationError = Localizer["FilterLibrary_Entry_NameEmptyValidation"];
 
             return;
         }
 
         if (ExistingLibraryEntries.OfType<LibraryEntrySavedFilter>().Any(e => string.Equals(e.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
         {
-            _validationError = $"A saved filter named '{trimmed}' already exists.";
+            _validationError = Localizer["FilterLibrary_Entry_SavedFilterExistsValidation", trimmed];
 
             return;
         }

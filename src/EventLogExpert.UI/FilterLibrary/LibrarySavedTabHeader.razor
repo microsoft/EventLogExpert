@@ -1,21 +1,21 @@
 @if (!_isExpanded)
 {
     <Button CssClass="library-saved-tab-new-button" IconClass="bi bi-plus-circle" OnClick="ExpandAsync">
-        New saved filter
+        @Localizer["FilterLibrary_Entry_NewSavedFilterAction"]
     </Button>
 }
 else
 {
-    <div aria-label="New saved filter draft"
+    <div aria-label="@Localizer["FilterLibrary_Entry_NewSavedFilterDraftAria"]"
         class="library-saved-tab-new-draft"
         role="region">
         <div class="library-saved-tab-new-draft-name">
-            <label for="@_nameInputId">Name</label>
+            <label for="@_nameInputId">@Localizer["FilterLibrary_Entry_NameLabel"]</label>
             <input @bind="_draftName"
                 @bind:after="OnNameChanged"
                 @bind:event="oninput"
                 id="@_nameInputId"
-                placeholder="Enter a name…"
+                placeholder="@Localizer["FilterLibrary_Entry_NamePlaceholder"]"
                 @ref="_nameInputRef"
                 type="text" />
         </div>
@@ -31,7 +31,7 @@ else
             PendingDraft="_pendingDraft" />
 
         <div class="library-saved-tab-new-draft-tags">
-            <TagPicker AriaLabel="Tags for new saved filter"
+            <TagPicker AriaLabel="@Localizer["FilterLibrary_Entry_NewSavedFilterTagsAria"]"
                 SuggestionSource="@AllLibraryTags"
                 Value="@_draftTags"
                 ValueChanged="@OnDraftTagsChangedAsync" />

@@ -3,14 +3,17 @@
 
 using Bunit;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.UI.FilterLibrary;
 using EventLogExpert.UI.Menu;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -33,6 +36,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         Services.AddSingleton(_announcements);
         Services.AddSingleton(_commands);
         Services.AddSingleton(_menuService);
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 
         var activeFilters = Substitute.For<IActiveFiltersSource>();
         activeFilters.Current.Returns(_ => _paneState.Filters);
@@ -56,10 +60,10 @@ public sealed class LibraryEntryRowTests : BunitContext
         var component = RenderRow(entry, AllFilterSets: [filterSet]);
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        var sub = items.First(i => i.Label == "Add to filter set...").Children!;
+        var sub = items.First(i => i.Label == "[[FilterLibrary_Entry_AddToFilterSetMenu]]").Children!;
 
         Assert.Equal(3, sub.Count);
-        Assert.Equal("+ New filter set...", sub[0].Label);
+        Assert.Equal("[[FilterLibrary_Entry_NewFilterSetMenu]]", sub[0].Label);
         Assert.True(sub[1].IsSeparator);
         Assert.Equal("P1", sub[2].Label);
     }
@@ -71,11 +75,11 @@ public sealed class LibraryEntryRowTests : BunitContext
         var component = RenderRow(entry, AllFilterSets: []);
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        var sub = items.First(i => i.Label == "Add to filter set...").Children;
+        var sub = items.First(i => i.Label == "[[FilterLibrary_Entry_AddToFilterSetMenu]]").Children;
 
         Assert.NotNull(sub);
         Assert.Single(sub);
-        Assert.Equal("+ New filter set...", sub[0].Label);
+        Assert.Equal("[[FilterLibrary_Entry_NewFilterSetMenu]]", sub[0].Label);
     }
 
     [Fact]
@@ -101,7 +105,7 @@ public sealed class LibraryEntryRowTests : BunitContext
             onRequestPendingFocus: id => { calls.Add("focus"); return Task.CompletedTask; });
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        await items.First(i => i.Label == "Delete").OnClickAsync!.Invoke();
+        await items.First(i => i.Label == "[[FilterLibrary_Entry_DeleteMenu]]").OnClickAsync!.Invoke();
 
         Assert.Equal(["focus", "delete"], calls);
     }
@@ -114,21 +118,46 @@ public sealed class LibraryEntryRowTests : BunitContext
         _alerts.ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()).Returns(true);
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        await items.First(i => i.Label == "Delete").OnClickAsync!.Invoke();
+        await items.First(i => i.Label == "[[FilterLibrary_Entry_DeleteMenu]]").OnClickAsync!.Invoke();
 
-        await _alerts.Received(1).ShowAlert("Delete from library?", Arg.Is<string>(m => m != null && m.Contains("filter set 'P' with 2 filters")), "Delete", "Cancel");
+        await _alerts.Received(1).ShowAlert(
+            "[[FilterLibrary_Entry_DeleteTitle]]",
+            "[[FilterLibrary_Entry_DeleteFilterSetMessage_Many(P|2)]]",
+            "[[FilterLibrary_Entry_DeleteMenu]]",
+            "[[Modal_Cancel]]");
+    }
+
+    [Fact]
+    public async Task DeleteOnFilterSet_WithOneFilter_RoutesSingularFilterSetConfirmMessage()
+    {
+        var filterSet = BuildFilterSet("Solo", filterCount: 1);
+        var component = RenderRow(filterSet);
+        _alerts.ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()).Returns(true);
+
+        var items = await CapturedMoreMenuItemsAsync(component);
+        await items.First(i => i.Label == "[[FilterLibrary_Entry_DeleteMenu]]").OnClickAsync!.Invoke();
+
+        await _alerts.Received(1).ShowAlert(
+            "[[FilterLibrary_Entry_DeleteTitle]]",
+            "[[FilterLibrary_Entry_DeleteFilterSetMessage_One(Solo|1)]]",
+            "[[FilterLibrary_Entry_DeleteMenu]]",
+            "[[Modal_Cancel]]");
     }
 
     [Fact]
     public async Task DeleteOnUserSavedFilter_ShowsConfirm_InvokesOnlyOnAccept()
     {
-        var entry = BuildSavedFilter("X");
+        var entry = BuildSavedFilter("O'Brien");
         bool deleted = false;
         var component = RenderRow(entry, onDelete: id => { deleted = true; return Task.CompletedTask; });
-        _alerts.ShowAlert("Delete from library?", Arg.Any<string>(), "Delete", "Cancel").Returns(false);
+        _alerts.ShowAlert(
+            "[[FilterLibrary_Entry_DeleteTitle]]",
+            "[[FilterLibrary_Entry_DeleteFilterMessage(O'Brien)]]",
+            "[[FilterLibrary_Entry_DeleteMenu]]",
+            "[[Modal_Cancel]]").Returns(false);
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        await items.First(i => i.Label == "Delete").OnClickAsync!.Invoke();
+        await items.First(i => i.Label == "[[FilterLibrary_Entry_DeleteMenu]]").OnClickAsync!.Invoke();
 
         Assert.False(deleted);
     }
@@ -196,7 +225,7 @@ public sealed class LibraryEntryRowTests : BunitContext
             OnAddToFilterSet: i => { captured = i; return Task.CompletedTask; });
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        var p1Item = items.First(i => i.Label == "Add to filter set...").Children!.First(c => c.Label == "P1");
+        var p1Item = items.First(i => i.Label == "[[FilterLibrary_Entry_AddToFilterSetMenu]]").Children!.First(c => c.Label == "P1");
         await p1Item.OnClickAsync!.Invoke();
 
         Assert.NotNull(captured);
@@ -225,7 +254,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         Assert.NotNull(captured);
         Assert.Equal(entry.Id, captured.EntryId);
         Assert.True(captured.NewIsFavorite);
-        _announcements.Received(1).Announce(Arg.Is<string>(s => s != null && s.Contains("Marked X as favorite")));
+        _announcements.Received(1).Announce(Arg.Is<string>(s => s != null && s.Contains("[[FilterLibrary_Entry_MarkedFavoriteAnnouncement(X)]]")));
     }
 
     [Fact]
@@ -261,6 +290,22 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
+    public void FavoriteToggle_RoutesAddAndRemoveStatesThroughDistinctAriaAndTitleKeys()
+    {
+        var notFavorite = RenderRow(BuildSavedFilter("Entry"));
+        var notFavoriteButton = notFavorite.Find("button.button-yellow");
+
+        Assert.Equal("[[FilterLibrary_Entry_AddFavoriteAria(Entry)]]", notFavoriteButton.GetAttribute("aria-label"));
+        Assert.Equal("[[FilterLibrary_Entry_AddFavoriteTitle]]", notFavoriteButton.GetAttribute("title"));
+
+        var favorite = RenderRow(BuildSavedFilter("Entry") with { IsFavorite = true });
+        var favoriteButton = favorite.Find("button.button-yellow");
+
+        Assert.Equal("[[FilterLibrary_Entry_RemoveFavoriteAria(Entry)]]", favoriteButton.GetAttribute("aria-label"));
+        Assert.Equal("[[FilterLibrary_Entry_RemoveFavoriteTitle]]", favoriteButton.GetAttribute("title"));
+    }
+
+    [Fact]
     public void FilterSetEntry_DoesNotRenderFavoriteButton()
     {
         var filterSet = BuildFilterSet("P");
@@ -270,12 +315,34 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
+    public void KindIcon_RoutesFilterAndFilterSetStatesThroughDistinctAriaKeys()
+    {
+        var filter = RenderRow(BuildSavedFilter("Filter"));
+
+        Assert.Equal("[[FilterLibrary_Entry_FilterKindAria]]", filter.Find("i.library-entry-kind-icon").GetAttribute("aria-label"));
+
+        var filterSet = RenderRow(BuildFilterSet("Set"));
+
+        Assert.Equal("[[FilterLibrary_Entry_FilterSetKindAria]]", filterSet.Find("i.library-entry-kind-icon").GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public void MoreActionsButton_RoutesAriaAndTitleThroughDistinctKeys()
+    {
+        var component = RenderRow(BuildSavedFilter("Entry"));
+        var button = component.Find("button[aria-haspopup='menu']");
+
+        Assert.Equal("[[FilterLibrary_Entry_MoreActionsAria(Entry)]]", button.GetAttribute("aria-label"));
+        Assert.Equal("[[FilterLibrary_Entry_MoreActionsTitle]]", button.GetAttribute("title"));
+    }
+
+    [Fact]
     public async Task MoreButtonClick_OpensMenuViaIMenuServiceWithAnchorCoords()
     {
         var entry = BuildSavedFilter("X");
         var component = RenderRow(entry);
 
-        await component.Find("button[aria-label^='More actions for']").ClickAsync(new MouseEventArgs { Detail = 1 });
+        await component.Find("button[aria-label^='[[FilterLibrary_Entry_MoreActionsAria']").ClickAsync(new MouseEventArgs { Detail = 1 });
 
         _menuService.Received(1).OpenAt(
             Arg.Any<double>(),
@@ -289,7 +356,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         var entry = BuildSavedFilter("X");
         var component = RenderRow(entry);
 
-        await component.Find("button[aria-label^='More actions for']").ClickAsync(new MouseEventArgs { Detail = 0 });
+        await component.Find("button[aria-label^='[[FilterLibrary_Entry_MoreActionsAria']").ClickAsync(new MouseEventArgs { Detail = 0 });
 
         _menuService.Received(1).OpenAt(
             Arg.Any<double>(),
@@ -306,8 +373,8 @@ public sealed class LibraryEntryRowTests : BunitContext
         var entry = BuildSavedFilter("X");
         var component = RenderRow(entry);
 
-        var more = component.Find("button[aria-label^='More actions for']");
-        Assert.Contains("More actions for X", more.GetAttribute("aria-label"));
+        var more = component.Find("button[aria-label^='[[FilterLibrary_Entry_MoreActionsAria']");
+        Assert.Equal("[[FilterLibrary_Entry_MoreActionsAria(X)]]", more.GetAttribute("aria-label"));
         Assert.Equal("menu", more.GetAttribute("aria-haspopup"));
         Assert.Equal("false", more.GetAttribute("aria-expanded"));
     }
@@ -320,7 +387,7 @@ public sealed class LibraryEntryRowTests : BunitContext
 
         var items = await CapturedMoreMenuItemsAsync(component);
 
-        Assert.Contains(items, i => i.Label == "Save to Library");
+        Assert.Contains(items, i => i.Label == "[[FilterLibrary_Entry_SaveToLibraryMenu]]");
     }
 
     [Fact]
@@ -331,7 +398,7 @@ public sealed class LibraryEntryRowTests : BunitContext
 
         var items = await CapturedMoreMenuItemsAsync(component);
 
-        Assert.DoesNotContain(items, i => i.Label == "Save to Library");
+        Assert.DoesNotContain(items, i => i.Label == "[[FilterLibrary_Entry_SaveToLibraryMenu]]");
     }
 
     [Fact]
@@ -341,7 +408,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         var component = RenderRow(entry);
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        var addToFilterSet = items.FirstOrDefault(i => i.Label == "Add to filter set...");
+        var addToFilterSet = items.FirstOrDefault(i => i.Label == "[[FilterLibrary_Entry_AddToFilterSetMenu]]");
 
         Assert.NotNull(addToFilterSet);
         Assert.NotNull(addToFilterSet.Children);
@@ -355,7 +422,7 @@ public sealed class LibraryEntryRowTests : BunitContext
 
         var items = await CapturedMoreMenuItemsAsync(component);
 
-        Assert.DoesNotContain(items, i => i.Label == "Add to filter set...");
+        Assert.DoesNotContain(items, i => i.Label == "[[FilterLibrary_Entry_AddToFilterSetMenu]]");
     }
 
     [Fact]
@@ -366,7 +433,7 @@ public sealed class LibraryEntryRowTests : BunitContext
 
         var items = await CapturedMoreMenuItemsAsync(component);
 
-        Assert.DoesNotContain(items, i => i.Label == "Save to Library");
+        Assert.DoesNotContain(items, i => i.Label == "[[FilterLibrary_Entry_SaveToLibraryMenu]]");
     }
 
     [Fact]
@@ -378,7 +445,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         _alerts.DisplayPrompt(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Func<string, string?>>()).Returns("");
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        await items.First(i => i.Label == "Add to filter set...").Children!.First().OnClickAsync!.Invoke();
+        await items.First(i => i.Label == "[[FilterLibrary_Entry_AddToFilterSetMenu]]").Children!.First().OnClickAsync!.Invoke();
 
         Assert.False(invoked);
     }
@@ -392,11 +459,41 @@ public sealed class LibraryEntryRowTests : BunitContext
         _alerts.DisplayPrompt(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Func<string, string?>>()).Returns("My Preset");
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        await items.First(i => i.Label == "Add to filter set...").Children!.First().OnClickAsync!.Invoke();
+        await items.First(i => i.Label == "[[FilterLibrary_Entry_AddToFilterSetMenu]]").Children!.First().OnClickAsync!.Invoke();
 
         Assert.NotNull(captured);
         Assert.Null(captured.FilterSetId);
         Assert.Equal("My Preset", captured.NewFilterSetName);
+    }
+
+    [Theory]
+    [InlineData(30, "[[FilterLibrary_Entry_RelativeTime_JustNow]]")]
+    [InlineData(90, "[[FilterLibrary_Entry_RelativeTime_Minutes(1)]]")]
+    [InlineData(7200, "[[FilterLibrary_Entry_RelativeTime_Hours(2)]]")]
+    [InlineData(259200, "[[FilterLibrary_Entry_RelativeTime_Days(3)]]")]
+    public void PreviouslyUsedRelativeTime_RoutesEachDisplayedRangeThroughExpectedKey(
+        int secondsAgo,
+        string expectedMarker)
+    {
+        var entry = BuildAutoTrackedFilterEntry("Recent") with
+        {
+            LastUsedUtc = DateTimeOffset.UtcNow.AddSeconds(-secondsAgo)
+        };
+        var component = RenderRow(entry, activeTab: LibraryTab.PreviouslyUsed);
+
+        Assert.Contains(expectedMarker, component.Find(".library-entry-name").TextContent);
+    }
+
+    [Fact]
+    public void PreviouslyUsedTrackedBadge_RoutesAriaAndTitleThroughDistinctKeys()
+    {
+        var entry = BuildAutoTrackedFilterEntry("Tracked");
+        var component = RenderRow(entry, activeTab: LibraryTab.PreviouslyUsed);
+        var badge = component.Find(".library-entry-tracked-badge");
+
+        Assert.Equal("[[FilterLibrary_Entry_TrackedAria]]", badge.GetAttribute("aria-label"));
+        Assert.Equal("[[FilterLibrary_Entry_TrackedTitle]]", badge.GetAttribute("title"));
+        Assert.Equal("[[FilterLibrary_Entry_TrackedLabel]]", badge.TextContent.Trim());
     }
 
     [Fact]
@@ -405,11 +502,11 @@ public sealed class LibraryEntryRowTests : BunitContext
         var entry = BuildSavedFilter("X") with { Tags = ["bug", "perf"] };
         var component = RenderRow(entry);
 
-        await component.Find("button[aria-label='Remove tag bug']").ClickAsync(new MouseEventArgs());
+        await component.Find("button[aria-label='[[FilterLibrary_Entry_RemoveTagAria(bug)]]']").ClickAsync(new MouseEventArgs());
 
         _commands.Received(1).SetEntryTags(entry.Id, Arg.Is<ImmutableList<string>>(
             tags => tags != null && tags.SequenceEqual(new[] { "perf" })));
-        _announcements.Received(1).Announce("Removed tag 'bug' from X");
+        _announcements.Received(1).Announce("[[FilterLibrary_Entry_TagRemovedAnnouncement(bug|X)]]");
     }
 
     [Fact]
@@ -428,7 +525,16 @@ public sealed class LibraryEntryRowTests : BunitContext
         var component = RenderRow(filterSet);
 
         Assert.Contains("bi-collection", component.Find("i.library-entry-kind-icon").GetAttribute("class"));
-        Assert.Contains("(3 filters)", component.Find(".library-entry-name").TextContent);
+        Assert.Contains("[[FilterLibrary_Entry_FilterCount_Many(3)]]", component.Find(".library-entry-name").TextContent);
+    }
+
+    [Fact]
+    public void Render_FilterSetEntry_WithOneFilter_RoutesSingularFilterCount()
+    {
+        var filterSet = BuildFilterSet("P", filterCount: 1);
+        var component = RenderRow(filterSet);
+
+        Assert.Contains("[[FilterLibrary_Entry_FilterCount_One(1)]]", component.Find(".library-entry-name").TextContent);
     }
 
     [Fact]
@@ -439,7 +545,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         var component = RenderRow(entry, onReplace: id => { captured = id; return Task.CompletedTask; });
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        var replace = items.First(i => i.Label == "Replace current filters");
+        var replace = items.First(i => i.Label == "[[FilterLibrary_Entry_ReplaceCurrentMenu]]");
         await replace.OnClickAsync!.Invoke();
 
         Assert.Equal(entry.Id, captured);
@@ -456,10 +562,10 @@ public sealed class LibraryEntryRowTests : BunitContext
         bool replaced = false;
         var component = RenderRow(entry, onReplace: id => { replaced = true; return Task.CompletedTask; });
 
-        _alerts.ShowAlert("Replace current filters?", Arg.Any<string>(), "Replace", "Cancel").Returns(false);
+        _alerts.ShowAlert("[[FilterLibrary_Entry_ReplacePromptTitle]]", Arg.Any<string>(), "[[FilterPane_Action_Replace]]", "[[Modal_Cancel]]").Returns(false);
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        await items.First(i => i.Label == "Replace current filters").OnClickAsync!.Invoke();
+        await items.First(i => i.Label == "[[FilterLibrary_Entry_ReplaceCurrentMenu]]").OnClickAsync!.Invoke();
 
         Assert.False(replaced);
     }
@@ -472,10 +578,39 @@ public sealed class LibraryEntryRowTests : BunitContext
         var component = RenderRow(entry, onSaveToLibrary: id => { invoked = true; return Task.CompletedTask; });
 
         var items = await CapturedMoreMenuItemsAsync(component);
-        await items.First(i => i.Label == "Save to Library").OnClickAsync!.Invoke();
+        await items.First(i => i.Label == "[[FilterLibrary_Entry_SaveToLibraryMenu]]").OnClickAsync!.Invoke();
 
         Assert.True(invoked);
-        _announcements.Received(1).Announce(Arg.Is<string>(s => s != null && s.Contains("Saved X to library")));
+        _announcements.Received(1).Announce(Arg.Is<string>(s => s != null && s.Contains("[[FilterLibrary_Entry_SavedToLibraryAnnouncement(X)]]")));
+    }
+
+    [Fact]
+    public async Task TagEditDoneButton_RoutesAriaAndTitleThroughDistinctKeys()
+    {
+        var entry = BuildSavedFilter("Entry") with { Tags = ["alpha"] };
+        var component = RenderRow(entry);
+
+        await component.Find(".library-entry-tag-add-inline").ClickAsync(new MouseEventArgs());
+
+        var doneButton = component.Find(".library-entry-tags-done");
+        Assert.Equal("[[FilterLibrary_Entry_DoneEditingTagsAria]]", doneButton.GetAttribute("aria-label"));
+        Assert.Equal("[[FilterLibrary_Entry_DoneTitle]]", doneButton.GetAttribute("title"));
+    }
+
+    [Fact]
+    public void TagEditToggle_RoutesAddAndEditStatesThroughDistinctAriaAndTitleKeys()
+    {
+        var noTags = RenderRow(BuildSavedFilter("Entry"));
+        var addButton = noTags.Find(".library-entry-tag-add-inline");
+
+        Assert.Equal("[[FilterLibrary_Entry_AddTagsAria(Entry)]]", addButton.GetAttribute("aria-label"));
+        Assert.Equal("[[FilterLibrary_Entry_AddTagsTitle]]", addButton.GetAttribute("title"));
+
+        var withTags = RenderRow(BuildSavedFilter("Entry") with { Tags = ["alpha"] });
+        var editButton = withTags.Find(".library-entry-tag-add-inline");
+
+        Assert.Equal("[[FilterLibrary_Entry_EditTagsAria(Entry)]]", editButton.GetAttribute("aria-label"));
+        Assert.Equal("[[FilterLibrary_Entry_EditTagsTitle]]", editButton.GetAttribute("title"));
     }
 
     [Fact]
@@ -543,7 +678,7 @@ public sealed class LibraryEntryRowTests : BunitContext
         IReadOnlyList<MenuItem>? captured = null;
         _menuService.WhenForAnyArgs(s => s.OpenAt(0, 0, null!, false, false))
             .Do(call => captured = call.ArgAt<IReadOnlyList<MenuItem>>(2));
-        await component.Find("button[aria-label^='More actions for']").ClickAsync(new MouseEventArgs { Detail = 1 });
+        await component.Find("button[aria-label^='[[FilterLibrary_Entry_MoreActionsAria']").ClickAsync(new MouseEventArgs { Detail = 1 });
         Assert.NotNull(captured);
         return captured;
     }

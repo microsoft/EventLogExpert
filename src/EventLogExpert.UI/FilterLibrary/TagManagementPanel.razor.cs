@@ -1,8 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.FilterLibrary;
+using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.FilterLibrary;
 
@@ -11,9 +14,9 @@ public sealed partial class TagManagementPanel : ComponentBase
     private const int SearchVisibleThreshold = 6;
 
     private string? _deleteConfirmTag;
+    private ElementReference _editInputRef;
     private string _editingNewName = string.Empty;
     private string? _editingTag;
-    private ElementReference _editInputRef;
     private string? _mergeTargetTag;
     private bool _pendingFocusEdit;
     private string _searchText = string.Empty;
@@ -29,6 +32,8 @@ public sealed partial class TagManagementPanel : ComponentBase
     [Parameter] public EventCallback<(string OldName, string NewName)> OnTagRenamed { get; set; }
 
     [Inject] private IFilterLibraryCommands FilterLibraryCommands { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -148,6 +153,16 @@ public sealed partial class TagManagementPanel : ComponentBase
             .Select(t => (t, usageCounts.GetValueOrDefault(t)));
     }
 
+    private string MergeAriaLabel(string tag, string mergeTargetTag, int count) =>
+        LocalizedCount.OneOrManyRaw(
+            Localizer,
+            count,
+            "FilterLibrary_Tags_MergeAria_One",
+            "FilterLibrary_Tags_MergeAria_Many",
+            tag,
+            mergeTargetTag,
+            count);
+
     private void OnEditNameChanged()
     {
         if (_mergeTargetTag is null) { return; }
@@ -158,4 +173,12 @@ public sealed partial class TagManagementPanel : ComponentBase
             _mergeTargetTag = null;
         }
     }
+
+    private string RemoveConfirmLabel(int count) =>
+        LocalizedCount.OneOrManyRaw(
+            Localizer,
+            count,
+            "FilterLibrary_Tags_RemoveConfirm_One",
+            "FilterLibrary_Tags_RemoveConfirm_Many",
+            count);
 }

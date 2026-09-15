@@ -4,31 +4,31 @@
         <div class="library-entry-filter-editor-list" id="@_filterListId">
             @if (FilterSet.Filters.Count == 0 && _pendingDrafts.Count == 0)
             {
-                <p class="library-entry-filter-editor-empty">No filters in this set.</p>
+                <p class="library-entry-filter-editor-empty">@Localizer["FilterLibrary_Editor_Empty"]</p>
             }
 
             @foreach (var saved in FilterSet.Filters)
             {
                 <LibraryFilterRow Id="@ComponentId.For(saved.Id, ComponentIdScope.LibraryFilter).Value"
-                    @key="saved.Id"
                     OnExclusionChanged="@(e => OnExclusionChangedForSaved(saved.Id, e))"
                     OnRemove="@(() => OnRemoveSaved(saved.Id))"
                     OnSave="@(updated => OnSaveSavedFilter(saved.Id, updated))"
                     OnToggleEnabled="@(() => OnToggleEnabledForSaved(saved.Id))"
-                    Value="saved" />
+                    Value="saved"
+                    @key="saved.Id" />
             }
 
             @foreach (var draft in _pendingDrafts)
             {
                 <LibraryFilterRow Id="@ComponentId.For(draft.Id, ComponentIdScope.LibraryPendingFilter).Value"
-                    @key="draft.Id"
                     OnPendingDiscard="@(() => DiscardPendingDraft(draft))"
                     OnPendingSave="@(built => SavePendingDraft(draft, built))"
-                    PendingDraft="draft" />
+                    PendingDraft="draft"
+                    @key="draft.Id" />
             }
 
             <Button CssClass="library-entry-filter-editor-add-button" IconClass="bi bi-plus" OnClick="AddPendingDraft">
-                Add filter
+                @Localizer["FilterLibrary_Editor_AddFilter"]
             </Button>
         </div>
     }

@@ -3,17 +3,17 @@
     return;
 }
 
-<div aria-label="Tag management"
+<div aria-label="@Localizer["FilterLibrary_Tags_RegionAria"]"
     class="library-tag-management-panel"
     id="@Id"
     role="region">
     @if (AllLibraryTags.Count >= SearchVisibleThreshold)
     {
         <div class="library-tag-management-search">
-            <input aria-label="Filter tags"
+            <input aria-label="@Localizer["FilterLibrary_Tags_FilterAria"]"
                 @bind="_searchText"
                 @bind:event="oninput"
-                placeholder="Filter tags…"
+                placeholder="@Localizer["FilterLibrary_Tags_FilterPlaceholder"]"
                 type="text" />
         </div>
     }
@@ -24,7 +24,7 @@
             <div class="library-tag-management-row" @key="tag">
                 @if (_editingTag == tag)
                 {
-                    <input aria-label="@($"Rename tag {tag}")"
+                    <input aria-label="@Localizer["FilterLibrary_Tags_RenameInputAria", tag]"
                         @bind="_editingNewName"
                         @bind:after="OnEditNameChanged"
                         @bind:event="oninput"
@@ -37,8 +37,8 @@
                     {
                         <WarningButton IconClass="bi bi-union"
                             OnClick="ConfirmMergeAsync"
-                            aria-label="@($"Merge tag {tag} into {_mergeTargetTag}, affects {count} entries")">
-                            Merge into '@_mergeTargetTag'
+                            aria-label="@MergeAriaLabel(tag, _mergeTargetTag, count)">
+                            @Localizer["FilterLibrary_Tags_MergeAction", _mergeTargetTag]
                         </WarningButton>
                     }
                     else
@@ -46,29 +46,29 @@
                         <PrimaryButton IconClass="bi bi-check2"
                             IconOnly
                             OnClick="ConfirmRenameAsync"
-                            aria-label="@($"Save renamed tag {tag}")" />
+                            aria-label="@Localizer["FilterLibrary_Tags_SaveRenameAria", tag]" />
                     }
 
                     <Button IconClass="bi bi-x-circle"
                         IconOnly
                         OnClick="CancelEdit"
-                        aria-label="Cancel rename" />
+                        aria-label="@Localizer["FilterLibrary_Tags_CancelRenameAria"]" />
                 }
                 else if (_deleteConfirmTag == tag)
                 {
                     <span class="library-tag-management-row-name">@tag</span>
                     <span class="library-tag-management-row-count">(@count)</span>
-                    <span class="library-tag-management-row-confirm">Remove from @count entries?</span>
+                    <span class="library-tag-management-row-confirm">@RemoveConfirmLabel(count)</span>
 
                     <DangerButton IconClass="bi bi-check2"
                         IconOnly
                         OnClick="ConfirmDeleteAsync"
-                        aria-label="@($"Confirm delete tag {tag}")" />
+                        aria-label="@Localizer["FilterLibrary_Tags_ConfirmDeleteAria", tag]" />
 
                     <Button IconClass="bi bi-x-circle"
                         IconOnly
                         OnClick="CancelDelete"
-                        aria-label="Cancel delete" />
+                        aria-label="@Localizer["FilterLibrary_Tags_CancelDeleteAria"]" />
                 }
                 else
                 {
@@ -78,14 +78,14 @@
                     <Button IconClass="bi bi-pencil"
                         IconOnly
                         OnClick="@(() => BeginRename(tag))"
-                        aria-label="@($"Rename tag {tag}")"
-                        title="Rename" />
+                        aria-label="@Localizer["FilterLibrary_Tags_RenameActionAria", tag]"
+                        title="@Localizer["FilterLibrary_Tags_RenameTitle"]" />
 
                     <DangerButton IconClass="bi bi-trash"
                         IconOnly
                         OnClick="@(() => BeginDelete(tag))"
-                        aria-label="@($"Delete tag {tag}")"
-                        title="Delete" />
+                        aria-label="@Localizer["FilterLibrary_Tags_DeleteActionAria", tag]"
+                        title="@Localizer["FilterLibrary_Tags_DeleteTitle"]" />
                 }
             </div>
         }

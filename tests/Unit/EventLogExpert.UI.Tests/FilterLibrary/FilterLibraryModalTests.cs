@@ -485,6 +485,38 @@ public sealed class FilterLibraryModalTests : BunitContext
         component.WaitForAssertion(() => Assert.Empty(component.FindAll(".filter-library-loading")));
     }
 
+    [Theory]
+    [InlineData(0, "[[FilterLibrary_ExportedEntries_Many(0)]]")]
+    [InlineData(1, "[[FilterLibrary_ExportedEntries_One(1)]]")]
+    [InlineData(2, "[[FilterLibrary_ExportedEntries_Many(2)]]")]
+    public async Task OnExportAsync_RoutesExportedEntryCountAnnouncementThroughOneAndManyKeys(
+        int entryCount,
+        string expectedAnnouncement)
+    {
+        string path = Path.Combine(AppContext.BaseDirectory, $"filter-library-export-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            SetState(new FilterLibraryState
+            {
+                Entries = [.. Enumerable.Range(0, entryCount).Select(index => BuildSavedFilter($"Entry {index}"))],
+                IsLoaded = true
+            });
+            _exportService.Serialize(Arg.Any<IReadOnlyList<LibraryEntry>>()).Returns("{}");
+            _filePicker.PickSaveAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<string?>())
+                .Returns(path);
+            var component = Render<FilterLibraryModal>();
+
+            await InvokePrivateTask(component.Instance, "OnExportAsync");
+
+            _announcements.Received(1).Announce(expectedAnnouncement);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Fact]
     public async Task OnImportAsync_InitialPreflightError_RoutesTypedErrorThroughLocalizer()
     {
@@ -640,9 +672,9 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Theory]
-    [InlineData(0, "No saved filters or filter sets")]
-    [InlineData(1, "No favorited")]
-    [InlineData(2, "No filters have been applied recently")]
+    [InlineData(0, "[[FilterLibrary_Empty_Saved]]")]
+    [InlineData(1, "[[FilterLibrary_Empty_Favorites]]")]
+    [InlineData(2, "[[FilterLibrary_Empty_PreviouslyUsed]]")]
     public async Task Render_EmptyTab_ShowsTabSpecificMessage(int tabIndex, string expectedFragment)
     {
         SetState(new FilterLibraryState { IsLoaded = true });
@@ -956,7 +988,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         await bar.KeyDownAsync(new KeyboardEventArgs { Key = "Escape" });
 
         Assert.Equal(2, component.Find("[role='tabpanel'].active").QuerySelectorAll(".library-entry").Length);
-        _announcements.Received().Announce(Arg.Is<string>(s => s != null && s.Contains("Tag filters cleared")));
+        _announcements.Received().Announce(Arg.Is<string>(s => s != null && s.Contains("[[FilterLibrary_TagFiltersClearedAnnouncement]]")));
     }
 
     [Fact]
@@ -969,7 +1001,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         var bar = component.Find(".library-tag-filter-bar");
         await bar.KeyDownAsync(new KeyboardEventArgs { Key = "Escape" });
 
-        _announcements.DidNotReceive().Announce(Arg.Is<string>(s => s != null && s.Contains("Tag filters cleared")));
+        _announcements.DidNotReceive().Announce(Arg.Is<string>(s => s != null && s.Contains("[[FilterLibrary_TagFiltersClearedAnnouncement]]")));
     }
 
     [Fact]
@@ -987,7 +1019,7 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         Assert.Equal(10, visibleChips.Length);
         Assert.NotNull(overflowButton);
-        Assert.Contains("+2 more", overflowButton.TextContent);
+        Assert.Contains("[[FilterLibrary_ShowMore(2)]]", overflowButton.TextContent);
         Assert.Equal("false", overflowButton.GetAttribute("aria-expanded"));
         await Task.CompletedTask;
     }
@@ -1089,7 +1121,7 @@ public sealed class FilterLibraryModalTests : BunitContext
             .ClickAsync(new MouseEventArgs());
 
         var empty = component.Find("[role='tabpanel'].active .library-empty-state");
-        Assert.Contains("No entries match the selected tags", empty.TextContent);
+        Assert.Contains("[[FilterLibrary_Empty_TagFilter]]", empty.TextContent);
     }
 
     [Fact]

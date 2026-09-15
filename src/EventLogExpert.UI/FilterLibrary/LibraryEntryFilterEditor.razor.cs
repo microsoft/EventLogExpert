@@ -4,9 +4,11 @@
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterLibrary;
@@ -22,6 +24,8 @@ public sealed partial class LibraryEntryFilterEditor : ComponentBase
     [Parameter] public bool IsExpanded { get; set; }
 
     [Inject] private IFilterLibraryCommands FilterLibraryCommands { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     protected override void OnInitialized()
     {
