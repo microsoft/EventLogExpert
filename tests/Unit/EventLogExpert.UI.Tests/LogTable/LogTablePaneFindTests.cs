@@ -122,9 +122,13 @@ public sealed class LogTablePaneFindTests : CultureSensitiveBunitContext
 
         OpenFindAndSearch(cut, "match");
 
-        cut.WaitForAssertion(() => Assert.Single(cut.FindAll("tr[data-find='current']")));
-        Assert.Equal("true", cut.Find("tr[data-find='current']").GetAttribute("aria-current"));
-        Assert.DoesNotContain(cut.FindAll("tr[data-find='match']"), row => row.HasAttribute("aria-current"));
+        cut.WaitForAssertion(() =>
+        {
+            var currentRows = cut.FindAll("tr[data-find='current']");
+            Assert.Single(currentRows);
+            Assert.Equal("true", currentRows[0].GetAttribute("aria-current"));
+            Assert.DoesNotContain(cut.FindAll("tr[data-find='match']"), row => row.HasAttribute("aria-current"));
+        });
     }
 
     [Fact]
@@ -134,8 +138,12 @@ public sealed class LogTablePaneFindTests : CultureSensitiveBunitContext
 
         OpenFindAndSearch(cut, "match");
 
-        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("mark.find-mark")));
-        Assert.Equal("match", cut.Find("mark.find-mark").TextContent);
+        cut.WaitForAssertion(() =>
+        {
+            var marks = cut.FindAll("mark.find-mark");
+            Assert.NotEmpty(marks);
+            Assert.Equal("match", marks[0].TextContent);
+        });
     }
 
     [Fact]
@@ -181,9 +189,12 @@ public sealed class LogTablePaneFindTests : CultureSensitiveBunitContext
 
         OpenFindAndSearch(cut, "match");
 
-        cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll("tr[data-find]").Count));
-        Assert.Single(cut.FindAll("tr[data-find='current']"));
-        Assert.Contains("2", cut.Find(".find-count").TextContent);
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Equal(2, cut.FindAll("tr[data-find]").Count);
+            Assert.Single(cut.FindAll("tr[data-find='current']"));
+            Assert.Contains("2", cut.Find(".find-count").TextContent);
+        });
     }
 
     [Fact]
