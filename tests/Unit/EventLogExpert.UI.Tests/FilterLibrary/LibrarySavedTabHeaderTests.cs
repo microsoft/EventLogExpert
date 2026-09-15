@@ -91,6 +91,17 @@ public sealed class LibrarySavedTabHeaderTests : BunitContext
     }
 
     [Fact]
+    public async Task NewDraftTagPicker_RoutesPlaceholderThroughLocalizer()
+    {
+        var component = Render(allTags: [], existing: []);
+
+        await component.Find(".library-saved-tab-new-button").ClickAsync(new MouseEventArgs());
+
+        var input = component.Find(".library-saved-tab-new-draft-tags .tag-picker-input");
+        Assert.Equal("[[FilterLibrary_Entry_TagInputPlaceholder]]", input.GetAttribute("placeholder"));
+    }
+
+    [Fact]
     public async Task SaveWithDuplicateName_ShowsValidationError_DoesNotAddEntry()
     {
         var existing = BuildSavedFilter("Dup");

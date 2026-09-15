@@ -10,7 +10,7 @@
                 <ChromelessButton CssClass="tag-picker-chip-remove"
                     IconClass="bi bi-x-circle"
                     OnClick="@(() => RemoveTagAsync(index))"
-                    aria-label="@($"Remove {tag}")" />
+                    aria-label="@RemoveTagAriaLabel(tag)" />
             </span>
         }
 

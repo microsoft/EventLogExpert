@@ -6,6 +6,7 @@ using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using System.Collections.Immutable;
+using System.Globalization;
 
 namespace EventLogExpert.UI.Inputs;
 
@@ -20,9 +21,11 @@ public sealed partial class TagPicker : ComponentBase
     private bool _isDropdownOpen;
     private bool _isInputFocused;
 
-    [Parameter] public string? AriaLabel { get; set; }
+    [Parameter][EditorRequired] public string? AriaLabel { get; set; }
 
-    [Parameter] public string? Placeholder { get; set; } = "Add tag…";
+    [Parameter][EditorRequired] public string? Placeholder { get; set; } = "Add tag…";
+
+    [Parameter][EditorRequired] public string RemoveTagAriaLabelFormat { get; set; } = "Remove {0}";
 
     [Parameter][EditorRequired] public required IReadOnlyList<string> SuggestionSource { get; set; }
 
@@ -30,7 +33,7 @@ public sealed partial class TagPicker : ComponentBase
 
     [Parameter] public EventCallback<ImmutableList<string>> ValueChanged { get; set; }
 
-    private string EffectiveAriaLabel => string.IsNullOrWhiteSpace(AriaLabel) ? "Tags" : AriaLabel;
+    private string? EffectiveAriaLabel => AriaLabel;
 
     private bool IsListboxOpen => _isDropdownOpen && _isInputFocused && _filteredSuggestions.Count > 0;
 
@@ -197,6 +200,9 @@ public sealed partial class TagPicker : ComponentBase
             .Where(s => typed.Length == 0 || s.Contains(typed, StringComparison.OrdinalIgnoreCase))
             .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)];
     }
+
+    private string RemoveTagAriaLabel(string tag) =>
+        string.Format(CultureInfo.CurrentCulture, RemoveTagAriaLabelFormat, tag);
 
     private async Task RemoveTagAsync(int index)
     {

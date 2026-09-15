@@ -107,6 +107,8 @@
     {
         <div class="library-entry-row-tags-edit">
             <TagPicker AriaLabel="@Localizer["FilterLibrary_Entry_TagsAria", Entry.Name]"
+                Placeholder="@Localizer["FilterLibrary_Entry_TagInputPlaceholder"]"
+                RemoveTagAriaLabelFormat="@Localizer["FilterLibrary_Entry_RemoveTagChipAria"]"
                 SuggestionSource="@AllLibraryTags"
                 Value="@Entry.Tags"
                 ValueChanged="@OnTagsChangedAsync" />
