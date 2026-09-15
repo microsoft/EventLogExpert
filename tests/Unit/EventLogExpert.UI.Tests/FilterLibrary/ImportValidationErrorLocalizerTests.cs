@@ -29,8 +29,8 @@ public sealed class ImportValidationErrorLocalizerTests
         { new ImportValidationError.MissingEntriesProperty(), "[[FilterImport_Error_MissingEntriesProperty]]" },
         { new ImportValidationError.UnsupportedShape(), "[[FilterImport_Error_UnsupportedShape]]" },
         { new ImportValidationError.MissingEntryName(), "[[FilterImport_Error_MissingEntryName]]" },
-        { new ImportValidationError.InvalidBasicFilters(["One"]), "[[FilterImport_Error_InvalidBasicFilters_One(One)]]" },
-        { new ImportValidationError.InvalidBasicFilters(["One", "Two"]), "[[FilterImport_Error_InvalidBasicFilters_Many(One, Two)]]" },
+        { new ImportValidationError.InvalidBasicFilters(["One"], 1), "[[FilterImport_Error_InvalidBasicFilters_One(One)]]" },
+        { new ImportValidationError.InvalidBasicFilters(["One"], 2), "[[FilterImport_Error_InvalidBasicFilters_Many(One)]]" },
         { new ImportValidationError.EntryIdExpectedJsonString(JsonTokenType.Number), "[[FilterImport_Error_EntryIdExpectedJsonString(Number)]]" },
         { new ImportValidationError.EntryIdExpectedNonEmptyString(), "[[FilterImport_Error_EntryIdExpectedNonEmptyString]]" },
         { new ImportValidationError.EntryIdInvalidGuid("bad"), "[[FilterImport_Error_EntryIdInvalidGuid(bad)]]" },
@@ -72,11 +72,23 @@ public sealed class ImportValidationErrorLocalizerTests
         Assert.Equal(expected, ImportValidationErrorLocalizer.Describe(_localizer, error));
 
     [Fact]
+    public void NeutralInvalidBasicFilterMany_PivotsOnInvalidFilterCount()
+    {
+        var actual = WithEnUsCulture(() => ImportValidationErrorLocalizer.Describe(
+            BuildLocalizer(),
+            new ImportValidationError.InvalidBasicFilters(["Set Entry"], 2)));
+
+        Assert.Equal(
+            "Import file contains Basic filters that did not parse into a valid Basic filter: Set Entry. Remove or fix them and re-import.",
+            actual);
+    }
+
+    [Fact]
     public void NeutralInvalidBasicFilterSingular_UsesApprovedGrammarCorrection()
     {
         var actual = WithEnUsCulture(() => ImportValidationErrorLocalizer.Describe(
             BuildLocalizer(),
-            new ImportValidationError.InvalidBasicFilters(["Broken"])));
+            new ImportValidationError.InvalidBasicFilters(["Broken"], 1)));
 
         Assert.Equal(
             "Import file contains a Basic filter that did not parse into a valid Basic filter: Broken. Remove or fix it and re-import.",
@@ -102,7 +114,7 @@ public sealed class ImportValidationErrorLocalizerTests
         leafType == typeof(ImportValidationError.EntryIdExpectedJsonString) ? new ImportValidationError.EntryIdExpectedJsonString(JsonTokenType.Number) :
         leafType == typeof(ImportValidationError.EntryIdExpectedNonEmptyString) ? new ImportValidationError.EntryIdExpectedNonEmptyString() :
         leafType == typeof(ImportValidationError.EntryIdInvalidGuid) ? new ImportValidationError.EntryIdInvalidGuid("bad") :
-        leafType == typeof(ImportValidationError.InvalidBasicFilters) ? new ImportValidationError.InvalidBasicFilters(["One"]) :
+        leafType == typeof(ImportValidationError.InvalidBasicFilters) ? new ImportValidationError.InvalidBasicFilters(["One"], 1) :
         leafType == typeof(ImportValidationError.InvalidSchemaVersion) ? new ImportValidationError.InvalidSchemaVersion(0) :
         leafType == typeof(ImportValidationError.MissingEntriesProperty) ? new ImportValidationError.MissingEntriesProperty() :
         leafType == typeof(ImportValidationError.MissingEntryName) ? new ImportValidationError.MissingEntryName() :

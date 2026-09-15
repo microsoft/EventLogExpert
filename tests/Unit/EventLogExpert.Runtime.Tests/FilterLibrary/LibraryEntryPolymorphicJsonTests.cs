@@ -34,6 +34,20 @@ public sealed class LibraryEntryPolymorphicJsonTests
     }
 
     [Fact]
+    public void Deserialize_TagsNonStringArrayElement_IsCaughtByJsonExceptionHandler()
+    {
+        var json = """
+            {"Kind":"Filter","Id":"00000000-0000-0000-0000-000000000013","Name":"BadTags","CreatedUtc":"2026-05-31T12:00:00+00:00","tags":["valid",42],"Filter":{"Color":0,"ComparisonText":"Level == 4","IsExcluded":false,"Mode":"Advanced"}}
+            """;
+
+        var exception = Record.Exception(() => JsonSerializer.Deserialize<LibraryEntry>(json));
+
+        Assert.IsAssignableFrom<JsonException>(exception);
+        var typedException = Assert.IsType<ImportValidationException>(exception);
+        Assert.Equal(new ImportValidationError.TagsExpectedStringElement(JsonTokenType.Number), typedException.Error);
+    }
+
+    [Fact]
     public void Deserialize_TagsNonStringArrayElement_ThrowsImportValidationException()
     {
         var json = """
