@@ -19,6 +19,7 @@
                 aria-expanded="@(IsAddFilterMenuOpen ? "true" : "false")"
                 aria-haspopup="menu"
                 aria-label="@Localizer["FilterPane_AddMenuAria"]"
+                data-tooltip="@Localizer["FilterPane_AddMenuAria"]"
                 @onkeydown="HandleAddFilterChevronKeyDownAsync"
                 @ref="_addFilterChevron" />
         </div>

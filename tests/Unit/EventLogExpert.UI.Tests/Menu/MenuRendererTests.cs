@@ -82,6 +82,26 @@ public sealed class MenuRendererTests : BunitContext
     }
 
     [Fact]
+    public async Task MenuRenderer_ArrowNavigation_SkipsDisabledItemWithReason()
+    {
+        var items = new[]
+        {
+            MenuItem.Item("First", () => { }),
+            MenuItem.Item("Middle", () => { }, isEnabled: false, disabledReason: "Unavailable"),
+            MenuItem.Item("Last", () => { }),
+        };
+
+        var component = Render<MenuRenderer>(parameters => parameters.Add(p => p.Items, items));
+
+        Assert.Equal("0", component.FindAll("li.menu-item")[0].GetAttribute("tabindex"));
+
+        await component.Find("ul.menu-list").KeyDownAsync(new KeyboardEventArgs { Key = "ArrowDown" });
+
+        Assert.Equal("-1", component.FindAll("li.menu-item")[1].GetAttribute("tabindex"));
+        Assert.Equal("0", component.FindAll("li.menu-item")[2].GetAttribute("tabindex"));
+    }
+
+    [Fact]
     public async Task MenuRenderer_DisabledItemActivation_DoesNotRaiseOnActivated()
     {
         bool actionInvoked = false;
@@ -100,6 +120,22 @@ public sealed class MenuRendererTests : BunitContext
 
         Assert.False(actionInvoked);
         Assert.False(activated);
+    }
+
+    [Fact]
+    public void MenuRenderer_WithAllItemsDisabled_RendersNoFocusableItemAndDoesNotThrow()
+    {
+        var items = new[]
+        {
+            MenuItem.Item("One", () => { }, isEnabled: false, disabledReason: "Reason one"),
+            MenuItem.Item("Two", () => { }, isEnabled: false, disabledReason: "Reason two"),
+        };
+
+        var component = Render<MenuRenderer>(parameters => parameters.Add(p => p.Items, items));
+
+        Assert.All(
+            component.FindAll("li.menu-item"),
+            item => Assert.Equal("-1", item.GetAttribute("tabindex")));
     }
 
     [Fact]
@@ -124,7 +160,7 @@ public sealed class MenuRendererTests : BunitContext
     }
 
     [Fact]
-    public void MenuRenderer_WithDisabledItemAndReason_AnnouncesReasonAndParticipatesInRovingFocus()
+    public void MenuRenderer_WithDisabledItemAndReason_AnnouncesReasonButSkipsRovingFocus()
     {
         const string reason = "No cached filters yet - apply a Basic or Advanced filter to populate.";
         var items = new[]
@@ -148,8 +184,8 @@ public sealed class MenuRendererTests : BunitContext
         Assert.Contains("visually-hidden", hiddenSpan!.ClassName ?? string.Empty);
         Assert.Equal(reason, hiddenSpan.TextContent);
 
-        Assert.Equal("0", disabled.GetAttribute("tabindex"));
-        Assert.Equal("-1", component.FindAll("li.menu-item")[1].GetAttribute("tabindex"));
+        Assert.Equal("-1", disabled.GetAttribute("tabindex"));
+        Assert.Equal("0", component.FindAll("li.menu-item")[1].GetAttribute("tabindex"));
     }
 
     [Fact]

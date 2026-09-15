@@ -43,6 +43,10 @@
     }
 }
 
+.color-box {
+    border: 2px solid var(--text-secondary);
+}
+
 .color-box[data-highlight="none"] {
     background: transparent;
     border-color: transparent;
