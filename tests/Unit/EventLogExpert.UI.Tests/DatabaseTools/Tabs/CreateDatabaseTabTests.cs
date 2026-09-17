@@ -10,6 +10,7 @@ using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using EventLogExpert.Runtime.DebugLog;
+using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DatabaseTools.Tabs;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components.Web;
@@ -89,7 +90,7 @@ public sealed class CreateDatabaseTabTests : BunitContext
                 })));
 
             component.Find("#create-target-path").Input(targetPath);
-            await component.FindAll("[role='option']").Single(option => option.TextContent.Trim() == "Import and enable").MouseDownAsync(new MouseEventArgs());
+            await component.FindAll("[role='option']").Single(option => option.TextContent.Trim() == "[[AutoImportMode_ImportAndEnable]]").MouseDownAsync(new MouseEventArgs());
 
             component.Find(".button-green").Click();
 
@@ -117,7 +118,7 @@ public sealed class CreateDatabaseTabTests : BunitContext
         // Random subdirectory keeps the mocked success artifact absent.
         var missingDatabasePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "missing.db");
         component.Find("#create-target-path").Input(missingDatabasePath);
-        await component.FindAll("[role='option']").Single(option => option.TextContent.Trim() == "Import database").MouseDownAsync(new MouseEventArgs());
+        await component.FindAll("[role='option']").Single(option => option.TextContent.Trim() == "[[AutoImportMode_Import]]").MouseDownAsync(new MouseEventArgs());
 
         component.Find(".button-green").Click();
 
@@ -144,13 +145,13 @@ public sealed class CreateDatabaseTabTests : BunitContext
 
         component.WaitForAssertion(() =>
         {
-            Assert.Contains("Importing database", component.Markup);
+            Assert.Contains("[[AutoImportState_Importing]]", component.Markup);
             Assert.True(component.Find(".button-green").HasAttribute("disabled"));
         });
 
         await component.InvokeAsync(importGate.SetResult);
 
-        component.WaitForAssertion(() => Assert.Contains("Database imported", component.Markup));
+        component.WaitForAssertion(() => Assert.Contains("[[AutoImportState_Imported]]", component.Markup));
     }
 
     [Fact]
@@ -167,13 +168,13 @@ public sealed class CreateDatabaseTabTests : BunitContext
                 .AddCascadingValue("RequestAutoImport", (Func<string, bool, Task>)((_, _) => importGate.Task)));
 
             component.Find("#create-target-path").Input(targetPath);
-            await component.FindAll("[role='option']").Single(option => option.TextContent.Trim() == "Import database").MouseDownAsync(new MouseEventArgs());
+            await component.FindAll("[role='option']").Single(option => option.TextContent.Trim() == "[[AutoImportMode_Import]]").MouseDownAsync(new MouseEventArgs());
 
             component.Find(".button-green").Click();
 
             component.WaitForAssertion(() =>
             {
-                Assert.Contains("Importing database", component.Markup);
+                Assert.Contains("[[AutoImportState_Importing]]", component.Markup);
                 Assert.Empty(component.FindAll(".button-red"));
                 Assert.True(component.Find(".button-green").HasAttribute("disabled"));
             });
@@ -182,7 +183,7 @@ public sealed class CreateDatabaseTabTests : BunitContext
 
             component.WaitForAssertion(() =>
             {
-                Assert.Contains("Database imported", component.Markup);
+                Assert.Contains("[[AutoImportState_Imported]]", component.Markup);
                 Assert.False(component.Find(".button-green").HasAttribute("disabled"));
             });
         }
@@ -241,7 +242,7 @@ public sealed class CreateDatabaseTabTests : BunitContext
 
         Assert.True(string.IsNullOrEmpty(component.Find("#create-wim-index").GetAttribute("value")));
 
-        component.FindAll("button").Single(button => button.TextContent.Contains("Load editions")).Click();
+        component.FindAll("button").Single(button => button.TextContent.Contains("[[Db_Create_LoadEditions]]")).Click();
 
         component.WaitForAssertion(() => Assert.Equal(
             "2: ServerStandard (Windows Server 2025 Standard)",
@@ -259,7 +260,7 @@ public sealed class CreateDatabaseTabTests : BunitContext
         var component = Render<CreateDatabaseTab>();
         component.Find("#create-source-path").Input(@"C:\images\install.wim");
 
-        component.FindAll("button").Single(button => button.TextContent.Contains("Load editions")).Click();
+        component.FindAll("button").Single(button => button.TextContent.Contains("[[Db_Create_LoadEditions]]")).Click();
 
         component.WaitForAssertion(() => Services.GetRequiredService<IOperationLogProgressFactory>()
             .Received()
@@ -286,6 +287,38 @@ public sealed class CreateDatabaseTabTests : BunitContext
 
         Assert.NotEmpty(component.FindAll(".bi-shield-lock"));
         Assert.Empty(component.FindAll("#create-include-protected"));
+    }
+
+    [Fact]
+    public async Task PostSuccessAutoImportIncomplete_LogsLocalizedReasonNotRawEnglish()
+    {
+        var writtenDatabasePaths = ConfigureCreateSucceededWritingDatabaseFile();
+
+        var targetPath = BuildTempDatabaseTargetPath();
+        try
+        {
+            var component = Render<CreateDatabaseTab>(parameters => parameters
+                .AddCascadingValue("RequestAutoImport", (Func<string, bool, Task>)((_, _) =>
+                    throw new AutoImportIncompleteException())));
+
+            component.Find("#create-target-path").Input(targetPath);
+            await component.FindAll("[role='option']").Single(option => option.TextContent.Trim() == "[[AutoImportMode_Import]]").MouseDownAsync(new MouseEventArgs());
+
+            component.Find(".button-green").Click();
+
+            component.WaitForAssertion(() =>
+            {
+                Assert.Contains("[[AutoImportState_Failed]]", component.Markup);
+                Assert.Contains(
+                    "[[DatabaseTools_Log_ImportFailed([[DatabaseTools_AutoImport_DidNotComplete]])]]",
+                    component.Markup);
+                Assert.DoesNotContain("The database import did not complete.", component.Markup);
+            });
+        }
+        finally
+        {
+            DeleteFilesIfPresent(writtenDatabasePaths);
+        }
     }
 
     [Fact]
@@ -332,7 +365,7 @@ public sealed class CreateDatabaseTabTests : BunitContext
         component.Find("#create-include-protected").Change(true);
 
         Assert.Equal("create-run-elevation-help", component.Find(".button-green").GetAttribute("aria-describedby"));
-        Assert.Contains("administrator access", component.Find("#create-run-elevation-help").TextContent);
+        Assert.Equal("[[DatabaseTools_Elevation_ProtectedProviders]]", component.Find("#create-run-elevation-help").TextContent);
     }
 
     [Fact]

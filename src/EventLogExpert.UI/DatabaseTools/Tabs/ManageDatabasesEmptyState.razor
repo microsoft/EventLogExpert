@@ -1,3 +1,5 @@
+@inject IStringLocalizer<SharedResource> Localizer
+
 <div class="manage-databases-empty">
-    Import a provider database (.db file) using the <strong>Import database&hellip;</strong> button above to resolve events from other providers.
+    @((MarkupString)Localizer["Db_Manage_EmptyState"].Value)
 </div>

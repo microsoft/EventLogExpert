@@ -2,11 +2,13 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DebugLog;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -28,14 +30,6 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 
     // Snapshot at dispatch so post-run import targets the built file, not later target-field edits.
     private string? _producedDatabasePathSnapshot;
-
-    private enum AutoImportState
-    {
-        NotImported,
-        Importing,
-        Imported,
-        Failed,
-    }
 
     public bool IsConfirming { get; private set; }
 
@@ -59,13 +53,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         {
             ResetAutoImportStateIfPathChanged();
 
-            return _autoImportState switch
-            {
-                AutoImportState.Importing => "Importing database…",
-                AutoImportState.Imported => "Database imported",
-                AutoImportState.Failed => "Retry import database",
-                _ => "Import database",
-            };
+            return AutoImportStateLocalizer.Label(Localizer, _autoImportState);
         }
     }
 
@@ -83,6 +71,8 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 
     // Post-success auto-import runs while IsRunning remains true; hide Cancel because it cannot cancel the import.
     protected bool IsImportInProgress => _autoImportState == AutoImportState.Importing;
+
+    [Inject] protected IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     protected virtual string LogCategory => LogCategories.DatabaseTools;
 
@@ -163,13 +153,14 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
             _ => LogLevel.Information
         };
 
+        string durationSeconds = result.Duration.TotalSeconds.ToString("F1");
         var message = result.Outcome switch
         {
-            DatabaseToolsOutcome.Succeeded => $"Completed in {result.Duration.TotalSeconds:F1}s.",
-            DatabaseToolsOutcome.Cancelled => $"[Cancelled after {result.Duration.TotalSeconds:F1}s]",
-            DatabaseToolsOutcome.Failed => string.IsNullOrWhiteSpace(result.FailureSummary)
-                ? "[Failed: see debug log]"
-                : $"[Failed: {result.FailureSummary}]",
+            DatabaseToolsOutcome.Succeeded => Localizer["DatabaseTools_OutcomeMessage_Succeeded", durationSeconds],
+            DatabaseToolsOutcome.Cancelled => Localizer["DatabaseTools_OutcomeMessage_Cancelled", durationSeconds],
+            DatabaseToolsOutcome.Failed => string.IsNullOrWhiteSpace(result.FailureSummary) ?
+                Localizer["DatabaseTools_OutcomeMessage_FailedSeeDebugLog"] :
+                Localizer["DatabaseTools_OutcomeMessage_FailedWithSummary", result.FailureSummary],
             _ => string.Empty
         };
 
@@ -248,7 +239,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
                 return;
             }
 
-            batch = _pendingEntries.ToArray();
+            batch = [.. _pendingEntries];
             _pendingEntries.Clear();
             _flushScheduled = false;
         }
@@ -288,9 +279,18 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         {
             _autoImportState = AutoImportState.Failed;
         }
+        catch (AutoImportIncompleteException)
+        {
+            AppendEntry(new LogRecord(
+                DateTime.UtcNow,
+                LogLevel.Warning,
+                Localizer["DatabaseTools_Log_ImportFailed",
+                Localizer["DatabaseTools_AutoImport_DidNotComplete"]]));
+            _autoImportState = AutoImportState.Failed;
+        }
         catch (Exception ex)
         {
-            AppendEntry(new LogRecord(DateTime.UtcNow, LogLevel.Warning, $"Import failed: {ex.Message}"));
+            AppendEntry(new LogRecord(DateTime.UtcNow, LogLevel.Warning, Localizer["DatabaseTools_Log_ImportFailed", ex.Message]));
             _autoImportState = AutoImportState.Failed;
         }
     }
@@ -351,7 +351,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         {
             var failedOutcome = new DatabaseToolsResult(DatabaseToolsOutcome.Failed, ex.Message, Stopwatch.GetElapsedTime(startTimestamp));
             Outcome = failedOutcome;
-            AppendEntry(new LogRecord(DateTime.UtcNow, LogLevel.Error, $"Unexpected error: {ex.Message}"));
+            AppendEntry(new LogRecord(DateTime.UtcNow, LogLevel.Error, Localizer["DatabaseTools_Log_UnexpectedError", ex.Message]));
             AppendOutcome(failedOutcome);
         }
         finally
@@ -385,10 +385,5 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         }
     }
 
-    private protected static string FormatAutoImportMode(AutoImportMode mode) => mode switch
-    {
-        AutoImportMode.ImportAndEnable => "Import and enable",
-        AutoImportMode.Import => "Import database",
-        _ => "Don't import",
-    };
+    private protected string FormatAutoImportMode(AutoImportMode mode) => AutoImportModeLocalizer.Label(Localizer, mode);
 }

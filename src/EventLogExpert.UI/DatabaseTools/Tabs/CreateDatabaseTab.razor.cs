@@ -68,9 +68,9 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
 
     private string? RunElevationTitle =>
         !WillElevate ? null :
-        IsOfflineImagePath
-            ? "Prompts for administrator access to read the offline image in an elevated helper; the app does not relaunch."
-            : "Prompts for administrator access to include protected providers (Security, etc.); the app does not relaunch.";
+        IsOfflineImagePath ?
+            Localizer["DatabaseTools_Elevation_OfflineImage"].Value :
+            Localizer["DatabaseTools_Elevation_ProtectedProviders"].Value;
 
     private bool ShowProtectedProvidersOption => IsLocalProviderScan && !CurrentVersionProvider.IsAdmin;
 
@@ -121,10 +121,10 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
         {
             var result = await AlertSurface.ShowInlineAlertAsync(
                 new InlineAlertRequest(
-                    Title: "Database already exists",
-                    Message: $"{Path.GetFileName(target)} already exists. Overwrite it? The existing database is backed up and restored automatically if the rebuild fails.",
-                    AcceptLabel: "Overwrite",
-                    CancelLabel: "Cancel",
+                    Title: Localizer["DatabaseTools_DbExists_Title"],
+                    Message: Localizer["Db_Create_DbExists_RebuildOverwriteMessage", Path.GetFileName(target)],
+                    AcceptLabel: Localizer["DatabaseTools_Action_Overwrite"],
+                    CancelLabel: Localizer["Modal_Cancel"],
                     IsPrompt: false,
                     PromptInitialValue: null),
                 CancellationToken.None);
@@ -186,7 +186,7 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
 
                 if (_imageEditions.Count == 0)
                 {
-                    _editionsError = "No editions were found in the selected image.";
+                    _editionsError = Localizer["Db_Create_Editions_NoneFound"].Value;
                 }
                 else if (_imageEditions.All(edition => edition.Index != _wimIndex))
                 {
@@ -195,13 +195,13 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
             }
             else if (result.Outcome != DatabaseToolsOutcome.Cancelled)
             {
-                _editionsError = result.FailureSummary ?? "Failed to list image editions.";
+                _editionsError = result.FailureSummary ?? Localizer["Db_Create_Editions_Failed"].Value;
             }
         }
         catch (OperationCanceledException) { /* Superseded or cancelled; leave state for the newer request. */ }
         catch (Exception ex)
         {
-            _editionsError = $"Failed to list image editions: {ex.Message}";
+            _editionsError = Localizer["Db_Create_Editions_FailedWithDetail", ex.Message].Value;
         }
         finally
         {
@@ -214,7 +214,9 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
         var pattern = e.Value?.ToString() ?? string.Empty;
         _filterText = pattern;
 
-        _filterError = FilterRegexFactory.TryCreate(pattern, out _compiledFilter, out var error) ? null : $"Invalid regex: {error}";
+        _filterError = FilterRegexFactory.TryCreate(pattern, out _compiledFilter, out var error) ?
+            null :
+            Localizer["DatabaseTools_Filter_InvalidRegex", error ?? string.Empty].Value;
     }
 
     private void OnIncludeProtectedProvidersInput(ChangeEventArgs e) => _includeProtectedProviders = e.Value as bool? ?? false;
@@ -229,19 +231,22 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
 
     private async Task PickSkipAsync()
     {
-        var path = await PickFileAsync("Pick provider source to skip", s_skipExtensions);
+        var path = await PickFileAsync(Localizer["Db_Create_Picker_SkipSource"], s_skipExtensions);
+
         if (!string.IsNullOrEmpty(path)) { _skipPath = path; }
     }
 
     private async Task PickSourceAsync()
     {
-        var path = await PickFileAsync("Pick source (.db, .evtx, .wim, .esd, .iso, .vhdx, or .vhd)", s_sourceExtensions);
+        var path = await PickFileAsync(Localizer["Db_Create_Picker_Source"], s_sourceExtensions);
+
         if (!string.IsNullOrEmpty(path)) { SetSourcePath(path); }
     }
 
     private async Task PickTargetAsync()
     {
-        var path = await PickSaveFileAsync("Pick output .db (or type a new name)", s_dbExtensions, "providers.db");
+        var path = await PickSaveFileAsync(Localizer["DatabaseTools_Picker_OutputDbNewName"], s_dbExtensions, "providers.db");
+
         if (!string.IsNullOrEmpty(path)) { _targetPath = path; }
     }
 

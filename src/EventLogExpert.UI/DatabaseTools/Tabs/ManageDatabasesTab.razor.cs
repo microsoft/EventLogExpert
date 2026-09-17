@@ -95,8 +95,8 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     private string MasterCheckboxAriaLabel =>
         _selectedForBulk.Count >= DatabaseService.Entries.Count && _selectedForBulk.Count > 0 ?
-            "Clear selection" :
-            "Select all";
+            Localizer["Db_Manage_Master_ClearSelection"] :
+            Localizer["Db_Manage_Master_SelectAll"];
 
     private string MasterCheckboxIconClass =>
         _selectedForBulk.Count == 0 ?
@@ -136,6 +136,21 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         await FocusRestoreAsync(_selectButton);
     }
 
+    internal static string SelectRemoveConfirmAcceptLabel(
+        IStringLocalizer<SharedResource> localizer,
+        int upgradeCount,
+        int databaseCount) =>
+        LocalizedCount.OneOrManyRaw(
+            localizer,
+            upgradeCount,
+            databaseCount,
+            "Db_Manage_RemoveConfirm_Accept_OneOne",
+            "Db_Manage_RemoveConfirm_Accept_OneMany",
+            "Db_Manage_RemoveConfirm_Accept_ManyOne",
+            "Db_Manage_RemoveConfirm_Accept_ManyMany",
+            upgradeCount,
+            databaseCount);
+
     internal async Task<bool> ApplyPendingTogglesAsync()
     {
         if (IsUpgradeBlocked) { return false; }
@@ -160,7 +175,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         if (HasDatabaseStateChanged)
         {
-            AnnouncementService.Announce("Database changes applied");
+            AnnouncementService.Announce(Localizer["Db_Manage_Announcement_ChangesApplied"]);
         }
 
         return true;
@@ -205,29 +220,23 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         base.OnInitialized();
     }
 
-    private static string BuildBulkPlainMessage(IReadOnlyList<string> fileNames)
-    {
-        var list = string.Join(", ", fileNames.Take(MaxListedFileNames));
-        var more = fileNames.Count > MaxListedFileNames ? $", and {fileNames.Count - MaxListedFileNames} more" : string.Empty;
-
-        return $"Are you sure you want to remove these {fileNames.Count} databases? ({list}{more})";
-    }
-
     private static ValueTask FocusRestoreAsync(ButtonBase? button) =>
         button != null ? ElementFocus.SafelyAsync(button.Element, preventScroll: true) : ValueTask.CompletedTask;
 
-    private static string GetSkipReason(DatabaseEntry entry, bool isUpgrading)
+    private static DatabaseUpgradeSkipReason GetSkipReason(DatabaseEntry entry, bool isUpgrading)
     {
-        if (entry.BackupExists) { return "Restore from backup required"; }
-        if (isUpgrading) { return "Upgrade in progress"; }
+        if (entry.BackupExists) { return DatabaseUpgradeSkipReason.BackupRequired; }
+
+        if (isUpgrading) { return DatabaseUpgradeSkipReason.UpgradeInProgress; }
+        
         return entry.Status switch
         {
-            DatabaseStatus.Ready => "Already up to date",
-            DatabaseStatus.NotClassified => "Classification pending",
-            DatabaseStatus.UnrecognizedSchema => "Unrecognized schema",
-            DatabaseStatus.ObsoleteSchema => "Obsolete schema",
-            DatabaseStatus.ClassificationFailed => "Classification failed",
-            _ => "Not eligible"
+            DatabaseStatus.Ready => DatabaseUpgradeSkipReason.AlreadyUpToDate,
+            DatabaseStatus.NotClassified => DatabaseUpgradeSkipReason.ClassificationPending,
+            DatabaseStatus.UnrecognizedSchema => DatabaseUpgradeSkipReason.UnrecognizedSchema,
+            DatabaseStatus.ObsoleteSchema => DatabaseUpgradeSkipReason.ObsoleteSchema,
+            DatabaseStatus.ClassificationFailed => DatabaseUpgradeSkipReason.ClassificationFailed,
+            _ => DatabaseUpgradeSkipReason.NotEligible
         };
     }
 
@@ -236,26 +245,25 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         if (result is null)
         {
             if (AlertSurface is null) { return; }
+
             try
             {
                 _ = await AlertSurface.ShowInlineAlertAsync(
                     new InlineAlertRequest(
-                        Title: "Upgrade not started",
-                        Message: "Another upgrade is already in progress.",
+                        Title: Localizer["Db_Manage_UpgradeNotStarted_Title"],
+                        Message: Localizer["Db_Manage_UpgradeNotStarted_Message"],
                         AcceptLabel: null,
-                        CancelLabel: "OK",
+                        CancelLabel: Localizer["Modal_Accept"],
                         IsPrompt: false,
                         PromptInitialValue: null),
                     CancellationToken.None);
             }
             catch (ObjectDisposedException) { }
+
             return;
         }
 
-        if (attempted > 0
-            && result.Succeeded.Count == 0
-            && result.Failed.Count == 0
-            && result.Cancelled.Count == 0)
+        if (attempted > 0 && result.Succeeded.Count == 0 && result.Failed.Count == 0 && result.Cancelled.Count == 0)
         {
             return;
         }
@@ -308,9 +316,11 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         if (!anyRemovalAffectsActiveLog) { return baseMessage; }
 
-        string warning = fileNames.Count == 1 ?
-            "Removing will close and reopen any affected log views." :
-            "Removing these databases will close and reopen any affected log views.";
+        string warning = LocalizedCount.OneOrManyRaw(
+            Localizer,
+            fileNames.Count,
+            "Db_Manage_Remove_CloseReopenWarning_One",
+            "Db_Manage_Remove_CloseReopenWarning_Many");
 
         return $"{baseMessage} {warning}";
     }
@@ -323,10 +333,10 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         {
             var result = await AlertSurface.ShowInlineAlertAsync(
                 new InlineAlertRequest(
-                    Title: "Database already exists",
-                    Message: $"{fileName} already exists. Overwrite?",
-                    AcceptLabel: "Overwrite",
-                    CancelLabel: "Skip",
+                    Title: Localizer["DatabaseTools_DbExists_Title"],
+                    Message: Localizer["DatabaseTools_DbExists_OverwriteMessage", fileName],
+                    AcceptLabel: Localizer["DatabaseTools_Action_Overwrite"],
+                    CancelLabel: Localizer["DatabaseTools_Action_Skip"],
                     IsPrompt: false,
                     PromptInitialValue: null),
                 cancellationToken);
@@ -336,24 +346,43 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         catch (ObjectDisposedException) { return false; }
     }
 
+    private string BuildBulkPlainMessage(IReadOnlyList<string> fileNames)
+    {
+        string namesSummary = BuildNamesSummary(fileNames);
+
+        return Localizer["Db_Manage_Remove_BulkPlain", fileNames.Count, namesSummary];
+    }
+
     private string BuildCancelThenRemoveMessage(IReadOnlyList<string> fileNames, IReadOnlyList<string> upgradingFiles)
     {
-        var upgradingList = string.Join(", ", upgradingFiles.Take(MaxListedFileNames));
-        var moreUpgrading = upgradingFiles.Count > MaxListedFileNames ? $", and {upgradingFiles.Count - MaxListedFileNames} more" : string.Empty;
-        var fileList = string.Join(", ", fileNames.Take(MaxListedFileNames));
-        var moreFiles = fileNames.Count > MaxListedFileNames ? $", and {fileNames.Count - MaxListedFileNames} more" : string.Empty;
+        string upgradingNamesSummary = BuildNamesSummary(upgradingFiles);
+        string fileNamesSummary = BuildNamesSummary(fileNames);
+        int batchCount = CountUpgradeBatchesForPrompt(upgradingFiles);
 
-        string baseMessage = $"Upgrade in progress for: {upgradingList}{moreUpgrading}. " +
-            $"This will cancel the upgrade batch(es) \u2014 which may include other files not in your selection \u2014 " +
-            $"and then remove: {fileList}{moreFiles}. Are you sure?";
+        string baseMessage = LocalizedCount.OneOrManyRaw(
+            Localizer,
+            batchCount,
+            "Db_Manage_Remove_CancelThenRemove_One",
+            "Db_Manage_Remove_CancelThenRemove_Many",
+            upgradingNamesSummary,
+            fileNamesSummary);
 
         return AppendCloseReopenWarningIfNeeded(baseMessage, fileNames);
+    }
+
+    private string BuildNamesSummary(IReadOnlyList<string> fileNames)
+    {
+        string visibleNames = string.Join(", ", fileNames.Take(MaxListedFileNames));
+
+        return fileNames.Count > MaxListedFileNames ?
+            Localizer["Db_Manage_MoreNames", visibleNames, fileNames.Count - MaxListedFileNames] :
+            visibleNames;
     }
 
     private string BuildPlainRemoveMessage(IReadOnlyList<string> fileNames)
     {
         string baseMessage = fileNames.Count == 1 ?
-            $"Are you sure you want to remove {fileNames[0]}?" :
+            Localizer["Db_Manage_Remove_SinglePlain", fileNames[0]] :
             BuildBulkPlainMessage(fileNames);
 
         return AppendCloseReopenWarningIfNeeded(baseMessage, fileNames);
@@ -410,6 +439,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
                            (entry is not null && GetUpgradeProgressForEntry(entry) is not null) ||
                            IsFileInAnyKnownBatch(file);
                 });
+
                 if (!stillAlive) { pendingBatches[batchId].TrySetResult(); }
             }
 
@@ -486,13 +516,15 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         bool requiresCancelFirst = IsAnyFileUpgrading(validFileNames, out var upgradingFiles);
 
-        string title = validFileNames.Count == 1 ?
-            "Remove Database" :
-            $"Remove {validFileNames.Count} Databases";
+        string title = LocalizedCount.OneOrManyRaw(
+            Localizer,
+            validFileNames.Count,
+            "Db_Manage_Remove_Title_One",
+            "Db_Manage_Remove_Title_Many");
 
         string acceptLabel = requiresCancelFirst ?
-            $"Cancel {upgradingFiles.Count} upgrade{(upgradingFiles.Count == 1 ? "" : "s")} and remove {validFileNames.Count} database{(validFileNames.Count == 1 ? "" : "s")}" :
-            "Remove";
+            SelectRemoveConfirmAcceptLabel(Localizer, upgradingFiles.Count, validFileNames.Count) :
+            Localizer["Db_Manage_Action_Remove"];
 
         string message = requiresCancelFirst ?
             BuildCancelThenRemoveMessage(validFileNames, upgradingFiles) :
@@ -506,7 +538,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
                     Title: title,
                     Message: message,
                     AcceptLabel: acceptLabel,
-                    CancelLabel: "Cancel",
+                    CancelLabel: Localizer["Modal_Cancel"],
                     IsPrompt: false,
                     PromptInitialValue: null),
                 CancellationToken.None);
@@ -534,6 +566,30 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         _initialActiveSnapshot = ComputeActiveSet();
         _schemaUpgradeOccurred = false;
         _restorationOccurred = false;
+    }
+
+    private int CountUpgradeBatchesForPrompt(IReadOnlyList<string> upgradingFiles)
+    {
+        HashSet<UpgradeBatchId> cancellableBatchIds = [];
+        bool hasCoordinatorTrackedUncancellableFile = false;
+
+        foreach (string fileName in upgradingFiles)
+        {
+            CancellableBatch? cancellable = GetCancellableBatchForFile(fileName);
+
+            if (cancellable is not null)
+            {
+                cancellableBatchIds.Add(cancellable.Value.BatchId);
+            }
+            else if (Coordinator.IsUpgradeInFlight(fileName))
+            {
+                hasCoordinatorTrackedUncancellableFile = true;
+            }
+        }
+
+        int batchCount = cancellableBatchIds.Count + (hasCoordinatorTrackedUncancellableFile ? 1 : 0);
+
+        return Math.Max(1, batchCount);
     }
 
     private void DiscardPending()
@@ -650,7 +706,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         if (outcome.DatabaseStateChanged)
         {
             _schemaUpgradeOccurred = true;
-            AnnouncementService.Announce("Database imported");
+            AnnouncementService.Announce(Localizer["DatabaseTools_Announcement_DatabaseImported"]);
         }
     }
 
@@ -732,7 +788,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         if (_eligibleUpgradeCount == 0 || IsUpgradeBlocked) { return; }
 
         var eligible = new List<string>();
-        var skipped = new List<(string FileName, string Reason)>();
+        var skipped = new List<(string FileName, DatabaseUpgradeSkipReason Reason)>();
 
         foreach (var entry in DatabaseService.Entries.ToList())
         {
@@ -775,10 +831,10 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         await AnnounceBulkUpgradeOutcomeAsync(result, eligible.Count);
 
-        bool cleanSuccess = result is not null
-            && result.Failed.Count == 0
-            && result.Cancelled.Count == 0
-            && result.Succeeded.Count > 0;
+        bool cleanSuccess = result is not null &&
+            result.Failed.Count == 0 &&
+            result.Cancelled.Count == 0 &&
+            result.Succeeded.Count > 0;
 
         if (cleanSuccess)
         {
@@ -858,7 +914,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     {
         if (IsUpgradeBlocked)
         {
-            AnnouncementService.Announce("Cannot save: a database upgrade is in progress.");
+            AnnouncementService.Announce(Localizer["Db_Manage_CannotSaveInProgress"]);
 
             return;
         }
@@ -885,27 +941,26 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
     private async Task<bool> PromptSubsetConfirmAsync(
         IReadOnlyList<string> eligible,
-        IReadOnlyList<(string FileName, string Reason)> skipped,
+        IReadOnlyList<(string FileName, DatabaseUpgradeSkipReason Reason)> skipped,
         CancellationToken cancellationToken)
     {
         if (AlertSurface is null) { return true; }
 
         var sb = new StringBuilder();
-        sb.Append(eligible.Count);
-        sb.Append(" of ");
-        sb.Append(eligible.Count + skipped.Count);
-        sb.AppendLine(" selected databases will be upgraded.");
+        sb.AppendLine(Localizer["Db_Manage_SubsetConfirm_Intro", eligible.Count, eligible.Count + skipped.Count]);
         sb.AppendLine();
-        sb.Append("The following ");
-        sb.Append(skipped.Count);
-        sb.Append(skipped.Count == 1 ? " database will be skipped:" : " databases will be skipped:");
+        sb.Append(LocalizedCount.OneOrManyRaw(
+            Localizer,
+            skipped.Count,
+            "Db_Manage_SubsetConfirm_SkipHeader_One",
+            "Db_Manage_SubsetConfirm_SkipHeader_Many"));
 
         foreach (var (fileName, reason) in skipped)
         {
             sb.Append("\n  \u2022 ");
             sb.Append(fileName);
             sb.Append(" (");
-            sb.Append(reason);
+            sb.Append(DatabaseUpgradeSkipReasonLocalizer.Describe(Localizer, reason));
             sb.Append(')');
         }
 
@@ -914,10 +969,10 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         {
             response = await AlertSurface.ShowInlineAlertAsync(
                 new InlineAlertRequest(
-                    Title: "Upgrade selected databases",
+                    Title: Localizer["Db_Manage_SubsetConfirm_Title"],
                     Message: sb.ToString(),
-                    AcceptLabel: $"Upgrade {eligible.Count}",
-                    CancelLabel: "Cancel",
+                    AcceptLabel: Localizer["Db_Manage_UpgradeCount", eligible.Count],
+                    CancelLabel: Localizer["Modal_Cancel"],
                     IsPrompt: false,
                     PromptInitialValue: null),
                 cancellationToken);
@@ -985,7 +1040,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
                 }
                 else if (outcome.Confirmed)
                 {
-                    failed.Add((fileName, "removal failed after confirmation"));
+                    failed.Add((fileName, Localizer["Db_Manage_FailureReason_RemovalFailedAfterConfirmation"]));
                     TraceLogger.Warning(
                         $"{nameof(ManageDatabasesTab)}.{nameof(RemoveDatabasesAsync)}: removal of '{fileName}' was confirmed but did not complete.");
                 }
@@ -1014,14 +1069,25 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         if (succeeded.Count > 0)
         {
             AnnouncementService.Announce(
-                $"Removed {succeeded.Count} database{(succeeded.Count == 1 ? "" : "s")}.");
+                LocalizedCount.OneOrManyRaw(
+                    Localizer,
+                    succeeded.Count,
+                    "Db_Manage_Announcement_Removed_One",
+                    "Db_Manage_Announcement_Removed_Many"));
         }
 
         if (failed.Count > 0)
         {
             var (firstFailedFile, firstFailedReason) = failed[0];
             AnnouncementService.Announce(
-                $"{failed.Count} removal{(failed.Count == 1 ? "" : "s")} failed. First: {firstFailedFile} ({firstFailedReason}).");
+                LocalizedCount.OneOrManyRaw(
+                    Localizer,
+                    failed.Count,
+                    "Db_Manage_Announcement_RemoveFailed_One",
+                    "Db_Manage_Announcement_RemoveFailed_Many",
+                    failed.Count,
+                    firstFailedFile,
+                    firstFailedReason));
         }
 
         var remainingEntries = DatabaseService.Entries.ToList();
@@ -1049,7 +1115,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         if (IsUpgradeBlocked)
         {
-            AnnouncementService.Announce("Cannot restore: a database upgrade is in progress.");
+            AnnouncementService.Announce(Localizer["Db_Manage_CannotRestoreInProgress"]);
 
             return;
         }
@@ -1064,7 +1130,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         {
             TraceLogger.Warning(
                 $"{nameof(ManageDatabasesTab)}.{nameof(RestoreFromBackup)} failed for '{entry.FileName}': {ex}");
-            AnnouncementService.Announce($"Could not restore {entry.FileName} from backup.");
+            AnnouncementService.Announce(Localizer["Db_Manage_RestoreFailed", entry.FileName]);
 
             return;
         }
@@ -1074,11 +1140,11 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         if (restored)
         {
             _restorationOccurred = true;
-            AnnouncementService.Announce($"Restored {entry.FileName} from backup.");
+            AnnouncementService.Announce(Localizer["Db_Manage_RestoreSucceeded", entry.FileName]);
         }
         else
         {
-            AnnouncementService.Announce($"Could not restore {entry.FileName} from backup.");
+            AnnouncementService.Announce(Localizer["Db_Manage_RestoreFailed", entry.FileName]);
         }
     }
 
@@ -1157,9 +1223,13 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     private void UpdateSelectionAnnouncement()
     {
         int count = _selectedForBulk.Count;
-        _selectionAnnouncement = count == 0
-            ? "Selection cleared."
-            : $"{count} database{(count == 1 ? "" : "s")} selected.";
+        _selectionAnnouncement = count == 0 ?
+            Localizer["Db_Manage_SelectionCleared"] :
+            LocalizedCount.OneOrManyRaw(
+                Localizer,
+                count,
+                "Db_Manage_Selection_One",
+                "Db_Manage_Selection_Many");
     }
 
     private async Task UpgradeEntry(string fileName)
