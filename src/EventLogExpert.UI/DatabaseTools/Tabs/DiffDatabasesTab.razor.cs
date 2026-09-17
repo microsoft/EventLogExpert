@@ -41,19 +41,22 @@ public sealed partial class DiffDatabasesTab : DatabaseToolsTabBase<DiffDatabase
 
     private async Task PickFirstAsync()
     {
-        var path = await PickFileAsync("Pick first source (.db or .evtx)", s_sourceExtensions);
+        var path = await PickFileAsync(Localizer["Db_Diff_Picker_FirstSource"], s_sourceExtensions);
+
         if (!string.IsNullOrEmpty(path)) { _firstPath = path; }
     }
 
     private async Task PickNewDbAsync()
     {
-        var path = await PickSaveFileAsync("Pick output .db (or type a new name)", s_dbExtensions, "diff.db");
+        var path = await PickSaveFileAsync(Localizer["DatabaseTools_Picker_OutputDbNewName"], s_dbExtensions, "diff.db");
+
         if (!string.IsNullOrEmpty(path)) { _newDbPath = path; }
     }
 
     private async Task PickSecondAsync()
     {
-        var path = await PickFileAsync("Pick second source (.db or .evtx)", s_sourceExtensions);
+        var path = await PickFileAsync(Localizer["Db_Diff_Picker_SecondSource"], s_sourceExtensions);
+
         if (!string.IsNullOrEmpty(path)) { _secondPath = path; }
     }
 }

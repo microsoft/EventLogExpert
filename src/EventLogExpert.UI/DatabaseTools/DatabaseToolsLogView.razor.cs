@@ -2,12 +2,14 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
@@ -45,6 +47,8 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
+
     private string OutcomeChipAriaLive => Outcome?.Outcome == DatabaseToolsOutcome.Failed ? "assertive" : "polite";
 
     private string OutcomeChipCss => Outcome?.Outcome switch
@@ -65,13 +69,7 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
 
     private string OutcomeChipRole => Outcome?.Outcome == DatabaseToolsOutcome.Failed ? "alert" : "status";
 
-    private string OutcomeChipText => Outcome?.Outcome switch
-    {
-        DatabaseToolsOutcome.Succeeded => "Succeeded",
-        DatabaseToolsOutcome.Cancelled => "Cancelled",
-        DatabaseToolsOutcome.Failed => "Failed",
-        _ => string.Empty
-    };
+    private string OutcomeChipText => Outcome is null ? string.Empty : DatabaseToolsOutcomeLocalizer.Label(Localizer, Outcome.Outcome);
 
     public async ValueTask DisposeAsync()
     {
@@ -209,7 +207,7 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            await AlertDialogService.ShowAlert("Export Failed", ex.Message, "OK");
+            await AlertDialogService.ShowAlert(Localizer["DatabaseTools_Log_ExportFailed_Title"], ex.Message, Localizer["Modal_Accept"]);
         }
     }
 

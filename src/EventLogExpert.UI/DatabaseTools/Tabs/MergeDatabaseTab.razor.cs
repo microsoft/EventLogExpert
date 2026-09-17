@@ -10,13 +10,10 @@ namespace EventLogExpert.UI.DatabaseTools.Tabs;
 
 public sealed partial class MergeDatabaseTab : DatabaseToolsTabBase<MergeDatabaseRequest>
 {
-    private const string KeepModeLabel = "Keep - skip providers already in target";
-    private const string OverwriteModeLabel = "Overwrite - replace providers already in target";
-
     private static readonly IReadOnlyList<string> s_dbExtensions = [".db"];
     private static readonly IReadOnlyList<string> s_sourceExtensions = [".db", ".evtx"];
 
-    private bool _overwrite;
+    private MergeOverwriteMode _overwriteMode = MergeOverwriteMode.Keep;
     private string _sourcePath = string.Empty;
     private string _targetPath = string.Empty;
 
@@ -28,7 +25,7 @@ public sealed partial class MergeDatabaseTab : DatabaseToolsTabBase<MergeDatabas
     protected override string? ProducedDatabasePathCandidate => _targetPath.Trim();
 
     protected override MergeDatabaseRequest BuildRequest() =>
-        new(_sourcePath.Trim(), _targetPath.Trim(), _overwrite);
+        new(_sourcePath.Trim(), _targetPath.Trim(), _overwriteMode == MergeOverwriteMode.Overwrite);
 
     protected override Task<DatabaseToolsResult> DispatchAsync(
         MergeDatabaseRequest request,
@@ -36,7 +33,7 @@ public sealed partial class MergeDatabaseTab : DatabaseToolsTabBase<MergeDatabas
         CancellationToken cancellationToken) =>
         DatabaseToolsService.MergeAsync(request, logProgress, progress: null, cancellationToken, VerboseLogging);
 
-    private static string FormatOverwriteMode(bool overwrite) => overwrite ? OverwriteModeLabel : KeepModeLabel;
+    private string FormatOverwriteMode(MergeOverwriteMode mode) => MergeOverwriteModeLocalizer.Label(Localizer, mode);
 
     private void OnSourcePathInput(ChangeEventArgs e) => _sourcePath = e.Value?.ToString() ?? string.Empty;
 
@@ -44,13 +41,15 @@ public sealed partial class MergeDatabaseTab : DatabaseToolsTabBase<MergeDatabas
 
     private async Task PickSourceAsync()
     {
-        var path = await PickFileAsync("Pick source (.db or .evtx)", s_sourceExtensions);
+        var path = await PickFileAsync(Localizer["DatabaseTools_Picker_SourceDbOrEvtx"], s_sourceExtensions);
+
         if (!string.IsNullOrEmpty(path)) { _sourcePath = path; }
     }
 
     private async Task PickTargetAsync()
     {
-        var path = await PickFileAsync("Pick target .db", s_dbExtensions);
+        var path = await PickFileAsync(Localizer["Db_Merge_Picker_TargetDb"], s_dbExtensions);
+
         if (!string.IsNullOrEmpty(path)) { _targetPath = path; }
     }
 }

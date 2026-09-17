@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
@@ -12,6 +13,7 @@ using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Menu;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.TestUtils;
@@ -39,6 +41,7 @@ internal static class DatabaseToolsTestDependencies
             services.AddSingleton(Substitute.For<IMenuActionService>());
             services.AddSingleton(Substitute.For<ITraceLogger>());
             services.AddOperationLogProgressFactoryMock();
+            services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 
             return services;
         }

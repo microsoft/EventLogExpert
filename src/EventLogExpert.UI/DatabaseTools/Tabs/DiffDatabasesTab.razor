@@ -4,9 +4,9 @@
 <div class="db-tab diff-databases-tab">
     <div class="db-tab-form">
         <div class="form-row">
-            <label for="diff-first-path">First source</label>
+            <label for="diff-first-path">@Localizer["Db_Diff_FirstSource"]</label>
             <div class="path-input-group">
-                <span class="db-tab-help" id="diff-first-path-help">Required. Baseline source. Providers in the second source that also appear here are excluded from the result.</span>
+                <span class="db-tab-help" id="diff-first-path-help">@Localizer["Db_Diff_FirstSourceHelp"]</span>
                 <input aria-describedby="diff-first-path-help"
                     class="input source-path"
                     disabled="@IsRunning"
@@ -15,14 +15,14 @@
                     placeholder="C:\path\to\baseline.db"
                     type="text"
                     value="@_firstPath" />
-                <Button Disabled="@IsRunning" OnClick="PickFirstAsync">Browse…</Button>
+                <Button Disabled="@IsRunning" OnClick="PickFirstAsync">@Localizer["DatabaseTools_Action_Browse"]</Button>
             </div>
         </div>
 
         <div class="form-row">
-            <label for="diff-second-path">Second source</label>
+            <label for="diff-second-path">@Localizer["Db_Diff_SecondSource"]</label>
             <div class="path-input-group">
-                <span class="db-tab-help" id="diff-second-path-help">Required. Providers in this source that are NOT in the first source are copied to the new .db output.</span>
+                <span class="db-tab-help" id="diff-second-path-help">@Localizer["Db_Diff_SecondSourceHelp"]</span>
                 <input aria-describedby="diff-second-path-help"
                     class="input source-path"
                     disabled="@IsRunning"
@@ -31,19 +31,19 @@
                     placeholder="C:\path\to\candidate.db"
                     type="text"
                     value="@_secondPath" />
-                <Button Disabled="@IsRunning" OnClick="PickSecondAsync">Browse…</Button>
+                <Button Disabled="@IsRunning" OnClick="PickSecondAsync">@Localizer["DatabaseTools_Action_Browse"]</Button>
             </div>
         </div>
 
         <div class="form-row">
-            <label>Result</label>
-            <span aria-label="Result direction" class="direction-row">Providers in second source that are NOT in first source</span>
+            <label>@Localizer["Db_Diff_Result"]</label>
+            <span aria-label="@Localizer["Db_Diff_ResultDirectionAria"]" class="direction-row">@Localizer["Db_Diff_ResultDirection"]</span>
         </div>
 
         <div class="form-row">
-            <label for="diff-new-db">New .db output</label>
+            <label for="diff-new-db">@Localizer["Db_Diff_NewDbOutput"]</label>
             <div class="path-input-group">
-                <span class="db-tab-help" id="diff-new-db-help">Required. Path to a new .db file that will receive the providers found only in the second source.</span>
+                <span class="db-tab-help" id="diff-new-db-help">@Localizer["Db_Diff_NewDbHelp"]</span>
                 <input aria-describedby="diff-new-db-help"
                     class="input target-path"
                     disabled="@IsRunning"
@@ -52,7 +52,7 @@
                     placeholder="C:\path\to\new-diff-database.db"
                     type="text"
                     value="@_newDbPath" />
-                <Button Disabled="@IsRunning" OnClick="PickNewDbAsync">Browse…</Button>
+                <Button Disabled="@IsRunning" OnClick="PickNewDbAsync">@Localizer["DatabaseTools_Action_Browse"]</Button>
             </div>
         </div>
     </div>
@@ -63,16 +63,16 @@
             {
                 @if (IsCancelling)
                 {
-                    <Button Disabled IconClass="bi bi-hourglass-split">Cancelling…</Button>
+                    <Button Disabled IconClass="bi bi-hourglass-split">@Localizer["DatabaseTools_Action_Cancelling"]</Button>
                 }
                 else
                 {
-                    <DangerButton IconClass="bi bi-x-circle" OnClick="CancelRun">Cancel</DangerButton>
+                    <DangerButton IconClass="bi bi-x-circle" OnClick="CancelRun">@Localizer["Modal_Cancel"]</DangerButton>
                 }
             }
             else
             {
-                <PrimaryButton Disabled="@(!CanRun)" IconClass="bi bi-play-fill" OnClick="RunAsync">Run</PrimaryButton>
+                <PrimaryButton Disabled="@(!CanRun)" IconClass="bi bi-play-fill" OnClick="RunAsync">@Localizer["DatabaseTools_Action_Run"]</PrimaryButton>
             }
         </ToolbarLeadingContent>
     </DatabaseToolsLogView>

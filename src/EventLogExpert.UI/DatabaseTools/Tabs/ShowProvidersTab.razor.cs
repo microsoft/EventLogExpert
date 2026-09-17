@@ -35,9 +35,7 @@ public sealed partial class ShowProvidersTab : DatabaseToolsTabBase<ShowProvider
     private bool IsLocalProviderScan => string.IsNullOrWhiteSpace(_sourcePath);
 
     private string? RunElevationTitle =>
-        WillElevate
-            ? "Prompts for administrator access to include protected providers (Security, etc.); the app does not relaunch."
-            : null;
+        WillElevate ? Localizer["DatabaseTools_Elevation_ProtectedProviders"].Value : null;
 
     private bool ShowProtectedProvidersOption => IsLocalProviderScan && !CurrentVersionProvider.IsAdmin;
 
@@ -62,14 +60,16 @@ public sealed partial class ShowProvidersTab : DatabaseToolsTabBase<ShowProvider
         var pattern = e.Value?.ToString() ?? string.Empty;
         _filterText = pattern;
 
-        _filterError = FilterRegexFactory.TryCreate(pattern, out _compiledFilter, out var error) ? null : $"Invalid regex: {error}";
+        _filterError = FilterRegexFactory.TryCreate(pattern, out _compiledFilter, out var error) ?
+            null :
+            Localizer["DatabaseTools_Filter_InvalidRegex", error ?? string.Empty].Value;
     }
 
     private void OnIncludeProtectedProvidersInput(ChangeEventArgs e) => _includeProtectedProviders = e.Value as bool? ?? false;
 
     private async Task PickSourceAsync()
     {
-        var path = await PickFileAsync("Pick source (.db or .evtx)", s_sourceExtensions);
+        var path = await PickFileAsync(Localizer["DatabaseTools_Picker_SourceDbOrEvtx"], s_sourceExtensions);
 
         if (!string.IsNullOrEmpty(path)) { _sourcePath = path; }
     }

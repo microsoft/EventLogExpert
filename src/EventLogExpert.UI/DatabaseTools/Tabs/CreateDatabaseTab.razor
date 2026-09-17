@@ -4,9 +4,9 @@
 <div class="create-database-tab db-tab">
     <div class="db-tab-form">
         <div class="form-row">
-            <label for="create-target-path">Target .db</label>
+            <label for="create-target-path">@Localizer["DatabaseTools_Field_TargetDb"]</label>
             <div class="path-input-group">
-                <span class="db-tab-help" id="create-target-path-help">Required. Path to a new .db file to create.</span>
+                <span class="db-tab-help" id="create-target-path-help">@Localizer["Db_Create_TargetHelp"]</span>
                 <input aria-describedby="create-target-path-help"
                     class="input target-path"
                     disabled="@IsRunning"
@@ -15,15 +15,15 @@
                     placeholder="C:\path\to\new-database.db"
                     type="text"
                     value="@_targetPath" />
-                <Button Disabled="@IsRunning" OnClick="PickTargetAsync">Browse…</Button>
+                <Button Disabled="@IsRunning" OnClick="PickTargetAsync">@Localizer["DatabaseTools_Action_Browse"]</Button>
             </div>
         </div>
 
         <div class="form-row">
-            <label for="create-source-path">Source path</label>
+            <label for="create-source-path">@Localizer["DatabaseTools_Field_SourcePath"]</label>
             <div class="path-input-group">
                 <span class="db-tab-help" id="create-source-path-help">
-                    Optional. Leave empty to use local providers. Accepts a .db or .evtx path, a folder, or an offline image (.wim, .esd, .iso, or .vhdx/.vhd). When an image is given, providers are read from it, fully offline.
+                    @Localizer["Db_Create_SourceHelp"]
                 </span>
                 <input aria-describedby="create-source-path-help"
                     class="input source-path"
@@ -33,7 +33,7 @@
                     placeholder="C:\path\to\source.evtx"
                     type="text"
                     value="@_sourcePath" />
-                <Button Disabled="@IsRunning" OnClick="PickSourceAsync">Browse…</Button>
+                <Button Disabled="@IsRunning" OnClick="PickSourceAsync">@Localizer["DatabaseTools_Action_Browse"]</Button>
             </div>
         </div>
 
@@ -46,7 +46,7 @@
                         id="create-include-protected"
                         @onchange="OnIncludeProtectedProvidersInput"
                         type="checkbox" />
-                    Include protected providers such as Security (requires elevation)
+                    @Localizer["DatabaseTools_IncludeProtectedProviders"]
                 </label>
             </div>
         }
@@ -60,7 +60,7 @@
                         id="create-folder-as-image"
                         @onchange="OnTreatFolderAsImageInput"
                         type="checkbox" />
-                    Folder is an offline Windows image (mounted volume or extracted image), not a folder of .db/.evtx files
+                    @Localizer["Db_Create_FolderIsOfflineImage"]
                 </label>
             </div>
         }
@@ -68,19 +68,19 @@
         @if (IsWimIndexApplicable)
         {
             <div class="form-row">
-                <label for="create-wim-index" id="create-wim-index-label">Image index</label>
+                <label for="create-wim-index" id="create-wim-index-label">@Localizer["Db_Create_ImageIndex"]</label>
                 <div class="path-input-group">
-                    <span class="db-tab-help" id="create-wim-index-help">Optional. 1-based image index. Type an index, or load the image's editions to pick one from the list. An ISO requires an index.</span>
+                    <span class="db-tab-help" id="create-wim-index-help">@Localizer["Db_Create_ImageIndexHelp"]</span>
                     <ValueSelect AriaDescribedBy="@(_editionsError is null ? "create-wim-index-help" : "create-wim-index-help create-wim-index-error")"
                         AriaInvalid="@(_editionsError is null ? "false" : "true")"
                         AriaLabelledBy="create-wim-index-label"
-                        @bind-Value="_wimIndex"
                         CssClass="input wim-index"
                         Disabled="@IsRunning"
                         Id="create-wim-index"
                         IsInput="true"
                         T="int?"
-                        ToStringFunc="FormatSelectedImageIndex">
+                        ToStringFunc="FormatSelectedImageIndex"
+                        @bind-Value="_wimIndex">
                         @foreach (var edition in _imageEditions)
                         {
                             <ValueSelectItem T="int?" Value="edition.Index">@FormatEditionLabel(edition)</ValueSelectItem>
@@ -88,8 +88,8 @@
                     </ValueSelect>
                     <Button Disabled="@(IsRunning || _isLoadingEditions)"
                         OnClick="LoadEditionsAsync"
-                        title="List the image's editions (always elevated) and fill the index list.">
-                        @(_isLoadingEditions ? "Loading…" : "Load editions")
+                        title="@Localizer["Db_Create_LoadEditionsTitle"]">
+                        @(_isLoadingEditions ? Localizer["Db_Create_LoadingEditions"] : Localizer["Db_Create_LoadEditions"])
                     </Button>
                 </div>
 
@@ -104,17 +104,17 @@
         }
 
         <div class="form-row">
-            <label for="create-filter">Filter (regex)</label>
+            <label for="create-filter">@Localizer["DatabaseTools_Field_FilterRegex"]</label>
             <input aria-describedby="@(_filterError is null ? "create-filter-help" : "create-filter-help create-filter-error")"
                 aria-invalid="@(_filterError is not null ? "true" : "false")"
                 class="@FilterCssClass"
                 disabled="@IsRunning"
                 id="create-filter"
                 @oninput="OnFilterInput"
-                placeholder="e.g. ^Microsoft-.*"
+                placeholder="@Localizer["DatabaseTools_Filter_Placeholder", "^Microsoft-.*"]"
                 type="text"
                 value="@_filterText" />
-            <span class="db-tab-help" id="create-filter-help">Optional regular expression. Provider names containing a match are included; anchor with ^ and $ for a full-string match.</span>
+            <span class="db-tab-help" id="create-filter-help">@Localizer["DatabaseTools_Filter_Help"]</span>
 
             @if (_filterError is not null)
             {
@@ -126,10 +126,10 @@
         </div>
 
         <div class="form-row">
-            <label for="create-skip-path">Skip providers from</label>
+            <label for="create-skip-path">@Localizer["Db_Create_SkipProvidersFrom"]</label>
             <div class="path-input-group">
                 <span class="db-tab-help" id="create-skip-path-help">
-                    Optional. Path to a .db or .evtx whose providers should be excluded from the new database.
+                    @Localizer["Db_Create_SkipProvidersHelp"]
                 </span>
                 <input aria-describedby="create-skip-path-help"
                     class="input skip-path"
@@ -139,22 +139,31 @@
                     placeholder="C:\path\to\exclude.db"
                     type="text"
                     value="@_skipPath" />
-                <Button Disabled="@IsRunning" OnClick="PickSkipAsync">Browse…</Button>
+                <Button Disabled="@IsRunning" OnClick="PickSkipAsync">@Localizer["DatabaseTools_Action_Browse"]</Button>
             </div>
         </div>
 
         <div class="form-row">
-            <label for="create-auto-import" id="create-auto-import-label">When finished</label>
+            <label for="create-auto-import" id="create-auto-import-label">@Localizer["DatabaseTools_Field_WhenFinished"]</label>
             <ValueSelect AriaLabelledBy="create-auto-import-label"
-                @bind-Value="AutoImportMode"
                 CssClass="input"
                 Disabled="@IsRunning"
                 Id="create-auto-import"
                 T="AutoImportMode"
-                ToStringFunc="FormatAutoImportMode">
-                <ValueSelectItem T="AutoImportMode" Value="AutoImportMode.Off">Don't import</ValueSelectItem>
-                <ValueSelectItem T="AutoImportMode" Value="AutoImportMode.Import">Import database</ValueSelectItem>
-                <ValueSelectItem T="AutoImportMode" Value="AutoImportMode.ImportAndEnable">Import and enable</ValueSelectItem>
+                ToStringFunc="FormatAutoImportMode"
+                @bind-Value="AutoImportMode">
+                <ValueSelectItem T="AutoImportMode"
+                    Value="AutoImportMode.Off">
+                    @AutoImportModeLocalizer.Label(Localizer, AutoImportMode.Off)
+                </ValueSelectItem>
+                <ValueSelectItem T="AutoImportMode"
+                    Value="AutoImportMode.Import">
+                    @AutoImportModeLocalizer.Label(Localizer, AutoImportMode.Import)
+                </ValueSelectItem>
+                <ValueSelectItem T="AutoImportMode"
+                    Value="AutoImportMode.ImportAndEnable">
+                    @AutoImportModeLocalizer.Label(Localizer, AutoImportMode.ImportAndEnable)
+                </ValueSelectItem>
             </ValueSelect>
         </div>
     </div>
@@ -166,13 +175,13 @@
                 @if (IsCancelling)
                 {
                     <Button Disabled IconClass="bi bi-hourglass-split">
-                        Cancelling…
+                        @Localizer["DatabaseTools_Action_Cancelling"]
                     </Button>
                 }
                 else
                 {
                     <DangerButton IconClass="bi bi-x-circle" OnClick="CancelRun">
-                        Cancel
+                        @Localizer["Modal_Cancel"]
                     </DangerButton>
                 }
             }
@@ -183,12 +192,12 @@
                     <span class="visually-hidden" id="create-run-elevation-help">@RunElevationTitle</span>
                 }
 
-                <PrimaryButton aria-describedby="@(WillElevate ? "create-run-elevation-help" : null)"
-                    Disabled="@(!CanRun || IsRunning || IsImportInProgress || IsConfirming)"
+                <PrimaryButton Disabled="@(!CanRun || IsRunning || IsImportInProgress || IsConfirming)"
                     IconClass="@(WillElevate ? "bi bi-shield-lock" : "bi bi-play-fill")"
                     OnClick="RunCreateAsync"
+                    aria-describedby="@(WillElevate ? "create-run-elevation-help" : null)"
                     title="@RunElevationTitle">
-                    Run
+                    @Localizer["DatabaseTools_Action_Run"]
                 </PrimaryButton>
             }
         </ToolbarLeadingContent>

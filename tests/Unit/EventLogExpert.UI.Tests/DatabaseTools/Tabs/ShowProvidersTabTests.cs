@@ -88,7 +88,7 @@ public sealed class ShowProvidersTabTests : BunitContext
         component.Find("#show-include-protected").Change(true);
 
         Assert.Equal("show-run-elevation-help", component.Find(".button-green").GetAttribute("aria-describedby"));
-        Assert.Contains("administrator access", component.Find("#show-run-elevation-help").TextContent);
+        Assert.Equal("[[DatabaseTools_Elevation_ProtectedProviders]]", component.Find("#show-run-elevation-help").TextContent);
     }
 
     private void AssertShowRoutedThroughElevatedHelper(IElevatedDatabaseToolsRunner elevatedRunner)

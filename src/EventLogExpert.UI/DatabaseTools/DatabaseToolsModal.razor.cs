@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Database;
@@ -9,19 +10,20 @@ using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.DatabaseTools.Tabs;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.DatabaseTools;
 
 public sealed partial class DatabaseToolsModal : IInlineAlertSurface
 {
-    private static readonly (DatabaseToolsTab Tab, string Label)[] s_tabs =
+    private static readonly DatabaseToolsTab[] s_tabs =
     [
-        (DatabaseToolsTab.Manage, "Manage"),
-        (DatabaseToolsTab.Show, "Show Providers"),
-        (DatabaseToolsTab.Create, "Create Database"),
-        (DatabaseToolsTab.Merge, "Merge Databases"),
-        (DatabaseToolsTab.Diff, "Diff Databases"),
-        (DatabaseToolsTab.Upgrade, "Upgrade Database")
+        DatabaseToolsTab.Manage,
+        DatabaseToolsTab.Show,
+        DatabaseToolsTab.Create,
+        DatabaseToolsTab.Merge,
+        DatabaseToolsTab.Diff,
+        DatabaseToolsTab.Upgrade
     ];
     private readonly CancellationTokenSource _autoImportCts = new();
 
@@ -44,6 +46,8 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
         (_upgradeTab?.IsRunning ?? false);
 
     [Inject] private IDatabaseOperationCoordinator DatabaseOperationCoordinator { get; init; } = null!;
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     [Inject] private ILogReloadCoordinator LogReloadCoordinator { get; init; } = null!;
 
@@ -92,10 +96,10 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
         {
             var savePrompt = await ShowInlineAlertAsync(
                 new InlineAlertRequest(
-                    Title: "Unsaved changes",
-                    Message: "You have pending database changes. Save them now?",
-                    AcceptLabel: "Save",
-                    CancelLabel: "Don't save",
+                    Title: Localizer["DatabaseTools_Unsaved_Title"],
+                    Message: Localizer["DatabaseTools_Unsaved_Message"],
+                    AcceptLabel: Localizer["Modal_Save"],
+                    CancelLabel: Localizer["DatabaseTools_Unsaved_DontSave"],
                     IsPrompt: false,
                     PromptInitialValue: null),
                 CancellationToken.None);
@@ -109,10 +113,10 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
             {
                 var closeAnyway = await ShowInlineAlertAsync(
                     new InlineAlertRequest(
-                        Title: "Discard changes?",
-                        Message: "Close without saving? Pending changes will be lost.",
-                        AcceptLabel: "Close",
-                        CancelLabel: "Stay open",
+                        Title: Localizer["DatabaseTools_Discard_Title"],
+                        Message: Localizer["DatabaseTools_Discard_Message"],
+                        AcceptLabel: Localizer["Modal_Close"],
+                        CancelLabel: Localizer["DatabaseTools_Discard_StayOpen"],
                         IsPrompt: false,
                         PromptInitialValue: null),
                     CancellationToken.None);
@@ -127,10 +131,10 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
         {
             var confirm = await ShowInlineAlertAsync(
                 new InlineAlertRequest(
-                    Title: "Operation in progress",
-                    Message: "An operation is running. Cancel and close anyway?",
-                    AcceptLabel: "Cancel and close",
-                    CancelLabel: "Continue running",
+                    Title: Localizer["DatabaseTools_Running_Title"],
+                    Message: Localizer["DatabaseTools_Running_Message"],
+                    AcceptLabel: Localizer["DatabaseTools_Running_CancelAndClose"],
+                    CancelLabel: Localizer["DatabaseTools_Running_ContinueRunning"],
                     IsPrompt: false,
                     PromptInitialValue: null),
                 CancellationToken.None);
@@ -149,10 +153,10 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
         {
             var result = await ShowInlineAlertAsync(
                 new InlineAlertRequest(
-                    Title: "Database already exists",
-                    Message: $"{fileName} already exists. Overwrite?",
-                    AcceptLabel: "Overwrite",
-                    CancelLabel: "Skip",
+                    Title: Localizer["DatabaseTools_DbExists_Title"],
+                    Message: Localizer["DatabaseTools_DbExists_OverwriteMessage", fileName],
+                    AcceptLabel: Localizer["DatabaseTools_Action_Overwrite"],
+                    CancelLabel: Localizer["DatabaseTools_Action_Skip"],
                     IsPrompt: false,
                     PromptInitialValue: null),
                 cancellationToken);
@@ -174,10 +178,12 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
 
             if (!outcome.DatabaseStateChanged || outcome.Failures.Count > 0 || outcome.UpgradeFailures.Count > 0)
             {
-                throw new InvalidOperationException("The database import did not complete.");
+                throw new AutoImportIncompleteException();
             }
 
-            AnnouncementService.Announce(enable ? "Database imported and enabled" : "Database imported");
+            AnnouncementService.Announce(enable ?
+                Localizer["DatabaseTools_Announcement_DatabaseImportedEnabled"] :
+                Localizer["DatabaseTools_Announcement_DatabaseImported"]);
 
             if (enable)
             {
@@ -188,12 +194,14 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
         catch (OperationCanceledException)
         {
             await ShowAutoImportErrorAsync(Path.GetFileName(producedPath));
+
             throw;
         }
         catch (Exception ex)
         {
             TraceLogger.Warning($"{nameof(DatabaseToolsModal)}.{nameof(HandleAutoImportAsync)} failed: {ex}");
             await ShowAutoImportErrorAsync(Path.GetFileName(producedPath));
+
             throw;
         }
     }
@@ -208,11 +216,10 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
         {
             var result = await ShowInlineAlertAsync(
                 new InlineAlertRequest(
-                    Title: "Reload Open Logs Now?",
-                    Message: "In order for these changes to take effect, all currently open logs must be reloaded. " +
-                        "Would you like to reload all open logs now?",
-                    AcceptLabel: "Yes",
-                    CancelLabel: "No",
+                    Title: Localizer["DatabaseTools_Reload_Title"],
+                    Message: Localizer["DatabaseTools_Reload_Message"],
+                    AcceptLabel: Localizer["DatabaseTools_Action_Yes"],
+                    CancelLabel: Localizer["DatabaseTools_Action_No"],
                     IsPrompt: false,
                     PromptInitialValue: null),
                 CancellationToken.None);
@@ -240,10 +247,10 @@ public sealed partial class DatabaseToolsModal : IInlineAlertSurface
         {
             await ShowInlineAlertAsync(
                 new InlineAlertRequest(
-                    Title: "Import Failed",
-                    Message: $"The database was created, but '{fileName}' was not imported.",
-                    AcceptLabel: "OK",
-                    CancelLabel: "OK",
+                    Title: Localizer["DatabaseTools_ImportFailed_Title"],
+                    Message: Localizer["DatabaseTools_ImportFailed_Message", fileName],
+                    AcceptLabel: Localizer["Modal_Accept"],
+                    CancelLabel: Localizer["Modal_Accept"],
                     IsPrompt: false,
                     PromptInitialValue: null),
                 CancellationToken.None);

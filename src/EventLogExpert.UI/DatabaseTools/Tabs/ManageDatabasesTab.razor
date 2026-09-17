@@ -5,7 +5,7 @@
     {
         <div class="manage-status-banner manage-status-banner--info" role="status">
             <i aria-hidden="true" class="bi bi-arrow-repeat loader-spin manage-status-banner__spinner"></i>
-            <span class="manage-status-banner__message">Classifying databases&hellip;</span>
+            <span class="manage-status-banner__message">@Localizer["Db_Manage_ClassifyingDatabases"]</span>
         </div>
     }
 
@@ -14,21 +14,21 @@
     <div class="manage-databases-import-row">
         @if (DatabaseService.Entries.Count > 0)
         {
-            <Button aria-pressed="@(_isSelectionModeActive ? "true" : "false")"
-                CssClass="manage-databases-select-btn"
+            <Button CssClass="manage-databases-select-btn"
                 IconClass="bi bi-check2-square"
-                id="manage-select-button"
                 OnClick="ToggleSelectionMode"
+                aria-pressed="@(_isSelectionModeActive ? "true" : "false")"
+                id="manage-select-button"
                 @ref="_selectButton">
-                @(_isSelectionModeActive ? "Done" : "Select")
+                @(_isSelectionModeActive ? Localizer["Db_Manage_Select_Done"] : Localizer["Db_Manage_Select_Select"])
             </Button>
         }
         <Button CssClass="manage-databases-import-btn"
             IconClass="bi bi-plus-circle"
-            id="manage-import-button"
             OnClick="ImportDatabase"
+            id="manage-import-button"
             @ref="_importButton">
-            Import database&hellip;
+            @Localizer["Db_Manage_ImportDatabase"]
         </Button>
     </div>
 
@@ -36,20 +36,20 @@
     {
         <div class="manage-databases-selection-header">
             <div class="manage-databases-master-checkbox">
-                <ChromelessButton aria-checked="@MasterCheckboxAriaChecked"
-                    aria-label="@MasterCheckboxAriaLabel"
-                    CssClass="manage-databases-master-btn"
+                <ChromelessButton CssClass="manage-databases-master-btn"
                     IconClass="@($"bi {MasterCheckboxIconClass}")"
                     OnClick="OnMasterCheckboxClickAsync"
+                    aria-checked="@MasterCheckboxAriaChecked"
+                    aria-label="@MasterCheckboxAriaLabel"
                     @ref="_masterCheckbox"
                     role="checkbox" />
             </div>
             <span class="manage-databases-selection-count">
-                @_selectedForBulk.Count of @DatabaseService.Entries.Count selected
+                @Localizer["Db_Manage_SelectionCount", _selectedForBulk.Count, DatabaseService.Entries.Count]
                 @if (_selectedForBulk.Count > 0)
                 {
                     <span class="manage-databases-selection-count-eligible">
-                        (@_eligibleUpgradeCount eligible for upgrade)
+                        @Localizer["Db_Manage_EligibleForUpgrade", _eligibleUpgradeCount]
                     </span>
                 }
             </span>
@@ -69,15 +69,15 @@
                     IsTogglePending="@_pendingToggles.ContainsKey(entry.FileName)"
                     IsUpgradeBlocked="@IsUpgradeBlocked"
                     IsUpgrading="@Coordinator.IsUpgradeInFlight(entry.FileName)"
-                    @key="entry.FileName"
                     OnRemove="@(() => RemoveDatabase(entry))"
                     OnRestoreFromBackup="@(() => RestoreFromBackup(entry))"
                     OnRetryClassification="@(() => RetryClassification(entry))"
                     OnSelectionToggle="@(() => ToggleSelection(entry.FileName))"
                     OnToggle="@(() => ToggleDatabase(entry.FileName))"
                     OnUpgrade="@(() => UpgradeEntry(entry.FileName))"
-                    @ref="_rowRefs[entry.FileName]"
-                    UpgradeProgress="@GetUpgradeProgressForEntry(entry)" />
+                    UpgradeProgress="@GetUpgradeProgressForEntry(entry)"
+                    @key="entry.FileName"
+                    @ref="_rowRefs[entry.FileName]" />
             }
         }
         else if (!IsClassificationPending)
@@ -88,48 +88,46 @@
 
     @if (_isSelectionModeActive && _selectedForBulk.Count > 0)
     {
-        <div aria-label="Bulk database actions" class="manage-databases-bulk-strip" role="group">
+        <div aria-label="@Localizer["Db_Manage_BulkActionsAria"]" class="manage-databases-bulk-strip" role="group">
             <span class="manage-databases-bulk-count">
-                @_selectedForBulk.Count selected
+                @Localizer["Db_Manage_SelectedCount", _selectedForBulk.Count]
             </span>
             @if (_eligibleUpgradeCount > 0)
             {
-                <PrimaryButton aria-describedby="@(IsUpgradeBlocked ? _upgradeBlockedHelpId : null)"
-                    Disabled="@IsUpgradeBlocked"
+                <PrimaryButton Disabled="@IsUpgradeBlocked"
                     OnClick="OnBulkUpgradeClickAsync"
+                    aria-describedby="@(IsUpgradeBlocked ? _upgradeBlockedHelpId : null)"
                     @ref="_bulkUpgradeButton">
-                    Upgrade @_eligibleUpgradeCount
+                    @Localizer["Db_Manage_UpgradeCount", _eligibleUpgradeCount]
                 </PrimaryButton>
             }
             <DangerButton OnClick="OnBulkRemoveClickAsync"
                 @ref="_bulkRemoveButton">
-                Remove @_selectedForBulk.Count
+                @Localizer["Db_Manage_RemoveCount", _selectedForBulk.Count]
             </DangerButton>
             <span class="visually-hidden" id="@_upgradeBlockedHelpId">
-                @(IsUpgradeBlocked
-                    ? "Cannot upgrade: another upgrade is already in progress."
-                    : string.Empty)
+                @(IsUpgradeBlocked ? Localizer["Db_Manage_CannotUpgradeInProgress"] : string.Empty)
             </span>
         </div>
     }
 
     @if (HasPendingChanges)
     {
-        <div aria-label="Pending database changes" class="manage-databases-save-strip" role="group">
+        <div aria-label="@Localizer["Db_Manage_PendingChangesAria"]" class="manage-databases-save-strip" role="group">
             <span class="manage-databases-pending-count">
-                @_pendingToggles.Count pending change@(_pendingToggles.Count == 1 ? "" : "s")
+                @LocalizedCount.OneOrManyRaw(Localizer, _pendingToggles.Count, "Db_Manage_PendingChange_One", "Db_Manage_PendingChange_Many")
             </span>
             <Button OnClick="DiscardPending">
-                Discard
+                @Localizer["Db_Manage_Discard"]
             </Button>
-            <PrimaryButton aria-describedby="@(IsUpgradeBlocked ? _saveBlockedHelpId : null)"
-                Disabled="@IsUpgradeBlocked"
-                id="manage-save"
-                OnClick="OnSaveClickAsync">
-                Save changes
+            <PrimaryButton Disabled="@IsUpgradeBlocked"
+                OnClick="OnSaveClickAsync"
+                aria-describedby="@(IsUpgradeBlocked ? _saveBlockedHelpId : null)"
+                id="manage-save">
+                @Localizer["Db_Manage_SaveChanges"]
             </PrimaryButton>
             <span class="visually-hidden" id="@_saveBlockedHelpId">
-                @(IsUpgradeBlocked ? "Cannot save: a database upgrade is in progress." : string.Empty)
+                @(IsUpgradeBlocked ? Localizer["Db_Manage_CannotSaveInProgress"] : string.Empty)
             </span>
         </div>
     }

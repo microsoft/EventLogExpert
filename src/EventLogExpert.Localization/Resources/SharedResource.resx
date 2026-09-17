@@ -4054,4 +4054,695 @@
     <value>Previously Used</value>
     <comment>Filter library Previously Used tab label.</comment>
   </data>
+  <!-- Database Tools tab enum labels. -->
+  <data name="DatabaseToolsTab_Manage" xml:space="preserve">
+    <value>Manage</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseToolsTab_Show" xml:space="preserve">
+    <value>Show Providers</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseToolsTab_Create" xml:space="preserve">
+    <value>Create Database</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseToolsTab_Merge" xml:space="preserve">
+    <value>Merge Databases</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseToolsTab_Diff" xml:space="preserve">
+    <value>Diff Databases</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseToolsTab_Upgrade" xml:space="preserve">
+    <value>Upgrade Database</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="AutoImportMode_ImportAndEnable" xml:space="preserve">
+    <value>Import and enable</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="AutoImportMode_Import" xml:space="preserve">
+    <value>Import database</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="AutoImportMode_Off" xml:space="preserve">
+    <value>Don't import</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseToolsOutcome_Succeeded" xml:space="preserve">
+    <value>Succeeded</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseToolsOutcome_Cancelled" xml:space="preserve">
+    <value>Cancelled</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseToolsOutcome_Failed" xml:space="preserve">
+    <value>Failed</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="AutoImportState_Importing" xml:space="preserve">
+    <value>Importing database…</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="AutoImportState_Imported" xml:space="preserve">
+    <value>Database imported</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="AutoImportState_Failed" xml:space="preserve">
+    <value>Retry import database</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="AutoImportState_NotImported" xml:space="preserve">
+    <value>Import database</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="MergeOverwriteMode_Keep" xml:space="preserve">
+    <value>Keep - skip providers already in target</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="MergeOverwriteMode_Overwrite" xml:space="preserve">
+    <value>Overwrite - replace providers already in target</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseUpgradeSkipReason_BackupRequired" xml:space="preserve">
+    <value>Restore from backup required</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseUpgradeSkipReason_UpgradeInProgress" xml:space="preserve">
+    <value>Upgrade in progress</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseUpgradeSkipReason_AlreadyUpToDate" xml:space="preserve">
+    <value>Already up to date</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseUpgradeSkipReason_ClassificationPending" xml:space="preserve">
+    <value>Classification pending</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseUpgradeSkipReason_UnrecognizedSchema" xml:space="preserve">
+    <value>Unrecognized schema</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseUpgradeSkipReason_ObsoleteSchema" xml:space="preserve">
+    <value>Obsolete schema</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseUpgradeSkipReason_ClassificationFailed" xml:space="preserve">
+    <value>Classification failed</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseUpgradeSkipReason_NotEligible" xml:space="preserve">
+    <value>Not eligible</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <!-- Database Tools modal chrome and alerts. -->
+  <data name="DatabaseTools_AriaLabel" xml:space="preserve">
+    <value>Databases</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_TablistAriaLabel" xml:space="preserve">
+    <value>Database tools</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_OutputLabel" xml:space="preserve">
+    <value>Output</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Output_Normal" xml:space="preserve">
+    <value>Normal</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Output_Verbose" xml:space="preserve">
+    <value>Verbose</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Output_VerboseHelp" xml:space="preserve">
+    <value>Verbose includes trace-level diagnostic details on next run.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Unsaved_Title" xml:space="preserve">
+    <value>Unsaved changes</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Unsaved_Message" xml:space="preserve">
+    <value>You have pending database changes. Save them now?</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Unsaved_DontSave" xml:space="preserve">
+    <value>Don't save</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Discard_Title" xml:space="preserve">
+    <value>Discard changes?</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Discard_Message" xml:space="preserve">
+    <value>Close without saving? Pending changes will be lost.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Discard_StayOpen" xml:space="preserve">
+    <value>Stay open</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Running_Title" xml:space="preserve">
+    <value>Operation in progress</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Running_Message" xml:space="preserve">
+    <value>An operation is running. Cancel and close anyway?</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Running_CancelAndClose" xml:space="preserve">
+    <value>Cancel and close</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Running_ContinueRunning" xml:space="preserve">
+    <value>Continue running</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_DbExists_Title" xml:space="preserve">
+    <value>Database already exists</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_DbExists_OverwriteMessage" xml:space="preserve">
+    <value>{0} already exists. Overwrite?</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Action_Overwrite" xml:space="preserve">
+    <value>Overwrite</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Action_Skip" xml:space="preserve">
+    <value>Skip</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Announcement_DatabaseImported" xml:space="preserve">
+    <value>Database imported</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Announcement_DatabaseImportedEnabled" xml:space="preserve">
+    <value>Database imported and enabled</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Reload_Title" xml:space="preserve">
+    <value>Reload Open Logs Now?</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Reload_Message" xml:space="preserve">
+    <value>In order for these changes to take effect, all currently open logs must be reloaded. Would you like to reload all open logs now?</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Action_Yes" xml:space="preserve">
+    <value>Yes</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Action_No" xml:space="preserve">
+    <value>No</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_ImportFailed_Title" xml:space="preserve">
+    <value>Import Failed</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_ImportFailed_Message" xml:space="preserve">
+    <value>The database was created, but '{0}' was not imported.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <!-- Database Tools log view. -->
+  <data name="DatabaseTools_Log_EntryCount_One" xml:space="preserve">
+    <value>{0} entry</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Log_EntryCount_Many" xml:space="preserve">
+    <value>{0} entries</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Log_Copy" xml:space="preserve">
+    <value>Copy</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Log_JumpToLatest" xml:space="preserve">
+    <value>Jump to latest</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Log_NoOutput" xml:space="preserve">
+    <value>No output.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Log_ExportFailed_Title" xml:space="preserve">
+    <value>Export Failed</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <!-- Database Tools operation outcome and diagnostic log messages. -->
+  <data name="DatabaseTools_OutcomeMessage_Succeeded" xml:space="preserve">
+    <value>Completed in {0}s.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_OutcomeMessage_Cancelled" xml:space="preserve">
+    <value>[Cancelled after {0}s]</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_OutcomeMessage_FailedSeeDebugLog" xml:space="preserve">
+    <value>[Failed: see debug log]</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_OutcomeMessage_FailedWithSummary" xml:space="preserve">
+    <value>[Failed: {0}]</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Log_ImportFailed" xml:space="preserve">
+    <value>Import failed: {0}</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_AutoImport_DidNotComplete" xml:space="preserve">
+    <value>The database import did not complete.</value>
+    <comment>Database tools UI text. Log detail shown when a post-build auto-import finishes with failures.</comment>
+  </data>
+  <data name="DatabaseTools_Log_UnexpectedError" xml:space="preserve">
+    <value>Unexpected error: {0}</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <!-- Database Tools shared tab actions, fields, filters, elevation, and pickers. -->
+  <data name="DatabaseTools_Action_Browse" xml:space="preserve">
+    <value>Browse…</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Action_Cancelling" xml:space="preserve">
+    <value>Cancelling…</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Action_Run" xml:space="preserve">
+    <value>Run</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Field_SourcePath" xml:space="preserve">
+    <value>Source path</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Field_TargetDb" xml:space="preserve">
+    <value>Target .db</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Field_WhenFinished" xml:space="preserve">
+    <value>When finished</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Field_FilterRegex" xml:space="preserve">
+    <value>Filter (regex)</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Filter_Placeholder" xml:space="preserve">
+    <value>e.g. {0}</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Filter_Help" xml:space="preserve">
+    <value>Optional regular expression. Provider names containing a match are included; anchor with ^ and $ for a full-string match.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Filter_InvalidRegex" xml:space="preserve">
+    <value>Invalid regex: {0}</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_IncludeProtectedProviders" xml:space="preserve">
+    <value>Include protected providers such as Security (requires elevation)</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Elevation_ProtectedProviders" xml:space="preserve">
+    <value>Prompts for administrator access to include protected providers (Security, etc.); the app does not relaunch.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Elevation_OfflineImage" xml:space="preserve">
+    <value>Prompts for administrator access to read the offline image in an elevated helper; the app does not relaunch.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Picker_OutputDbNewName" xml:space="preserve">
+    <value>Pick output .db (or type a new name)</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_Picker_SourceDbOrEvtx" xml:space="preserve">
+    <value>Pick source (.db or .evtx)</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <!-- Create Database tab. -->
+  <data name="Db_Create_TargetHelp" xml:space="preserve">
+    <value>Required. Path to a new .db file to create.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Create_SourceHelp" xml:space="preserve">
+    <value>Optional. Leave empty to use local providers. Accepts a .db or .evtx path, a folder, or an offline image (.wim, .esd, .iso, or .vhdx/.vhd). When an image is given, providers are read from it, fully offline.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Create_FolderIsOfflineImage" xml:space="preserve">
+    <value>Folder is an offline Windows image (mounted volume or extracted image), not a folder of .db/.evtx files</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Create_ImageIndex" xml:space="preserve">
+    <value>Image index</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Create_ImageIndexHelp" xml:space="preserve">
+    <value>Optional. 1-based image index. Type an index, or load the image's editions to pick one from the list. An ISO requires an index.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Create_LoadEditionsTitle" xml:space="preserve">
+    <value>List the image's editions (always elevated) and fill the index list.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Create_LoadingEditions" xml:space="preserve">
+    <value>Loading…</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Create_LoadEditions" xml:space="preserve">
+    <value>Load editions</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Create_SkipProvidersFrom" xml:space="preserve">
+    <value>Skip providers from</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Create_SkipProvidersHelp" xml:space="preserve">
+    <value>Optional. Path to a .db or .evtx whose providers should be excluded from the new database.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Create_DbExists_RebuildOverwriteMessage" xml:space="preserve">
+    <value>{0} already exists. Overwrite it? The existing database is backed up and restored automatically if the rebuild fails.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Create_Editions_NoneFound" xml:space="preserve">
+    <value>No editions were found in the selected image.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Create_Editions_Failed" xml:space="preserve">
+    <value>Failed to list image editions.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Create_Editions_FailedWithDetail" xml:space="preserve">
+    <value>Failed to list image editions: {0}</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Create_Picker_SkipSource" xml:space="preserve">
+    <value>Pick provider source to skip</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Create_Picker_Source" xml:space="preserve">
+    <value>Pick source (.db, .evtx, .wim, .esd, .iso, .vhdx, or .vhd)</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <!-- Diff Databases tab. -->
+  <data name="Db_Diff_FirstSource" xml:space="preserve">
+    <value>First source</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Diff_FirstSourceHelp" xml:space="preserve">
+    <value>Required. Baseline source. Providers in the second source that also appear here are excluded from the result.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Diff_SecondSource" xml:space="preserve">
+    <value>Second source</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Diff_SecondSourceHelp" xml:space="preserve">
+    <value>Required. Providers in this source that are NOT in the first source are copied to the new .db output.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Diff_Result" xml:space="preserve">
+    <value>Result</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Diff_ResultDirectionAria" xml:space="preserve">
+    <value>Result direction</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Diff_ResultDirection" xml:space="preserve">
+    <value>Providers in second source that are NOT in first source</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Diff_NewDbOutput" xml:space="preserve">
+    <value>New .db output</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Diff_NewDbHelp" xml:space="preserve">
+    <value>Required. Path to a new .db file that will receive the providers found only in the second source.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Diff_Picker_FirstSource" xml:space="preserve">
+    <value>Pick first source (.db or .evtx)</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Diff_Picker_SecondSource" xml:space="preserve">
+    <value>Pick second source (.db or .evtx)</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <!-- Merge Databases tab. -->
+  <data name="Db_Merge_Source" xml:space="preserve">
+    <value>Source</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Merge_SourceHelp" xml:space="preserve">
+    <value>Required. Path to a .db or .evtx whose providers will be merged into the target.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Merge_TargetHelp" xml:space="preserve">
+    <value>Required. Path to the existing target .db that will receive the merged providers.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Merge_ExistingProviders" xml:space="preserve">
+    <value>Existing providers</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Merge_Picker_TargetDb" xml:space="preserve">
+    <value>Pick target .db</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <!-- Show Providers tab. -->
+  <data name="Db_Show_SourceHelp" xml:space="preserve">
+    <value>Optional. Leave empty to list local providers. Accepts a .db or .evtx path; paste a folder path to use a directory.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <!-- Upgrade Database tab. -->
+  <data name="Db_Upgrade_DatabaseLabel" xml:space="preserve">
+    <value>Database (.db)</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Upgrade_DatabaseHelp" xml:space="preserve">
+    <value>Required. Path to the .db whose schema will be upgraded to the current version.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Upgrade_Picker_Database" xml:space="preserve">
+    <value>Pick .db to upgrade</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <!-- Manage Databases tab. -->
+  <data name="Db_Manage_ClassifyingDatabases" xml:space="preserve">
+    <value>Classifying databases…</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Select_Done" xml:space="preserve">
+    <value>Done</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Select_Select" xml:space="preserve">
+    <value>Select</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_ImportDatabase" xml:space="preserve">
+    <value>Import database…</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_SelectionCount" xml:space="preserve">
+    <value>{0} of {1} selected</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_EligibleForUpgrade" xml:space="preserve">
+    <value>({0} eligible for upgrade)</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_BulkActionsAria" xml:space="preserve">
+    <value>Bulk database actions</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_SelectedCount" xml:space="preserve">
+    <value>{0} selected</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_UpgradeCount" xml:space="preserve">
+    <value>Upgrade {0}</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_RemoveCount" xml:space="preserve">
+    <value>Remove {0}</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_CannotUpgradeInProgress" xml:space="preserve">
+    <value>Cannot upgrade: another upgrade is already in progress.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_PendingChangesAria" xml:space="preserve">
+    <value>Pending database changes</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_PendingChange_One" xml:space="preserve">
+    <value>{0} pending change</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_PendingChange_Many" xml:space="preserve">
+    <value>{0} pending changes</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Discard" xml:space="preserve">
+    <value>Discard</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_SaveChanges" xml:space="preserve">
+    <value>Save changes</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_CannotSaveInProgress" xml:space="preserve">
+    <value>Cannot save: a database upgrade is in progress.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_EmptyState" xml:space="preserve">
+    <value>Import a provider database (.db file) using the &lt;strong&gt;Import database…&lt;/strong&gt; button above to resolve events from other providers.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Master_ClearSelection" xml:space="preserve">
+    <value>Clear selection</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Master_SelectAll" xml:space="preserve">
+    <value>Select all</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Announcement_ChangesApplied" xml:space="preserve">
+    <value>Database changes applied</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_MoreNames" xml:space="preserve">
+    <value>{0}, and {1} more</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Remove_BulkPlain" xml:space="preserve">
+    <value>Are you sure you want to remove these {0} databases? ({1})</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_UpgradeNotStarted_Title" xml:space="preserve">
+    <value>Upgrade not started</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_UpgradeNotStarted_Message" xml:space="preserve">
+    <value>Another upgrade is already in progress.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Remove_CloseReopenWarning_One" xml:space="preserve">
+    <value>Removing will close and reopen any affected log views.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Remove_CloseReopenWarning_Many" xml:space="preserve">
+    <value>Removing these databases will close and reopen any affected log views.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Remove_CancelThenRemove_One" xml:space="preserve">
+    <value>Upgrade in progress for: {0}. This will cancel the upgrade batch — which may include other files not in your selection — and then remove: {1}. Are you sure?</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Remove_CancelThenRemove_Many" xml:space="preserve">
+    <value>Upgrade in progress for: {0}. This will cancel the upgrade batches — which may include other files not in your selection — and then remove: {1}. Are you sure?</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Remove_SinglePlain" xml:space="preserve">
+    <value>Are you sure you want to remove {0}?</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Remove_Title_One" xml:space="preserve">
+    <value>Remove Database</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Remove_Title_Many" xml:space="preserve">
+    <value>Remove {0} Databases</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_RemoveConfirm_Accept_OneOne" xml:space="preserve">
+    <value>Cancel {0} upgrade and remove {1} database</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_RemoveConfirm_Accept_OneMany" xml:space="preserve">
+    <value>Cancel {0} upgrade and remove {1} databases</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_RemoveConfirm_Accept_ManyOne" xml:space="preserve">
+    <value>Cancel {0} upgrades and remove {1} database</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_RemoveConfirm_Accept_ManyMany" xml:space="preserve">
+    <value>Cancel {0} upgrades and remove {1} databases</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Action_Remove" xml:space="preserve">
+    <value>Remove</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_SubsetConfirm_Intro" xml:space="preserve">
+    <value>{0} of {1} selected databases will be upgraded.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_SubsetConfirm_SkipHeader_One" xml:space="preserve">
+    <value>The following {0} database will be skipped:</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_SubsetConfirm_SkipHeader_Many" xml:space="preserve">
+    <value>The following {0} databases will be skipped:</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_SubsetConfirm_Title" xml:space="preserve">
+    <value>Upgrade selected databases</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_FailureReason_RemovalFailedAfterConfirmation" xml:space="preserve">
+    <value>removal failed after confirmation</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Announcement_Removed_One" xml:space="preserve">
+    <value>Removed {0} database.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Announcement_Removed_Many" xml:space="preserve">
+    <value>Removed {0} databases.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Announcement_RemoveFailed_One" xml:space="preserve">
+    <value>{0} removal failed. First: {1} ({2}).</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Announcement_RemoveFailed_Many" xml:space="preserve">
+    <value>{0} removals failed. First: {1} ({2}).</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_CannotRestoreInProgress" xml:space="preserve">
+    <value>Cannot restore: a database upgrade is in progress.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_RestoreFailed" xml:space="preserve">
+    <value>Could not restore {0} from backup.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_RestoreSucceeded" xml:space="preserve">
+    <value>Restored {0} from backup.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_SelectionCleared" xml:space="preserve">
+    <value>Selection cleared.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Selection_One" xml:space="preserve">
+    <value>{0} database selected.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_Selection_Many" xml:space="preserve">
+    <value>{0} databases selected.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
 </root>

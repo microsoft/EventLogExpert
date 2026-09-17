@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
@@ -20,6 +21,7 @@ using EventLogExpert.UI.Tests.DatabaseTools.Tabs;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.DatabaseTools;
@@ -66,6 +68,7 @@ public sealed class DatabaseToolsModalTabbingTests : BunitContext
         Services.AddSingleton(Substitute.For<ICurrentVersionProvider>());
         Services.AddSingleton(Substitute.For<IMenuActionService>());
         Services.AddOperationLogProgressFactoryMock();
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 
     }
 
@@ -170,7 +173,14 @@ public sealed class DatabaseToolsModalTabbingTests : BunitContext
         var tabs = component.FindAll("[role='tab']");
         Assert.Equal(6, tabs.Count);
         Assert.Equal("true", tabs[0].GetAttribute("aria-selected"));
-        Assert.Equal("Manage", tabs[0].TextContent.Trim());
+        string[] expectedLabels = [
+            "[[DatabaseToolsTab_Manage]]",
+            "[[DatabaseToolsTab_Show]]",
+            "[[DatabaseToolsTab_Create]]",
+            "[[DatabaseToolsTab_Merge]]",
+            "[[DatabaseToolsTab_Diff]]",
+            "[[DatabaseToolsTab_Upgrade]]"];
+        Assert.Equal(expectedLabels, tabs.Select(tab => tab.TextContent.Trim()));
         for (int i = 1; i < tabs.Count; i++)
         {
             Assert.Equal("false", tabs[i].GetAttribute("aria-selected"));

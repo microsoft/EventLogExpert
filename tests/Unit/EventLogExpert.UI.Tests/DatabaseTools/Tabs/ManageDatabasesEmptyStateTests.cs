@@ -2,19 +2,25 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Localization;
 using EventLogExpert.UI.DatabaseTools.Tabs;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.Tests.DatabaseTools.Tabs;
 
 public sealed class ManageDatabasesEmptyStateTests : BunitContext
 {
+    public ManageDatabasesEmptyStateTests() =>
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new EmptyStateLocalizer());
+
     [Fact]
     public void ManageDatabasesEmptyState_BoldsImportButtonReferenceForVisualHierarchy()
     {
         var component = Render<ManageDatabasesEmptyState>();
 
         var strong = component.Find(".manage-databases-empty strong");
-        Assert.Equal("Import database\u2026", strong.TextContent);
+        Assert.Equal("Import database…", strong.TextContent);
     }
 
     [Fact]
@@ -35,6 +41,18 @@ public sealed class ManageDatabasesEmptyStateTests : BunitContext
 
         var empty = component.Find(".manage-databases-empty");
         Assert.Contains("Import a provider database", empty.TextContent);
-        Assert.Contains("Import database\u2026", empty.TextContent);
+        Assert.Contains("Import database…", empty.TextContent);
+    }
+
+    private sealed class EmptyStateLocalizer : IStringLocalizer<SharedResource>
+    {
+        public LocalizedString this[string name] => new(
+            name,
+            "Import a provider database (.db file) using the <strong>Import database…</strong> button above to resolve events from other providers.",
+            resourceNotFound: false);
+
+        public LocalizedString this[string name, params object[] arguments] => this[name];
+
+        public IEnumerable<LocalizedString> GetAllStrings(bool includeParentCultures) => [];
     }
 }

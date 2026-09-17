@@ -4,10 +4,10 @@
 <div class="db-tab merge-database-tab">
     <div class="db-tab-form">
         <div class="form-row">
-            <label for="merge-source-path">Source</label>
+            <label for="merge-source-path">@Localizer["Db_Merge_Source"]</label>
             <div class="path-input-group">
                 <span class="db-tab-help" id="merge-source-path-help">
-                    Required. Path to a .db or .evtx whose providers will be merged into the target.
+                    @Localizer["Db_Merge_SourceHelp"]
                 </span>
                 <input aria-describedby="merge-source-path-help"
                     class="input source-path"
@@ -17,14 +17,14 @@
                     placeholder="C:\path\to\source.db"
                     type="text"
                     value="@_sourcePath" />
-                <Button Disabled="@IsRunning" OnClick="PickSourceAsync">Browse…</Button>
+                <Button Disabled="@IsRunning" OnClick="PickSourceAsync">@Localizer["DatabaseTools_Action_Browse"]</Button>
             </div>
         </div>
 
         <div class="form-row">
-            <label for="merge-target-path">Target .db</label>
+            <label for="merge-target-path">@Localizer["DatabaseTools_Field_TargetDb"]</label>
             <div class="path-input-group">
-                <span class="db-tab-help" id="merge-target-path-help">Required. Path to the existing target .db that will receive the merged providers.</span>
+                <span class="db-tab-help" id="merge-target-path-help">@Localizer["Db_Merge_TargetHelp"]</span>
                 <input aria-describedby="merge-target-path-help"
                     class="input target-path"
                     disabled="@IsRunning"
@@ -33,33 +33,48 @@
                     placeholder="C:\path\to\existing-database.db"
                     type="text"
                     value="@_targetPath" />
-                <Button Disabled="@IsRunning" OnClick="PickTargetAsync">Browse…</Button>
+                <Button Disabled="@IsRunning" OnClick="PickTargetAsync">@Localizer["DatabaseTools_Action_Browse"]</Button>
             </div>
         </div>
 
         <div class="form-row">
-            <label for="merge-overwrite-mode" id="merge-overwrite-mode-label">Existing providers</label>
+            <label for="merge-overwrite-mode" id="merge-overwrite-mode-label">@Localizer["Db_Merge_ExistingProviders"]</label>
             <ValueSelect AriaLabelledBy="merge-overwrite-mode-label"
-                @bind-Value="_overwrite"
                 CssClass="input filter-dropdown overwrite-mode-select"
-                T="bool"
-                ToStringFunc="FormatOverwriteMode">
-                <ValueSelectItem T="bool" Value="false">@KeepModeLabel</ValueSelectItem>
-                <ValueSelectItem T="bool" Value="true">@OverwriteModeLabel</ValueSelectItem>
+                T="MergeOverwriteMode"
+                ToStringFunc="FormatOverwriteMode"
+                @bind-Value="_overwriteMode">
+                <ValueSelectItem T="MergeOverwriteMode"
+                    Value="MergeOverwriteMode.Keep">
+                    @MergeOverwriteModeLocalizer.Label(Localizer, MergeOverwriteMode.Keep)
+                </ValueSelectItem>
+                <ValueSelectItem T="MergeOverwriteMode"
+                    Value="MergeOverwriteMode.Overwrite">
+                    @MergeOverwriteModeLocalizer.Label(Localizer, MergeOverwriteMode.Overwrite)
+                </ValueSelectItem>
             </ValueSelect>
         </div>
 
         <div class="form-row">
-            <label for="merge-auto-import" id="merge-auto-import-label">When finished</label>
+            <label for="merge-auto-import" id="merge-auto-import-label">@Localizer["DatabaseTools_Field_WhenFinished"]</label>
             <ValueSelect AriaLabelledBy="merge-auto-import-label"
-                @bind-Value="AutoImportMode"
                 CssClass="input"
                 Id="merge-auto-import"
                 T="AutoImportMode"
-                ToStringFunc="FormatAutoImportMode">
-                <ValueSelectItem T="AutoImportMode" Value="AutoImportMode.Off">Don't import</ValueSelectItem>
-                <ValueSelectItem T="AutoImportMode" Value="AutoImportMode.Import">Import database</ValueSelectItem>
-                <ValueSelectItem T="AutoImportMode" Value="AutoImportMode.ImportAndEnable">Import and enable</ValueSelectItem>
+                ToStringFunc="FormatAutoImportMode"
+                @bind-Value="AutoImportMode">
+                <ValueSelectItem T="AutoImportMode"
+                    Value="AutoImportMode.Off">
+                    @AutoImportModeLocalizer.Label(Localizer, AutoImportMode.Off)
+                </ValueSelectItem>
+                <ValueSelectItem T="AutoImportMode"
+                    Value="AutoImportMode.Import">
+                    @AutoImportModeLocalizer.Label(Localizer, AutoImportMode.Import)
+                </ValueSelectItem>
+                <ValueSelectItem T="AutoImportMode"
+                    Value="AutoImportMode.ImportAndEnable">
+                    @AutoImportModeLocalizer.Label(Localizer, AutoImportMode.ImportAndEnable)
+                </ValueSelectItem>
             </ValueSelect>
         </div>
     </div>
@@ -70,16 +85,20 @@
             {
                 @if (IsCancelling)
                 {
-                    <Button Disabled IconClass="bi bi-hourglass-split">Cancelling…</Button>
+                    <Button Disabled IconClass="bi bi-hourglass-split">@Localizer["DatabaseTools_Action_Cancelling"]</Button>
                 }
                 else
                 {
-                    <DangerButton IconClass="bi bi-x-circle" OnClick="CancelRun">Cancel</DangerButton>
+                    <DangerButton IconClass="bi bi-x-circle" OnClick="CancelRun">@Localizer["Modal_Cancel"]</DangerButton>
                 }
             }
             else
             {
-                <PrimaryButton Disabled="@(!CanRun || IsRunning || IsImportInProgress || IsConfirming)" IconClass="bi bi-play-fill" OnClick="RunAsync">Run</PrimaryButton>
+                <PrimaryButton Disabled="@(!CanRun || IsRunning || IsImportInProgress || IsConfirming)"
+                    IconClass="bi bi-play-fill"
+                    OnClick="RunAsync">
+                    @Localizer["DatabaseTools_Action_Run"]
+                </PrimaryButton>
             }
         </ToolbarLeadingContent>
         <ToolbarTrailingContent>

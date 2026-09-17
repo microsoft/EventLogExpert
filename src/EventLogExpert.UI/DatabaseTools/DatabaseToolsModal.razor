@@ -1,7 +1,7 @@
 @using EventLogExpert.UI.DatabaseTools.Tabs
 @inherits ModalBase<bool>
 
-<ModalChrome AriaLabel="Databases"
+<ModalChrome AriaLabel="@Localizer["DatabaseTools_AriaLabel"]"
     BodyLayout="ModalBodyLayout.Flex"
     Footer="FooterPreset.CloseOnly"
     Height="80%"
@@ -18,10 +18,10 @@
             <CascadingValue IsFixed="true" Value="(IInlineAlertSurface)this">
                 <CascadingValue Name="RequestAutoImport" Value="HandleAutoImportAsync">
                     <div class="db-tabs-container">
-                        <SidebarTabs @bind-ActiveTab="_activeTab"
-                            TablistAriaLabel="Database tools"
-                            Tabs="s_tabs"
-                            TTab="DatabaseToolsTab">
+                        <SidebarTabs TTab="DatabaseToolsTab"
+                            TablistAriaLabel="@Localizer["DatabaseTools_TablistAriaLabel"]"
+                            Tabs="[.. s_tabs.Select(tab => (tab, DatabaseToolsTabLocalizer.Label(Localizer, tab)))]"
+                            @bind-ActiveTab="_activeTab">
                             <TabContent Context="tab">
                                 @switch (tab)
                                 {
@@ -59,14 +59,14 @@
     </ChildContent>
     <ExtraFooterContent>
         <div aria-labelledby="verbose-mode-label" class="verbose-mode" role="group">
-            <span class="verbose-mode-label" id="verbose-mode-label">Output</span>
+            <span class="verbose-mode-label" id="verbose-mode-label">@Localizer["DatabaseTools_OutputLabel"]</span>
             <OptionSelect AriaDescribedBy="verbose-mode-help"
                 AriaLabelledBy="verbose-mode-label"
-                @bind-Value="_verboseLogging"
-                DisabledString="Normal"
-                EnabledString="Verbose" />
+                DisabledString="@Localizer["DatabaseTools_Output_Normal"]"
+                EnabledString="@Localizer["DatabaseTools_Output_Verbose"]"
+                @bind-Value="_verboseLogging" />
             <span class="visually-hidden" id="verbose-mode-help">
-                Verbose includes trace-level diagnostic details on next run.
+                @Localizer["DatabaseTools_Output_VerboseHelp"]
             </span>
         </div>
     </ExtraFooterContent>

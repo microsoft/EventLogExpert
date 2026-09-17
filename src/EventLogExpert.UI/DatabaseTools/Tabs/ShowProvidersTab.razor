@@ -4,10 +4,10 @@
 <div class="db-tab show-providers-tab">
     <div class="db-tab-form">
         <div class="form-row">
-            <label for="show-source-path">Source path</label>
+            <label for="show-source-path">@Localizer["DatabaseTools_Field_SourcePath"]</label>
             <div class="path-input-group">
                 <span class="db-tab-help" id="show-source-path-help">
-                    Optional. Leave empty to list local providers. Accepts a .db or .evtx path; paste a folder path to use a directory.
+                    @Localizer["Db_Show_SourceHelp"]
                 </span>
                 <input aria-describedby="show-source-path-help"
                     @bind-value="_sourcePath"
@@ -17,7 +17,7 @@
                     id="show-source-path"
                     placeholder="C:\path\to\source.evtx"
                     type="text" />
-                <Button Disabled="@IsRunning" OnClick="PickSourceAsync">Browse…</Button>
+                <Button Disabled="@IsRunning" OnClick="PickSourceAsync">@Localizer["DatabaseTools_Action_Browse"]</Button>
             </div>
         </div>
 
@@ -30,24 +30,24 @@
                         id="show-include-protected"
                         @onchange="OnIncludeProtectedProvidersInput"
                         type="checkbox" />
-                    Include protected providers such as Security (requires elevation)
+                    @Localizer["DatabaseTools_IncludeProtectedProviders"]
                 </label>
             </div>
         }
 
         <div class="form-row">
-            <label for="show-filter">Filter (regex)</label>
+            <label for="show-filter">@Localizer["DatabaseTools_Field_FilterRegex"]</label>
             <input aria-describedby="@(_filterError is null ? "show-filter-help" : "show-filter-help show-filter-error")"
                 aria-invalid="@(_filterError is not null ? "true" : "false")"
                 class="@FilterCssClass"
                 disabled="@IsRunning"
                 id="show-filter"
                 @oninput="OnFilterInput"
-                placeholder="e.g. ^Microsoft-.*"
+                placeholder="@Localizer["DatabaseTools_Filter_Placeholder", "^Microsoft-.*"]"
                 type="text"
                 value="@_filterText" />
             <span class="db-tab-help" id="show-filter-help">
-                Optional regular expression. Provider names containing a match are included; anchor with ^ and $ for a full-string match.
+                @Localizer["DatabaseTools_Filter_Help"]
             </span>
 
             @if (_filterError is not null)
@@ -66,11 +66,11 @@
             {
                 @if (IsCancelling)
                 {
-                    <Button Disabled IconClass="bi bi-hourglass-split">Cancelling…</Button>
+                    <Button Disabled IconClass="bi bi-hourglass-split">@Localizer["DatabaseTools_Action_Cancelling"]</Button>
                 }
                 else
                 {
-                    <DangerButton IconClass="bi bi-x-circle" OnClick="CancelRun">Cancel</DangerButton>
+                    <DangerButton IconClass="bi bi-x-circle" OnClick="CancelRun">@Localizer["Modal_Cancel"]</DangerButton>
                 }
             }
             else
@@ -80,12 +80,12 @@
                     <span class="visually-hidden" id="show-run-elevation-help">@RunElevationTitle</span>
                 }
 
-                <PrimaryButton aria-describedby="@(WillElevate ? "show-run-elevation-help" : null)"
-                    Disabled="@(!CanRun)"
+                <PrimaryButton Disabled="@(!CanRun)"
                     IconClass="@(WillElevate ? "bi bi-shield-lock" : "bi bi-play-fill")"
                     OnClick="RunShowAsync"
+                    aria-describedby="@(WillElevate ? "show-run-elevation-help" : null)"
                     title="@RunElevationTitle">
-                    Run
+                    @Localizer["DatabaseTools_Action_Run"]
                 </PrimaryButton>
             }
         </ToolbarLeadingContent>
