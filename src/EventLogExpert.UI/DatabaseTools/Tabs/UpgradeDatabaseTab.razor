@@ -12,7 +12,7 @@
                     disabled="@IsRunning"
                     id="upgrade-db-path"
                     @oninput="OnDbPathInput"
-                    placeholder="C:\path\to\database.db"
+                    placeholder="@Localizer["DatabaseTools_PathInput_Placeholder_ExistingDatabase"]"
                     type="text"
                     value="@_dbPath" />
                 <Button Disabled="@IsRunning" OnClick="PickDbAsync">@Localizer["DatabaseTools_Action_Browse"]</Button>

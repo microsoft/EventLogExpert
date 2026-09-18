@@ -18,6 +18,7 @@ using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.Export;
 using EventLogExpert.Runtime.LogTable;
@@ -110,6 +111,8 @@ internal static class MauiProgramExtensions
             services.AddSingleton<IFilePickerService, MauiFilePickerService>();
             services.AddSingleton<IFolderPickerService, MauiFolderPickerService>();
             services.AddSingleton<IEvtxFolderEnumerator, MauiEvtxFolderEnumerator>();
+            services.AddSingleton<IDirectoryExistence, DirectoryExistence>();
+            services.AddSingleton<IDatabaseToolsPickerDirectory, DatabaseToolsPickerDirectory>();
 
             return services;
         }
@@ -121,6 +124,7 @@ internal static class MauiProgramExtensions
             services.AddSingleton<IDetailsPanePreferencesProvider, DetailsPanePreferencesAdapter>();
             services.AddSingleton<IStatsDrawerPreferencesProvider, StatsDrawerPreferencesAdapter>();
             services.AddSingleton<IDatabasePreferencesProvider, DatabasePreferencesAdapter>();
+            services.AddSingleton<IDatabaseToolsPickerPreferencesProvider, DatabaseToolsPickerPreferencesAdapter>();
 
             return services;
         }

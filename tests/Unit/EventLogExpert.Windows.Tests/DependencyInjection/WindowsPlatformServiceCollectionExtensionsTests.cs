@@ -4,6 +4,7 @@
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Identity;
 using EventLogExpert.Runtime.Common.Restart;
+using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -17,6 +18,7 @@ public sealed class WindowsPlatformServiceCollectionExtensionsTests
     [InlineData(typeof(IApplicationRestartService))]
     [InlineData(typeof(IWindowsIdentityProvider))]
     [InlineData(typeof(IElevatedHelperProcessHost))]
+    [InlineData(typeof(IDatabaseToolsFallbackDirectoryProvider))]
     public void AddWindowsPlatformAdapters_ShouldResolveHostFacingAbstraction(Type serviceType)
     {
         var services = new ServiceCollection();

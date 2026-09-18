@@ -62,6 +62,7 @@ public sealed class DatabaseToolsModalTabbingTests : BunitContext
         Services.AddSingleton(Substitute.For<IDatabaseToolsService>());
         Services.AddSingleton(Substitute.For<IElevatedDatabaseToolsRunner>());
         Services.AddSingleton(Substitute.For<IFilePickerService>());
+        Services.AddSingleton(Substitute.For<IDatabaseToolsPickerDirectory>());
         Services.AddSingleton(Substitute.For<IFileSaveService>());
         Services.AddSingleton(Substitute.For<IClipboardService>());
         Services.AddSingleton(Substitute.For<IAlertDialogService>());

@@ -6,6 +6,7 @@ using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.ShowProviders;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Versioning;
+using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using Microsoft.AspNetCore.Components;
 using System.Text.RegularExpressions;
@@ -69,7 +70,7 @@ public sealed partial class ShowProvidersTab : DatabaseToolsTabBase<ShowProvider
 
     private async Task PickSourceAsync()
     {
-        var path = await PickFileAsync(Localizer["DatabaseTools_Picker_SourceDbOrEvtx"], s_sourceExtensions);
+        var path = await PickFileAsync(Localizer["DatabaseTools_Picker_SourceDbOrEvtx"], s_sourceExtensions, DatabaseToolsPickRole.Source);
 
         if (!string.IsNullOrEmpty(path)) { _sourcePath = path; }
     }

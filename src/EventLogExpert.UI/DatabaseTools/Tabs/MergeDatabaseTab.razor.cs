@@ -4,6 +4,7 @@
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.MergeDatabase;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.DatabaseTools;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.DatabaseTools.Tabs;
@@ -41,14 +42,14 @@ public sealed partial class MergeDatabaseTab : DatabaseToolsTabBase<MergeDatabas
 
     private async Task PickSourceAsync()
     {
-        var path = await PickFileAsync(Localizer["DatabaseTools_Picker_SourceDbOrEvtx"], s_sourceExtensions);
+        var path = await PickFileAsync(Localizer["DatabaseTools_Picker_SourceDbOrEvtx"], s_sourceExtensions, DatabaseToolsPickRole.Source);
 
         if (!string.IsNullOrEmpty(path)) { _sourcePath = path; }
     }
 
     private async Task PickTargetAsync()
     {
-        var path = await PickFileAsync(Localizer["Db_Merge_Picker_TargetDb"], s_dbExtensions);
+        var path = await PickFileAsync(Localizer["Db_Merge_Picker_TargetDb"], s_dbExtensions, DatabaseToolsPickRole.ExistingDatabase);
 
         if (!string.IsNullOrEmpty(path)) { _targetPath = path; }
     }

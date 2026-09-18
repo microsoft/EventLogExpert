@@ -4,6 +4,7 @@
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.UpgradeDatabase;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.DatabaseTools;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.DatabaseTools.Tabs;
@@ -30,7 +31,7 @@ public sealed partial class UpgradeDatabaseTab : DatabaseToolsTabBase<UpgradeDat
 
     private async Task PickDbAsync()
     {
-        var path = await PickFileAsync(Localizer["Db_Upgrade_Picker_Database"], s_dbExtensions);
+        var path = await PickFileAsync(Localizer["Db_Upgrade_Picker_Database"], s_dbExtensions, DatabaseToolsPickRole.ExistingDatabase);
 
         if (!string.IsNullOrEmpty(path)) { _dbPath = path; }
     }
