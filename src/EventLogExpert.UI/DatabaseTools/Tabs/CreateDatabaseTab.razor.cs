@@ -6,6 +6,7 @@ using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
 using EventLogExpert.Eventing.OfflineImaging.Wim;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using EventLogExpert.UI.Alerts;
@@ -231,21 +232,24 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
 
     private async Task PickSkipAsync()
     {
-        var path = await PickFileAsync(Localizer["Db_Create_Picker_SkipSource"], s_skipExtensions);
+        var path = await PickFileAsync(Localizer["Db_Create_Picker_SkipSource"], s_skipExtensions, DatabaseToolsPickRole.Source);
 
         if (!string.IsNullOrEmpty(path)) { _skipPath = path; }
     }
 
     private async Task PickSourceAsync()
     {
-        var path = await PickFileAsync(Localizer["Db_Create_Picker_Source"], s_sourceExtensions);
+        var path = await PickFileAsync(Localizer["Db_Create_Picker_Source"], s_sourceExtensions, DatabaseToolsPickRole.Source);
 
         if (!string.IsNullOrEmpty(path)) { SetSourcePath(path); }
     }
 
     private async Task PickTargetAsync()
     {
-        var path = await PickSaveFileAsync(Localizer["DatabaseTools_Picker_OutputDbNewName"], s_dbExtensions, "providers.db");
+        var path = await PickSaveFileAsync(Localizer["DatabaseTools_Picker_OutputDbNewName"],
+            s_dbExtensions,
+            DatabaseToolsPickRole.Output,
+            "providers.db");
 
         if (!string.IsNullOrEmpty(path)) { _targetPath = path; }
     }

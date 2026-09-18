@@ -34,6 +34,7 @@ internal static class DatabaseToolsTestDependencies
             services.AddSingleton(Substitute.For<IDatabaseToolsService>());
             services.AddSingleton(Substitute.For<IElevatedDatabaseToolsRunner>());
             services.AddSingleton(Substitute.For<IFilePickerService>());
+            services.AddSingleton(Substitute.For<IDatabaseToolsPickerDirectory>());
             services.AddSingleton(Substitute.For<IFileSaveService>());
             services.AddSingleton(Substitute.For<IClipboardService>());
             services.AddSingleton(Substitute.For<IAlertDialogService>());

@@ -14,7 +14,7 @@
                     disabled="@IsRunning"
                     id="merge-source-path"
                     @oninput="OnSourcePathInput"
-                    placeholder="C:\path\to\source.db"
+                    placeholder="@Localizer["DatabaseTools_PathInput_Placeholder_Source"]"
                     type="text"
                     value="@_sourcePath" />
                 <Button Disabled="@IsRunning" OnClick="PickSourceAsync">@Localizer["DatabaseTools_Action_Browse"]</Button>
@@ -30,7 +30,7 @@
                     disabled="@IsRunning"
                     id="merge-target-path"
                     @oninput="OnTargetPathInput"
-                    placeholder="C:\path\to\existing-database.db"
+                    placeholder="@Localizer["DatabaseTools_PathInput_Placeholder_ExistingDatabase"]"
                     type="text"
                     value="@_targetPath" />
                 <Button Disabled="@IsRunning" OnClick="PickTargetAsync">@Localizer["DatabaseTools_Action_Browse"]</Button>

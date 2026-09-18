@@ -4355,6 +4355,18 @@
     <value>Filter (regex)</value>
     <comment>Database tools UI text.</comment>
   </data>
+  <data name="DatabaseTools_PathInput_Placeholder_Source" xml:space="preserve">
+    <value>Log, database, or image file</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_PathInput_Placeholder_Output" xml:space="preserve">
+    <value>New database file (.db)</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="DatabaseTools_PathInput_Placeholder_ExistingDatabase" xml:space="preserve">
+    <value>Existing database (.db)</value>
+    <comment>Database tools UI text.</comment>
+  </data>
   <data name="DatabaseTools_Filter_Placeholder" xml:space="preserve">
     <value>e.g. {0}</value>
     <comment>Database tools UI text.</comment>

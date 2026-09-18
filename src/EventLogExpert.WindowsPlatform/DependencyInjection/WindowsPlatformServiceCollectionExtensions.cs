@@ -3,7 +3,9 @@
 
 using EventLogExpert.Runtime.Common.Identity;
 using EventLogExpert.Runtime.Common.Restart;
+using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
+using EventLogExpert.WindowsPlatform.DatabaseTools;
 using EventLogExpert.WindowsPlatform.Elevation;
 using EventLogExpert.WindowsPlatform.Identity;
 using EventLogExpert.WindowsPlatform.Restart;
@@ -21,6 +23,7 @@ public static class WindowsPlatformServiceCollectionExtensions
             services.AddSingleton<IApplicationRestartService, WindowsApplicationRestartService>();
             services.AddSingleton<IWindowsIdentityProvider, WindowsIdentityProvider>();
             services.AddSingleton<IElevatedHelperProcessHost, ElevatedHelperProcessHost>();
+            services.AddSingleton<IDatabaseToolsFallbackDirectoryProvider, DatabaseToolsFallbackDirectoryProvider>();
 
             return services;
         }

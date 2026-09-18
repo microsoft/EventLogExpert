@@ -44,7 +44,8 @@ internal static partial class Win32FileDialog
     public static unsafe IReadOnlyList<string> PickMultipleFiles(
         IntPtr hwndOwner,
         IReadOnlyList<string> extensions,
-        string? title = null)
+        string? title = null,
+        string? initialDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(extensions);
 
@@ -57,26 +58,34 @@ internal static partial class Win32FileDialog
         Span<char> titleBuffer = stackalloc char[CopyNullableTitle(default, title)];
         CopyNullableTitle(titleBuffer, title);
 
+        Span<char> initialDirectoryBuffer = stackalloc char[CopyNullableInitialDirectory(default, initialDirectory)];
+        CopyNullableInitialDirectory(initialDirectoryBuffer, initialDirectory);
+
         fixed (char* fileBufferPtr = fileBuffer)
         {
             fixed (char* filterPtr = filter)
             {
                 fixed (char* titlePtr = titleBuffer)
                 {
-                    var ofn = BuildOfn(
-                        hwndOwner,
-                        (IntPtr)filterPtr,
-                        (IntPtr)fileBufferPtr,
-                        titleBuffer.IsEmpty ? IntPtr.Zero : (IntPtr)titlePtr,
-                        multiSelect: true);
-
-                    if (!GetOpenFileNameW(ref ofn))
+                    fixed (char* initialDirectoryPtr = initialDirectoryBuffer)
                     {
-                        ThrowIfDialogError();
-                        return [];
-                    }
+                        var ofn = BuildOfn(
+                            hwndOwner,
+                            (IntPtr)filterPtr,
+                            (IntPtr)fileBufferPtr,
+                            titleBuffer.IsEmpty ? IntPtr.Zero : (IntPtr)titlePtr,
+                            initialDirectoryBuffer.IsEmpty ? IntPtr.Zero : (IntPtr)initialDirectoryPtr,
+                            multiSelect: true);
 
-                    return ParseMultiSelectBuffer(fileBuffer);
+                        if (!GetOpenFileNameW(ref ofn))
+                        {
+                            ThrowIfDialogError();
+
+                            return [];
+                        }
+
+                        return ParseMultiSelectBuffer(fileBuffer);
+                    }
                 }
             }
         }
@@ -87,7 +96,8 @@ internal static partial class Win32FileDialog
         IntPtr hwndOwner,
         IReadOnlyList<string> extensions,
         string? suggestedFileName = null,
-        string? title = null)
+        string? title = null,
+        string? initialDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(extensions);
 
@@ -122,6 +132,9 @@ internal static partial class Win32FileDialog
         Span<char> titleBuffer = stackalloc char[CopyNullableTitle(default, title)];
         CopyNullableTitle(titleBuffer, title);
 
+        Span<char> initialDirectoryBuffer = stackalloc char[CopyNullableInitialDirectory(default, initialDirectory)];
+        CopyNullableInitialDirectory(initialDirectoryBuffer, initialDirectory);
+
         fixed (char* fileBufferPtr = fileBuffer)
         {
             fixed (char* filterPtr = filter)
@@ -130,33 +143,39 @@ internal static partial class Win32FileDialog
                 {
                     fixed (char* titlePtr = titleBuffer)
                     {
-                        var ofn = new OpenFileName
+                        fixed (char* initialDirectoryPtr = initialDirectoryBuffer)
                         {
-                            lStructSize = OpenFileName.NativeSize,
-                            hwndOwner = hwndOwner,
-                            lpstrFilter = (IntPtr)filterPtr,
-                            nFilterIndex = 1,
-                            lpstrFile = (IntPtr)fileBufferPtr,
-                            nMaxFile = FileBufferChars,
-                            lpstrDefExt = (IntPtr)defaultExtPtr,
-                            lpstrTitle = titleBuffer.IsEmpty ? IntPtr.Zero : (IntPtr)titlePtr,
-                            Flags = OFN_EXPLORER
-                                | OFN_PATHMUSTEXIST
-                                | OFN_OVERWRITEPROMPT
-                                | OFN_HIDEREADONLY
-                                | OFN_NOREADONLYRETURN
-                                | OFN_NOCHANGEDIR
-                                | OFN_DONTADDTORECENT
-                        };
+                            var ofn = new OpenFileName
+                            {
+                                lStructSize = OpenFileName.NativeSize,
+                                hwndOwner = hwndOwner,
+                                lpstrFilter = (IntPtr)filterPtr,
+                                nFilterIndex = 1,
+                                lpstrFile = (IntPtr)fileBufferPtr,
+                                nMaxFile = FileBufferChars,
+                                lpstrDefExt = (IntPtr)defaultExtPtr,
+                                lpstrInitialDir = initialDirectoryBuffer.IsEmpty ? IntPtr.Zero : (IntPtr)initialDirectoryPtr,
+                                lpstrTitle = titleBuffer.IsEmpty ? IntPtr.Zero : (IntPtr)titlePtr,
+                                Flags = OFN_EXPLORER |
+                                    OFN_PATHMUSTEXIST |
+                                    OFN_OVERWRITEPROMPT |
+                                    OFN_HIDEREADONLY |
+                                    OFN_NOREADONLYRETURN |
+                                    OFN_NOCHANGEDIR |
+                                    OFN_DONTADDTORECENT
+                            };
 
-                        if (!GetSaveFileNameW(ref ofn))
-                        {
-                            ThrowIfDialogError();
-                            return null;
+                            if (!GetSaveFileNameW(ref ofn))
+                            {
+                                ThrowIfDialogError();
+
+                                return null;
+                            }
+
+                            var path = new string(fileBufferPtr);
+
+                            return string.IsNullOrEmpty(path) ? null : path;
                         }
-
-                        var path = new string(fileBufferPtr);
-                        return string.IsNullOrEmpty(path) ? null : path;
                     }
                 }
             }
@@ -167,7 +186,8 @@ internal static partial class Win32FileDialog
     public static unsafe string? PickSingleFile(
         IntPtr hwndOwner,
         IReadOnlyList<string> extensions,
-        string? title = null)
+        string? title = null,
+        string? initialDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(extensions);
 
@@ -180,27 +200,36 @@ internal static partial class Win32FileDialog
         Span<char> titleBuffer = stackalloc char[CopyNullableTitle(default, title)];
         CopyNullableTitle(titleBuffer, title);
 
+        Span<char> initialDirectoryBuffer = stackalloc char[CopyNullableInitialDirectory(default, initialDirectory)];
+        CopyNullableInitialDirectory(initialDirectoryBuffer, initialDirectory);
+
         fixed (char* fileBufferPtr = fileBuffer)
         {
             fixed (char* filterPtr = filter)
             {
                 fixed (char* titlePtr = titleBuffer)
                 {
-                    var ofn = BuildOfn(
-                        hwndOwner,
-                        (IntPtr)filterPtr,
-                        (IntPtr)fileBufferPtr,
-                        titleBuffer.IsEmpty ? IntPtr.Zero : (IntPtr)titlePtr,
-                        multiSelect: false);
-
-                    if (!GetOpenFileNameW(ref ofn))
+                    fixed (char* initialDirectoryPtr = initialDirectoryBuffer)
                     {
-                        ThrowIfDialogError();
-                        return null;
-                    }
+                        var ofn = BuildOfn(
+                            hwndOwner,
+                            (IntPtr)filterPtr,
+                            (IntPtr)fileBufferPtr,
+                            titleBuffer.IsEmpty ? IntPtr.Zero : (IntPtr)titlePtr,
+                            initialDirectoryBuffer.IsEmpty ? IntPtr.Zero : (IntPtr)initialDirectoryPtr,
+                            multiSelect: false);
 
-                    var path = new string(fileBufferPtr);
-                    return string.IsNullOrEmpty(path) ? null : path;
+                        if (!GetOpenFileNameW(ref ofn))
+                        {
+                            ThrowIfDialogError();
+
+                            return null;
+                        }
+
+                        var path = new string(fileBufferPtr);
+
+                        return string.IsNullOrEmpty(path) ? null : path;
+                    }
                 }
             }
         }
@@ -231,7 +260,13 @@ internal static partial class Win32FileDialog
         return needed;
     }
 
-    private static OpenFileName BuildOfn(IntPtr hwndOwner, IntPtr filterPtr, IntPtr fileBufferPtr, IntPtr titlePtr, bool multiSelect) =>
+    private static OpenFileName BuildOfn(
+        IntPtr hwndOwner,
+        IntPtr filterPtr,
+        IntPtr fileBufferPtr,
+        IntPtr titlePtr,
+        IntPtr initialDirectoryPtr,
+        bool multiSelect) =>
         new()
         {
             lStructSize = OpenFileName.NativeSize,
@@ -240,18 +275,32 @@ internal static partial class Win32FileDialog
             nFilterIndex = 1,
             lpstrFile = fileBufferPtr,
             nMaxFile = FileBufferChars,
+            lpstrInitialDir = initialDirectoryPtr,
             lpstrTitle = titlePtr,
-            Flags = OFN_EXPLORER
-                    | OFN_PATHMUSTEXIST
-                    | OFN_FILEMUSTEXIST
-                    | OFN_HIDEREADONLY
-                    | OFN_NOCHANGEDIR
-                    | OFN_DONTADDTORECENT
-                    | (multiSelect ? OFN_ALLOWMULTISELECT : 0)
+            Flags = OFN_EXPLORER |
+                OFN_PATHMUSTEXIST |
+                OFN_FILEMUSTEXIST |
+                OFN_HIDEREADONLY |
+                OFN_NOCHANGEDIR |
+                OFN_DONTADDTORECENT |
+                (multiSelect ? OFN_ALLOWMULTISELECT : 0)
         };
 
     [LibraryImport("Comdlg32.dll", EntryPoint = "CommDlgExtendedError")]
     private static partial int CommDlgExtendedError();
+
+    private static int CopyNullableInitialDirectory(Span<char> destination, string? initialDirectory)
+    {
+        if (string.IsNullOrEmpty(initialDirectory)) { return 0; }
+
+        var initialDirectoryLength = Math.Min(initialDirectory.Length, FileBufferChars - 1);
+        var needed = initialDirectoryLength + 1;
+        if (destination.IsEmpty) { return needed; }
+
+        initialDirectory.AsSpan(0, initialDirectoryLength).CopyTo(destination);
+        destination[initialDirectoryLength] = '\0';
+        return needed;
+    }
 
     /// <summary>
     ///     Builds (or measures, when <paramref name="destination" /> is empty) the null-terminated title buffer. Returns
@@ -266,10 +315,12 @@ internal static partial class Win32FileDialog
 
         var titleLen = Math.Min(title.Length, MaxTitleChars);
         var needed = titleLen + 1;
+
         if (destination.IsEmpty) { return needed; }
 
         title.AsSpan(0, titleLen).CopyTo(destination);
         destination[titleLen] = '\0';
+
         return needed;
     }
 
@@ -277,6 +328,7 @@ internal static partial class Win32FileDialog
     {
         source.CopyTo(destination);
         destination[source.Length] = '\0';
+
         return source.Length + 1;
     }
 

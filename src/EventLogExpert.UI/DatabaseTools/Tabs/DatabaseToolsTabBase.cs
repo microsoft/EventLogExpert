@@ -82,6 +82,8 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 
     protected DatabaseToolsResult? Outcome { get; set; }
 
+    [Inject] protected IDatabaseToolsPickerDirectory PickerDirectory { get; init; } = null!;
+
     // Uses the dispatch-time snapshot so later target-field edits cannot change the import target.
     protected string? ProducedDatabasePath =>
         Outcome?.Outcome == DatabaseToolsOutcome.Succeeded ? _producedDatabasePathSnapshot : null;
@@ -213,11 +215,30 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         await RequestProducedDatabaseImportAsync(AutoImportMode == AutoImportMode.ImportAndEnable);
     }
 
-    protected Task<string?> PickFileAsync(string pickerTitle, IReadOnlyList<string> extensions) =>
-        FilePickerService.PickAsync(pickerTitle, extensions);
+    protected async Task<string?> PickFileAsync(
+        string pickerTitle,
+        IReadOnlyList<string> extensions,
+        DatabaseToolsPickRole role)
+    {
+        string? initialDirectory = await PickerDirectory.ResolveInitialDirectoryAsync(role);
+        string? path = await FilePickerService.PickAsync(pickerTitle, extensions, initialDirectory);
+        PickerDirectory.RememberDirectory(role, path);
 
-    protected Task<string?> PickSaveFileAsync(string pickerTitle, IReadOnlyList<string> extensions, string? suggestedFileName = null) =>
-        FilePickerService.PickSaveAsync(pickerTitle, extensions, suggestedFileName);
+        return path;
+    }
+
+    protected async Task<string?> PickSaveFileAsync(
+        string pickerTitle,
+        IReadOnlyList<string> extensions,
+        DatabaseToolsPickRole role,
+        string? suggestedFileName = null)
+    {
+        string? initialDirectory = await PickerDirectory.ResolveInitialDirectoryAsync(role);
+        string? path = await FilePickerService.PickSaveAsync(pickerTitle, extensions, suggestedFileName, initialDirectory);
+        PickerDirectory.RememberDirectory(role, path);
+
+        return path;
+    }
 
     protected Task RunAsync() => RunCoreAsync((request, logProgress, ct) => DispatchAsync(request, logProgress, ct));
 

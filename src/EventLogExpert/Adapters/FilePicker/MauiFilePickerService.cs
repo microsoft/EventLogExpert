@@ -9,7 +9,10 @@ namespace EventLogExpert.Adapters.FilePicker;
 /// <summary>MAUI adapter that delegates to <see cref="Win32FileDialogService" /> for Win32 file picking.</summary>
 public sealed class MauiFilePickerService : IFilePickerService
 {
-    public Task<string?> PickAsync(string pickerTitle, IReadOnlyList<string> extensions)
+    public Task<string?> PickAsync(
+        string pickerTitle,
+        IReadOnlyList<string> extensions,
+        string? initialDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(pickerTitle);
         ArgumentNullException.ThrowIfNull(extensions);
@@ -20,12 +23,13 @@ public sealed class MauiFilePickerService : IFilePickerService
                 "At least one extension must be supplied.", nameof(extensions));
         }
 
-        return MainThread.InvokeOnMainThreadAsync(() => Win32FileDialogService.PickAsync(extensions, pickerTitle));
+        return MainThread.InvokeOnMainThreadAsync(() => Win32FileDialogService.PickAsync(extensions, pickerTitle, initialDirectory));
     }
 
     public Task<IReadOnlyList<string>> PickMultipleAsync(
         string pickerTitle,
-        IReadOnlyList<string> extensions)
+        IReadOnlyList<string> extensions,
+        string? initialDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(pickerTitle);
         ArgumentNullException.ThrowIfNull(extensions);
@@ -36,13 +40,14 @@ public sealed class MauiFilePickerService : IFilePickerService
                 "At least one extension must be supplied.", nameof(extensions));
         }
 
-        return MainThread.InvokeOnMainThreadAsync(() => Win32FileDialogService.PickMultipleAsync(extensions, pickerTitle));
+        return MainThread.InvokeOnMainThreadAsync(() => Win32FileDialogService.PickMultipleAsync(extensions, pickerTitle, initialDirectory));
     }
 
     public Task<string?> PickSaveAsync(
         string pickerTitle,
         IReadOnlyList<string> extensions,
-        string? suggestedFileName = null)
+        string? suggestedFileName = null,
+        string? initialDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(pickerTitle);
         ArgumentNullException.ThrowIfNull(extensions);
@@ -53,6 +58,6 @@ public sealed class MauiFilePickerService : IFilePickerService
                 "At least one extension must be supplied.", nameof(extensions));
         }
 
-        return MainThread.InvokeOnMainThreadAsync(() => Win32FileDialogService.PickSaveAsync(extensions, suggestedFileName, pickerTitle));
+        return MainThread.InvokeOnMainThreadAsync(() => Win32FileDialogService.PickSaveAsync(extensions, suggestedFileName, pickerTitle, initialDirectory));
     }
 }
