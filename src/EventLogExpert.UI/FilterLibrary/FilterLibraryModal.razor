@@ -35,6 +35,7 @@
                     @bind-ActiveTab="_activeTab"
                     @ref="_sidebarTabsRef">
                     <TabContent Context="tab">
+                        <div class="library-tab-scroll">
                         @{
                             var tagManagementPanelId = GetTagManagementPanelId(tab);
                             var tagOverflowRegionId = GetTagOverflowRegionId(tab);
@@ -146,6 +147,7 @@
 
                                 break;
                         }
+                        </div>
                     </TabContent>
                 </SidebarTabs>
             </CascadingValue>

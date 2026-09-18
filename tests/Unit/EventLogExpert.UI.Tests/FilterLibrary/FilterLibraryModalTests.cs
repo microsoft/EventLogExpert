@@ -926,6 +926,30 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Fact]
+    public void TabBody_WrapsTagChromeAndEntriesInSingleScrollRegionWithinActiveTabpanel()
+    {
+        SetState(new FilterLibraryState
+        {
+            Entries =
+            [
+                BuildSavedFilter("A") with { Tags = ["alpha"] },
+                BuildSavedFilter("B") with { Tags = ["alpha"] },
+            ],
+            IsLoaded = true,
+        });
+
+        var component = Render<FilterLibraryModal>();
+
+        var activePanel = component.Find("[role='tabpanel'].active");
+        Assert.Single(activePanel.QuerySelectorAll(".library-tab-scroll"));
+
+        var scrollRegion = activePanel.QuerySelector(".library-tab-scroll");
+        Assert.NotNull(scrollRegion);
+        Assert.Single(scrollRegion.QuerySelectorAll(".library-tag-filter-bar"));
+        Assert.Equal(2, scrollRegion.QuerySelectorAll(".library-entry").Length);
+    }
+
+    [Fact]
     public async Task TabClick_SwitchesActiveTab()
     {
         SetState(new FilterLibraryState { IsLoaded = true });
