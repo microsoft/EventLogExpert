@@ -244,6 +244,11 @@ input[type="search"]:focus-visible,
     position: fixed;
     z-index: var(--z-menu-overlay);
 
+    /* Inert like a native OS tooltip: it never intercepts the pointer (so it can't flicker or shadow the
+       control beneath) and is intentionally not hoverable - the text is duplicated on the control and exposed
+       via aria, so no information is lost. */
+    pointer-events: none;
+
     max-width: 15rem;
     padding: 2px 6px;
 
@@ -259,12 +264,12 @@ input[type="search"]:focus-visible,
 .focus-tooltip[hidden] { display: none; }
 
 /* Wide variant for overflow/rich-text tooltips (long paths, full messages, multiline detail):
-   a larger cap with hard word-breaking and a bounded, scrollable height so long unbroken strings
-   can't extend past the viewport. Intentional newlines in the source text are preserved. */
+   a larger cap with hard word-breaking so long unbroken strings wrap instead of overflowing. The bubble is
+   inert (pointer-events:none) and unfocusable, so it must NOT clip its content behind a scrollbar the user
+   could never reach; the viewport clamp keeps it on screen and the full text is also on the control + in aria.
+   Intentional newlines in the source text are preserved. */
 .focus-tooltip--wide {
     max-width: min(40rem, 90vw);
-    max-height: min(50vh, 20rem);
-    overflow-y: auto;
 
     overflow-wrap: anywhere;
     white-space: pre-wrap;

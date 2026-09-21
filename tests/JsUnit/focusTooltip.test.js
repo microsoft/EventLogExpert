@@ -1,10 +1,10 @@
-// Unit tests for the pure decision helpers extracted from wwwroot/Common/focusTooltip.js.
-// Run with Node's built-in test runner (zero dependencies): `node --test tests/JsUnit`.
+// Unit tests for the pure decision helpers + the state-machine reducer extracted from
+// wwwroot/Common/focusTooltip.js. Run with Node's built-in test runner: `node --test tests/JsUnit`.
 //
-// The bubble's layout/positioning and DOM event wiring stay manually verified (there is no DOM here); these
-// tests lock the branch logic that regressed in design review: sub-pixel-tolerant clip detection, the
-// hovered-over-focused precedence, and the nested-anchor ascent that stops an unclipped inner overflow span
-// from shadowing the tooltip of the control it sits inside (and the conceal case, resolve -> null).
+// The bubble's layout, DOM event wiring, and overflow-gate resolution stay manually verified (there is no DOM
+// here); these tests lock the pure branch logic that regressed repeatedly in design review: sub-pixel-tolerant
+// clip detection, hovered-over-focused precedence, nested-anchor ascent, cursor placement geometry, and the
+// show/hide/jitter timer state machine (the reducer).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -13,6 +13,9 @@ import {
     selectAnchor,
     resolveEffectiveAnchor,
     hoverTransferAnchor,
+    cursorPoint,
+    initialTooltipState,
+    reduce,
 } from "../../src/EventLogExpert.UI/wwwroot/Common/focusTooltip.js";
 
 // --- isClipped: sub-pixel-tolerant clip detection ---
@@ -123,4 +126,247 @@ test("hoverTransferAnchor: returns null when there is no related anchor", () => 
 test("hoverTransferAnchor: returns null when the related anchor is the hovered anchor itself", () => {
     const anchor = { contains: () => true };
     assert.equal(hoverTransferAnchor(anchor, anchor), null);
+});
+
+// --- cursorPoint: placement geometry + pointer exclusion ---
+
+const VIEWPORT = { w: 1000, h: 800 };
+const OPTS = { offsetX: 14, offsetY: 18, margin: 4 };
+
+test("cursorPoint: default places the bubble down-right of the cursor, excluding the pointer", () => {
+    const p = cursorPoint(100, 100, 200, 60, VIEWPORT.w, VIEWPORT.h, OPTS);
+    assert.equal(p.left, 114);
+    assert.equal(p.top, 118);
+    assert.ok(p.left > 100 && p.top > 100, "pointer is above-left of the box");
+});
+
+test("cursorPoint: overflowing the right edge flips left of the cursor (right edge < pointer)", () => {
+    const p = cursorPoint(950, 100, 200, 60, VIEWPORT.w, VIEWPORT.h, OPTS);
+    assert.equal(p.left, 950 - 14 - 200);
+    assert.ok(p.left + 200 < 950, "box is entirely to the left of the pointer");
+});
+
+test("cursorPoint: overflowing the bottom edge flips above the cursor (bottom edge < pointer)", () => {
+    const p = cursorPoint(100, 780, 200, 60, VIEWPORT.w, VIEWPORT.h, OPTS);
+    assert.equal(p.top, 780 - 18 - 60);
+    assert.ok(p.top + 60 < 780, "box is entirely above the pointer");
+});
+
+test("cursorPoint: always clamps within the viewport margins", () => {
+    const p = cursorPoint(5, 5, 200, 60, VIEWPORT.w, VIEWPORT.h, OPTS);
+    assert.ok(p.left >= 4 && p.left + 200 <= VIEWPORT.w - 4);
+    assert.ok(p.top >= 4 && p.top + 60 <= VIEWPORT.h - 4);
+});
+
+test("cursorPoint: a box taller than the viewport clamps its top to the margin (top of text stays on screen)", () => {
+    const p = cursorPoint(100, 400, 200, 900, VIEWPORT.w, VIEWPORT.h, OPTS);
+    assert.equal(p.top, 4);
+});
+
+// --- reduce: show/hide/jitter timer state machine ---
+
+// Drive a fresh hover to maturity (adapter feedback simulated: a real render reports back renderResolved).
+function matureHover(state, anchor, { visible = true } = {}) {
+    let r = reduce(state, { type: "hoverEnter", anchor });
+    const scheduled = r.effects.find((e) => e.type === "scheduleShow");
+    r = reduce(r.state, { type: "showTimerFire", gen: scheduled.gen, stillOver: true });
+    r = reduce(r.state, { type: "renderResolved", anchor, visible });
+    return r.state;
+}
+
+function types(effects) { return effects.map((e) => e.type); }
+
+test("reduce: adjacent sweep - leaving a matured A then entering B keeps B's pending (the cross-control race)", () => {
+    const A = { id: "A" };
+    const B = { id: "B" };
+    let s = matureHover(initialTooltipState(), A);
+    assert.equal(s.hoveredAnchor, A);
+    assert.equal(s.visible, true);
+
+    let r = reduce(s, { type: "hoverLeave", anchor: A, transferTarget: null });
+    assert.equal(r.state.hoveredAnchor, null);
+    assert.ok(types(r.effects).includes("scheduleHide"), "routine hover-hide uses the conceal path");
+    assert.ok(!types(r.effects).includes("cancelShowTimer"), "never cancels a show while hiding");
+
+    r = reduce(r.state, { type: "hoverEnter", anchor: B });
+    assert.equal(r.state.pendingAnchor, B);
+    const scheduled = r.effects.find((e) => e.type === "scheduleShow");
+
+    const afterHide = reduce(r.state, { type: "hideTimerFire" });
+    assert.equal(afterHide.state.pendingAnchor, B, "A's conceal must not cancel B's pending show");
+
+    const promoted = reduce(afterHide.state, { type: "showTimerFire", gen: scheduled.gen, stillOver: true });
+    assert.equal(promoted.state.hoveredAnchor, B);
+});
+
+test("reduce: jitter-bridge - re-entering a still-visible cursor bubble restores it without a re-delay", () => {
+    const A = { id: "A" };
+    let s = matureHover(initialTooltipState(), A);
+    let r = reduce(s, { type: "hoverLeave", anchor: A, transferTarget: null });
+    assert.equal(r.state.hideScheduled, true);
+    assert.equal(r.state.displayLeaf, A);
+    assert.equal(r.state.visible, true);
+
+    r = reduce(r.state, { type: "hoverEnter", anchor: A });
+    assert.equal(r.state.hoveredAnchor, A, "bridged back to mature without re-pending");
+    assert.equal(r.state.pendingAnchor, null);
+    assert.ok(types(r.effects).includes("cancelHideTimer"));
+    assert.ok(!types(r.effects).includes("scheduleShow"), "no fresh 500ms delay");
+});
+
+test("reduce: jitter-on-concealed - a concealed leaf (visible=false) does NOT bridge; it re-pends", () => {
+    const L = { id: "L" };
+    // Mature the hover but the render resolved to nothing (untruncated overflow leaf).
+    let s = matureHover(initialTooltipState(), L, { visible: false });
+    assert.equal(s.visible, false);
+    let r = reduce(s, { type: "hoverLeave", anchor: L, transferTarget: null });
+    r = reduce(r.state, { type: "hoverEnter", anchor: L });
+    assert.equal(r.state.pendingAnchor, L, "concealed leaf re-pends so it can show if it became clipped");
+    assert.ok(types(r.effects).includes("scheduleShow"));
+});
+
+test("reduce: focus-grace - entering a control whose focus bubble is hiding does NOT bypass the show delay", () => {
+    const A = { id: "A" };
+    let r = reduce(initialTooltipState(), { type: "focusIn", anchor: A });
+    r = reduce(r.state, { type: "renderResolved", anchor: A, visible: true });
+    assert.equal(r.state.displayedMode, "element");
+    r = reduce(r.state, { type: "focusOut", anchor: A });
+    assert.equal(r.state.hideScheduled, true);
+
+    r = reduce(r.state, { type: "hoverEnter", anchor: A });
+    assert.equal(r.state.pendingAnchor, A, "element-mode grace bubble is not a cursor bubble, so no bridge");
+    assert.ok(types(r.effects).includes("scheduleShow"));
+});
+
+test("reduce: attrChange re-renders in the stored display mode, not one derived from the (now-cleared) hover", () => {
+    const A = { id: "A" };
+    let s = matureHover(initialTooltipState(), A);
+    let r = reduce(s, { type: "hoverLeave", anchor: A, transferTarget: null }); // grace: hovered cleared, displayLeaf=A, mode=cursor
+    r = reduce(r.state, { type: "attrChange" });
+    const render = r.effects.find((e) => e.type === "render");
+    assert.equal(render.mode, "cursor", "still a cursor bubble during the hide grace");
+});
+
+test("reduce: pending nested transfer - leaving a pending inner leaf for its ancestor re-pends the ancestor", () => {
+    const inner = { id: "inner" };
+    const outer = { id: "outer" };
+    let r = reduce(initialTooltipState(), { type: "hoverEnter", anchor: inner });
+    assert.equal(r.state.pendingAnchor, inner);
+    r = reduce(r.state, { type: "hoverLeave", anchor: inner, transferTarget: outer });
+    assert.equal(r.state.pendingAnchor, outer);
+    assert.ok(types(r.effects).includes("scheduleShow"));
+});
+
+test("reduce: transfer-to-mature - a pending inner leaf returning to its already-shown ancestor retains the ancestor", () => {
+    const outer = { id: "outer" };
+    const inner = { id: "inner" };
+    let s = matureHover(initialTooltipState(), outer);
+    // Move onto an inner leaf: a new pending starts while outer stays shown.
+    let r = reduce(s, { type: "hoverEnter", anchor: inner });
+    assert.equal(r.state.pendingAnchor, inner);
+    assert.equal(r.state.hoveredAnchor, outer);
+    // Return to outer: transferTarget === hoveredAnchor -> cancel pending, keep outer (INV4).
+    r = reduce(r.state, { type: "hoverLeave", anchor: inner, transferTarget: outer });
+    assert.equal(r.state.pendingAnchor, null);
+    assert.equal(r.state.hoveredAnchor, outer);
+    assert.notEqual(r.state.pendingAnchor, r.state.hoveredAnchor, "INV4: pending never equals hovered");
+    // Leaving outer now reaches the hovered branch and hides.
+    r = reduce(r.state, { type: "hoverLeave", anchor: outer, transferTarget: null });
+    assert.equal(r.state.hoveredAnchor, null);
+    assert.ok(types(r.effects).includes("scheduleHide"));
+});
+
+test("reduce: hover->focus fallback renders the focused control immediately (no linger) on leaving the hover", () => {
+    const focusCtl = { id: "focus" };
+    const hoverCtl = { id: "hover" };
+    let r = reduce(initialTooltipState(), { type: "focusIn", anchor: focusCtl });
+    r = reduce(r.state, { type: "renderResolved", anchor: focusCtl, visible: true });
+    let s = matureHover(r.state, hoverCtl);
+    assert.equal(s.hoveredAnchor, hoverCtl);
+
+    r = reduce(s, { type: "hoverLeave", anchor: hoverCtl, transferTarget: null });
+    assert.equal(r.state.displayLeaf, focusCtl);
+    assert.equal(r.state.displayedMode, "element");
+    const render = r.effects.find((e) => e.type === "render");
+    assert.equal(render.anchor, focusCtl);
+    assert.ok(!types(r.effects).includes("scheduleHide"), "fallback is a reposition, not a hide");
+});
+
+test("reduce: scroll with focus + hover clears the hover, renders the focus bubble, and cancels the pending", () => {
+    const focusCtl = { id: "focus" };
+    const hoverCtl = { id: "hover" };
+    let r = reduce(initialTooltipState(), { type: "focusIn", anchor: focusCtl });
+    r = reduce(r.state, { type: "renderResolved", anchor: focusCtl, visible: true });
+    let s = matureHover(r.state, hoverCtl);
+
+    r = reduce(s, { type: "scroll" });
+    assert.equal(r.state.hoveredAnchor, null);
+    assert.equal(r.state.pendingAnchor, null);
+    assert.equal(r.state.displayLeaf, focusCtl);
+    assert.equal(r.state.displayedMode, "element");
+});
+
+test("reduce: a stale showTimerFire (superseded generation) does not promote", () => {
+    const A = { id: "A" };
+    let r = reduce(initialTooltipState(), { type: "hoverEnter", anchor: A });
+    const staleGen = r.effects.find((e) => e.type === "scheduleShow").gen;
+    // Something bumps the generation (e.g. a pointerdown) before the timer fires.
+    r = reduce(r.state, { type: "pointerDown" });
+    const after = reduce(r.state, { type: "showTimerFire", gen: staleGen, stillOver: true });
+    assert.equal(after.state.hoveredAnchor, null, "stale timer is ignored");
+});
+
+test("reduce: promotion liveness - showTimerFire with stillOver=false drops the pending without showing", () => {
+    const A = { id: "A" };
+    let r = reduce(initialTooltipState(), { type: "hoverEnter", anchor: A });
+    const gen = r.effects.find((e) => e.type === "scheduleShow").gen;
+    const after = reduce(r.state, { type: "showTimerFire", gen, stillOver: false });
+    assert.equal(after.state.hoveredAnchor, null);
+    assert.equal(after.state.pendingAnchor, null);
+    assert.ok(!types(after.effects).includes("render"));
+});
+
+test("reduce: Escape and pointerDown both cancel a pending show", () => {
+    const A = { id: "A" };
+    let escaped = reduce(reduce(initialTooltipState(), { type: "hoverEnter", anchor: A }).state, { type: "escape" });
+    assert.equal(escaped.state.pendingAnchor, null);
+    assert.ok(types(escaped.effects).includes("cancelShowTimer"));
+
+    let clicked = reduce(reduce(initialTooltipState(), { type: "hoverEnter", anchor: A }).state, { type: "pointerDown" });
+    assert.equal(clicked.state.pendingAnchor, null);
+    assert.ok(types(clicked.effects).includes("cancelShowTimer"));
+});
+
+test("reduce: renderResolved only updates visibility for the current request (stale reports are ignored)", () => {
+    const A = { id: "A" };
+    const B = { id: "B" };
+    let s = matureHover(initialTooltipState(), A); // displayLeaf=A, visible=true
+    // A stale report for a superseded leaf must not flip visibility.
+    let r = reduce(s, { type: "renderResolved", anchor: B, visible: false });
+    assert.equal(r.state.visible, true);
+    r = reduce(s, { type: "renderResolved", anchor: A, visible: false });
+    assert.equal(r.state.visible, false);
+});
+
+test("reduce: scrolling during the hover-intent window cancels the pending show (no late tooltip)", () => {
+    const A = { id: "A" };
+    let r = reduce(initialTooltipState(), { type: "hoverEnter", anchor: A });
+    const gen = r.effects.find((e) => e.type === "scheduleShow").gen;
+    r = reduce(r.state, { type: "scroll" });
+    assert.equal(r.state.pendingAnchor, null, "scroll clears the pending show");
+    assert.ok(types(r.effects).includes("cancelShowTimer"));
+    // A now-stale show timer that still fires must not promote.
+    const after = reduce(r.state, { type: "showTimerFire", gen, stillOver: true });
+    assert.equal(after.state.hoveredAnchor, null);
+});
+
+test("reduce: INV1v - visibility is false after a conceal", () => {
+    const A = { id: "A" };
+    let s = matureHover(initialTooltipState(), A);
+    // Leave with no focus, then let the hide timer conceal it.
+    let r = reduce(s, { type: "hoverLeave", anchor: A, transferTarget: null });
+    r = reduce(r.state, { type: "hideTimerFire" });
+    assert.ok(types(r.effects).includes("conceal"));
+    assert.equal(r.state.displayLeaf, null);
+    assert.equal(r.state.visible, false);
 });
