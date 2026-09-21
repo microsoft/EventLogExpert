@@ -23,7 +23,6 @@ using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
 using System.Reflection;
-using TestContext = Xunit.TestContext;
 
 namespace EventLogExpert.UI.Tests.LogTable.Histogram;
 
@@ -429,7 +428,7 @@ public sealed class HistogramPaneTests : BunitContext
     }
 
     [Fact]
-    public async Task Render_WhenLegendHasLongLabel_WrapsVisibleValueInTitledSpan()
+    public async Task Render_WhenLegendHasLongLabel_WrapsVisibleValueInTooltipSpan()
     {
         const string longLabel = "Microsoft-Windows-Servicing-CbsPackageChangeState";
         IReadOnlyList<HistogramGroup> groups = HistogramGroups.ForCategories([longLabel], [longLabel], otherLabel: null);
@@ -448,7 +447,7 @@ public sealed class HistogramPaneTests : BunitContext
 
         var label = cut.Find(".histogram-legend-label");
         Assert.Equal(longLabel, label.TextContent);
-        Assert.Equal(longLabel, label.GetAttribute("title"));
+        Assert.Equal(longLabel, label.GetAttribute("data-tooltip"));
         Assert.Contains($"Hide {longLabel}", cut.Find(".histogram-legend-item").GetAttribute("aria-label"));
     }
 

@@ -156,7 +156,7 @@ public sealed class MenuRendererTests : BunitContext
         var disabled = component.FindAll("li.menu-item")[0];
         Assert.Equal("true", disabled.GetAttribute("aria-disabled"));
         Assert.Null(disabled.GetAttribute("aria-describedby"));
-        Assert.Null(disabled.GetAttribute("title"));
+        Assert.Null(disabled.GetAttribute("data-tooltip"));
         Assert.Equal("-1", disabled.GetAttribute("tabindex"));
 
         var enabled = component.FindAll("li.menu-item")[1];
@@ -177,7 +177,7 @@ public sealed class MenuRendererTests : BunitContext
 
         var disabled = component.FindAll("li.menu-item")[0];
         Assert.Equal("true", disabled.GetAttribute("aria-disabled"));
-        Assert.Equal(reason, disabled.GetAttribute("title"));
+        Assert.Equal(reason, disabled.GetAttribute("data-tooltip"));
 
         var describedBy = disabled.GetAttribute("aria-describedby");
         Assert.False(string.IsNullOrEmpty(describedBy));

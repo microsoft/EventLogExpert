@@ -17,47 +17,52 @@
         {
             if (row is AllLogsRow allLogs)
             {
-                <div class="@GetActiveTab(presentation, allLogs.Header) all-logs" @oncontextmenu="OpenAllLogsMenu"
+                <div class="@GetActiveTab(presentation, allLogs.Header) all-logs" data-tooltip="@GetTabTooltip(allLogs.Header)"
+                    @oncontextmenu="OpenAllLogsMenu"
                     @oncontextmenu:preventDefault="true"
-                    @oncontextmenu:stopPropagation="true"
-                    title="@GetTabTooltip(allLogs.Header)">
-                    <span @onkeydown="e => OnTabKeyDown(e, allLogs.Header)"
+                    @oncontextmenu:stopPropagation="true">
+                    <span aria-describedby="@($"tab-tip-{allLogs.Header.Id.Value:N}")"
+                        @onkeydown="e => OnTabKeyDown(e, allLogs.Header)"
                         @onmousedown="e => OnTabMouseDown(e, allLogs.Header)"
                         role="button"
                         tabindex="0">
                         @GetTabName(presentation, allLogs.Header)
                     </span>
+                    <span class="visually-hidden" id="@($"tab-tip-{allLogs.Header.Id.Value:N}")">@GetTabTooltip(allLogs.Header)</span>
                 </div>
             }
             else if (row is GroupRow group)
             {
                 <div class="tab-group" style="--group-color: var(--cat-color-@(GetGroupColorIndex(group.Group.Id)));">
-                    <div class="@GetActiveTab(presentation, group.Header) group-header" @oncontextmenu="args => OpenGroupHeaderMenu(args, group.Group)"
+                    <div class="@GetActiveTab(presentation, group.Header) group-header" data-tooltip="@GetTabTooltip(group.Header)"
+                        @oncontextmenu="args => OpenGroupHeaderMenu(args, group.Group)"
                         @oncontextmenu:preventDefault="true"
-                        @oncontextmenu:stopPropagation="true"
-                        title="@GetTabTooltip(group.Header)">
-                        <button aria-expanded="@(presentation.ActiveTabId == group.Header.Id ? (group.Group.IsCollapsed ? "false" : "true") : null)"
+                        @oncontextmenu:stopPropagation="true">
+                        <button aria-describedby="@($"tab-tip-{group.Header.Id.Value:N}")"
+                            aria-expanded="@(presentation.ActiveTabId == group.Header.Id ? (group.Group.IsCollapsed ? "false" : "true") : null)"
                             class="group-header-label"
                             @onclick="() => ActivateOrToggleGroup(group)"
                             type="button">
                             @GetTabName(presentation, group.Header)
                         </button>
+                        <span class="visually-hidden" id="@($"tab-tip-{group.Header.Id.Value:N}")">@GetTabTooltip(group.Header)</span>
                         <i aria-label="@Localizer["TabBar_CloseGroup"]"
                             class="bi bi-x-circle"
+                            data-tooltip="@Localizer["TabBar_CloseGroup"]"
                             @onclick="() => CloseGroup(group.Group)"
                             @onkeydown="e => OnCloseGroupKeyDown(e, group.Group)"
                             role="button"
-                            tabindex="0"
-                            title="@Localizer["TabBar_CloseGroup"]">
+                            tabindex="0">
                         </i>
                     </div>
                     @foreach (var member in VisibleMembers(presentation, group))
                     {
-                        <div class="@GetTabClass(presentation, member, true)" @oncontextmenu="args => OpenMemberMenu(args, member, group.Group)"
+                        <div class="@GetTabClass(presentation, member, true)" data-tooltip="@GetTabTooltip(member)"
+                            @oncontextmenu="args => OpenMemberMenu(args, member, group.Group)"
                             @oncontextmenu:preventDefault="true"
-                            @oncontextmenu:stopPropagation="true"
-                            title="@GetTabTooltip(member)">
-                            <span aria-disabled="@(member.IsLoading ? "true" : null)"
+                            @oncontextmenu:stopPropagation="true">
+                            <span aria-describedby="@($"tab-tip-{member.Id.Value:N}")"
+                                aria-disabled="@(member.IsLoading ? "true" : null)"
                                 @onkeydown="e => OnTabKeyDown(e, member)"
                                 @onmousedown="e => OnTabMouseDown(e, member)"
                                 role="button"
@@ -69,13 +74,14 @@
                                 }
                                 @GetTabName(presentation, member)
                             </span>
+                            <span class="visually-hidden" id="@($"tab-tip-{member.Id.Value:N}")">@GetTabTooltip(member)</span>
                             <i aria-label="@Localizer["TabBar_CloseLogAria"]"
                                 class="bi bi-x-circle"
+                                data-tooltip="@Localizer["TabBar_CloseLogAria"]"
                                 @onkeydown="e => OnCloseLogKeyDown(e, member)"
                                 @onmousedown="e => OnCloseLogMouseDown(e, member)"
                                 role="button"
-                                tabindex="0"
-                                title="@Localizer["TabBar_CloseLogAria"]">
+                                tabindex="0">
                             </i>
                         </div>
                     }
@@ -83,11 +89,12 @@
             }
             else if (row is StandaloneRow standalone)
             {
-                <div class="@GetActiveTab(presentation, standalone.Tab)" @oncontextmenu="args => OpenStandaloneMenu(args, standalone.Tab)"
+                <div class="@GetActiveTab(presentation, standalone.Tab)" data-tooltip="@GetTabTooltip(standalone.Tab)"
+                    @oncontextmenu="args => OpenStandaloneMenu(args, standalone.Tab)"
                     @oncontextmenu:preventDefault="true"
-                    @oncontextmenu:stopPropagation="true"
-                    title="@GetTabTooltip(standalone.Tab)">
-                    <span aria-disabled="@(standalone.Tab.IsLoading ? "true" : null)"
+                    @oncontextmenu:stopPropagation="true">
+                    <span aria-describedby="@($"tab-tip-{standalone.Tab.Id.Value:N}")"
+                        aria-disabled="@(standalone.Tab.IsLoading ? "true" : null)"
                         @onkeydown="e => OnTabKeyDown(e, standalone.Tab)"
                         @onmousedown="e => OnTabMouseDown(e, standalone.Tab)"
                         role="button"
@@ -99,13 +106,14 @@
                         }
                         @GetTabName(presentation, standalone.Tab)
                     </span>
+                    <span class="visually-hidden" id="@($"tab-tip-{standalone.Tab.Id.Value:N}")">@GetTabTooltip(standalone.Tab)</span>
                     <i aria-label="@Localizer["TabBar_CloseLogAria"]"
                         class="bi bi-x-circle"
+                        data-tooltip="@Localizer["TabBar_CloseLogAria"]"
                         @onkeydown="e => OnCloseLogKeyDown(e, standalone.Tab)"
                         @onmousedown="e => OnCloseLogMouseDown(e, standalone.Tab)"
                         role="button"
-                        tabindex="0"
-                        title="@Localizer["TabBar_CloseLogAria"]">
+                        tabindex="0">
                     </i>
                 </div>
             }

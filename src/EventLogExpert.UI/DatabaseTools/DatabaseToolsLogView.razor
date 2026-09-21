@@ -52,7 +52,7 @@
             <ItemContent>
                 <div class="log-entry @SeverityClass(entry.Level)">
                     <span class="log-timestamp">@entry.TimestampUtc.ToString("HH:mm:ss.fff")</span>
-                    <span class="log-message" title="@entry.Message">@entry.Message</span>
+                    <span class="log-message" data-tooltip="@entry.Message" data-tooltip-overflow>@entry.Message</span>
                 </div>
             </ItemContent>
             <EmptyContent>

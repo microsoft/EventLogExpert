@@ -69,17 +69,6 @@ public sealed class CheckboxTests : BunitContext
     }
 
     [Fact]
-    public void Render_AriaLabelledBy_AppliedToInput()
-    {
-        var component = Render<Checkbox>(parameters => parameters
-            .Add(p => p.Value, false)
-            .Add(p => p.AriaLabelledBy, "external-label-id"));
-
-        var input = component.Find("input[type='checkbox']");
-        Assert.Equal("external-label-id", input.GetAttribute("aria-labelledby"));
-    }
-
-    [Fact]
     public void Render_AriaLabelledByAndAriaLabel_SuppressesAriaLabelPerWaiAriaPrecedence()
     {
         var component = Render<Checkbox>(parameters => parameters
@@ -89,6 +78,17 @@ public sealed class CheckboxTests : BunitContext
 
         var input = component.Find("input[type='checkbox']");
         Assert.False(input.HasAttribute("aria-label"));
+        Assert.Equal("external-label-id", input.GetAttribute("aria-labelledby"));
+    }
+
+    [Fact]
+    public void Render_AriaLabelledBy_AppliedToInput()
+    {
+        var component = Render<Checkbox>(parameters => parameters
+            .Add(p => p.Value, false)
+            .Add(p => p.AriaLabelledBy, "external-label-id"));
+
+        var input = component.Find("input[type='checkbox']");
         Assert.Equal("external-label-id", input.GetAttribute("aria-labelledby"));
     }
 
@@ -127,14 +127,14 @@ public sealed class CheckboxTests : BunitContext
     }
 
     [Fact]
-    public void Render_TitleOnLabel_AppliedFromAriaLabel()
+    public void Render_TooltipOnLabel_AppliedFromAriaLabel()
     {
         var component = Render<Checkbox>(parameters => parameters
             .Add(p => p.Value, false)
             .Add(p => p.AriaLabel, "Tooltip text"));
 
         var label = component.Find("label.checkbox");
-        Assert.Equal("Tooltip text", label.GetAttribute("title"));
+        Assert.Equal("Tooltip text", label.GetAttribute("data-tooltip"));
     }
 
     [Fact]

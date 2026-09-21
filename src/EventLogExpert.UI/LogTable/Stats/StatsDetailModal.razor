@@ -40,21 +40,21 @@
                     @foreach (var row in VisibleRows)
                     {
                         <div class="stats-detail-row">
-                            <span class="stats-detail-value" title="@row.Value">@row.Value</span>
+                            <span class="stats-detail-value" data-tooltip="@row.Value" data-tooltip-overflow>@row.Value</span>
                             <span class="stats-detail-count">@FormatCount(row.Count)</span>
                             <span class="stats-detail-percent">@FormatShare(row.Count)</span>
                             <span class="stats-detail-actions">
                                 <button aria-label="@Localizer["Stats_Row_IncludeAria", StatsDimensionLocalizer.Label(Localizer, Dimension), row.Value]"
                                     class="stats-detail-include"
+                                    data-tooltip="@Localizer["Stats_Row_IncludeTitle"]"
                                     @onclick="() => Include(row)"
-                                    title="@Localizer["Stats_Row_IncludeTitle"]"
                                     type="button">
                                     <i aria-hidden="true" class="bi bi-plus-circle"></i>
                                 </button>
                                 <button aria-label="@Localizer["Stats_Row_ExcludeAria", StatsDimensionLocalizer.Label(Localizer, Dimension), row.Value]"
                                     class="stats-detail-exclude"
+                                    data-tooltip="@Localizer["Stats_Row_ExcludeTitle"]"
                                     @onclick="() => Exclude(row)"
-                                    title="@Localizer["Stats_Row_ExcludeTitle"]"
                                     type="button">
                                     <i aria-hidden="true" class="bi bi-dash-circle"></i>
                                 </button>

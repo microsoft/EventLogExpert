@@ -224,11 +224,11 @@ public sealed class FilterEditorLocalizerWiringTests : BunitContext
         Assert.Contains("[[FilterEditor_Action_CancelEdit_Aria]]", component.Markup);
         Assert.Equal(
             "[[FilterEditor_Action_CancelEdit_Title]]",
-            component.Find("button[aria-label='[[FilterEditor_Action_CancelEdit_Aria]]']").GetAttribute("title"));
+            component.Find("button[aria-label='[[FilterEditor_Action_CancelEdit_Aria]]']").GetAttribute("data-tooltip"));
         Assert.Contains("[[FilterEditor_Action_RemoveFilter_Aria]]", component.Markup);
         Assert.Equal(
             "[[FilterEditor_Action_RemoveFilter_Title]]",
-            component.Find("button[aria-label='[[FilterEditor_Action_RemoveFilter_Aria]]']").GetAttribute("title"));
+            component.Find("button[aria-label='[[FilterEditor_Action_RemoveFilter_Aria]]']").GetAttribute("data-tooltip"));
 
         var excluded = Render<FilterEditPanel>(parameters => parameters
             .Add(panel => panel.Filter, new FilterDraft { Mode = FilterMode.Advanced, IsExcluded = true }));

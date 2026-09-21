@@ -43,8 +43,8 @@
                         <button aria-label="@(shown ? Localizer["Histogram_Legend_Hide", accessibleLabel].Value : Localizer["Histogram_Legend_Show", accessibleLabel].Value)"
                             aria-pressed="@(shown ? "true" : "false")"
                             class="histogram-legend-item@(shown ? "" : " histogram-legend-hidden")"
+                            data-tooltip="@(shown ? Localizer["Histogram_Legend_Hide", accessibleLabel].Value : Localizer["Histogram_Legend_Show", accessibleLabel].Value)"
                             @onclick="() => ToggleGroup(key)"
-                            title="@(shown ? Localizer["Histogram_Legend_Hide", accessibleLabel].Value : Localizer["Histogram_Legend_Show", accessibleLabel].Value)"
                             type="button">
                             <svg aria-hidden="true"
                                 class="histogram-swatch"
@@ -52,7 +52,7 @@
                                 height="9"
                                 width="9">
                                 <rect class="@GroupColorClass(group)" data-highlight="@GroupHighlightCssName(group)" data-stackpos="@group" height="9" width="9"></rect>
-                            </svg><span class="histogram-legend-label" title="@label">@label</span>
+                            </svg><span class="histogram-legend-label" data-tooltip="@label" data-tooltip-overflow>@label</span>
                         </button>
                     }
                 </div>
@@ -63,21 +63,22 @@
             <span class="histogram-zoom-hint">@Localizer["Histogram_ZoomHint"]</span>
         }
         <div class="histogram-buttons">
-            <button aria-label="@Localizer["Histogram_ZoomOut"]" class="histogram-button" @onclick="() => ZoomFromControl(ZoomOutFactor)" title="@Localizer["Histogram_ZoomOut"]" type="button">-</button>
-            <button aria-label="@Localizer["Histogram_ZoomIn"]" class="histogram-button" @onclick="() => ZoomFromControl(ZoomInFactor)" title="@Localizer["Histogram_ZoomIn"]" type="button">+</button>
+            <button aria-label="@Localizer["Histogram_ZoomOut"]" class="histogram-button" data-tooltip="@Localizer["Histogram_ZoomOut"]" @onclick="() => ZoomFromControl(ZoomOutFactor)" type="button">-</button>
+            <button aria-label="@Localizer["Histogram_ZoomIn"]" class="histogram-button" data-tooltip="@Localizer["Histogram_ZoomIn"]" @onclick="() => ZoomFromControl(ZoomInFactor)" type="button">+</button>
             <button aria-label="@Localizer["Histogram_UndoZoomAria"]"
                 class="histogram-button"
+                data-tooltip="@(_windowHistory.Count != 0 ? Localizer["Histogram_UndoZoomTitle"].Value : null)"
                 disabled="@(_windowHistory.Count == 0)"
                 @onclick="UndoZoom"
-                title="@Localizer["Histogram_UndoZoomTitle"]"
+                title="@(_windowHistory.Count != 0 ? null : Localizer["Histogram_UndoZoomTitle"].Value)"
                 type="button">
                 @Localizer["Histogram_Undo"]
             </button>
-            <button aria-label="@Localizer["Histogram_FitAllEvents"]" class="histogram-button" @onclick="Fit" title="@Localizer["Histogram_FitAllEvents"]" type="button">@Localizer["Histogram_Fit"]</button>
+            <button aria-label="@Localizer["Histogram_FitAllEvents"]" class="histogram-button" data-tooltip="@Localizer["Histogram_FitAllEvents"]" @onclick="Fit" type="button">@Localizer["Histogram_Fit"]</button>
             <button aria-label="@Localizer["Histogram_ScopeVisibleRangeAria"]"
                 class="histogram-button@(_isZoomed ? " histogram-button-accent" : "")"
+                data-tooltip="@Localizer["Histogram_ScopeVisibleRangeTitle"]"
                 @onclick="ScopeToRange"
-                title="@Localizer["Histogram_ScopeVisibleRangeTitle"]"
                 type="button">
                 @Localizer["Histogram_Scope"]
             </button>

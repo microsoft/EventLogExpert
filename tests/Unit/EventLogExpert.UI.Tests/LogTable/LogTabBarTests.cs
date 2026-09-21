@@ -169,16 +169,16 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
-    public void AriaLabelsAndTitles_RouteThroughMarkerLocalizer()
+    public void AriaLabelsAndTooltips_RouteThroughMarkerLocalizer()
     {
         var (expandedState, _, _, _, _) = GroupedState(collapsed: false, activeIsMember1: false);
         _logTableState.Value.Returns(expandedState);
         var expandedCut = Render<LogTabBar>();
 
         Assert.Equal(Localizer["TabBar_CloseGroup"].Value, expandedCut.Find(".group-header > i.bi-x-circle").GetAttribute("aria-label"));
-        Assert.Equal(Localizer["TabBar_CloseGroup"].Value, expandedCut.Find(".group-header > i.bi-x-circle").GetAttribute("title"));
+        Assert.Equal(Localizer["TabBar_CloseGroup"].Value, expandedCut.Find(".group-header > i.bi-x-circle").GetAttribute("data-tooltip"));
         Assert.Equal(Localizer["TabBar_CloseLogAria"].Value, expandedCut.Find(".tab.member > i.bi-x-circle").GetAttribute("aria-label"));
-        Assert.Equal(Localizer["TabBar_CloseLogAria"].Value, expandedCut.Find(".tab.member > i.bi-x-circle").GetAttribute("title"));
+        Assert.Equal(Localizer["TabBar_CloseLogAria"].Value, expandedCut.Find(".tab.member > i.bi-x-circle").GetAttribute("data-tooltip"));
     }
 
     [Fact]
@@ -725,7 +725,7 @@ public sealed class LogTabBarTests : BunitContext
     }
 
     [Fact]
-    public void TabTitlesAndLiveNames_RouteArgumentsThroughMarkerLocalizer()
+    public void TabTooltipsAndLiveNames_RouteArgumentsThroughMarkerLocalizer()
     {
         var fileId = EventLogId.Create();
         var liveId = EventLogId.Create();
@@ -751,8 +751,8 @@ public sealed class LogTabBarTests : BunitContext
         var cut = Render<LogTabBar>();
         var tabs = cut.FindAll(".tab");
 
-        Assert.Equal(Localizer["TabBar_Tooltip_File", @"C:\logs\Application.evtx", "Application", "FILEHOST"].Value, tabs[0].GetAttribute("title"));
-        Assert.Equal(Localizer["TabBar_Tooltip_Live", "System", "LIVEHOST"].Value, tabs[1].GetAttribute("title"));
+        Assert.Equal(Localizer["TabBar_Tooltip_File", @"C:\logs\Application.evtx", "Application", "FILEHOST"].Value, tabs[0].GetAttribute("data-tooltip"));
+        Assert.Equal(Localizer["TabBar_Tooltip_Live", "System", "LIVEHOST"].Value, tabs[1].GetAttribute("data-tooltip"));
         Assert.Contains(Localizer["TabBar_TabName_Live", "System", "LIVEHOST"].Value, tabs[1].TextContent);
     }
 

@@ -53,8 +53,8 @@
             {
                 <button aria-label="@Localizer["Details_CopyEventAria"].Value"
                     class="details-copy-event"
+                    data-tooltip="@Localizer["Details_CopyEventAria"].Value"
                     @onclick="CopyEventAsync"
-                    title="@Localizer["Details_CopyEventAria"].Value"
                     type="button">
                     <i class="bi bi-clipboard"></i>
                     <span class="details-copy-event-label">@Localizer["Details_CopyEventButtonLabel"]</span>
@@ -68,8 +68,8 @@
                 aria-expanded="@IsExpanded"
                 aria-label="@Localizer[_isExpanded ? "Details_CollapseAria" : "Details_ExpandAria"].Value"
                 data-rotate="@IsExpanded"
-                id="details-header"
-                title="@Localizer[_isExpanded ? "Details_CollapseAria" : "Details_ExpandAria"].Value" />
+                data-tooltip="@Localizer[_isExpanded ? "Details_CollapseAria" : "Details_ExpandAria"].Value"
+                id="details-header" />
         </div>
     </div>
 
@@ -93,8 +93,7 @@
                                         @if (SeverityIcon.CssClass(_model.Severity) is { Length: > 0 } levelIcon)
                                         {
                                             <span aria-hidden="true"
-                                                class="level-icon @levelIcon"
-                                                title="@Localizer["Details_SeverityTitle", _model.Level].Value">
+                                                class="level-icon @levelIcon">
                                             </span>
                                         }
                                         @_model.Level
@@ -145,10 +144,10 @@
                                         <span>@Localizer["Details_SystemDetailsHeading"]</span>
                                         <button aria-label="@Localizer["Details_CopySystemDetailsAria"].Value"
                                             class="details-copy-section"
+                                            data-tooltip="@Localizer["Details_CopySystemDetailsAria"].Value"
                                             @onclick="() => CopyPropertiesAsync(_model.SystemProperties)"
                                             @onclick:preventDefault="true"
                                             @onclick:stopPropagation="true"
-                                            title="@Localizer["Details_CopySystemDetailsAria"].Value"
                                             type="button">
                                             <i class="bi bi-clipboard"></i>
                                         </button>
@@ -187,8 +186,8 @@
                                     {
                                         <button aria-label="@Localizer["Details_CopyEventDataAria"].Value"
                                             class="details-copy-section"
+                                            data-tooltip="@Localizer["Details_CopyEventDataAria"].Value"
                                             @onclick="() => CopyFieldsAsync(_model.EventData)"
-                                            title="@Localizer["Details_CopyEventDataAria"].Value"
                                             type="button">
                                             <i class="bi bi-clipboard"></i>
                                         </button>
@@ -223,8 +222,8 @@
                                         <h3>@Localizer["Details_UserDataHeading"]</h3>
                                         <button aria-label="@Localizer["Details_CopyUserDataAria"].Value"
                                             class="details-copy-section"
+                                            data-tooltip="@Localizer["Details_CopyUserDataAria"].Value"
                                             @onclick="() => CopyFieldsAsync(_model.UserData)"
-                                            title="@Localizer["Details_CopyUserDataAria"].Value"
                                             type="button">
                                             <i class="bi bi-clipboard"></i>
                                         </button>

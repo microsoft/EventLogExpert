@@ -7,20 +7,20 @@
                 IconOnly
                 OnClick="@(() => CopyScenarioJsonAsync(savedFilter))"
                 aria-label="@CopyScenarioAriaLabel(savedFilter)"
-                title="@Localizer["FilterEditor_RowAction_CopyScenarioTitle"]" />
+                data-tooltip="@Localizer["FilterEditor_RowAction_CopyScenarioTitle"]" />
         }
         <Button IconClass="bi bi-funnel"
             IconOnly
             OnClick="OnEdit"
             aria-label="@EditAriaLabel(savedFilter)"
-            @ref="_editButton"
-            title="@Localizer["FilterEditor_RowAction_EditTitle"]" />
+            data-tooltip="@Localizer["FilterEditor_RowAction_EditTitle"]"
+            @ref="_editButton" />
 
         <DangerButton IconClass="bi bi-dash-circle"
             IconOnly
             OnClick="OnRemove"
             aria-label="@RemoveAriaLabel(savedFilter)"
-            title="@Localizer["FilterEditor_RowAction_RemoveTitle"]" />
+            data-tooltip="@Localizer["FilterEditor_RowAction_RemoveTitle"]" />
 
         <span class="visually-hidden" id="@_enableToggleLabelId">@Localizer["FilterEditor_RowAction_EnableToggleLabel"]</span>
 

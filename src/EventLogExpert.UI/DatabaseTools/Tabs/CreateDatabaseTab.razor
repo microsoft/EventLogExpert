@@ -88,7 +88,8 @@
                     </ValueSelect>
                     <Button Disabled="@(IsRunning || _isLoadingEditions)"
                         OnClick="LoadEditionsAsync"
-                        title="@Localizer["Db_Create_LoadEditionsTitle"]">
+                        data-tooltip="@(!IsRunning && !_isLoadingEditions ? Localizer["Db_Create_LoadEditionsTitle"] : null)"
+                        title="@(!IsRunning && !_isLoadingEditions ? null : Localizer["Db_Create_LoadEditionsTitle"])">
                         @(_isLoadingEditions ? Localizer["Db_Create_LoadingEditions"] : Localizer["Db_Create_LoadEditions"])
                     </Button>
                 </div>
@@ -196,7 +197,8 @@
                     IconClass="@(WillElevate ? "bi bi-shield-lock" : "bi bi-play-fill")"
                     OnClick="RunCreateAsync"
                     aria-describedby="@(WillElevate ? "create-run-elevation-help" : null)"
-                    title="@RunElevationTitle">
+                    data-tooltip="@(CanRun && !IsRunning && !IsImportInProgress && !IsConfirming ? RunElevationTitle : null)"
+                    title="@(CanRun && !IsRunning && !IsImportInProgress && !IsConfirming ? null : RunElevationTitle)">
                     @Localizer["DatabaseTools_Action_Run"]
                 </PrimaryButton>
             }

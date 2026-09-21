@@ -87,13 +87,13 @@ public sealed class FilterLibraryChromeLocalizerWiringTests : BunitContext
     }
 
     [Fact]
-    public void ModalManageTagsToggle_RoutesAriaAndTitleThroughDistinctKeys()
+    public void ModalManageTagsToggle_RoutesAriaAndTooltipThroughDistinctKeys()
     {
         IRenderedComponent<FilterLibraryModal> component = RenderModalWithTagCount(1);
         IElement trigger = component.Find(".library-tag-management-trigger");
 
         Assert.Equal("[[FilterLibrary_ManageTagsAria]]", trigger.GetAttribute("aria-label"));
-        Assert.Equal("[[FilterLibrary_ManageTagsTitle]]", trigger.GetAttribute("title"));
+        Assert.Equal("[[FilterLibrary_ManageTagsTitle]]", trigger.GetAttribute("data-tooltip"));
     }
 
     [Fact]
@@ -105,7 +105,7 @@ public sealed class FilterLibraryChromeLocalizerWiringTests : BunitContext
 
         IElement trigger = component.Find(".library-tag-management-trigger");
         Assert.Equal("[[FilterLibrary_HideTagManagementAria]]", trigger.GetAttribute("aria-label"));
-        Assert.Equal("[[FilterLibrary_ManageTagsTitle]]", trigger.GetAttribute("title"));
+        Assert.Equal("[[FilterLibrary_ManageTagsTitle]]", trigger.GetAttribute("data-tooltip"));
     }
 
     [Fact]
@@ -196,17 +196,17 @@ public sealed class FilterLibraryChromeLocalizerWiringTests : BunitContext
     }
 
     [Fact]
-    public void TagPanelDeleteAction_RoutesAriaAndTitleThroughDistinctKeys()
+    public void TagPanelDeleteAction_RoutesAriaAndTooltipThroughDistinctKeys()
     {
         LibraryEntrySavedFilter entry = BuildSavedFilter("Entry") with { Tags = ["bug"] };
         IRenderedComponent<TagManagementPanel> component = Render<TagManagementPanel>(parameters => parameters
             .Add(panel => panel.AllLibraryTags, new[] { "bug" })
             .Add(panel => panel.AllEntries, new[] { entry }));
         IElement deleteButton = component.FindAll(".library-tag-management-row button")
-            .Single(button => button.GetAttribute("title") == "[[FilterLibrary_Tags_DeleteTitle]]");
+            .Single(button => button.GetAttribute("data-tooltip") == "[[FilterLibrary_Tags_DeleteTitle]]");
 
         Assert.Equal("[[FilterLibrary_Tags_DeleteActionAria(bug)]]", deleteButton.GetAttribute("aria-label"));
-        Assert.Equal("[[FilterLibrary_Tags_DeleteTitle]]", deleteButton.GetAttribute("title"));
+        Assert.Equal("[[FilterLibrary_Tags_DeleteTitle]]", deleteButton.GetAttribute("data-tooltip"));
     }
 
     [Theory]
@@ -261,10 +261,10 @@ public sealed class FilterLibraryChromeLocalizerWiringTests : BunitContext
             .Add(panel => panel.AllLibraryTags, new[] { "bug" })
             .Add(panel => panel.AllEntries, new[] { entry }));
         IElement renameButton = component.FindAll(".library-tag-management-row button")
-            .Single(button => button.GetAttribute("title") == "[[FilterLibrary_Tags_RenameTitle]]");
+            .Single(button => button.GetAttribute("data-tooltip") == "[[FilterLibrary_Tags_RenameTitle]]");
 
         Assert.Equal("[[FilterLibrary_Tags_RenameActionAria(bug)]]", renameButton.GetAttribute("aria-label"));
-        Assert.Equal("[[FilterLibrary_Tags_RenameTitle]]", renameButton.GetAttribute("title"));
+        Assert.Equal("[[FilterLibrary_Tags_RenameTitle]]", renameButton.GetAttribute("data-tooltip"));
 
         await renameButton.ClickAsync(new MouseEventArgs());
 

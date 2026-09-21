@@ -20,7 +20,7 @@
             var lensId = lens.Id;
             var label = FilterLensLabelFormatter.Format(Localizer, lens.Label);
             <span class="lens-chip">
-                <span class="lens-chip-label" title="@label">@label</span>
+                <span class="lens-chip-label" data-tooltip="@label" data-tooltip-overflow>@label</span>
                 <button aria-label="@Localizer["FilterLens_SaveAria", label].Value"
                     class="lens-chip-keep"
                     @onclick="@(() => Commands.PromoteLens(lensId))"
@@ -40,8 +40,8 @@
         <button aria-describedby="@SaveAsGroupHintRef"
             aria-disabled="@SaveAsGroupAriaDisabled"
             class="lens-action"
+            data-tooltip="@(CanSaveAsGroup ? null : Localizer["FilterLens_SaveAsGroup_DisabledTitle"].Value)"
             @onclick="SaveAsGroupAsync"
-            title="@(CanSaveAsGroup ? null : Localizer["FilterLens_SaveAsGroup_DisabledTitle"].Value)"
             type="button">
             @Localizer["FilterLens_SaveAsGroup"]
         </button>

@@ -3,8 +3,8 @@
         <span>@Field.Label</span>
         <button aria-label="@Localizer["Details_CopyValueAria", Field.Label].Value"
             class="details-copy"
+            data-tooltip="@Localizer["Details_CopyValueAria", Field.Label].Value"
             @onclick="OnCopy"
-            title="@Localizer["Details_CopyValueAria", Field.Label].Value"
             type="button">
             <i class="bi bi-clipboard"></i>
         </button>

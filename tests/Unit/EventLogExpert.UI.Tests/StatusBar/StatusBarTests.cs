@@ -134,12 +134,12 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Equal("[[StatusBar_Filter_Lens_Many(2)]]", cut.Find(".status-bar-filter").GetAttribute("title"));
+        Assert.Equal("[[StatusBar_Filter_Lens_Many(2)]]", cut.Find(".status-bar-filter").GetAttribute("data-tooltip"));
 
         _lensSource.Lenses.Returns(LensSummaries(3));
         cut.InvokeAsync(() => _lensSource.Changed += Raise.Event<Action>());
 
-        cut.WaitForAssertion(() => Assert.Equal("[[StatusBar_Filter_Lens_Many(3)]]", cut.Find(".status-bar-filter").GetAttribute("title")));
+        cut.WaitForAssertion(() => Assert.Equal("[[StatusBar_Filter_Lens_Many(3)]]", cut.Find(".status-bar-filter").GetAttribute("data-tooltip")));
     }
 
     [Fact]
@@ -225,7 +225,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         Assert.Contains("[[StatusBar_Counts_ShownOfTotal(200|1,500)]]", cut.Markup, StringComparison.Ordinal);
 
         var indicator = cut.Find(".status-bar-filter");
-        Assert.Equal("[[StatusBar_Filter_Active]]", indicator.GetAttribute("title"));
+        Assert.Equal("[[StatusBar_Filter_Active]]", indicator.GetAttribute("data-tooltip"));
     }
 
     [Fact]
@@ -237,7 +237,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         var cut = Render<UI.StatusBar.StatusBar>();
 
         Assert.Contains("[[StatusBar_Counts_ShownOfTotal(300|1,500)]]", cut.Markup, StringComparison.Ordinal);
-        Assert.Equal("[[StatusBar_Filter_Lens_Many(2)]]", cut.Find(".status-bar-filter").GetAttribute("title"));
+        Assert.Equal("[[StatusBar_Filter_Lens_Many(2)]]", cut.Find(".status-bar-filter").GetAttribute("data-tooltip"));
     }
 
     [Fact]
@@ -307,7 +307,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        var tooltip = cut.Find(".status-bar-memory").GetAttribute("title");
+        var tooltip = cut.Find(".status-bar-memory").GetAttribute("data-tooltip");
         Assert.Equal("[[StatusBar_Memory_Tooltip_Normal(100 MB|256 MB)]]", tooltip);
     }
 
@@ -381,7 +381,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         var button = Render<UI.StatusBar.StatusBar>().Find("button.status-bar-newevents");
         Assert.Contains("[[StatusBar_NewEvents_Label(42)]]", button.TextContent, StringComparison.Ordinal);
         Assert.False(button.HasAttribute("aria-label"));
-        Assert.Equal("[[StatusBar_NewEvents_Load]]", button.GetAttribute("title"));
+        Assert.Equal("[[StatusBar_NewEvents_Load]]", button.GetAttribute("data-tooltip"));
 
         button.Click();
 
@@ -396,14 +396,16 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         var cut = Render<UI.StatusBar.StatusBar>();
 
         var right = cut.Find(".status-bar-right");
-        var children = right.Children.ToList();
+        var chromeChildren = right.Children
+            .Where(child => !child.ClassList.Contains("visually-hidden"))
+            .ToList();
         var memoryChip = right.QuerySelector(".status-bar-memory");
         var newEventsButton = right.QuerySelector("button.status-bar-newevents");
 
         Assert.NotNull(memoryChip);
         Assert.NotNull(newEventsButton);
-        Assert.Equal(children.Count - 1, children.IndexOf(newEventsButton));
-        Assert.True(children.IndexOf(memoryChip) < children.IndexOf(newEventsButton));
+        Assert.Equal(chromeChildren.Count - 1, chromeChildren.IndexOf(newEventsButton));
+        Assert.True(chromeChildren.IndexOf(memoryChip) < chromeChildren.IndexOf(newEventsButton));
     }
 
     [Fact]
@@ -415,7 +417,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
 
         Assert.False(button.HasAttribute("disabled"));
         Assert.Contains("[[StatusBar_NewEvents_Label(0)]]", button.TextContent, StringComparison.Ordinal);
-        Assert.Equal("[[StatusBar_NewEvents_None]]", button.GetAttribute("title"));
+        Assert.Equal("[[StatusBar_NewEvents_None]]", button.GetAttribute("data-tooltip"));
     }
 
     [Fact]
@@ -483,14 +485,14 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
     }
 
     [Fact]
-    public void ResolverError_RendersInATruncatingSpanWithFullTitle()
+    public void ResolverError_RendersInATruncatingSpanWithFullTooltip()
     {
         _status = new StatusBarPresentation { ResolverStatus = ResolverStatus.FailedToLoad("Security.evtx") };
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
         var resolver = cut.Find(".status-bar-resolver");
-        Assert.Equal("[[StatusBar_Resolver_FailedToLoad(Security.evtx)]]", resolver.GetAttribute("title"));
+        Assert.Equal("[[StatusBar_Resolver_FailedToLoad(Security.evtx)]]", resolver.GetAttribute("data-tooltip"));
         Assert.Equal("[[StatusBar_Resolver_FailedToLoad(Security.evtx)]]", resolver.TextContent);
         Assert.DoesNotContain("[[Security.evtx]]", cut.Markup, StringComparison.Ordinal);
     }
@@ -554,19 +556,6 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         Assert.Contains("[[StatusBar_Loading_Failed(1,500)]]", cut.Markup, StringComparison.Ordinal);
     }
 
-    [Theory]
-    [InlineData(false, "[[StatusBar_Stats_Show]]")]
-    [InlineData(true, "[[StatusBar_Stats_Hide]]")]
-    public void StatsChip_Title_RoutesShowOrHideKeyByVisibility(bool isVisible, string expected)
-    {
-        SetActiveLog(total: 100, shown: 100, filter: Unfiltered, selected: 0);
-        _statsVisibility.IsVisible.Returns(isVisible);
-
-        var cut = Render<UI.StatusBar.StatusBar>();
-
-        Assert.Equal(expected, cut.Find("button.status-bar-stats:not(.status-bar-coverage)").GetAttribute("title"));
-    }
-
     [Fact]
     public void StatsChip_TogglesStatisticsVisibility_ThroughTheCommand()
     {
@@ -577,6 +566,19 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         cut.Find("button.status-bar-stats").Click();
 
         _statsCommands.Received(1).SetVisible(true);
+    }
+
+    [Theory]
+    [InlineData(false, "[[StatusBar_Stats_Show]]")]
+    [InlineData(true, "[[StatusBar_Stats_Hide]]")]
+    public void StatsChip_Tooltip_RoutesShowOrHideKeyByVisibility(bool isVisible, string expected)
+    {
+        SetActiveLog(total: 100, shown: 100, filter: Unfiltered, selected: 0);
+        _statsVisibility.IsVisible.Returns(isVisible);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Equal(expected, cut.Find("button.status-bar-stats:not(.status-bar-coverage)").GetAttribute("data-tooltip"));
     }
 
     [Fact]

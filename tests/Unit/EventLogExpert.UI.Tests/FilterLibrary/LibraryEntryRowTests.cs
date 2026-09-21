@@ -290,19 +290,19 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void FavoriteToggle_RoutesAddAndRemoveStatesThroughDistinctAriaAndTitleKeys()
+    public void FavoriteToggle_RoutesAddAndRemoveStatesThroughDistinctAriaAndTooltipKeys()
     {
         var notFavorite = RenderRow(BuildSavedFilter("Entry"));
         var notFavoriteButton = notFavorite.Find("button.button-yellow");
 
         Assert.Equal("[[FilterLibrary_Entry_AddFavoriteAria(Entry)]]", notFavoriteButton.GetAttribute("aria-label"));
-        Assert.Equal("[[FilterLibrary_Entry_AddFavoriteTitle]]", notFavoriteButton.GetAttribute("title"));
+        Assert.Equal("[[FilterLibrary_Entry_AddFavoriteTitle]]", notFavoriteButton.GetAttribute("data-tooltip"));
 
         var favorite = RenderRow(BuildSavedFilter("Entry") with { IsFavorite = true });
         var favoriteButton = favorite.Find("button.button-yellow");
 
         Assert.Equal("[[FilterLibrary_Entry_RemoveFavoriteAria(Entry)]]", favoriteButton.GetAttribute("aria-label"));
-        Assert.Equal("[[FilterLibrary_Entry_RemoveFavoriteTitle]]", favoriteButton.GetAttribute("title"));
+        Assert.Equal("[[FilterLibrary_Entry_RemoveFavoriteTitle]]", favoriteButton.GetAttribute("data-tooltip"));
     }
 
     [Fact]
@@ -327,13 +327,13 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void MoreActionsButton_RoutesAriaAndTitleThroughDistinctKeys()
+    public void MoreActionsButton_RoutesAriaAndTooltipThroughDistinctKeys()
     {
         var component = RenderRow(BuildSavedFilter("Entry"));
         var button = component.Find("button[aria-haspopup='menu']");
 
         Assert.Equal("[[FilterLibrary_Entry_MoreActionsAria(Entry)]]", button.GetAttribute("aria-label"));
-        Assert.Equal("[[FilterLibrary_Entry_MoreActionsTitle]]", button.GetAttribute("title"));
+        Assert.Equal("[[FilterLibrary_Entry_MoreActionsTitle]]", button.GetAttribute("data-tooltip"));
     }
 
     [Fact]
@@ -437,6 +437,33 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
+    public void MoreTagsButton_DescribedByIdIsTabScopedUniqueAndFormatSafe()
+    {
+        // Cap is 2 inline chips, so 4 tags leaves 2 hidden and renders the "+N more" button.
+        var entry = BuildSavedFilter("Entry") with { Tags = [.. Enumerable.Range(0, 4).Select(i => $"tag{i}")] };
+
+        var saved = RenderRow(entry, activeTab: LibraryTab.Saved);
+        var favorites = RenderRow(entry, activeTab: LibraryTab.Favorites);
+
+        var savedButton = saved.Find(".library-entry-tag-chip-more");
+        var favoritesButton = favorites.Find(".library-entry-tag-chip-more");
+        var savedId = savedButton.GetAttribute("aria-describedby")!;
+        var favoritesId = favoritesButton.GetAttribute("aria-describedby")!;
+
+        // The same entry renders in every library tabpanel at once, so the describedby id MUST include the tab
+        // to stay document-unique (D8/§4.C) - otherwise duplicate DOM ids and cross-tab describedby resolution.
+        Assert.NotEqual(savedId, favoritesId);
+
+        // The id is built from the Guid "N" format, not the LibraryEntryId record-struct ToString, so it has no
+        // whitespace or braces that would break aria-describedby IDREF token resolution.
+        Assert.DoesNotContain(savedId, c => char.IsWhiteSpace(c) || c is '{' or '}');
+
+        // describedby resolves to the hidden span, whose text equals the visual data-tooltip (the hidden tags).
+        var hint = saved.Find($"#{savedId}");
+        Assert.Equal(savedButton.GetAttribute("data-tooltip"), hint.TextContent);
+    }
+
+    [Fact]
     public async Task NewFilterSetSelected_PromptCancelled_DoesNotInvokeCallback()
     {
         var entry = BuildSavedFilter("X");
@@ -485,14 +512,14 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void PreviouslyUsedTrackedBadge_RoutesAriaAndTitleThroughDistinctKeys()
+    public void PreviouslyUsedTrackedBadge_RoutesAriaAndTooltipThroughDistinctKeys()
     {
         var entry = BuildAutoTrackedFilterEntry("Tracked");
         var component = RenderRow(entry, activeTab: LibraryTab.PreviouslyUsed);
         var badge = component.Find(".library-entry-tracked-badge");
 
         Assert.Equal("[[FilterLibrary_Entry_TrackedAria]]", badge.GetAttribute("aria-label"));
-        Assert.Equal("[[FilterLibrary_Entry_TrackedTitle]]", badge.GetAttribute("title"));
+        Assert.Equal("[[FilterLibrary_Entry_TrackedTitle]]", badge.GetAttribute("data-tooltip"));
         Assert.Equal("[[FilterLibrary_Entry_TrackedLabel]]", badge.TextContent.Trim());
     }
 
@@ -585,7 +612,7 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
-    public async Task TagEditDoneButton_RoutesAriaAndTitleThroughDistinctKeys()
+    public async Task TagEditDoneButton_RoutesAriaAndTooltipThroughDistinctKeys()
     {
         var entry = BuildSavedFilter("Entry") with { Tags = ["alpha"] };
         var component = RenderRow(entry);
@@ -594,23 +621,23 @@ public sealed class LibraryEntryRowTests : BunitContext
 
         var doneButton = component.Find(".library-entry-tags-done");
         Assert.Equal("[[FilterLibrary_Entry_DoneEditingTagsAria]]", doneButton.GetAttribute("aria-label"));
-        Assert.Equal("[[FilterLibrary_Entry_DoneTitle]]", doneButton.GetAttribute("title"));
+        Assert.Equal("[[FilterLibrary_Entry_DoneTitle]]", doneButton.GetAttribute("data-tooltip"));
     }
 
     [Fact]
-    public void TagEditToggle_RoutesAddAndEditStatesThroughDistinctAriaAndTitleKeys()
+    public void TagEditToggle_RoutesAddAndEditStatesThroughDistinctAriaAndTooltipKeys()
     {
         var noTags = RenderRow(BuildSavedFilter("Entry"));
         var addButton = noTags.Find(".library-entry-tag-add-inline");
 
         Assert.Equal("[[FilterLibrary_Entry_AddTagsAria(Entry)]]", addButton.GetAttribute("aria-label"));
-        Assert.Equal("[[FilterLibrary_Entry_AddTagsTitle]]", addButton.GetAttribute("title"));
+        Assert.Equal("[[FilterLibrary_Entry_AddTagsTitle]]", addButton.GetAttribute("data-tooltip"));
 
         var withTags = RenderRow(BuildSavedFilter("Entry") with { Tags = ["alpha"] });
         var editButton = withTags.Find(".library-entry-tag-add-inline");
 
         Assert.Equal("[[FilterLibrary_Entry_EditTagsAria(Entry)]]", editButton.GetAttribute("aria-label"));
-        Assert.Equal("[[FilterLibrary_Entry_EditTagsTitle]]", editButton.GetAttribute("title"));
+        Assert.Equal("[[FilterLibrary_Entry_EditTagsTitle]]", editButton.GetAttribute("data-tooltip"));
     }
 
     [Fact]

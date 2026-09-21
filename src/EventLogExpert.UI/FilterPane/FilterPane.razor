@@ -8,8 +8,8 @@
             <Button CssClass="split-button-primary"
                 IconClass="bi bi-plus-circle"
                 OnClick="AddBasicFilter"
-                @ref="_addFilterButton"
-                title="@Localizer["FilterPane_AddBasicTitle"]">
+                data-tooltip="@Localizer["FilterPane_AddBasicTitle"]"
+                @ref="_addFilterButton">
                 @Localizer["FilterPane_Action_AddFilter"]
             </Button>
             <Button CssClass="split-button-chevron"
@@ -217,9 +217,9 @@
                         @foreach (var filterSet in VisibleFilterSets)
                         {
                             <ValueSelectItem T="LibraryEntryId" Value="filterSet.Id">
-                                <span class="filter-set-option-row" title="@FormatFilterSetLabel(filterSet)">
-                                    <span class="filter-set-option-name">@filterSet.Name</span>
-                                    <span class="filter-set-option-meta">@Localizer["FilterPane_FilterSetOptionMeta", FormatFilterSetDetail(filterSet)]</span>
+                                <span class="filter-set-option-row">
+                                    <span class="filter-set-option-name" data-tooltip="@FormatFilterSetLabel(filterSet)" data-tooltip-overflow>@filterSet.Name</span>
+                                    <span class="filter-set-option-meta" data-tooltip="@FormatFilterSetLabel(filterSet)" data-tooltip-overflow>@Localizer["FilterPane_FilterSetOptionMeta", FormatFilterSetDetail(filterSet)]</span>
                                 </span>
                             </ValueSelectItem>
                         }
@@ -283,8 +283,10 @@
                         ValueChanged="id => SelectedScenarioId = id">
                         @foreach (var scenario in VisibleScenarioMatches)
                         {
-                            <ValueSelectItem T="string" Value="scenario.Id">
-                                <span class="filter-set-option-row" title="@Localizer["FilterPane_Scenario_OptionTitle", ScenarioGroupLocalizer.GroupDisplay(Localizer, scenario.Group), scenario.Purpose]">
+                            <ValueSelectItem AriaLabel="@scenario.Name" Description="@Localizer["FilterPane_Scenario_OptionTitle", ScenarioGroupLocalizer.GroupDisplay(Localizer, scenario.Group), scenario.Purpose]"
+                                T="string"
+                                Value="scenario.Id">
+                                <span class="filter-set-option-row" data-tooltip="@Localizer["FilterPane_Scenario_OptionTitle", ScenarioGroupLocalizer.GroupDisplay(Localizer, scenario.Group), scenario.Purpose]">
                                     <span class="filter-set-option-name">@scenario.Name</span>
                                 </span>
                             </ValueSelectItem>

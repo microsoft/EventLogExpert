@@ -13,8 +13,6 @@
                          <button class="correlation-row-button"
                              disabled="@_stale"
                              @onclick="() => OnEventActivated(correlatedEvent)"
-                             title="@(display.MessageSnippet.Length > 0 ?
-                                        display.MessageSnippet : Localizer["Correlation_NoMessage"].Value)"
                              type="button">
                              <span aria-hidden="true" class="correlation-row-severity @SeverityIconClass(display.Severity)"></span>
                              <span class="correlation-row-time">@FormatTime(correlatedEvent.TimeTicks)</span>
@@ -26,7 +24,7 @@
                              {
                                  <span class="correlation-row-source">@display.Source</span>
                              }
-                             <span class="correlation-row-message">
+                             <span class="correlation-row-message" data-tooltip="@display.MessageSnippet" data-tooltip-overflow>
                                  @if (display.MessageSnippet.Length > 0) { @display.MessageSnippet }
                                  else
                                  {
@@ -92,30 +90,36 @@
                 }
                 @if (focus.ErrorTotal > 0)
                 {
-                    <span class="correlation-summary-error" title="@Localizer["Correlation_ErrorTooltip"].Value">
+                    <span class="correlation-summary-error" data-tooltip="@Localizer["Correlation_ErrorTooltip"].Value">
                         <i aria-hidden="true" class="bi bi-exclamation-circle"></i> @FormatErrorCount(focus.ErrorTotal)
                     </span>
+                    <span class="visually-hidden">@Localizer["Correlation_ErrorTooltip"].Value</span>
                 }
                 @if (focus.WarningCount > 0)
                 {
-                    <span class="correlation-summary-warning" title="@Localizer["Correlation_WarningTooltip"].Value">
+                    <span class="correlation-summary-warning" data-tooltip="@Localizer["Correlation_WarningTooltip"].Value">
                         <i aria-hidden="true" class="bi bi-exclamation-triangle"></i> @FormatWarningCount(focus.WarningCount)
                     </span>
+                    <span class="visually-hidden">@Localizer["Correlation_WarningTooltip"].Value</span>
                 }
-                <span class="correlation-activity-id" title="@focus.ActivityId">@FormatActivityId(focus.ActivityId)</span>
+                <span aria-hidden="true" class="correlation-activity-id" data-tooltip="@focus.ActivityId">@FormatActivityId(focus.ActivityId)</span>
+                <span class="visually-hidden">@focus.ActivityId</span>
             </div>
             <div class="correlation-summary-actions">
-                <button class="correlation-filter-action"
+                <button aria-describedby="correlation-focus-filter-hint"
+                    class="correlation-filter-action"
+                    data-tooltip="@Localizer["Correlation_FilterTooltip"].Value"
                     @onclick="() => OnFilterToActivity(focus.ActivityId)"
-                    title="@Localizer["Correlation_FilterTooltip"].Value"
                     type="button">
                     @Localizer["Correlation_FilterButton"]
                 </button>
+                <span class="visually-hidden" id="correlation-focus-filter-hint">@Localizer["Correlation_FilterTooltip"].Value</span>
                 @if (focus.IsSharedOversized)
                 {
-                    <span class="correlation-warn" title="@Localizer["Correlation_SharedActivityTooltip"].Value">
+                    <span class="correlation-warn" data-tooltip="@Localizer["Correlation_SharedActivityTooltip"].Value">
                         @Localizer["Correlation_SharedActivityBadge"]
                     </span>
+                    <span class="visually-hidden">@Localizer["Correlation_SharedActivityTooltip"].Value</span>
                 }
             </div>
         </div>
@@ -135,7 +139,8 @@
                             type="button">
                             <i aria-hidden="true" class="bi @(IsExpanded(node) ? "bi-caret-down-fill" : "bi-caret-right-fill")"></i>
                             <span class="correlation-role">@RoleLabel(node.Role)</span>
-                            <span class="correlation-activity-id" title="@node.ActivityId">@FormatActivityId(node.ActivityId)</span>
+                            <span aria-hidden="true" class="correlation-activity-id" data-tooltip="@node.ActivityId">@FormatActivityId(node.ActivityId)</span>
+                            <span class="visually-hidden">@node.ActivityId</span>
                             <span class="correlation-count">@FormatEventCount(node.EventCount)</span>
                             @if (node.ErrorTotal > 0)
                             {
@@ -147,21 +152,24 @@
                             }
                             @if (node.IsCycle)
                             {
-                                <span class="correlation-warn" title="@Localizer["Correlation_CycleTooltip"].Value">
+                                <span class="correlation-warn" data-tooltip="@Localizer["Correlation_CycleTooltip"].Value">
                                     @Localizer["Correlation_CycleBadge"]
                                 </span>
+                                <span class="visually-hidden">@Localizer["Correlation_CycleTooltip"].Value</span>
                             }
                             @if (node.HasMultipleParents)
                             {
-                                <span class="correlation-warn" title="@Localizer["Correlation_MultipleParentsTooltip"].Value">
+                                <span class="correlation-warn" data-tooltip="@Localizer["Correlation_MultipleParentsTooltip"].Value">
                                     @Localizer["Correlation_MultipleParentsBadge"]
                                 </span>
+                                <span class="visually-hidden">@Localizer["Correlation_MultipleParentsTooltip"].Value</span>
                             }
                             @if (node.IsSharedOversized)
                             {
-                                <span class="correlation-warn" title="@Localizer["Correlation_SharedActivityCompactTooltip"].Value">
+                                <span class="correlation-warn" data-tooltip="@Localizer["Correlation_SharedActivityCompactTooltip"].Value">
                                     @Localizer["Correlation_SharedActivityBadge"]
                                 </span>
+                                <span class="visually-hidden">@Localizer["Correlation_SharedActivityCompactTooltip"].Value</span>
                             }
                         </button>
                         @if (IsExpanded(node))
@@ -174,12 +182,14 @@
                             {
                                 @Timeline(node)
                                 <div class="correlation-chip-actions">
-                                    <button class="correlation-filter-action"
+                                    <button aria-describedby="@($"correlation-filter-hint-{node.ActivityId}")"
+                                        class="correlation-filter-action"
+                                        data-tooltip="@Localizer["Correlation_FilterCompactTooltip"].Value"
                                         @onclick="() => OnFilterToActivity(node.ActivityId)"
-                                        title="@Localizer["Correlation_FilterCompactTooltip"].Value"
                                         type="button">
                                         @Localizer["Correlation_FilterButton"]
                                     </button>
+                                    <span class="visually-hidden" id="@($"correlation-filter-hint-{node.ActivityId}")">@Localizer["Correlation_FilterCompactTooltip"].Value</span>
                                 </div>
                             }
                         }
