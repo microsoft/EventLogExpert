@@ -1,35 +1,34 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-// A single shared, position:fixed tooltip that surfaces an icon-only control's label on BOTH keyboard
-// focus and pointer hover. The native `title` attribute only appears on mouse hover, leaving keyboard
-// users with no visible label. A CSS ::after bubble can't stand in because these
-// controls live inside overflow-clipping scroll panes (e.g. the filter pane, which is overflow:auto and,
-// when the filter list is collapsed, only header-height): a bubble anchored to the button would be clipped
-// by the pane. One fixed-position element appended to <body> escapes every ancestor clip.
+// A single shared, position:fixed tooltip that surfaces an icon-only control's label on BOTH keyboard focus
+// and pointer hover. The native `title` attribute only appears on mouse hover, leaving keyboard users with no
+// visible label; a CSS ::after bubble can't stand in because these controls live inside overflow-clipping
+// scroll panes (e.g. the filter pane), so a bubble anchored to the button would be clipped. One fixed-position
+// element appended to <body> escapes every ancestor clip.
 //
 // Opt in with data-tooltip="text" on the control. The accessible NAME still comes from the control's own
-// aria-label, so this element is a purely visual aid and is intentionally NOT wired via aria-describedby
-// (that would double-announce). Escape dismisses it, it stays visible while the pointer is over the control
-// or the bubble (so a pointer user can read it), and scroll/resize reposition it while its trigger is active
-// and drop it otherwise so it never drifts away stale (WCAG 1.4.13 dismissable / hoverable / persistent).
-// One idempotent registration wires delegated, capture-phase listeners for the whole app.
+// aria-label, so this element is a purely visual aid and is NOT wired via aria-describedby (that would
+// double-announce).
+//
+// The interaction imitates a native OS tooltip for the pointer: it waits SHOW_DELAY_MS before appearing, shows
+// near the cursor's rest point, and hides promptly on leave. The bubble is `pointer-events:none` (inert): it
+// can never be hovered - a deliberate tradeoff for the native feel, since the text is duplicated on the
+// control and exposed via aria (so no information is lost), Escape still dismisses it, and it stays while the
+// pointer is over the control. Keyboard focus shows the bubble promptly, anchored to the control (there is no
+// cursor).
+//
+// The logic is a pure `reduce(state, event)` state machine (exported, unit-tested) driven by a thin adapter
+// that owns the DOM, the timers, and the overflow-gate resolution. The reducer tracks RAW [data-tooltip]
+// leaves; the adapter resolves each to the effective anchor at render time.
+
+const SHOW_DELAY_MS = 500;
+const HIDE_DELAY_MS = 100;
+const CURSOR_OFFSET_X = 14;
+const CURSOR_OFFSET_Y = 18;
+const VIEWPORT_MARGIN = 4;
 
 let registered = false;
-let tip = null;
-// Keyboard focus and pointer hover are tracked separately because they can rest on DIFFERENT controls at
-// once (e.g. tab to A, then hover B): the hovered control wins the display while hovered, and leaving it
-// restores the still-focused control's tooltip instead of dropping it (WCAG 1.4.13 persistent).
-let focusedAnchor = null;
-let hoveredAnchor = null;
-let pointerOverTip = false;
-let hideTimer = 0;
-let hoverEndTimer = 0;
-let attributeObserver = null;
-let escapeConsumed = false;
-// The control the bubble is currently anchored to (the resolved effective anchor, which can differ from the
-// hovered/focused leaf when an unclipped overflow anchor was ascended past). Used to reposition on scroll.
-let shownAnchor = null;
 
 // --- Pure decision helpers (no module state, no side effects), exported for unit tests. ---
 
@@ -57,282 +56,488 @@ export function resolveEffectiveAnchor(leaf, clipped) {
     return anchor;
 }
 
-// When the pointer leaves a hovered anchor for a related target inside an ANCESTOR tooltip anchor (e.g. an
-// inner overflow label to its enclosing control), the hover should transfer to that ancestor - otherwise the
-// ancestor's own pointerover is suppressed (relatedTarget is still inside it) and its tooltip would vanish
-// after the bridge delay even though the pointer is still over the control. Returns the ancestor to hand off
-// to, or null to begin the normal hover-end. Pure; exported for tests.
-export function hoverTransferAnchor(hovered, relatedAnchor) {
-    return relatedAnchor && relatedAnchor !== hovered && relatedAnchor.contains(hovered) ? relatedAnchor : null;
+// When the pointer leaves a hovered/pending anchor for a related target inside an ANCESTOR tooltip anchor, the
+// hover should transfer to that ancestor - otherwise the ancestor's own pointerover is suppressed (the
+// relatedTarget is still inside it) and its tooltip would never start. Returns the ancestor to hand off to, or
+// null. Pure; exported for tests.
+export function hoverTransferAnchor(leaf, relatedAnchor) {
+    return relatedAnchor && relatedAnchor !== leaf && relatedAnchor.contains(leaf) ? relatedAnchor : null;
 }
 
-// The control the user is currently pointing at or has keyboard-focused (the "leaf"); a hovered control takes
-// precedence. This is the raw activity signal kept alive across scroll/hover-end; the actually-shown bubble is
-// resolved from it through the overflow gate in update().
-function activeAnchor() { return selectAnchor(focusedAnchor, hoveredAnchor); }
+// Place a cursor-anchored bubble near the pointer rest point: offset down-right, flip to the left of the
+// cursor when it would overflow the right edge and above the cursor when it would overflow the bottom, then
+// clamp into the viewport. On each non-degenerate branch the returned box excludes the pointer (default:
+// left>px && top>py; flip-left: right<px; flip-up: bottom<py); an over-large box clamps to the margin so the
+// top-left of the text stays on screen (the bubble is inert, so an unavoidable overlap is harmless). Pure;
+// exported for tests.
+export function cursorPoint(px, py, tipWidth, tipHeight, viewportWidth, viewportHeight, options) {
+    const offsetX = options && options.offsetX != null ? options.offsetX : CURSOR_OFFSET_X;
+    const offsetY = options && options.offsetY != null ? options.offsetY : CURSOR_OFFSET_Y;
+    const margin = options && options.margin != null ? options.margin : VIEWPORT_MARGIN;
 
-function ensureTip() {
-    if (tip) { return tip; }
+    let left = px + offsetX;
+    if (left + tipWidth > viewportWidth - margin) { left = px - offsetX - tipWidth; }
 
-    tip = document.createElement("div");
-    tip.className = "focus-tooltip";
-    tip.setAttribute("role", "tooltip");
-    tip.hidden = true;
+    let top = py + offsetY;
+    if (top + tipHeight > viewportHeight - margin) { top = py - offsetY - tipHeight; }
 
-    // Let the pointer move onto the bubble to read it without it vanishing (WCAG 1.4.13 hoverable). Leaving
-    // the bubble re-derives the hovered control from where the pointer went (back onto a control, or nothing).
-    // Touch has no hover and its tap-compatibility events would pin the bubble open, so only mouse/pen count.
-    tip.addEventListener("pointerenter", (e) => {
-        if (e.pointerType === "touch") { return; }
-        pointerOverTip = true; cancelHide(); cancelHoverEnd();
-    });
-    tip.addEventListener("pointerleave", (e) => {
-        if (e.pointerType === "touch") { return; }
-        pointerOverTip = false;
-        hoveredAnchor = e.relatedTarget?.closest?.("[data-tooltip]") ?? null;
-        update();
-    });
-
-    document.body.appendChild(tip);
-
-    return tip;
+    left = Math.max(margin, Math.min(left, viewportWidth - margin - tipWidth));
+    top = Math.max(margin, Math.min(top, viewportHeight - margin - tipHeight));
+    return { left, top };
 }
 
-function cancelHide() {
-    if (hideTimer) {
-        clearTimeout(hideTimer);
-        hideTimer = 0;
-    }
+// --- Pure state machine (no DOM, no timers), exported for unit tests. ---
+// State fields are RAW [data-tooltip] leaves (or null) plus display bookkeeping:
+//   focusedAnchor  keyboard-focused control
+//   pendingAnchor  control under the pointer whose SHOW_DELAY_MS timer is running (excluded from display)
+//   hoveredAnchor  matured hovered control (wins over focus)
+//   displayLeaf    the raw leaf whose display was last requested (drives the observer + attrChange)
+//   displayedMode  'cursor' | 'element' | null - how displayLeaf is currently placed
+//   visible        whether the adapter currently shows a bubble (set by renderResolved; read only by jitter)
+//   showGen        bumped on every (re)schedule/cancel; a showTimerFire promotes only if its token still matches
+//   hideScheduled  a conceal timer is pending
+export function initialTooltipState() {
+    return {
+        focusedAnchor: null,
+        pendingAnchor: null,
+        hoveredAnchor: null,
+        displayLeaf: null,
+        displayedMode: null,
+        visible: false,
+        showGen: 0,
+        hideScheduled: false,
+    };
 }
 
-function scheduleHide() {
-    // Delay the hide so the pointer can bridge the small gap between the control and the bubble without it
-    // vanishing, and so a focus<->hover handoff doesn't flicker.
-    cancelHide();
-    hideTimer = setTimeout(() => {
-        hideTimer = 0;
-        if (!activeAnchor() && !pointerOverTip) { hide(); }
-    }, 120);
-}
+// reduce(state, event) -> { state, effects }. Pure. Events and effects are plain objects; the adapter owns the
+// DOM/timer side of each effect. Invariants: render(x,m) <=> displayLeaf=x,displayedMode=m; conceal/teardown
+// <=> displayLeaf=null,displayedMode=null; scheduleHide <=> hideScheduled=true, cancelHideTimer <=> false;
+// pendingAnchor is never displayed and never equals hoveredAnchor; visible mirrors real on-screen presence.
+export function reduce(state, event) {
+    const next = { ...state };
+    const effects = [];
 
-function cancelHoverEnd() {
-    if (hoverEndTimer) {
-        clearTimeout(hoverEndTimer);
-        hoverEndTimer = 0;
-    }
-}
-
-function scheduleHoverEnd() {
-    // Keep showing the just-left hovered control through the bridge delay so the pointer can still reach its
-    // tooltip; without this, when another control holds keyboard focus, activeAnchor() would fall back to the
-    // focused control the instant the pointer leaves and the hovered control's tooltip could never be hovered
-    // (WCAG 1.4.13 hoverable). Reaching the bubble (pointerOverTip) or another control (pointerover) cancels it.
-    cancelHoverEnd();
-    hoverEndTimer = setTimeout(() => {
-        hoverEndTimer = 0;
-        if (!pointerOverTip) {
-            hoveredAnchor = null;
-            update();
+    switch (event.type) {
+        case "hoverEnter": {
+            const anchor = event.anchor;
+            if (anchor === next.hoveredAnchor) {
+                next.hideScheduled = false;
+                effects.push({ type: "cancelHideTimer" });
+            } else if (anchor === next.pendingAnchor) {
+                // Already counting down for this exact leaf; keep the running timer.
+            } else if (anchor === next.displayLeaf && next.hideScheduled && next.displayedMode === "cursor" && next.visible) {
+                // Jitter-bridge: the pointer briefly left a still-visible cursor bubble and came back to the
+                // same leaf. Restore it without re-waiting the show delay.
+                next.hoveredAnchor = anchor;
+                next.pendingAnchor = null;
+                next.showGen++;
+                next.hideScheduled = false;
+                effects.push({ type: "cancelHideTimer" }, { type: "cancelShowTimer" });
+            } else {
+                next.pendingAnchor = anchor;
+                next.showGen++;
+                effects.push({ type: "cancelShowTimer" }, { type: "scheduleShow", gen: next.showGen });
+            }
+            break;
         }
-    }, 120);
-}
-
-function position(anchor, element) {
-    const rect = anchor.getBoundingClientRect();
-    // The bubble sits flush against the control (no gap) so the pointer path from control to bubble is
-    // continuous and staying hovered is not pointer-speed-dependent (WCAG 1.4.13): a gap would leave a
-    // non-hit-testable strip that a slow crossing could dwell in past the hover-end delay, losing the bubble.
-    // Measure with fractional (sub-pixel) geometry and leave the trigger-facing edge unrounded so the two
-    // border-boxes share an exact coordinate at every device-pixel ratio; rounding it would reopen a
-    // sub-pixel seam (or a click-stealing overlap) at fractional zoom levels such as WCAG's 400%.
-    const gap = 0;
-    const margin = 4;
-    const tipRect = element.getBoundingClientRect();
-    const width = tipRect.width;
-    const height = tipRect.height;
-    const viewportWidth = document.documentElement.clientWidth;
-    const viewportHeight = document.documentElement.clientHeight;
-
-    // Prefer below the control; flip above only when there is no room below but there is above.
-    let top = rect.bottom + gap;
-    if (top + height > viewportHeight - margin && rect.top - gap - height >= margin) {
-        top = rect.top - gap - height;
+        case "hoverLeave": {
+            const anchor = event.anchor;
+            const transferTarget = event.transferTarget;
+            if (anchor === next.pendingAnchor) {
+                if (transferTarget === next.hoveredAnchor) {
+                    // The pointer went back to the already-shown ancestor; drop the pending, keep the mature.
+                    next.pendingAnchor = null;
+                    next.showGen++;
+                    effects.push({ type: "cancelShowTimer" });
+                } else if (transferTarget) {
+                    next.pendingAnchor = transferTarget;
+                    next.showGen++;
+                    effects.push({ type: "cancelShowTimer" }, { type: "scheduleShow", gen: next.showGen });
+                } else {
+                    next.pendingAnchor = null;
+                    next.showGen++;
+                    effects.push({ type: "cancelShowTimer" });
+                }
+            } else if (anchor === next.hoveredAnchor) {
+                if (transferTarget) {
+                    next.hoveredAnchor = transferTarget;
+                    next.displayLeaf = transferTarget;
+                    next.displayedMode = "cursor";
+                    effects.push({ type: "render", anchor: transferTarget, mode: "cursor" });
+                } else {
+                    next.hoveredAnchor = null;
+                    if (next.focusedAnchor) {
+                        // Fall back to the still-focused control's tooltip immediately (no linger).
+                        next.displayLeaf = next.focusedAnchor;
+                        next.displayedMode = "element";
+                        next.hideScheduled = false;
+                        effects.push({ type: "cancelHideTimer" }, { type: "render", anchor: next.focusedAnchor, mode: "element" });
+                    } else {
+                        next.hideScheduled = true;
+                        effects.push({ type: "scheduleHide" });
+                    }
+                }
+            }
+            break;
+        }
+        case "showTimerFire": {
+            if (event.gen !== next.showGen || !next.pendingAnchor) { break; }
+            if (!event.stillOver) { next.pendingAnchor = null; break; }
+            next.hoveredAnchor = next.pendingAnchor;
+            next.displayLeaf = next.pendingAnchor;
+            next.displayedMode = "cursor";
+            next.pendingAnchor = null;
+            effects.push({ type: "capturePoint" }, { type: "render", anchor: next.hoveredAnchor, mode: "cursor" });
+            break;
+        }
+        case "hideTimerFire": {
+            if (!next.hideScheduled) { break; }
+            next.hideScheduled = false;
+            if (next.hoveredAnchor == null && next.focusedAnchor == null) {
+                next.displayLeaf = null;
+                next.displayedMode = null;
+                next.visible = false;
+                effects.push({ type: "conceal" });
+            } else {
+                const leaf = next.hoveredAnchor || next.focusedAnchor;
+                const mode = next.hoveredAnchor ? "cursor" : "element";
+                next.displayLeaf = leaf;
+                next.displayedMode = mode;
+                effects.push({ type: "render", anchor: leaf, mode });
+            }
+            break;
+        }
+        case "focusIn": {
+            next.focusedAnchor = event.anchor;
+            next.hideScheduled = false;
+            effects.push({ type: "cancelHideTimer" });
+            if (!next.hoveredAnchor) {
+                next.displayLeaf = event.anchor;
+                next.displayedMode = "element";
+                effects.push({ type: "render", anchor: event.anchor, mode: "element" });
+            }
+            break;
+        }
+        case "focusOut": {
+            if (event.anchor === next.focusedAnchor) {
+                next.focusedAnchor = null;
+                if (!next.hoveredAnchor) {
+                    next.hideScheduled = true;
+                    effects.push({ type: "scheduleHide" });
+                }
+            }
+            break;
+        }
+        case "pointerDown": {
+            next.focusedAnchor = null;
+            next.pendingAnchor = null;
+            next.showGen++;
+            effects.push({ type: "cancelShowTimer" });
+            if (!next.hoveredAnchor && next.displayLeaf) {
+                next.hideScheduled = true;
+                effects.push({ type: "scheduleHide" });
+            }
+            break;
+        }
+        case "escape": {
+            next.focusedAnchor = null;
+            next.pendingAnchor = null;
+            next.hoveredAnchor = null;
+            next.displayLeaf = null;
+            next.displayedMode = null;
+            next.visible = false;
+            next.showGen++;
+            next.hideScheduled = false;
+            effects.push({ type: "cancelShowTimer" }, { type: "cancelHideTimer" }, { type: "teardown" });
+            break;
+        }
+        case "scroll": {
+            // A cursor bubble is pinned to a stale rest point once content scrolls (native tooltips vanish on
+            // scroll), so drop it; a focus bubble stays put and repositions to its control.
+            next.pendingAnchor = null;
+            next.showGen++;
+            effects.push({ type: "cancelShowTimer" });
+            if (next.hoveredAnchor) {
+                next.hoveredAnchor = null;
+                next.hideScheduled = false;
+                if (next.focusedAnchor) {
+                    next.displayLeaf = next.focusedAnchor;
+                    next.displayedMode = "element";
+                    effects.push({ type: "cancelHideTimer" }, { type: "render", anchor: next.focusedAnchor, mode: "element" });
+                } else {
+                    next.displayLeaf = null;
+                    next.displayedMode = null;
+                    next.visible = false;
+                    effects.push({ type: "cancelHideTimer" }, { type: "conceal" });
+                }
+            } else if (next.focusedAnchor) {
+                effects.push({ type: "reposition" });
+            } else if (next.displayLeaf) {
+                next.displayLeaf = null;
+                next.displayedMode = null;
+                next.hideScheduled = false;
+                next.visible = false;
+                effects.push({ type: "cancelHideTimer" }, { type: "conceal" });
+            }
+            break;
+        }
+        case "attrChange": {
+            if (next.displayLeaf) {
+                effects.push({ type: "render", anchor: next.displayLeaf, mode: next.displayedMode });
+            }
+            break;
+        }
+        case "renderResolved": {
+            if (event.anchor === next.displayLeaf) { next.visible = event.visible; }
+            break;
+        }
     }
 
-    // Align the tooltip's right edge to the control's, then clamp into the viewport. The horizontal edge has
-    // no flush neighbor, so it stays pixel-snapped to keep the label text crisp.
-    let left = rect.right - width;
-    left = Math.max(margin, Math.min(left, viewportWidth - margin - width));
-
-    element.style.left = `${Math.round(left)}px`;
-    element.style.top = `${top}px`;
+    return { state: next, effects };
 }
 
-function reposition() {
-    if (shownAnchor && tip && !tip.hidden) { position(shownAnchor, tip); }
-}
-
-// Re-render the tooltip for whichever control is currently active, or begin hiding it when none is. Called
-// on every focus/hover change (and by the attribute observer) so the bubble always reflects current state.
-function update() {
-    const leaf = activeAnchor();
-    const anchor = resolveEffectiveAnchor(leaf, isClipped);
-
-    if (!anchor) {
-        shownAnchor = null;
-        // An active-but-suppressed leaf (an unclipped overflow anchor with no showable ancestor) conceals the
-        // bubble WITHOUT clearing focus/hover state, so a still-focused control's tooltip is restored once the
-        // pointer leaves the unclipped hovered control. Nothing active at all begins the normal hide.
-        if (leaf) { concealTip(); }
-        else if (!pointerOverTip) { scheduleHide(); }
-        return;
-    }
-
-    const text = anchor.getAttribute("data-tooltip");
-    if (!text) { hide(); return; }
-
-    cancelHide();
-
-    const element = ensureTip();
-    element.textContent = text;
-    // Overflow/opt-in-wide anchors get the roomier bubble so long paths/messages read on fewer, wider lines.
-    element.classList.toggle("focus-tooltip--wide",
-        anchor.hasAttribute("data-tooltip-overflow") || anchor.hasAttribute("data-tooltip-wide"));
-    element.hidden = false;
-    shownAnchor = anchor;
-    position(anchor, element);
-
-    // The control can rewrite its own data-tooltip in place while it stays focused / hovered (e.g. the
-    // filter-list collapse toggle flips Expanded<->Collapsed on Enter), which dispatches neither a focus nor
-    // a mouse event - watch the attribute so the visible bubble tracks the current state.
-    attributeObserver ??= new MutationObserver(update);
-    attributeObserver.disconnect();
-    attributeObserver.observe(anchor, { attributes: true, attributeFilter: ["data-tooltip"] });
-}
-
-// Hide the bubble WITHOUT resetting focus/hover bookkeeping (unlike hide()), so a concealed overflow anchor
-// doesn't tear down a still-active focus/hover that should restore its own tooltip.
-function concealTip() {
-    cancelHide();
-    if (tip) { tip.hidden = true; }
-}
-
-function hide() {
-    cancelHide();
-    cancelHoverEnd();
-    if (attributeObserver) { attributeObserver.disconnect(); }
-    focusedAnchor = null;
-    hoveredAnchor = null;
-    pointerOverTip = false;
-    shownAnchor = null;
-    if (tip) { tip.hidden = true; }
-}
+// --- Adapter: owns the DOM, timers, pointer tracking, and overflow-gate resolution. ---
 
 export function registerFocusTooltip() {
     if (registered) { return; }
     registered = true;
 
-    document.addEventListener("focusin", (e) => {
-        const anchor = e.target.closest?.("[data-tooltip]");
-        // Only KEYBOARD focus should surface the tooltip. A pointer click also focuses the control, and that
-        // focus would otherwise leave the bubble stuck open after the pointer moved away. :focus-visible is
-        // the browser's keyboard-focus signal, which is keyboard-only for these buttons in WebView2. When the
-        // tooltip lives on a wrapper (e.g. a <label> whose inner <input> is the real focus target), the wrapper
-        // itself won't match :focus-visible, so also accept a keyboard-focused descendant.
-        const active = document.activeElement;
-        const keyboardFocused = !!anchor && (anchor.matches(":focus-visible") ||
-            (anchor.contains(active) && !!active && active.matches?.(":focus-visible")));
-        focusedAnchor = keyboardFocused ? anchor : null;
-        update();
-    }, true);
+    let state = initialTooltipState();
+    let tip = null;
+    let showTimer = 0;
+    let hideTimer = 0;
+    let pointerX = 0;
+    let pointerY = 0;
+    let showPointX = 0;
+    let showPointY = 0;
+    // The effective anchor currently on screen (may be an ancestor of displayLeaf), kept for reposition.
+    let shownAnchor = null;
+    // Direct references to the raw leaves the reducer last held, so a leave still matches even if the node
+    // loses its data-tooltip attribute mid-hover (attribute-based re-lookup would then fail).
+    let hoveredNode = null;
+    let pendingNode = null;
+    let attributeObserver = null;
+    let escapeConsumed = false;
 
-    document.addEventListener("pointerdown", () => {
-        // A pointer interaction supersedes a keyboard-focus tooltip: pointer users are governed by hover
-        // alone, so a control that was tabbed to and then clicked doesn't keep its bubble after the pointer
-        // leaves.
-        if (focusedAnchor) { focusedAnchor = null; update(); }
-    }, true);
+    function ensureTip() {
+        if (tip) { return tip; }
+        tip = document.createElement("div");
+        tip.className = "focus-tooltip";
+        tip.setAttribute("role", "tooltip");
+        tip.hidden = true;
+        document.body.appendChild(tip);
+        return tip;
+    }
 
-    document.addEventListener("focusout", (e) => {
-        // Focus left this control; focusin resets focusedAnchor synchronously if it lands on another anchor.
-        if (focusedAnchor && e.target.closest?.("[data-tooltip]") === focusedAnchor) {
-            focusedAnchor = null;
-            update();
+    function positionElement(anchor, element) {
+        // Keyboard focus has no cursor: sit flush below the control, right edges aligned, clamped horizontally.
+        const rect = anchor.getBoundingClientRect();
+        const tipRect = element.getBoundingClientRect();
+        const width = tipRect.width;
+        const height = tipRect.height;
+        const viewportWidth = document.documentElement.clientWidth;
+        const viewportHeight = document.documentElement.clientHeight;
+
+        let top = rect.bottom;
+        if (top + height > viewportHeight - VIEWPORT_MARGIN && rect.top - height >= VIEWPORT_MARGIN) {
+            top = rect.top - height;
         }
+        let left = rect.right - width;
+        left = Math.max(VIEWPORT_MARGIN, Math.min(left, viewportWidth - VIEWPORT_MARGIN - width));
+
+        element.style.left = `${Math.round(left)}px`;
+        element.style.top = `${top}px`;
+    }
+
+    function positionCursor(element) {
+        const tipRect = element.getBoundingClientRect();
+        const point = cursorPoint(
+            showPointX, showPointY, tipRect.width, tipRect.height,
+            document.documentElement.clientWidth, document.documentElement.clientHeight,
+            { offsetX: CURSOR_OFFSET_X, offsetY: CURSOR_OFFSET_Y, margin: VIEWPORT_MARGIN });
+        element.style.left = `${Math.round(point.left)}px`;
+        element.style.top = `${Math.round(point.top)}px`;
+    }
+
+    function observe(rawLeaf, effective) {
+        // Watch data-tooltip on BOTH the requested leaf and the resolved effective anchor (when different), so
+        // a control that rewrites its own tooltip while a hovered inner label ascends to it still updates.
+        attributeObserver ??= new MutationObserver(() => dispatch({ type: "attrChange" }));
+        attributeObserver.disconnect();
+        attributeObserver.observe(rawLeaf, { attributes: true, attributeFilter: ["data-tooltip"] });
+        if (effective && effective !== rawLeaf) {
+            attributeObserver.observe(effective, { attributes: true, attributeFilter: ["data-tooltip"] });
+        }
+    }
+
+    function stopObserving() {
+        if (attributeObserver) { attributeObserver.disconnect(); }
+    }
+
+    function applyRender(rawLeaf, mode) {
+        const element = ensureTip();
+        const effective = resolveEffectiveAnchor(rawLeaf, isClipped);
+        const text = effective ? effective.getAttribute("data-tooltip") : null;
+        if (effective && text) {
+            element.textContent = text;
+            element.classList.toggle("focus-tooltip--wide",
+                effective.hasAttribute("data-tooltip-overflow") || effective.hasAttribute("data-tooltip-wide"));
+            element.hidden = false;
+            shownAnchor = effective;
+            if (mode === "cursor") { positionCursor(element); } else { positionElement(effective, element); }
+            observe(rawLeaf, effective);
+            dispatch({ type: "renderResolved", anchor: rawLeaf, visible: true });
+        } else {
+            shownAnchor = null;
+            stopObserving();
+            element.hidden = true;
+            dispatch({ type: "renderResolved", anchor: rawLeaf, visible: false });
+        }
+    }
+
+    function computeStillOver() {
+        const node = state.pendingAnchor;
+        if (!node || !node.isConnected) { return false; }
+        const under = document.elementFromPoint(pointerX, pointerY);
+        return !!under && node.contains(under);
+    }
+
+    function applyEffect(effect) {
+        switch (effect.type) {
+            case "scheduleShow":
+                if (showTimer) { clearTimeout(showTimer); }
+                showTimer = setTimeout(() => {
+                    showTimer = 0;
+                    dispatch({ type: "showTimerFire", gen: effect.gen, stillOver: computeStillOver() });
+                }, SHOW_DELAY_MS);
+                break;
+            case "cancelShowTimer":
+                if (showTimer) { clearTimeout(showTimer); showTimer = 0; }
+                break;
+            case "scheduleHide":
+                if (hideTimer) { clearTimeout(hideTimer); }
+                hideTimer = setTimeout(() => { hideTimer = 0; dispatch({ type: "hideTimerFire" }); }, HIDE_DELAY_MS);
+                break;
+            case "cancelHideTimer":
+                if (hideTimer) { clearTimeout(hideTimer); hideTimer = 0; }
+                break;
+            case "capturePoint":
+                showPointX = pointerX;
+                showPointY = pointerY;
+                break;
+            case "render":
+                applyRender(effect.anchor, effect.mode);
+                break;
+            case "reposition":
+                if (shownAnchor && tip && !tip.hidden) { positionElement(shownAnchor, tip); }
+                break;
+            case "conceal":
+                shownAnchor = null;
+                stopObserving();
+                if (tip) { tip.hidden = true; }
+                break;
+            case "teardown":
+                shownAnchor = null;
+                hoveredNode = null;
+                pendingNode = null;
+                stopObserving();
+                if (tip) { tip.hidden = true; }
+                break;
+        }
+    }
+
+    function dispatch(event) {
+        const result = reduce(state, event);
+        state = result.state;
+        // Keep the adapter's raw-node references in step with the reducer so a leave can match by containment
+        // even after an anchor loses its data-tooltip attribute.
+        hoveredNode = state.hoveredAnchor;
+        pendingNode = state.pendingAnchor;
+        for (const effect of result.effects) { applyEffect(effect); }
+    }
+
+    function closestAnchor(node) { return node && node.closest ? node.closest("[data-tooltip]") : null; }
+
+    document.addEventListener("pointermove", (e) => {
+        if (e.pointerType === "touch") { return; }
+        pointerX = e.clientX;
+        pointerY = e.clientY;
     }, true);
 
     document.addEventListener("pointerover", (e) => {
-        // Ignore touch: it has no hover, and a tap's compatibility events would open the tooltip during
-        // activation and leave it lingering (touch delivers no reliable pointerout on lift). Mouse and pen
-        // keep hover support (pointerType is "mouse", "pen", or "touch").
         if (e.pointerType === "touch") { return; }
-        const anchor = e.target.closest?.("[data-tooltip]");
-        // Ignore movement WITHIN the same control (e.g. the button <-> its icon child): a genuine enter
-        // comes from outside the anchor, so relatedTarget is not already inside it. Without this guard an
-        // Escape dismissal would reopen on the next internal transition even though the pointer never left
-        // the trigger (WCAG 1.4.13 dismissable).
-        if (anchor && !anchor.contains(e.relatedTarget)) { cancelHoverEnd(); hoveredAnchor = anchor; update(); }
+        pointerX = e.clientX;
+        pointerY = e.clientY;
+        const anchor = closestAnchor(e.target);
+        // A genuine enter comes from outside the anchor; movement within it (button <-> icon child) has a
+        // relatedTarget already inside, and must not restart the timer or reopen after an Escape dismissal.
+        if (anchor && !anchor.contains(e.relatedTarget)) { dispatch({ type: "hoverEnter", anchor }); }
     }, true);
 
     document.addEventListener("pointerout", (e) => {
         if (e.pointerType === "touch") { return; }
-        // Left the hovered control - but not when moving between its children or onto the bubble (the bubble's
-        // own pointerleave handles that handoff). Defer clearing it through the bridge delay so its tooltip stays
-        // reachable even when another control holds keyboard focus (which activeAnchor() would otherwise fall
-        // back to immediately).
-        if (hoveredAnchor
-            && e.target.closest?.("[data-tooltip]") === hoveredAnchor
-            && e.relatedTarget !== tip
-            && !hoveredAnchor.contains(e.relatedTarget)) {
-            const outer = hoverTransferAnchor(hoveredAnchor, e.relatedTarget?.closest?.("[data-tooltip]"));
-            if (outer) {
-                // Pointer moved out to an enclosing control's anchor - hand the hover to it now (its own
-                // pointerover is suppressed because relatedTarget is still inside it), instead of hiding.
-                cancelHoverEnd();
-                hoveredAnchor = outer;
-                update();
-            } else {
-                scheduleHoverEnd();
+        const related = e.relatedTarget;
+        // Match the leave against the stored raw nodes by containment (not a fresh attribute lookup), so it is
+        // recognized even if the node lost data-tooltip while hovered.
+        for (const node of [hoveredNode, pendingNode]) {
+            if (node && (node === e.target || node.contains(e.target)) && node !== related && !node.contains(related)) {
+                const transferTarget = hoverTransferAnchor(node, closestAnchor(related));
+                dispatch({ type: "hoverLeave", anchor: node, transferTarget });
             }
         }
     }, true);
 
+    document.addEventListener("focusin", (e) => {
+        const anchor = closestAnchor(e.target);
+        // Only KEYBOARD focus should surface the tooltip; a pointer click also focuses the control (and is
+        // governed by hover instead). :focus-visible is the browser's keyboard-focus signal for these buttons
+        // in WebView2; when the tooltip lives on a wrapper (<label> around the real <input>), accept a
+        // keyboard-focused descendant.
+        const active = document.activeElement;
+        const keyboardFocused = !!anchor && (anchor.matches(":focus-visible") ||
+            (anchor.contains(active) && !!active && active.matches?.(":focus-visible")));
+        if (keyboardFocused) { dispatch({ type: "focusIn", anchor }); }
+        else if (state.focusedAnchor) { dispatch({ type: "focusOut", anchor: state.focusedAnchor }); }
+    }, true);
+
+    document.addEventListener("pointerdown", () => { dispatch({ type: "pointerDown" }); }, true);
+
+    document.addEventListener("focusout", (e) => {
+        const anchor = closestAnchor(e.target);
+        if (anchor && anchor === state.focusedAnchor) { dispatch({ type: "focusOut", anchor }); }
+    }, true);
+
     document.addEventListener("keydown", (e) => {
         if (e.key !== "Escape") { return; }
-
-        // Dismiss on Escape without moving focus (WCAG 1.4.13). Consume the key while a tooltip is visible so
-        // the dismissal is standalone - for a control inside a dialog, an unconsumed Escape would also run the
-        // host's cancel and close it. Keep consuming the auto-repeat keydowns from the SAME held press (the
-        // tooltip is already hidden after the first) via the latch, so a held Escape can't fall through and
-        // close the host too. The latch clears on keyup, so a fresh Escape press reaches the host as usual.
-        if (tip && !tip.hidden) {
-            hide();
-            escapeConsumed = true;
-        }
-
+        // Dismiss on Escape without moving focus (WCAG 1.4.13 dismissable), and cancel a still-pending (not yet
+        // shown) hover so it can't pop after the key. Only CONSUME the key when a bubble was actually visible,
+        // so a merely-pending hover doesn't steal Escape from a host dialog. Keep consuming the auto-repeat
+        // keydowns from the same held press via the latch (cleared on keyup).
+        const wasVisible = !!(tip && !tip.hidden);
+        if (hasActiveTooltipState()) { dispatch({ type: "escape" }); }
+        if (wasVisible) { escapeConsumed = true; }
         if (escapeConsumed) {
             e.stopPropagation();
             e.preventDefault();
         }
     }, true);
 
-    document.addEventListener("keyup", (e) => {
-        if (e.key === "Escape") { escapeConsumed = false; }
-    }, true);
+    document.addEventListener("keyup", (e) => { if (e.key === "Escape") { escapeConsumed = false; } }, true);
 
-    // Also clear the latch if focus leaves the window mid-hold (e.g. Alt+Tab while Escape is held), since the
-    // matching keyup may then be delivered elsewhere and never seen here.
     window.addEventListener("blur", () => { escapeConsumed = false; });
 
-    // Keep the pinned bubble aligned with its control while a trigger is active; only drop it once nothing is
-    // focused/hovered, so a still-focused tooltip stays put (WCAG 1.4.13 persistent).
+    // Reposition/drop tooltips on scroll or resize. Gate on reducer state, not bubble visibility: during the
+    // 500ms hover-intent window the bubble is still hidden, but a scroll must still cancel that pending show
+    // (a cursor rest point goes stale once content moves).
+    function hasActiveTooltipState() {
+        return !!(state.pendingAnchor || state.hoveredAnchor || state.focusedAnchor || state.displayLeaf);
+    }
+
     document.addEventListener("scroll", () => {
-        if (!tip || tip.hidden) { return; }
-        if (activeAnchor() || pointerOverTip) { reposition(); } else { hide(); }
+        if (hasActiveTooltipState()) { dispatch({ type: "scroll" }); }
     }, true);
 
     window.addEventListener("resize", () => {
-        if (!tip || tip.hidden) { return; }
-        if (activeAnchor() || pointerOverTip) { reposition(); } else { hide(); }
+        if (hasActiveTooltipState()) { dispatch({ type: "scroll" }); }
     });
 }
