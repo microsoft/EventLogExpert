@@ -62,6 +62,48 @@ public sealed class ValueSelectTests : BunitContext
     }
 
     [Fact]
+    public void Item_WithAriaLabelAndDescription_PinsNameAndWiresUniqueDescribedByPerOption()
+    {
+        var options = new[]
+        {
+            (Value: "a", Name: "Alpha", Description: "The first option, described"),
+            (Value: "b", Name: "Beta", Description: "The second option, described"),
+        };
+
+        var component = Render<ValueSelect<string>>(parameters => parameters
+            .Add(p => p.Value, "a")
+            .Add(p => p.ValueChanged, _ => { })
+            .Add(p => p.ChildContent, builder =>
+            {
+                var seq = 0;
+
+                foreach (var option in options)
+                {
+                    builder.OpenComponent<ValueSelectItem<string>>(seq++);
+                    builder.AddAttribute(seq++, nameof(ValueSelectItem<string>.Value), option.Value);
+                    builder.AddAttribute(seq++, nameof(ValueSelectItem<string>.AriaLabel), option.Name);
+                    builder.AddAttribute(seq++, nameof(ValueSelectItem<string>.Description), option.Description);
+                    builder.CloseComponent();
+                }
+            }));
+
+        var rendered = component.FindAll("[role='option']");
+        Assert.Equal(2, rendered.Count);
+
+        // Name is pinned via aria-label so the hidden description span cannot pollute the option's accessible name.
+        Assert.Equal("Alpha", rendered[0].GetAttribute("aria-label"));
+        Assert.Equal("Beta", rendered[1].GetAttribute("aria-label"));
+
+        // Each option's describedby is unique (per-item ComponentId) and resolves to a hidden span with the text.
+        var firstDescribedBy = rendered[0].GetAttribute("aria-describedby")!;
+        var secondDescribedBy = rendered[1].GetAttribute("aria-describedby")!;
+        Assert.False(string.IsNullOrWhiteSpace(firstDescribedBy));
+        Assert.NotEqual(firstDescribedBy, secondDescribedBy);
+        Assert.Equal("The first option, described", component.Find($"#{firstDescribedBy}").TextContent);
+        Assert.Equal("The second option, described", component.Find($"#{secondDescribedBy}").TextContent);
+    }
+
+    [Fact]
     public void Keyboard_ArrowDownOnClosedSelect_OpensDropdownWithoutChangingValue()
     {
         string bound = "b";

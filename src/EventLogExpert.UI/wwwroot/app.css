@@ -253,10 +253,22 @@ input[type="search"]:focus-visible,
     border-radius: 3px;
     box-shadow: var(--shadow-menu);
 
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
 }
 
 .focus-tooltip[hidden] { display: none; }
+
+/* Wide variant for overflow/rich-text tooltips (long paths, full messages, multiline detail):
+   a larger cap with hard word-breaking and a bounded, scrollable height so long unbroken strings
+   can't extend past the viewport. Intentional newlines in the source text are preserved. */
+.focus-tooltip--wide {
+    max-width: min(40rem, 90vw);
+    max-height: min(50vh, 20rem);
+    overflow-y: auto;
+
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
 
 html, body {
     height: 100%;

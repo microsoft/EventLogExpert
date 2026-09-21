@@ -10,7 +10,7 @@
                     aria-label="@(filter.IsExcluded ? Localizer["FilterEditor_EditPanel_ExcludedAria"] : Localizer["FilterEditor_EditPanel_IncludedAria"])"
                     aria-pressed="@(filter.IsExcluded ? "true" : "false")"
                     data-excluded="@(filter.IsExcluded ? "true" : "false")"
-                    title="@(filter.IsExcluded ? Localizer["FilterEditor_ExcludeToggle_TitleExcluded"] : Localizer["FilterEditor_ExcludeToggle_TitleIncluded"])" />
+                    data-tooltip="@(filter.IsExcluded ? Localizer["FilterEditor_ExcludeToggle_TitleExcluded"] : Localizer["FilterEditor_ExcludeToggle_TitleIncluded"])" />
 
                 <div class="color-picker-wrapper" data-filter-excluded="@(filter.IsExcluded ? "true" : "false")">
                     <ValueSelect AriaDescribedBy="@(filter.IsExcluded ? _colorDescriptionId : null)"
@@ -46,7 +46,7 @@
                     IconOnly
                     OnClick="OnCancel"
                     aria-label="@Localizer["FilterEditor_Action_CancelEdit_Aria"]"
-                    title="@Localizer["FilterEditor_Action_CancelEdit_Title"]" />
+                    data-tooltip="@Localizer["FilterEditor_Action_CancelEdit_Title"]" />
 
                 @if (!IsPending)
                 {
@@ -54,7 +54,7 @@
                         IconOnly
                         OnClick="OnRemove"
                         aria-label="@Localizer["FilterEditor_Action_RemoveFilter_Aria"]"
-                        title="@Localizer["FilterEditor_Action_RemoveFilter_Title"]" />
+                        data-tooltip="@Localizer["FilterEditor_Action_RemoveFilter_Title"]" />
                 }
             </div>
         </div>

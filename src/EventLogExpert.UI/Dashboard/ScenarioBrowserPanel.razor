@@ -8,17 +8,20 @@
         <ul aria-label="@(Localizer["Dashboard_ScenariosListAria"])" class="scenario-browser__list" @onkeydown="OnListKeyDownAsync" role="listbox">
             @foreach (var scenario in Scenarios)
             {
-                <li aria-selected="@(IsSelected(scenario) ? "true" : "false")"
+                <li aria-describedby="@($"scenario-purpose-{scenario.Id}")"
+                    aria-label="@scenario.Name"
+                    aria-selected="@(IsSelected(scenario) ? "true" : "false")"
                     class="@OptionClass(scenario)"
+                    data-tooltip="@scenario.Purpose"
                     @onclick="() => OnSelect.InvokeAsync(scenario)"
                     @ref="_optionRefs[scenario.Id]"
                     role="option"
-                    tabindex="@(IsSelected(scenario) ? "0" : "-1")"
-                    title="@scenario.Purpose">
+                    tabindex="@(IsSelected(scenario) ? "0" : "-1")">
                     <span aria-hidden="true" class="scenario-browser__option-icon"><i class="bi @EmptyStateDashboard.ScenarioIcon(scenario.Group)"></i></span>
                     <span class="scenario-browser__option-body">
                         <span class="scenario-browser__option-name">@scenario.Name</span>
                     </span>
+                    <span class="visually-hidden" id="@($"scenario-purpose-{scenario.Id}")">@scenario.Purpose</span>
                 </li>
             }
         </ul>

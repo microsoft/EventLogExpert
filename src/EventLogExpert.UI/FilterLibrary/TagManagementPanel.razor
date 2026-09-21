@@ -79,13 +79,13 @@
                         IconOnly
                         OnClick="@(() => BeginRename(tag))"
                         aria-label="@Localizer["FilterLibrary_Tags_RenameActionAria", tag]"
-                        title="@Localizer["FilterLibrary_Tags_RenameTitle"]" />
+                        data-tooltip="@Localizer["FilterLibrary_Tags_RenameTitle"]" />
 
                     <DangerButton IconClass="bi bi-trash"
                         IconOnly
                         OnClick="@(() => BeginDelete(tag))"
                         aria-label="@Localizer["FilterLibrary_Tags_DeleteActionAria", tag]"
-                        title="@Localizer["FilterLibrary_Tags_DeleteTitle"]" />
+                        data-tooltip="@Localizer["FilterLibrary_Tags_DeleteTitle"]" />
                 }
             </div>
         }

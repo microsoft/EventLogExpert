@@ -5,8 +5,8 @@
             OnClick="OnAndOrClick"
             aria-label="@JoinerAriaLabel"
             data-mode="@(Value.JoinWithAny ? "or" : "and")"
-            @ref="_editorFirstInput"
-            title="@JoinerTitle">
+            data-tooltip="@JoinerTitle"
+            @ref="_editorFirstInput">
             @JoinerLabel
         </ChromelessButton>
 
@@ -19,13 +19,14 @@
             IconOnly
             OnClick="OnDoneClick"
             aria-label="@Localizer["FilterEditor_Predicate_DoneAria"]"
-            title="@(Value.IsComplete ? Localizer["FilterEditor_Predicate_DoneTitle"] : Localizer["FilterEditor_Predicate_DoneDisabledTitle"])" />
+            data-tooltip="@(Value.IsComplete ? Localizer["FilterEditor_Predicate_DoneTitle"] : null)"
+            title="@(Value.IsComplete ? null : Localizer["FilterEditor_Predicate_DoneDisabledTitle"])" />
 
         <DangerButton IconClass="bi bi-x-circle"
             IconOnly
             OnClick="OnRemoveChip"
             aria-label="@Localizer["FilterEditor_Predicate_RemoveAria", SummaryText]"
-            title="@Localizer["FilterEditor_Predicate_RemoveTitle"]" />
+            data-tooltip="@Localizer["FilterEditor_Predicate_RemoveTitle"]" />
     </div>
 }
 else
@@ -34,8 +35,8 @@ else
         <ChromelessButton CssClass="filter-predicate-edit"
             OnClick="OnEditChip"
             aria-label="@Localizer["FilterEditor_Predicate_EditAria", SummaryText]"
-            @ref="_chipEditButton"
-            title="@Localizer["FilterEditor_Predicate_EditTitle"]">
+            data-tooltip="@Localizer["FilterEditor_Predicate_EditTitle"]"
+            @ref="_chipEditButton">
             <span class="filter-predicate-joiner">@JoinerLabel</span>
             <span class="filter-predicate-summary">@SummaryText</span>
         </ChromelessButton>
@@ -44,6 +45,6 @@ else
             IconClass="bi bi-x-circle"
             OnClick="OnRemoveChip"
             aria-label="@Localizer["FilterEditor_Predicate_RemoveAria", SummaryText]"
-            title="@Localizer["FilterEditor_Predicate_RemoveTitle"]" />
+            data-tooltip="@Localizer["FilterEditor_Predicate_RemoveTitle"]" />
     </div>
 }

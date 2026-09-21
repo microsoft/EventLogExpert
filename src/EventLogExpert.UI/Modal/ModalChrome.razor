@@ -18,15 +18,15 @@
         @if (!string.IsNullOrEmpty(Title))
         {
             <header class="dialog-header" inert="@HasInlineAlert">
-                <h2 class="dialog-title" id="@_titleId" title="@Title">@Title</h2>
+                <h2 class="dialog-title" data-tooltip="@Title" data-tooltip-overflow id="@_titleId">@Title</h2>
 
                 @if (ShowCloseButton)
                 {
-                    <Button aria-label="@EffectiveCloseButtonAriaLabel"
-                        CssClass="dialog-close"
+                    <Button CssClass="dialog-close"
                         Disabled="@HasInlineAlert"
                         IconClass="bi bi-x-circle"
-                        OnClick="HandleCloseButtonAsync" />
+                        OnClick="HandleCloseButtonAsync"
+                        aria-label="@EffectiveCloseButtonAriaLabel" />
                 }
             </header>
         }
@@ -86,18 +86,18 @@
                     break;
 
                 case FooterPreset.Dismiss:
-                    <Button autofocus
-                        Disabled="@(HasInlineAlert || FooterDisabled)"
-                        OnClick="HandleAcceptAsync">
+                    <Button Disabled="@(HasInlineAlert || FooterDisabled)"
+                        OnClick="HandleAcceptAsync"
+                        autofocus>
                         @EffectiveAcceptLabel
                     </Button>
 
                     break;
 
                 case FooterPreset.AcceptCancel:
-                    <PrimaryButton autofocus
-                        Disabled="@(HasInlineAlert || FooterDisabled || AcceptDisabled)"
-                        OnClick="HandleAcceptAsync">
+                    <PrimaryButton Disabled="@(HasInlineAlert || FooterDisabled || AcceptDisabled)"
+                        OnClick="HandleAcceptAsync"
+                        autofocus>
                         @EffectiveAcceptLabel
                     </PrimaryButton>
 
@@ -134,7 +134,7 @@
             role="alertdialog">
             @if (!string.IsNullOrEmpty(InlineAlert.Title))
             {
-                <h3 class="inline-alert-title" id="@_inlineAlertTitleId" title="@InlineAlert.Title">@InlineAlert.Title</h3>
+                <h3 class="inline-alert-title" data-tooltip="@InlineAlert.Title" data-tooltip-overflow id="@_inlineAlertTitleId">@InlineAlert.Title</h3>
             }
 
             <p class="inline-alert-message" id="@_inlineAlertMessageId">@InlineAlert.Message</p>
@@ -146,10 +146,10 @@
                     AriaLabelledBy="@_inlineAlertMessageId"
                     CssClass="input dialog-input"
                     OnEnter="HandleInlineAlertAcceptOnEnterAsync"
-                    @ref="_inlineAlertInput"
                     UpdateOnInput="true"
                     Value="@_inlineAlertPromptValue"
-                    ValueChanged="HandleInlineAlertPromptValueChanged" />
+                    ValueChanged="HandleInlineAlertPromptValueChanged"
+                    @ref="_inlineAlertInput" />
 
                 @if (ValidationError is not null)
                 {
@@ -164,9 +164,9 @@
             <div class="inline-alert-buttons">
                 @if (!string.IsNullOrEmpty(InlineAlert.AcceptLabel))
                 {
-                    <PrimaryButton autofocus="@(!InlineAlert.IsPrompt)"
-                        Disabled="@(ValidationError is not null)"
+                    <PrimaryButton Disabled="@(ValidationError is not null)"
                         OnClick="HandleInlineAlertAcceptAsync"
+                        autofocus="@(!InlineAlert.IsPrompt)"
                         @ref="_inlineAlertAcceptButton">
                         @InlineAlert.AcceptLabel
                     </PrimaryButton>
@@ -178,8 +178,8 @@
                         @InlineAlert.SecondaryActionLabel
                     </Button>
                 }
-                <Button autofocus="@(string.IsNullOrEmpty(InlineAlert.AcceptLabel))"
-                    OnClick="HandleInlineAlertCancelAsync"
+                <Button OnClick="HandleInlineAlertCancelAsync"
+                    autofocus="@(string.IsNullOrEmpty(InlineAlert.AcceptLabel))"
                     @ref="_inlineAlertCancelButton">
                     @InlineAlert.CancelLabel
                 </Button>

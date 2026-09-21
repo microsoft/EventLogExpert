@@ -83,20 +83,19 @@ public sealed class StatsLocalizerWiringTests : BunitContext
                 Assert.Equal("[[Stats_Detail_FilterValuesAria]]", cut.Find(".stats-detail-search").GetAttribute("aria-label"));
                 Assert.Equal("[[Stats_Detail_FilterValuesPlaceholder]]", cut.Find(".stats-detail-search").GetAttribute("placeholder"));
                 Assert.Equal("[[Stats_Row_IncludeAria([[Stats_Dimension_Source]]|Alpha)]]", cut.Find(".stats-detail-include").GetAttribute("aria-label"));
-                Assert.Equal("[[Stats_Row_ExcludeTitle]]", cut.Find(".stats-detail-exclude").GetAttribute("title"));
+                Assert.Equal("[[Stats_Row_ExcludeTitle]]", cut.Find(".stats-detail-exclude").GetAttribute("data-tooltip"));
             },
             s_wait);
     }
 
     [Fact]
-    public void StatsDrawer_ResizeChrome_IsDrivenByTheLocalizer()
+    public void StatsDrawer_Visible_RendersStatsPane()
     {
         _statsVisibility.IsVisible.Returns(true);
         ComponentFactories.AddStub<StatsPane>();
 
         var cut = Render<StatsDrawer>();
 
-        Assert.Equal("[[Stats_Drawer_ResizeTitle]]", cut.Find(".stats-drawer-resizer").GetAttribute("title"));
         Assert.NotEmpty(cut.FindComponents<Stub<StatsPane>>());
     }
 

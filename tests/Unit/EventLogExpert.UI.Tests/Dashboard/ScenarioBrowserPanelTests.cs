@@ -87,7 +87,7 @@ public sealed class ScenarioBrowserPanelTests : BunitContext
     }
 
     [Fact]
-    public void Option_RendersNameOnly_WithPurposeInTitle()
+    public void Option_RendersNameOnly_WithPurposeInTooltip()
     {
         var scenarios = new[] { Scenario("first", "First") };
 
@@ -101,7 +101,7 @@ public sealed class ScenarioBrowserPanelTests : BunitContext
 
         Assert.Equal("First", option.QuerySelector(".scenario-browser__option-name")!.TextContent);
         Assert.Empty(option.QuerySelectorAll(".scenario-browser__option-purpose"));
-        Assert.Equal("Purpose", option.GetAttribute("title"));
+        Assert.Equal("Purpose", option.GetAttribute("data-tooltip"));
     }
 
     [Fact]

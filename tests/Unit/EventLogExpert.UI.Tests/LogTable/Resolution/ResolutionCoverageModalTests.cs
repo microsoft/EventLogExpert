@@ -438,8 +438,8 @@ public sealed class ResolutionCoverageModalTests : BunitContext
         cut.WaitForState(() => cut.FindAll(".resolution-coverage-row").Count == 2, s_wait);
 
         var rows = cut.FindAll(".resolution-coverage-row");
-        var mixedTip = rows[0].QuerySelector(".coverage-pill")!.GetAttribute("title");
-        var failedTip = rows[1].QuerySelector(".coverage-pill")!.GetAttribute("title");
+        var mixedTip = rows[0].QuerySelector(".coverage-pill")!.GetAttribute("data-tooltip");
+        var failedTip = rows[1].QuerySelector(".coverage-pill")!.GetAttribute("data-tooltip");
 
         Assert.Contains("no provider metadata", mixedTip);
         Assert.Contains("no message match", mixedTip);

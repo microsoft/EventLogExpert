@@ -90,7 +90,7 @@ public sealed class HistogramPaneLocalizerWiringTests : BunitContext
         Assert.Equal("[[Histogram_TimelineRoleDescription]]", cut.Find(".histogram-scroll").GetAttribute("aria-label"));
         Assert.Equal("[[Histogram_TimelineRoleDescription]]", cut.Find(".histogram-scroll").GetAttribute("aria-roledescription"));
         Assert.Equal("[[Histogram_ZoomOut]]", cut.FindAll(".histogram-button")[0].GetAttribute("aria-label"));
-        Assert.Equal("[[Histogram_ZoomIn]]", cut.FindAll(".histogram-button")[1].GetAttribute("title"));
+        Assert.Equal("[[Histogram_ZoomIn]]", cut.FindAll(".histogram-button")[1].GetAttribute("data-tooltip"));
         Assert.Contains("[[Histogram_Undo]]", cut.Markup, StringComparison.Ordinal);
         Assert.Contains("[[Histogram_Fit]]", cut.Markup, StringComparison.Ordinal);
         Assert.Contains("[[Histogram_Scope]]", cut.Markup, StringComparison.Ordinal);

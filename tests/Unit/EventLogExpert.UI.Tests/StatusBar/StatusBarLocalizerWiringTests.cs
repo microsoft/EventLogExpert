@@ -83,25 +83,25 @@ public sealed class StatusBarLocalizerWiringTests : BunitContext
 
         Assert.Equal("Application", cut.Find(".status-bar-source").TextContent);
         Assert.DoesNotContain("[[Application]]", cut.Markup, StringComparison.Ordinal);
-        Assert.Equal("[[StatusBar_Stats_Show]]", cut.Find("button.status-bar-stats").GetAttribute("title"));
+        Assert.Equal("[[StatusBar_Stats_Show]]", cut.Find("button.status-bar-stats").GetAttribute("data-tooltip"));
         Assert.Contains("[[StatusBar_Counts_ShownOfTotalSelected(50|100|3)]]", cut.Markup, StringComparison.Ordinal);
         Assert.Equal("[[StatusBar_Coverage_AriaLabel(2)]]", cut.Find(".status-bar-coverage").GetAttribute("aria-label"));
-        Assert.Equal("[[StatusBar_Coverage_Tooltip(2|100)]]", cut.Find(".status-bar-coverage").GetAttribute("title"));
+        Assert.Equal("[[StatusBar_Coverage_Tooltip(2|100)]]", cut.Find(".status-bar-coverage").GetAttribute("data-tooltip"));
         Assert.Contains("[[StatusBar_Coverage_Chip(2)]]", cut.Markup, StringComparison.Ordinal);
-        Assert.Equal("[[StatusBar_Filter_ActiveLens_Many(2)]]", cut.Find(".status-bar-filter").GetAttribute("title"));
+        Assert.Equal("[[StatusBar_Filter_ActiveLens_Many(2)]]", cut.Find(".status-bar-filter").GetAttribute("data-tooltip"));
         Assert.Equal("[[StatusBar_Filter_Chip]]", cut.Find(".status-bar-filter").TextContent);
         Assert.Equal("[[StatusBar_Activity_BufferFull]]", cut.Find(".status-bar-announce").TextContent);
         Assert.Contains("[[StatusBar_Memory_Value_Elevated(100 MB)]]", cut.Find(".status-bar-memory").TextContent, StringComparison.Ordinal);
         Assert.Equal(
             "[[StatusBar_Memory_Tooltip_Elevated(100 MB|256 MB)]]",
-            cut.Find(".status-bar-memory").GetAttribute("title"));
+            cut.Find(".status-bar-memory").GetAttribute("data-tooltip"));
         Assert.Equal("[[StatusBar_Memory_Announce_Elevated]]", cut.Find(".status-bar-memory-announce").TextContent);
         Assert.Contains("[[StatusBar_Loading_Count(12)]]", cut.Markup, StringComparison.Ordinal);
         Assert.Contains("[[StatusBar_Loading_Failed(3)]]", cut.Markup, StringComparison.Ordinal);
         Assert.Contains("[[StatusBar_Activity_BufferFull]]", cut.Markup, StringComparison.Ordinal);
 
         var newEventsButton = cut.Find("button.status-bar-newevents");
-        Assert.Equal("[[StatusBar_NewEvents_Load]]", newEventsButton.GetAttribute("title"));
+        Assert.Equal("[[StatusBar_NewEvents_Load]]", newEventsButton.GetAttribute("data-tooltip"));
         Assert.Equal("[[StatusBar_NewEvents_Label(1000)]]", newEventsButton.TextContent.Trim());
     }
 
@@ -126,7 +126,7 @@ public sealed class StatusBarLocalizerWiringTests : BunitContext
         var cut = Render<UI.StatusBar.StatusBar>();
 
         Assert.Equal("Application", cut.Find(".status-bar-source").TextContent);
-        Assert.Equal("[[StatusBar_Stats_Hide]]", cut.Find("button.status-bar-stats").GetAttribute("title"));
+        Assert.Equal("[[StatusBar_Stats_Hide]]", cut.Find("button.status-bar-stats").GetAttribute("data-tooltip"));
     }
 
     [Fact]
@@ -165,7 +165,7 @@ public sealed class StatusBarLocalizerWiringTests : BunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Equal(expected, cut.Find(".status-bar-filter").GetAttribute("title"));
+        Assert.Equal(expected, cut.Find(".status-bar-filter").GetAttribute("data-tooltip"));
     }
 
     [Fact]
@@ -195,7 +195,7 @@ public sealed class StatusBarLocalizerWiringTests : BunitContext
 
         Assert.Equal("[[StatusBar_Resolver_FailedToLoad(Security.evtx)]]", cut.Find(".status-bar-announce").TextContent);
         var resolver = cut.Find(".status-bar-resolver");
-        Assert.Equal("[[StatusBar_Resolver_FailedToLoad(Security.evtx)]]", resolver.GetAttribute("title"));
+        Assert.Equal("[[StatusBar_Resolver_FailedToLoad(Security.evtx)]]", resolver.GetAttribute("data-tooltip"));
         Assert.Equal("[[StatusBar_Resolver_FailedToLoad(Security.evtx)]]", resolver.TextContent);
         Assert.DoesNotContain("[[Security.evtx]]", cut.Markup, StringComparison.Ordinal);
     }

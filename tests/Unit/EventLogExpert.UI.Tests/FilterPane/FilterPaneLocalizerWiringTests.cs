@@ -228,7 +228,11 @@ public sealed class FilterPaneLocalizerWiringTests : BunitContext
 
         var component = Render<UI.FilterPane.FilterPane>();
 
-        Assert.Equal("[[FilterPane_AddBasicTitle]]", component.Find(".split-button-primary").GetAttribute("title"));
+        var addBasicButton = component.Find(".split-button-primary");
+        Assert.Equal("[[FilterPane_AddBasicTitle]]", addBasicButton.GetAttribute("data-tooltip"));
+        Assert.False(addBasicButton.HasAttribute("aria-describedby"));
+        Assert.False(addBasicButton.HasAttribute("title"));
+        Assert.Empty(component.FindAll("#add-filter-basic-hint"));
         Assert.Contains("[[FilterPane_Action_AddFilter]]", component.Markup);
         Assert.Equal("[[FilterPane_AddMenuAria]]", component.Find(".split-button-chevron").GetAttribute("aria-label"));
         Assert.Equal("[[FilterPane_AddMenuAria]]", component.Find(".split-button-chevron").GetAttribute("data-tooltip"));

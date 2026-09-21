@@ -8,7 +8,7 @@
             aria-label="@(savedFilter.IsExcluded ? Localizer["FilterEditor_RowHeader_ExcludedAria", savedFilter.ComparisonText] : Localizer["FilterEditor_RowHeader_IncludedAria", savedFilter.ComparisonText])"
             aria-pressed="@(savedFilter.IsExcluded ? "true" : "false")"
             data-excluded="@(savedFilter.IsExcluded ? "true" : "false")"
-            title="@(savedFilter.IsExcluded ? Localizer["FilterEditor_ExcludeToggle_TitleExcluded"] : Localizer["FilterEditor_ExcludeToggle_TitleIncluded"])" />
+            data-tooltip="@(savedFilter.IsExcluded ? Localizer["FilterEditor_ExcludeToggle_TitleExcluded"] : Localizer["FilterEditor_ExcludeToggle_TitleIncluded"])" />
 
         <div aria-hidden="true"
             class="color-box"

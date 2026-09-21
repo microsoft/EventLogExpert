@@ -18,7 +18,8 @@
             IconOnly
             OnClick="AddPredicate"
             aria-label="@AddPredicateAriaLabel"
+            data-tooltip="@(CanAddPredicate ? AddPredicateTitle : null)"
             @ref="_addButton"
-            title="@AddPredicateTitle" />
+            title="@(CanAddPredicate ? null : AddPredicateTitle)" />
     </span>
 </div>

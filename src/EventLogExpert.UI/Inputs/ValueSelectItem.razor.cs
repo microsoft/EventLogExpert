@@ -12,6 +12,9 @@ public sealed partial class ValueSelectItem<T> : IDisposable
     private ValueSelect<T> _parent = null!;
 
     [Parameter]
+    public string? AriaLabel { get; set; }
+
+    [Parameter]
     public RenderFragment? ChildContent { get; set; }
 
     [Parameter]
@@ -24,12 +27,17 @@ public sealed partial class ValueSelectItem<T> : IDisposable
     public string? DataHighlight { get; set; }
 
     [Parameter]
+    public string? Description { get; set; }
+
+    [Parameter]
     public bool IsDisabled { get; set; }
 
     public string ItemId { get; } = ComponentId.NewUnique().Value;
 
     [Parameter]
     public T Value { get; set; } = default!;
+
+    internal string DescriptionId => $"{ItemId}-desc";
 
     private string? DisplayString
     {

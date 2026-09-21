@@ -27,10 +27,49 @@ let hideTimer = 0;
 let hoverEndTimer = 0;
 let attributeObserver = null;
 let escapeConsumed = false;
+// The control the bubble is currently anchored to (the resolved effective anchor, which can differ from the
+// hovered/focused leaf when an unclipped overflow anchor was ascended past). Used to reposition on scroll.
+let shownAnchor = null;
 
-// The control whose tooltip should show right now: a hovered control takes precedence, falling back to the
-// focused control.
-function activeAnchor() { return hoveredAnchor || focusedAnchor; }
+// --- Pure decision helpers (no module state, no side effects), exported for unit tests. ---
+
+// Whether an element's own text is actually clipped by its box. The >1 tolerance defeats the sub-pixel
+// scrollWidth/clientWidth rounding that fractional display scaling (125-175%) produces, which would otherwise
+// flip an unclipped element to "clipped" (or vice-versa) by a single device pixel.
+export function isClipped(el) {
+    return (el.scrollWidth - el.clientWidth > 1) || (el.scrollHeight - el.clientHeight > 1);
+}
+
+// The control whose tooltip should show: a hovered control takes precedence over a focused one.
+export function selectAnchor(focused, hovered) { return hovered || focused; }
+
+function isOverflowAnchor(el) { return !!el && !!el.hasAttribute && el.hasAttribute("data-tooltip-overflow"); }
+
+// An overflow anchor shows its tooltip only when its text is actually clipped. Climb from the hovered/focused
+// leaf past any unclipped overflow anchors to the nearest ancestor [data-tooltip] that should show (a clipped
+// overflow anchor, or any non-overflow anchor); return null when nothing qualifies, so an unclipped inner
+// overflow span never shadows the tooltip of the control it sits inside. `clipped` is injected for testing.
+export function resolveEffectiveAnchor(leaf, clipped) {
+    let anchor = leaf;
+    while (anchor && isOverflowAnchor(anchor) && !clipped(anchor)) {
+        anchor = anchor.parentElement ? anchor.parentElement.closest("[data-tooltip]") : null;
+    }
+    return anchor;
+}
+
+// When the pointer leaves a hovered anchor for a related target inside an ANCESTOR tooltip anchor (e.g. an
+// inner overflow label to its enclosing control), the hover should transfer to that ancestor - otherwise the
+// ancestor's own pointerover is suppressed (relatedTarget is still inside it) and its tooltip would vanish
+// after the bridge delay even though the pointer is still over the control. Returns the ancestor to hand off
+// to, or null to begin the normal hover-end. Pure; exported for tests.
+export function hoverTransferAnchor(hovered, relatedAnchor) {
+    return relatedAnchor && relatedAnchor !== hovered && relatedAnchor.contains(hovered) ? relatedAnchor : null;
+}
+
+// The control the user is currently pointing at or has keyboard-focused (the "leaf"); a hovered control takes
+// precedence. This is the raw activity signal kept alive across scroll/hover-end; the actually-shown bubble is
+// resolved from it through the overflow gate in update().
+function activeAnchor() { return selectAnchor(focusedAnchor, hoveredAnchor); }
 
 function ensureTip() {
     if (tip) { return tip; }
@@ -130,17 +169,22 @@ function position(anchor, element) {
 }
 
 function reposition() {
-    const anchor = activeAnchor();
-    if (anchor && tip && !tip.hidden) { position(anchor, tip); }
+    if (shownAnchor && tip && !tip.hidden) { position(shownAnchor, tip); }
 }
 
 // Re-render the tooltip for whichever control is currently active, or begin hiding it when none is. Called
 // on every focus/hover change (and by the attribute observer) so the bubble always reflects current state.
 function update() {
-    const anchor = activeAnchor();
+    const leaf = activeAnchor();
+    const anchor = resolveEffectiveAnchor(leaf, isClipped);
 
     if (!anchor) {
-        if (!pointerOverTip) { scheduleHide(); }
+        shownAnchor = null;
+        // An active-but-suppressed leaf (an unclipped overflow anchor with no showable ancestor) conceals the
+        // bubble WITHOUT clearing focus/hover state, so a still-focused control's tooltip is restored once the
+        // pointer leaves the unclipped hovered control. Nothing active at all begins the normal hide.
+        if (leaf) { concealTip(); }
+        else if (!pointerOverTip) { scheduleHide(); }
         return;
     }
 
@@ -151,7 +195,11 @@ function update() {
 
     const element = ensureTip();
     element.textContent = text;
+    // Overflow/opt-in-wide anchors get the roomier bubble so long paths/messages read on fewer, wider lines.
+    element.classList.toggle("focus-tooltip--wide",
+        anchor.hasAttribute("data-tooltip-overflow") || anchor.hasAttribute("data-tooltip-wide"));
     element.hidden = false;
+    shownAnchor = anchor;
     position(anchor, element);
 
     // The control can rewrite its own data-tooltip in place while it stays focused / hovered (e.g. the
@@ -162,6 +210,13 @@ function update() {
     attributeObserver.observe(anchor, { attributes: true, attributeFilter: ["data-tooltip"] });
 }
 
+// Hide the bubble WITHOUT resetting focus/hover bookkeeping (unlike hide()), so a concealed overflow anchor
+// doesn't tear down a still-active focus/hover that should restore its own tooltip.
+function concealTip() {
+    cancelHide();
+    if (tip) { tip.hidden = true; }
+}
+
 function hide() {
     cancelHide();
     cancelHoverEnd();
@@ -169,6 +224,7 @@ function hide() {
     focusedAnchor = null;
     hoveredAnchor = null;
     pointerOverTip = false;
+    shownAnchor = null;
     if (tip) { tip.hidden = true; }
 }
 
@@ -180,8 +236,13 @@ export function registerFocusTooltip() {
         const anchor = e.target.closest?.("[data-tooltip]");
         // Only KEYBOARD focus should surface the tooltip. A pointer click also focuses the control, and that
         // focus would otherwise leave the bubble stuck open after the pointer moved away. :focus-visible is
-        // the browser's keyboard-focus signal, which is keyboard-only for these buttons in WebView2.
-        focusedAnchor = anchor && anchor.matches(":focus-visible") ? anchor : null;
+        // the browser's keyboard-focus signal, which is keyboard-only for these buttons in WebView2. When the
+        // tooltip lives on a wrapper (e.g. a <label> whose inner <input> is the real focus target), the wrapper
+        // itself won't match :focus-visible, so also accept a keyboard-focused descendant.
+        const active = document.activeElement;
+        const keyboardFocused = !!anchor && (anchor.matches(":focus-visible") ||
+            (anchor.contains(active) && !!active && active.matches?.(":focus-visible")));
+        focusedAnchor = keyboardFocused ? anchor : null;
         update();
     }, true);
 
@@ -223,7 +284,16 @@ export function registerFocusTooltip() {
             && e.target.closest?.("[data-tooltip]") === hoveredAnchor
             && e.relatedTarget !== tip
             && !hoveredAnchor.contains(e.relatedTarget)) {
-            scheduleHoverEnd();
+            const outer = hoverTransferAnchor(hoveredAnchor, e.relatedTarget?.closest?.("[data-tooltip]"));
+            if (outer) {
+                // Pointer moved out to an enclosing control's anchor - hand the hover to it now (its own
+                // pointerover is suppressed because relatedTarget is still inside it), instead of hiding.
+                cancelHoverEnd();
+                hoveredAnchor = outer;
+                update();
+            } else {
+                scheduleHoverEnd();
+            }
         }
     }, true);
 

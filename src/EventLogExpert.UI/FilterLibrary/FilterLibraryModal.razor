@@ -54,7 +54,7 @@
                                     aria-controls="@(_isTagManagementExpanded ? tagManagementPanelId : null)"
                                     aria-expanded="@(_isTagManagementExpanded ? "true" : "false")"
                                     aria-label="@(_isTagManagementExpanded ? Localizer["FilterLibrary_HideTagManagementAria"] : Localizer["FilterLibrary_ManageTagsAria"])"
-                                    title="@Localizer["FilterLibrary_ManageTagsTitle"]" />
+                                    data-tooltip="@Localizer["FilterLibrary_ManageTagsTitle"]" />
                                 @{
                                     var visibleTags = AllLibraryTags.Take(TagFilterBarMaxVisible).ToList();
                                     var hiddenTagsCount = AllLibraryTags.Count - visibleTags.Count;

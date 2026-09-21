@@ -1510,10 +1510,6 @@
   <data name="Details_ExpandAria" xml:space="preserve">
     <value>Expand details</value>
   </data>
-  <data name="Details_SeverityTitle" xml:space="preserve">
-    <value>Severity: {0}</value>
-    <comment>{0} is the invariant event level, such as Error or Warning.</comment>
-  </data>
   <data name="Details_EventId" xml:space="preserve">
     <value>Event ID {0}</value>
     <comment>{0} is the numeric Windows Event Log event ID.</comment>
@@ -2897,7 +2893,6 @@
   <data name="Stats_NoneValue" xml:space="preserve"><value>(none)</value></data>
   <data name="Stats_ViewAll" xml:space="preserve"><value>View all</value></data>
   <data name="Stats_Computing" xml:space="preserve"><value>Computing...</value></data>
-  <data name="Stats_Drawer_ResizeTitle" xml:space="preserve"><value>Drag to resize</value></data>
   <data name="Stats_Detail_Title" xml:space="preserve"><value>All {0} values</value><comment>{0} is a localized statistics dimension label.</comment></data>
   <data name="Stats_Detail_CloseLabel" xml:space="preserve"><value>Close</value></data>
   <data name="Stats_Detail_FilterValuesAria" xml:space="preserve"><value>Filter values</value></data>
@@ -3059,7 +3054,7 @@
   <data name="Histogram_BinCursor_Breakdown" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3} ({4}).</value></data>
   <data name="Histogram_BinCursor_Spike_Breakdown" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3} ({4}), spike.</value></data>  <!-- Filter pane localization. Counts remain raw and ungrouped for byte-identical en-US output. -->
   <data name="FilterPane_AddBasicTitle" xml:space="preserve">
-    <value>Add Basic filter (use chevron for Advanced or Recent)</value>
+    <value>Add Basic filter</value>
   </data>
   <data name="FilterPane_Action_AddFilter" xml:space="preserve">
     <value>Add Filter</value>

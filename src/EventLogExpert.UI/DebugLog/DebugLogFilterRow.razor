@@ -2,15 +2,15 @@
 @if (Draft is { } draft)
 {
     <div class="debug-log-filter-editor">
-        <Button aria-label="@(draft.IsExcluded ? "Filter is excluded; activate to include" : "Filter is included; activate to exclude")"
-            aria-pressed="@(draft.IsExcluded ? "true" : "false")"
-            CssClass="debug-log-filter-exclude-toggle"
-            data-excluded="@(draft.IsExcluded ? "true" : "false")"
+        <Button CssClass="debug-log-filter-exclude-toggle"
             IconClass="@(draft.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"
             IconOnly
             OnClick="OnEditorExcludeToggled"
-            @ref="_editorFirstControl"
-            title="@(draft.IsExcluded ? "Excluded - click to include" : "Included - click to exclude")" />
+            aria-label="@(draft.IsExcluded ? "Filter is excluded; activate to include" : "Filter is included; activate to exclude")"
+            aria-pressed="@(draft.IsExcluded ? "true" : "false")"
+            data-excluded="@(draft.IsExcluded ? "true" : "false")"
+            data-tooltip="@(draft.IsExcluded ? "Excluded - click to include" : "Included - click to exclude")"
+            @ref="_editorFirstControl" />
 
         <ValueSelect AriaLabel="Filter field"
             CssClass="input filter-dropdown"
@@ -72,26 +72,27 @@
             </ValueSelect>
         }
 
-        <Button aria-label="Save filter"
-            Disabled="@(!draft.IsComplete)"
+        <Button Disabled="@(!draft.IsComplete)"
             IconClass="bi bi-check-circle"
             IconOnly
             OnClick="OnSave"
-            title="@(draft.IsComplete ? "Save filter" : "Add a value to finish this filter")" />
+            aria-label="Save filter"
+            data-tooltip="@(draft.IsComplete ? "Save filter" : null)"
+            title="@(draft.IsComplete ? null : "Add a value to finish this filter")" />
 
-        <Button aria-label="Cancel edit"
-            IconClass="bi bi-x-circle"
+        <Button IconClass="bi bi-x-circle"
             IconOnly
             OnClick="OnCancel"
-            title="Cancel edit" />
+            aria-label="Cancel edit"
+            data-tooltip="Cancel edit" />
 
         @if (Applied is not null)
         {
-            <DangerButton aria-label="Remove filter"
-                IconClass="bi bi-dash-circle"
+            <DangerButton IconClass="bi bi-dash-circle"
                 IconOnly
                 OnClick="OnRemove"
-                title="Remove filter" />
+                aria-label="Remove filter"
+                data-tooltip="Remove filter" />
         }
     </div>
 }
@@ -100,36 +101,36 @@ else if (Applied is { } applied)
     var summary = FilterSummary(applied);
 
     <div class="debug-log-filter-chip" data-disabled="@(applied.IsEnabled ? "false" : "true")">
-        <Button aria-label="@(applied.IsExcluded ? "Filter is excluded; activate to include" : "Filter is included; activate to exclude")"
-            aria-pressed="@(applied.IsExcluded ? "true" : "false")"
-            CssClass="debug-log-filter-exclude-toggle"
-            data-excluded="@(applied.IsExcluded ? "true" : "false")"
+        <Button CssClass="debug-log-filter-exclude-toggle"
             IconClass="@(applied.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"
             IconOnly
             OnClick="OnExcludeToggled"
-            title="@(applied.IsExcluded ? "Excluded - click to include" : "Included - click to exclude")" />
+            aria-label="@(applied.IsExcluded ? "Filter is excluded; activate to include" : "Filter is included; activate to exclude")"
+            aria-pressed="@(applied.IsExcluded ? "true" : "false")"
+            data-excluded="@(applied.IsExcluded ? "true" : "false")"
+            data-tooltip="@(applied.IsExcluded ? "Excluded - click to include" : "Included - click to exclude")" />
 
-        <Button aria-label="@(applied.IsEnabled ? "Filter is enabled; activate to disable" : "Filter is disabled; activate to enable")"
-            aria-pressed="@(applied.IsEnabled ? "true" : "false")"
-            CssClass="debug-log-filter-enable-toggle"
-            data-enabled="@(applied.IsEnabled ? "true" : "false")"
+        <Button CssClass="debug-log-filter-enable-toggle"
             IconClass="@(applied.IsEnabled ? "bi bi-toggle-on" : "bi bi-toggle-off")"
             IconOnly
             OnClick="OnEnableToggled"
-            title="@(applied.IsEnabled ? "Enabled - click to disable" : "Disabled - click to enable")" />
+            aria-label="@(applied.IsEnabled ? "Filter is enabled; activate to disable" : "Filter is disabled; activate to enable")"
+            aria-pressed="@(applied.IsEnabled ? "true" : "false")"
+            data-enabled="@(applied.IsEnabled ? "true" : "false")"
+            data-tooltip="@(applied.IsEnabled ? "Enabled - click to disable" : "Disabled - click to enable")" />
 
-        <ChromelessButton aria-label="@($"Edit filter: {summary}")"
-            CssClass="debug-log-filter-chip-edit"
+        <ChromelessButton CssClass="debug-log-filter-chip-edit"
             OnClick="OnEdit"
-            @ref="_chipEditButton"
-            title="Edit filter">
-            <span class="debug-log-filter-summary" title="@summary">@summary</span>
+            aria-label="@($"Edit filter: {summary}")"
+            data-tooltip="Edit filter"
+            @ref="_chipEditButton">
+            <span class="debug-log-filter-summary" data-tooltip="@summary" data-tooltip-overflow>@summary</span>
         </ChromelessButton>
 
-        <ChromelessButton aria-label="@($"Remove filter: {summary}")"
-            CssClass="debug-log-filter-chip-remove"
+        <ChromelessButton CssClass="debug-log-filter-chip-remove"
             IconClass="bi bi-x-circle"
             OnClick="OnRemove"
-            title="Remove filter" />
+            aria-label="@($"Remove filter: {summary}")"
+            data-tooltip="Remove filter" />
     </div>
 }

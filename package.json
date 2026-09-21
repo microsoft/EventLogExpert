@@ -1,0 +1,10 @@
+{
+  "name": "eventlogexpert-web-assets",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Node test harness for the EventLogExpert.UI wwwroot JavaScript. The app ships these as browser ES modules; this manifest exists only so Node's built-in test runner treats them as ES modules too (type: module) and can import their pure, side-effect-free helpers. No runtime dependencies.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"tests/JsUnit/**/*.test.js\""
+  }
+}

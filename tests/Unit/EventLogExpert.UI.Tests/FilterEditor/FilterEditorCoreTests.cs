@@ -111,7 +111,7 @@ public sealed class FilterEditorCoreTests : BunitContext
 
         Assert.False(component.Instance.IsEditing);
 
-        component.Find("button[title='[[FilterEditor_RowAction_EditTitle]]']").Click();
+        component.Find("button[data-tooltip='[[FilterEditor_RowAction_EditTitle]]']").Click();
 
         Assert.True(component.Instance.IsEditing);
         _announcements.Received(1).Announce("[[FilterEditor_Announcement_EditingFilter]]");
