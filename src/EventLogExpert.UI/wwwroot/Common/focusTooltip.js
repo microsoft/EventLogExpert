@@ -86,6 +86,22 @@ export function cursorPoint(px, py, tipWidth, tipHeight, viewportWidth, viewport
     return { left, top };
 }
 
+// Given the per-line client rects of a Range over the tooltip's text, return the box width (px) that hugs the
+// widest wrapped line, or null when there is nothing to measure. box-sizing:border-box (the app default) makes
+// the `width` property the border box, so horizontal padding+border are added back to keep the content box
+// wide enough for the widest line; content-box needs no add-back. ceil so a sub-pixel measurement can't clip
+// the widest line onto a new row. Pure; exported for tests.
+export function hugWidth(lineRects, boxSizing, paddingLeft, paddingRight, borderLeft, borderRight) {
+    let widest = 0;
+    for (const rect of lineRects) {
+        if (rect.width > widest) { widest = rect.width; }
+    }
+    if (widest <= 0) { return null; }
+    const boxExtra = boxSizing === "border-box" ?
+        paddingLeft + paddingRight + borderLeft + borderRight : 0;
+    return Math.ceil(widest) + boxExtra;
+}
+
 // --- Pure state machine (no DOM, no timers), exported for unit tests. ---
 // State fields are RAW [data-tooltip] leaves (or null) plus display bookkeeping:
 //   focusedAnchor  keyboard-focused control
@@ -298,6 +314,39 @@ export function reduce(state, event) {
 
 // --- Adapter: owns the DOM, timers, pointer tracking, and overflow-gate resolution. ---
 
+// Visibility primitives for the single shared tooltip element. Exported (taking supportsPopover as a
+// parameter, so the module reads no DOM globals at import time) to stay unit-testable with a mock element
+// under `node --test`. On the popover path the element is a manual popover promoted into the browser top
+// layer by showPopover(), so it renders ABOVE an open modal <dialog> (showModal() puts the dialog in the top
+// layer, which no z-index can reach); on the fallback path it degrades to the prior hidden-attribute toggle.
+export function showTip(element, supportsPopover) {
+    if (!element) { return; }
+    if (supportsPopover) {
+        if (!element.isConnected) { return; }
+        // Re-promote an already-open tooltip to the TOP of the top layer (above a dialog opened after it):
+        // hide+show is synchronous so nothing paints between the calls (no flicker), and it moves no focus
+        // (the bubble has no focusable content and no autofocus).
+        if (element.matches(":popover-open")) { element.hidePopover(); }
+        element.showPopover();
+    } else {
+        element.hidden = false;
+    }
+}
+
+export function hideTip(element, supportsPopover) {
+    if (!element) { return; }
+    if (supportsPopover) {
+        if (element.matches(":popover-open")) { element.hidePopover(); }
+    } else {
+        element.hidden = true;
+    }
+}
+
+export function isTipShown(element, supportsPopover) {
+    if (!element) { return false; }
+    return supportsPopover ? element.matches(":popover-open") : !element.hidden;
+}
+
 export function registerFocusTooltip() {
     if (registered) { return; }
     registered = true;
@@ -318,13 +367,34 @@ export function registerFocusTooltip() {
     let pendingNode = null;
     let attributeObserver = null;
     let escapeConsumed = false;
+    // The Popover API (top-layer) shipped alongside the :popover-open selector in Chromium 114; WebView2
+    // Evergreen is current Chromium. Detect once here (never at module top level - `node --test` imports this
+    // DOM-free module and a top-level HTMLElement/document access would ReferenceError). Probe the SELECTOR
+    // too, not just showPopover: the visibility helpers match(":popover-open"), which throws SyntaxError on a
+    // UA that exposes showPopover but not the selector - fall back to the hidden-attribute toggle there rather
+    // than letting every show/hide/Escape throw. Fallback still works, just without top-layer reach.
+    function popoverOpenSelectorSupported() {
+        try { document.createElement("div").matches(":popover-open"); return true; }
+        catch { return false; }
+    }
+    const supportsPopover =
+        typeof HTMLElement !== "undefined" && typeof HTMLElement.prototype.showPopover === "function" &&
+        popoverOpenSelectorSupported();
 
     function ensureTip() {
         if (tip) { return tip; }
         tip = document.createElement("div");
         tip.className = "focus-tooltip";
         tip.setAttribute("role", "tooltip");
-        tip.hidden = true;
+        if (supportsPopover) {
+            // Manual popover: enters the top layer on showPopover(), so it can render above an open modal
+            // <dialog>. Do NOT also set the `hidden` attribute - the author rule
+            // `.focus-tooltip[hidden] { display:none }` would override the UA popover display and keep the
+            // bubble hidden even after showPopover().
+            tip.setAttribute("popover", "manual");
+        } else {
+            tip.hidden = true;
+        }
         document.body.appendChild(tip);
         return tip;
     }
@@ -359,6 +429,27 @@ export function registerFocusTooltip() {
         element.style.top = `${Math.round(point.top)}px`;
     }
 
+    function hugToWrappedWidth(element) {
+        // A shrink-to-fit box (width:auto) sizes to the *unwrapped* max-content width, so once a message is
+        // long enough to wrap it sits at the full max-width with dead space to the right of the shorter
+        // wrapped lines (text-wrap:balance evens the lines but does NOT pull the box in). Measure the widest
+        // line actually rendered and set that as the width so the bubble hugs its text like a native OS
+        // tooltip. Runs synchronously between showTip and positioning, so no intermediate state is painted.
+        // Reset left to 0 and clear any prior hug first: a leftover inline left from a previous show would
+        // otherwise shrink the available width (shrink-to-fit is min(max-content, viewport - left)) and
+        // over-wrap the text before we lock the box; positionElement/positionCursor set the real left next.
+        element.style.left = "0px";
+        element.style.width = "";
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const style = getComputedStyle(element);
+        const width = hugWidth(
+            range.getClientRects(), style.boxSizing,
+            parseFloat(style.paddingLeft), parseFloat(style.paddingRight),
+            parseFloat(style.borderLeftWidth), parseFloat(style.borderRightWidth));
+        if (width !== null) { element.style.width = `${width}px`; }
+    }
+
     function observe(rawLeaf, effective) {
         // Watch data-tooltip on BOTH the requested leaf and the resolved effective anchor (when different), so
         // a control that rewrites its own tooltip while a hovered inner label ascends to it still updates.
@@ -382,15 +473,16 @@ export function registerFocusTooltip() {
             element.textContent = text;
             element.classList.toggle("focus-tooltip--wide",
                 effective.hasAttribute("data-tooltip-overflow") || effective.hasAttribute("data-tooltip-wide"));
-            element.hidden = false;
+            showTip(element, supportsPopover);
+            hugToWrappedWidth(element);
             shownAnchor = effective;
             if (mode === "cursor") { positionCursor(element); } else { positionElement(effective, element); }
             observe(rawLeaf, effective);
-            dispatch({ type: "renderResolved", anchor: rawLeaf, visible: true });
+            dispatch({ type: "renderResolved", anchor: rawLeaf, visible: isTipShown(element, supportsPopover) });
         } else {
             shownAnchor = null;
             stopObserving();
-            element.hidden = true;
+            hideTip(element, supportsPopover);
             dispatch({ type: "renderResolved", anchor: rawLeaf, visible: false });
         }
     }
@@ -429,19 +521,19 @@ export function registerFocusTooltip() {
                 applyRender(effect.anchor, effect.mode);
                 break;
             case "reposition":
-                if (shownAnchor && tip && !tip.hidden) { positionElement(shownAnchor, tip); }
+                if (shownAnchor && isTipShown(tip, supportsPopover)) { positionElement(shownAnchor, tip); }
                 break;
             case "conceal":
                 shownAnchor = null;
                 stopObserving();
-                if (tip) { tip.hidden = true; }
+                hideTip(tip, supportsPopover);
                 break;
             case "teardown":
                 shownAnchor = null;
                 hoveredNode = null;
                 pendingNode = null;
                 stopObserving();
-                if (tip) { tip.hidden = true; }
+                hideTip(tip, supportsPopover);
                 break;
         }
     }
@@ -513,7 +605,7 @@ export function registerFocusTooltip() {
         // shown) hover so it can't pop after the key. Only CONSUME the key when a bubble was actually visible,
         // so a merely-pending hover doesn't steal Escape from a host dialog. Keep consuming the auto-repeat
         // keydowns from the same held press via the latch (cleared on keyup).
-        const wasVisible = !!(tip && !tip.hidden);
+        const wasVisible = isTipShown(tip, supportsPopover);
         if (hasActiveTooltipState()) { dispatch({ type: "escape" }); }
         if (wasVisible) { escapeConsumed = true; }
         if (escapeConsumed) {
@@ -525,6 +617,14 @@ export function registerFocusTooltip() {
     document.addEventListener("keyup", (e) => { if (e.key === "Escape") { escapeConsumed = false; } }, true);
 
     window.addEventListener("blur", () => { escapeConsumed = false; });
+
+    // A modal is about to enter the top layer: ModalChrome.razor.js dispatches this on document immediately
+    // before dialog.showModal(). Tear down any showing/pending tooltip so it can't be stranded behind the
+    // dialog (top-layer order is show order) or consume an Escape meant for the modal. Reuses the existing
+    // `escape` transition (full reset + cancel timers + teardown/hidePopover); a safe no-op when idle, and it
+    // does not touch escapeConsumed (that latch lives only in the keydown handler). When the modal later
+    // closes and restores focus to its launcher, the focusin listener re-shows the tooltip normally.
+    document.addEventListener("focus-tooltip:dismiss", () => { dispatch({ type: "escape" }); });
 
     // Reposition/drop tooltips on scroll or resize. Gate on reducer state, not bubble visibility: during the
     // 500ms hover-intent window the bubble is still hidden, but a scroll must still cancel that pending show
@@ -538,6 +638,15 @@ export function registerFocusTooltip() {
     }, true);
 
     window.addEventListener("resize", () => {
-        if (hasActiveTooltipState()) { dispatch({ type: "scroll" }); }
+        if (!hasActiveTooltipState()) { return; }
+        dispatch({ type: "scroll" });
+        // A resize (unlike a scroll) can change the wrap width - max-width is min(32rem, 90vw) - so the width
+        // hugToWrappedWidth locked is now stale. Re-hug a still-showing (keyboard-focus) tooltip; same
+        // synchronous task, so the left:0 measurement never paints, and the scroll path stays cheap (no
+        // re-hug there, where the wrap can't change).
+        if (shownAnchor && isTipShown(tip, supportsPopover)) {
+            hugToWrappedWidth(tip);
+            positionElement(shownAnchor, tip);
+        }
     });
 }

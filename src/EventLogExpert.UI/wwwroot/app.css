@@ -103,7 +103,9 @@
 
     /* Z-index layers. Keep all stacking decisions in one place so
        components compose predictably. Spaced by 20 to leave room for new
-       layers without renumbering existing ones. */
+       layers without renumbering existing ones. (The focus tooltip is the
+       exception: on the popover path it promotes into the browser top layer,
+       above this scale; --z-menu-overlay applies only on its fallback path.) */
     --z-base: 1;
     --z-dropdown: 20;
     --z-error-ui: 40;
@@ -244,12 +246,37 @@ input[type="search"]:focus-visible,
     position: fixed;
     z-index: var(--z-menu-overlay);
 
+    /* When shown as a top-layer manual popover (so it can render above an open modal <dialog>), neutralize the
+       UA [popover] rule so it doesn't fight our inline left/top positioning and content sizing: inset:0 would
+       pin the fixed box to all four edges (our inline left/top set only two, stretching it), margin:auto would
+       center it, and width/height:fit-content sizes the box height against the *unwrapped* (max-content) text
+       width - so a long tooltip paints a box too short for the text once it wraps, and the trailing line spills
+       past the border. Restoring width/height:auto makes it a normal shrink-to-fit fixed box whose height
+       matches the wrapped text (max-width still caps how wide it grows); overflow:visible then only guards
+       against a phantom sub-pixel scrollbar. Harmless no-ops on the non-popover fallback path. */
+    inset: auto;
+    margin: 0;
+    width: auto;
+    height: auto;
+    overflow: visible;
+
     /* Inert like a native OS tooltip: it never intercepts the pointer (so it can't flicker or shadow the
        control beneath) and is intentionally not hoverable - the text is duplicated on the control and exposed
        via aria, so no information is lost. */
     pointer-events: none;
 
-    max-width: 15rem;
+    /* Cap wide enough to read like a native OS tooltip (which isn't pinned to a narrow column) while still
+       wrapping genuinely long messages; width:auto above shrinks short tooltips to fit, so this only bounds
+       how wide a long one grows. */
+    max-width: min(32rem, 90vw);
+
+    /* Balance the wrapped lines so a message never breaks into a full first line above a lone trailing word,
+       the way a native tooltip wouldn't. This only evens the line lengths; the box is pulled in to hug the
+       widest line by hugToWrappedWidth() in focusTooltip.js (CSS shrink-to-fit alone stays at max-width for
+       any text long enough to wrap). No-op on single-line tooltips; Chromium falls back to normal wrapping
+       past its balance line-cap, so very long messages are unaffected. */
+    text-wrap: balance;
+
     padding: 2px 6px;
 
     background-color: var(--background-darkgray);
@@ -263,6 +290,9 @@ input[type="search"]:focus-visible,
 
 .focus-tooltip[hidden] { display: none; }
 
+/* The tooltip popover never needs its top-layer backdrop; drop it so no ::backdrop rule can paint a scrim. */
+.focus-tooltip::backdrop { display: none; }
+
 /* Wide variant for overflow/rich-text tooltips (long paths, full messages, multiline detail):
    a larger cap with hard word-breaking so long unbroken strings wrap instead of overflowing. The bubble is
    inert (pointer-events:none) and unfocusable, so it must NOT clip its content behind a scrollbar the user
@@ -273,6 +303,11 @@ input[type="search"]:focus-visible,
 
     overflow-wrap: anywhere;
     white-space: pre-wrap;
+
+    /* Override the base text-wrap:balance: with overflow-wrap:anywhere every character is a break opportunity,
+       so balancing would fragment a long path into short even-length chunks (and hugWidth would then lock that
+       narrow width). Greedy wrapping keeps long paths/messages filling each line. */
+    text-wrap: wrap;
 }
 
 html, body {
