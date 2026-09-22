@@ -14,8 +14,12 @@ import {
     resolveEffectiveAnchor,
     hoverTransferAnchor,
     cursorPoint,
+    hugWidth,
     initialTooltipState,
     reduce,
+    showTip,
+    hideTip,
+    isTipShown,
 } from "../../src/EventLogExpert.UI/wwwroot/Common/focusTooltip.js";
 
 // --- isClipped: sub-pixel-tolerant clip detection ---
@@ -255,6 +259,111 @@ test("reduce: pending nested transfer - leaving a pending inner leaf for its anc
     r = reduce(r.state, { type: "hoverLeave", anchor: inner, transferTarget: outer });
     assert.equal(r.state.pendingAnchor, outer);
     assert.ok(types(r.effects).includes("scheduleShow"));
+});
+
+// --- Adapter visibility helpers: showTip / hideTip / isTipShown (popover path + fallback) ---
+//
+// These three helpers own the ONLY DOM writes that flip tooltip visibility. On the popover path they call
+// showPopover()/hidePopover(), which throw InvalidStateError on already-open / not-open / disconnected. There
+// is no DOM here (and jsdom implements neither showPopover nor :popover-open), so a hand-rolled mock models
+// the open-state and the throw contract, locking the guard logic a browser would otherwise be the only judge
+// of. supportsPopover is passed in, matching the production adapter that computes it once and forwards it.
+
+function mockPopover({ connected = true } = {}) {
+    let open = false;
+    const calls = [];
+    return {
+        isConnected: connected,
+        hidden: true,
+        calls,
+        get open() { return open; },
+        showPopover() {
+            calls.push("show");
+            if (!this.isConnected) { throw new Error("InvalidStateError: not connected"); }
+            if (open) { throw new Error("InvalidStateError: already open"); }
+            open = true;
+        },
+        hidePopover() {
+            calls.push("hide");
+            if (!open) { throw new Error("InvalidStateError: not open"); }
+            open = false;
+        },
+        matches(selector) { return selector === ":popover-open" ? open : false; },
+    };
+}
+
+test("showTip (popover): opens a closed popover", () => {
+    const el = mockPopover();
+    showTip(el, true);
+    assert.equal(el.open, true);
+    assert.equal(isTipShown(el, true), true);
+});
+
+test("showTip (popover): re-promotes an already-open popover via hide+show (top-layer reorder)", () => {
+    const el = mockPopover();
+    showTip(el, true);
+    assert.deepEqual(el.calls, ["show"]);
+    // Second show on an open popover MUST hide then show to move it back to the top of the top layer (above a
+    // dialog opened after it). A plain `if (:popover-open) return;` would leave calls at ["show"] and fail here.
+    showTip(el, true);
+    assert.deepEqual(el.calls, ["show", "hide", "show"]);
+    assert.equal(el.open, true);
+});
+
+test("showTip (popover): no-op on a disconnected element (showPopover would throw)", () => {
+    const el = mockPopover({ connected: false });
+    assert.doesNotThrow(() => showTip(el, true));
+    assert.equal(el.open, false);
+});
+
+test("hideTip (popover): closes an open popover and is a no-op when already closed", () => {
+    const el = mockPopover();
+    showTip(el, true);
+    hideTip(el, true);
+    assert.equal(el.open, false);
+    assert.doesNotThrow(() => hideTip(el, true)); // would throw 'not open' without the :popover-open guard
+    assert.equal(el.open, false);
+});
+
+test("isTipShown (popover): reflects the popover open state", () => {
+    const el = mockPopover();
+    assert.equal(isTipShown(el, true), false);
+    showTip(el, true);
+    assert.equal(isTipShown(el, true), true);
+});
+
+test("showTip/hideTip (fallback): toggle the hidden attribute when popover is unsupported", () => {
+    const el = { hidden: true };
+    showTip(el, false);
+    assert.equal(el.hidden, false);
+    assert.equal(isTipShown(el, false), true);
+    hideTip(el, false);
+    assert.equal(el.hidden, true);
+    assert.equal(isTipShown(el, false), false);
+});
+
+test("showTip/hideTip/isTipShown: a null element is a safe no-op", () => {
+    assert.doesNotThrow(() => showTip(null, true));
+    assert.doesNotThrow(() => hideTip(null, true));
+    assert.equal(isTipShown(null, true), false);
+    assert.equal(isTipShown(null, false), false);
+});
+
+// --- hugWidth: pure width arithmetic for the tooltip hug (widest line + border-box add-back) ---
+
+test("hugWidth: picks the widest line and adds horizontal padding+border under border-box", () => {
+    const rects = [{ width: 100.2 }, { width: 140.6 }, { width: 90 }];
+    // ceil(140.6)=141, + padding(6+6) + border(1+1)=14 => 155
+    assert.equal(hugWidth(rects, "border-box", 6, 6, 1, 1), 155);
+});
+
+test("hugWidth: content-box adds no chrome (width already is the content box)", () => {
+    assert.equal(hugWidth([{ width: 140.6 }], "content-box", 6, 6, 1, 1), 141);
+});
+
+test("hugWidth: returns null when there is no positive-width line to hug", () => {
+    assert.strictEqual(hugWidth([], "border-box", 6, 6, 1, 1), null);
+    assert.strictEqual(hugWidth([{ width: 0 }], "border-box", 6, 6, 1, 1), null);
 });
 
 test("reduce: transfer-to-mature - a pending inner leaf returning to its already-shown ancestor retains the ancestor", () => {

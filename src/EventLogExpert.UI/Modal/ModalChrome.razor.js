@@ -23,6 +23,11 @@ export function showModal(ref) {
     ref._returnFocusElement = (previouslyFocused instanceof HTMLElement && previouslyFocused !== document.body) ?
         previouslyFocused : null;
 
+    // Dismiss any focus tooltip before the dialog enters the top layer, so a launcher tooltip can't be
+    // stranded behind the modal or consume an Escape meant for it. focusTooltip.js listens for this on
+    // document; the event is a no-op when the tooltip isn't registered or nothing is showing.
+    document.dispatchEvent(new Event("focus-tooltip:dismiss"));
+
     ref.showModal();
 
     // Content modals drop their footer autofocus, so the native dialog may land focus on the
@@ -53,7 +58,14 @@ export function closeModal(ref) {
     const returnTarget = ref._returnFocusElement;
     ref._returnFocusElement = null;
 
-    if (ref.open) { ref.close(); }
+    if (ref.open) {
+        // Symmetric with showModal (which gates on ref.open too): tear down any tooltip showing over the
+        // dialog before it leaves the top layer, so one anchored to in-dialog content isn't stranded on the
+        // body-level popover after the dialog detaches. A no-op when nothing is showing; the focus restored
+        // below re-fires focusin to re-show a launcher tooltip.
+        document.dispatchEvent(new Event("focus-tooltip:dismiss"));
+        ref.close();
+    }
 
     // Defer focus to the next frame so the dialog's close + DOM detach completes first; otherwise
     // browsers may move focus to <body> after we set it.
