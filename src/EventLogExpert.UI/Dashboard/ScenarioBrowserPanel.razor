@@ -8,7 +8,7 @@
         <ul aria-label="@(Localizer["Dashboard_ScenariosListAria"])" class="scenario-browser__list" @onkeydown="OnListKeyDownAsync" role="listbox">
             @foreach (var scenario in Scenarios)
             {
-                <li aria-describedby="@($"scenario-purpose-{scenario.Id}")"
+                <li aria-describedby="@PurposeId(scenario)"
                     aria-label="@scenario.Name"
                     aria-selected="@(IsSelected(scenario) ? "true" : "false")"
                     class="@OptionClass(scenario)"
@@ -21,7 +21,7 @@
                     <span class="scenario-browser__option-body">
                         <span class="scenario-browser__option-name">@scenario.Name</span>
                     </span>
-                    <span class="visually-hidden" id="@($"scenario-purpose-{scenario.Id}")">@scenario.Purpose</span>
+                    <span class="visually-hidden" id="@PurposeId(scenario)">@scenario.Purpose</span>
                 </li>
             }
         </ul>

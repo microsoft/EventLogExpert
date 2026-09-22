@@ -3,6 +3,7 @@
 
 using Bunit;
 using EventLogExpert.UI.Inputs;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 
 namespace EventLogExpert.UI.Tests.Inputs;
@@ -12,6 +13,39 @@ public sealed class ValueSelectTests : BunitContext
     public ValueSelectTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
+    }
+
+    [Fact]
+    public void ClearItem_OmitsDataTooltipSoRenderedTextIsUsed_ButValuedOptionKeepsIt()
+    {
+        // A ClearItem's Value is default, so its DisplayString is empty; the data-tooltip is omitted and the
+        // overflow tooltip falls back to the rendered textContent ("All values"). A valued option keeps its
+        // DisplayString (which the ValueSelect's converter already renders as the visible label).
+        var component = Render<ValueSelect<string>>(parameters => parameters
+            .Add(p => p.Value, "x")
+            .Add(p => p.ValueChanged, _ => { })
+            .Add(p => p.ChildContent, builder =>
+            {
+                builder.OpenComponent<ValueSelectItem<string>>(0);
+                builder.AddAttribute(1, nameof(ValueSelectItem<string>.ClearItem), true);
+                builder.AddAttribute(2, nameof(ValueSelectItem<string>.ChildContent),
+                    (RenderFragment)(fragment => fragment.AddContent(0, "All values")));
+                builder.CloseComponent();
+
+                builder.OpenComponent<ValueSelectItem<string>>(3);
+                builder.AddAttribute(4, nameof(ValueSelectItem<string>.Value), "x");
+                builder.CloseComponent();
+            }));
+
+        var options = component.FindAll("[role='option']");
+        var clearOption = options.First(option => option.TextContent.Contains("All values"));
+        var valuedOption = options.First(option => !option.TextContent.Contains("All values"));
+
+        Assert.False(clearOption.HasAttribute("data-tooltip"), "ClearItem omits the Value-derived data-tooltip");
+        Assert.True(clearOption.HasAttribute("data-tooltip-overflow"));
+
+        Assert.Equal("x", valuedOption.GetAttribute("data-tooltip"));
+        Assert.True(valuedOption.HasAttribute("data-tooltip-overflow"));
     }
 
     [Fact]
@@ -59,6 +93,40 @@ public sealed class ValueSelectTests : BunitContext
         component.Find("input[role='combobox']").Input("12");
 
         Assert.Equal(12, bound);
+    }
+
+    [Fact]
+    public void Item_RendersOverflowFocusTooltipAndNoNativeTitle()
+    {
+        var options = new[] { (Value: "a", Name: "Alpha"), (Value: "b", Name: "Beta") };
+
+        var component = Render<ValueSelect<string>>(parameters => parameters
+            .Add(p => p.Value, "a")
+            .Add(p => p.ValueChanged, _ => { })
+            .Add(p => p.ChildContent, builder =>
+            {
+                var seq = 0;
+
+                foreach (var option in options)
+                {
+                    builder.OpenComponent<ValueSelectItem<string>>(seq++);
+                    builder.AddAttribute(seq++, nameof(ValueSelectItem<string>.Value), option.Value);
+                    builder.AddAttribute(seq++, nameof(ValueSelectItem<string>.AriaLabel), option.Name);
+                    builder.CloseComponent();
+                }
+            }));
+
+        foreach (var option in component.FindAll("[role='option']"))
+        {
+            Assert.True(option.HasAttribute("data-tooltip"));
+            Assert.True(option.HasAttribute("data-tooltip-overflow"));
+            Assert.False(option.HasAttribute("title"));
+        }
+
+        var input = component.Find("input[role='combobox']");
+        Assert.True(input.HasAttribute("data-tooltip"));
+        Assert.True(input.HasAttribute("data-tooltip-overflow"));
+        Assert.False(input.HasAttribute("title"));
     }
 
     [Fact]

@@ -84,8 +84,7 @@
                     IconClass="@(WillElevate ? "bi bi-shield-lock" : "bi bi-play-fill")"
                     OnClick="RunShowAsync"
                     aria-describedby="@(WillElevate ? "show-run-elevation-help" : null)"
-                    data-tooltip="@(CanRun ? RunElevationTitle : null)"
-                    title="@(CanRun ? null : RunElevationTitle)">
+                    data-tooltip="@RunElevationTitle">
                     @Localizer["DatabaseTools_Action_Run"]
                 </PrimaryButton>
             }

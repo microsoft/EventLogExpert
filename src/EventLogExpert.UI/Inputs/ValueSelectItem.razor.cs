@@ -37,7 +37,7 @@ public sealed partial class ValueSelectItem<T> : IDisposable
     [Parameter]
     public T Value { get; set; } = default!;
 
-    internal string DescriptionId => $"{ItemId}-desc";
+    private string DescriptionId => $"{ItemId}-desc";
 
     private string? DisplayString
     {

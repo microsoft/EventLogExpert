@@ -7,8 +7,8 @@
         <span class="stats-headline">@HeadlineText()</span>
         <button aria-label="@Localizer["Stats_ResolutionCoverageAria"]"
             class="stats-coverage-link"
-            @onclick="OpenCoverage"
             data-tooltip="@Localizer["Stats_ResolutionCoverageTitle"]"
+            @onclick="OpenCoverage"
             type="button">
             @Localizer["Stats_ResolutionCoverage"]
         </button>
@@ -26,8 +26,8 @@
                 @foreach (var segment in SeveritySegments())
                 {
                     <span class="stats-severity-seg @segment.CssClass"
-                        style="flex-grow:@Css(segment.Percent)"
-                        data-tooltip="@Localizer["Stats_SeveritySegmentTooltip", segment.Label, FormatCount(segment.Count), FormatPercent(segment.Percent)]">
+                        data-tooltip="@Localizer["Stats_SeveritySegmentTooltip", segment.Label, FormatCount(segment.Count), FormatPercent(segment.Percent)]"
+                        style="flex-grow:@Css(segment.Percent)">
                     </span>
                 }
             </div>
@@ -80,19 +80,17 @@
                                         <span aria-label="@Localizer["Stats_RowActionsAria"]" class="stats-row-actions" role="group">
                                             <button aria-label="@Localizer["Stats_Row_IncludeAria", StatsDimensionLocalizer.Label(Localizer, section.Dimension), contributor.Value]"
                                                 class="stats-include"
+                                                data-tooltip="@(AreRowActionsDisabled(section) ? null : Localizer["Stats_Row_IncludeTitle"].Value)"
                                                 disabled="@AreRowActionsDisabled(section)"
                                                 @onclick="() => IncludeContributor(section, contributor)"
-                                                data-tooltip="@(AreRowActionsDisabled(section) ? null : Localizer["Stats_Row_IncludeTitle"].Value)"
-                                                title="@(AreRowActionsDisabled(section) ? Localizer["Stats_Row_IncludeTitle"].Value : null)"
                                                 type="button">
                                                 <i aria-hidden="true" class="bi bi-plus-circle"></i>
                                             </button>
                                             <button aria-label="@Localizer["Stats_Row_ExcludeAria", StatsDimensionLocalizer.Label(Localizer, section.Dimension), contributor.Value]"
                                                 class="stats-exclude"
+                                                data-tooltip="@(AreRowActionsDisabled(section) ? null : Localizer["Stats_Row_ExcludeTitle"].Value)"
                                                 disabled="@AreRowActionsDisabled(section)"
                                                 @onclick="() => ExcludeContributor(section, contributor)"
-                                                data-tooltip="@(AreRowActionsDisabled(section) ? null : Localizer["Stats_Row_ExcludeTitle"].Value)"
-                                                title="@(AreRowActionsDisabled(section) ? Localizer["Stats_Row_ExcludeTitle"].Value : null)"
                                                 type="button">
                                                 <i aria-hidden="true" class="bi bi-dash-circle"></i>
                                             </button>

@@ -358,6 +358,31 @@ public sealed class FilterEditorLocalizerWiringTests : BunitContext
     }
 
     [Fact]
+    public void PredicateEditor_DoneButton_DescribesDisabledReasonAndSwitchesTooltipWhenComplete()
+    {
+        var incompletePredicate = new FilterPredicateDraft();
+        var incompleteComponent = RenderPredicate(incompletePredicate, isEditing: true);
+
+        var disabledDoneButton = incompleteComponent.Find("button[aria-label='[[FilterEditor_Predicate_DoneAria]]']");
+        Assert.True(disabledDoneButton.HasAttribute("disabled"));
+        Assert.False(disabledDoneButton.HasAttribute("title"));
+        Assert.Equal("[[FilterEditor_Predicate_DoneDisabledTitle]]", disabledDoneButton.GetAttribute("data-tooltip"));
+
+        string? hintId = disabledDoneButton.GetAttribute("aria-describedby");
+        Assert.NotNull(hintId);
+        Assert.EndsWith("_DoneHint", hintId);
+        Assert.Equal("[[FilterEditor_Predicate_DoneDisabledTitle]]", incompleteComponent.Find($"#{hintId}").TextContent);
+
+        var completePredicate = new FilterPredicateDraft { Comparison = { Value = "1" } };
+        var completeComponent = RenderPredicate(completePredicate, isEditing: true);
+        var enabledDoneButton = completeComponent.Find("button[aria-label='[[FilterEditor_Predicate_DoneAria]]']");
+        Assert.False(enabledDoneButton.HasAttribute("disabled"));
+        Assert.False(enabledDoneButton.HasAttribute("title"));
+        Assert.Equal("[[FilterEditor_Predicate_DoneTitle]]", enabledDoneButton.GetAttribute("data-tooltip"));
+        Assert.False(enabledDoneButton.HasAttribute("aria-describedby"));
+    }
+
+    [Fact]
     public void PredicateEditor_RoutesButtonsThroughLocalizer()
     {
         var predicate = new FilterPredicateDraft { JoinWithAny = true };
@@ -381,6 +406,23 @@ public sealed class FilterEditorLocalizerWiringTests : BunitContext
         andPredicate.Comparison.Value = "1";
         andComponent.Render();
         Assert.Contains("[[FilterEditor_Predicate_DoneTitle]]", andComponent.Markup);
+    }
+
+    [Fact]
+    public void PredicateList_AddButton_RoutesStateDependentFocusTooltipWithoutNativeTitle()
+    {
+        var enabled = Render<FilterPredicateList>(parameters => parameters.Add(list => list.Predicates, []));
+        var enabledAddButton = enabled.Find(".add-filter-predicate-button");
+        Assert.False(enabledAddButton.HasAttribute("disabled"));
+        Assert.False(enabledAddButton.HasAttribute("title"));
+        Assert.Equal("[[FilterEditor_PredicateList_AddTitle]]", enabledAddButton.GetAttribute("data-tooltip"));
+
+        var disabled = Render<FilterPredicateList>(parameters => parameters.Add(list => list.Predicates, [new FilterPredicateDraft()]));
+        var disabledAddButton = disabled.Find(".add-filter-predicate-button");
+        Assert.True(disabledAddButton.HasAttribute("disabled"));
+        Assert.False(disabledAddButton.HasAttribute("title"));
+        Assert.False(disabledAddButton.HasAttribute("aria-describedby"));
+        Assert.Equal("[[FilterEditor_PredicateList_AddDisabledTitle]]", disabledAddButton.GetAttribute("data-tooltip"));
     }
 
     [Fact]

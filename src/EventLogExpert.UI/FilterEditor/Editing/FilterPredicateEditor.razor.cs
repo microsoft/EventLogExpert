@@ -4,6 +4,7 @@
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Localization;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
@@ -32,6 +33,11 @@ public sealed partial class FilterPredicateEditor : ComponentBase
     [Parameter] public EventCallback OnRemove { get; set; }
 
     [Parameter][EditorRequired] public FilterPredicateDraft Value { get; set; } = null!;
+
+    // Unique per-predicate id for the disabled-Done hint (aria-describedby target); predicates coexist in a
+    // list, so scope the id the same way the comparison labels do - a raw Value.Id renders with spaces (record
+    // ToString), which is an invalid HTML id.
+    private string DoneHintId => ComponentId.For(Value.Id, ComponentIdScope.Predicate).Suffix("DoneHint").Value;
 
     private string JoinerAriaLabel =>
         Value.JoinWithAny ?

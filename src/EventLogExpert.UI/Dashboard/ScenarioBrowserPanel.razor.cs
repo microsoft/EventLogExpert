@@ -4,6 +4,7 @@
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Scenarios.Catalog;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -15,6 +16,11 @@ namespace EventLogExpert.UI.Dashboard;
 public sealed partial class ScenarioBrowserPanel : IAsyncDisposable
 {
     private readonly Dictionary<string, ElementReference> _optionRefs = new();
+
+    // Stable DOM-safe id per scenario for the aria-describedby purpose hint. Scenario ids are catalog strings
+    // (kebab-case by convention but not enforced for third-party packs), so an id with whitespace or other
+    // arbitrary characters would split the IDREF and drop the description; a generated ComponentId is always safe.
+    private readonly Dictionary<string, string> _purposeIds = new();
 
     private string? _pendingFocusId;
     private ElementReference _scenarioBrowserRootRef;
@@ -138,5 +144,16 @@ public sealed partial class ScenarioBrowserPanel : IAsyncDisposable
         if (IsScenarioDisabled(scenario)) { classes += " scenario-browser__option--disabled"; }
 
         return classes;
+    }
+
+    private string PurposeId(ScenarioDefinition scenario)
+    {
+        if (!_purposeIds.TryGetValue(scenario.Id, out var id))
+        {
+            id = ComponentId.NewUnique("scenario-purpose").Value;
+            _purposeIds[scenario.Id] = id;
+        }
+
+        return id;
     }
 }

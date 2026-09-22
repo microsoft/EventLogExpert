@@ -105,6 +105,28 @@ public sealed class ScenarioBrowserPanelTests : BunitContext
     }
 
     [Fact]
+    public void PurposeHint_UsesDomSafeIdMatchingAriaDescribedby()
+    {
+        // A pack-supplied id can contain whitespace/arbitrary characters (kebab-case is a convention, not
+        // enforced), which would split an aria-describedby IDREF and drop the purpose description. The panel
+        // generates a DOM-safe id instead, so the hint still resolves.
+        var scenario = Scenario("sys health/pack 1", "Health");
+
+        var cut = Render<ScenarioBrowserPanel>(parameters => parameters
+            .Add(panel => panel.Scenarios, [scenario])
+            .Add(panel => panel.Selected, scenario)
+            .Add(panel => panel.IsFavored, _ => false)
+            .Add(panel => panel.IsScenarioDisabled, _ => false));
+
+        var option = cut.Find("[role='option']");
+        var describedBy = option.GetAttribute("aria-describedby");
+
+        Assert.False(string.IsNullOrWhiteSpace(describedBy));
+        Assert.DoesNotContain(" ", describedBy);
+        Assert.Equal("Purpose", cut.Find($"#{describedBy}").TextContent);
+    }
+
+    [Fact]
     public void SelectionFollowsFocus_ArrowDown_SelectsNextScenario()
     {
         var scenarios = new[] { Scenario("first", "First"), Scenario("second", "Second") };
