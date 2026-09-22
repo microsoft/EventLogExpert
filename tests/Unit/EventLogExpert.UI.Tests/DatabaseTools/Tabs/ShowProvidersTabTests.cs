@@ -77,6 +77,28 @@ public sealed class ShowProvidersTabTests : BunitContext
     }
 
     [Fact]
+    public void RunButton_ElevationBranch_UsesFocusTooltipWithoutNativeTitle()
+    {
+        var component = Render<ShowProvidersTab>();
+
+        var plainRunButton = component.Find(".button-green");
+        Assert.False(plainRunButton.HasAttribute("disabled"));
+        Assert.False(plainRunButton.HasAttribute("title"));
+        Assert.False(plainRunButton.HasAttribute("data-tooltip"));
+        Assert.False(plainRunButton.HasAttribute("aria-describedby"));
+
+        component.Find("#show-include-protected").Change(true);
+        component.Find("#show-filter").Input("[unterminated");
+
+        var elevatedRunButton = component.Find(".button-green");
+        Assert.True(elevatedRunButton.HasAttribute("disabled"));
+        Assert.False(elevatedRunButton.HasAttribute("title"));
+        Assert.Equal("[[DatabaseTools_Elevation_ProtectedProviders]]", elevatedRunButton.GetAttribute("data-tooltip"));
+        Assert.Equal("show-run-elevation-help", elevatedRunButton.GetAttribute("aria-describedby"));
+        Assert.Equal("[[DatabaseTools_Elevation_ProtectedProviders]]", component.Find("#show-run-elevation-help").TextContent);
+    }
+
+    [Fact]
     public void RunButton_ExposesElevationToScreenReaders_OnlyWhenElevating()
     {
         // The aria-hidden shield needs aria-describedby as the screen-reader elevation cue.

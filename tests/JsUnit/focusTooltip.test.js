@@ -10,7 +10,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
     isClipped,
-    selectAnchor,
     resolveEffectiveAnchor,
     hoverTransferAnchor,
     cursorPoint,
@@ -40,34 +39,18 @@ test("isClipped: vertical (line-clamp) overflow beyond tolerance is clipped", ()
     assert.equal(isClipped({ scrollWidth: 100, clientWidth: 100, scrollHeight: 60, clientHeight: 20 }), true);
 });
 
-// --- selectAnchor: a hovered control beats a focused one ---
-
-test("selectAnchor: a hovered control takes precedence over a focused one", () => {
-    const focused = { id: "focused" };
-    const hovered = { id: "hovered" };
-    assert.equal(selectAnchor(focused, hovered), hovered);
-});
-
-test("selectAnchor: falls back to the focused control when nothing is hovered", () => {
-    const focused = { id: "focused" };
-    assert.equal(selectAnchor(focused, null), focused);
-});
-
-test("selectAnchor: null when neither is set", () => {
-    assert.equal(selectAnchor(null, null), null);
-});
-
 // --- resolveEffectiveAnchor: overflow gate + nested-anchor ascent ---
 
 // Minimal DOM-node mock exposing only the members resolveEffectiveAnchor touches. Every mock node is itself a
-// tooltip anchor, so closest("[data-tooltip]") resolves to the node it is called on (the nearest ancestor).
+// non-empty tooltip anchor, so a [data-tooltip] closest() query resolves to the node it is called on (the
+// nearest ancestor).
 function anchorNode({ overflow = false, parent = null, dims = null } = {}) {
     return {
         _overflow: overflow,
         _dims: dims,
         parentElement: parent,
         hasAttribute(name) { return name === "data-tooltip-overflow" ? this._overflow : true; },
-        closest(selector) { return selector === "[data-tooltip]" ? this : null; },
+        closest(selector) { return selector.startsWith("[data-tooltip]") ? this : null; },
     };
 }
 
@@ -135,6 +118,9 @@ test("hoverTransferAnchor: returns null when the related anchor is the hovered a
 // --- cursorPoint: placement geometry + pointer exclusion ---
 
 const VIEWPORT = { w: 1000, h: 800 };
+// Offsets are intentionally distinct from the production CURSOR_OFFSET_X/Y (10/15): passing
+// arbitrary offsets proves cursorPoint derives placement from its parameters rather than
+// reading the module-level constants (a constant-leak regression would be masked if they matched).
 const OPTS = { offsetX: 14, offsetY: 18, margin: 4 };
 
 test("cursorPoint: default places the bubble down-right of the cursor, excluding the pointer", () => {
@@ -444,6 +430,38 @@ test("reduce: Escape and pointerDown both cancel a pending show", () => {
     let clicked = reduce(reduce(initialTooltipState(), { type: "hoverEnter", anchor: A }).state, { type: "pointerDown" });
     assert.equal(clicked.state.pendingAnchor, null);
     assert.ok(types(clicked.effects).includes("cancelShowTimer"));
+});
+
+test("reduce: a detached focused leaf (focusOut then scroll, as the adapter routes it) conceals instead of stranding", () => {
+    const A = { id: "A" };
+    let s = reduce(initialTooltipState(), { type: "focusIn", anchor: A }).state;
+    s = reduce(s, { type: "renderResolved", anchor: A, visible: true }).state;
+    s = reduce(s, { type: "focusOut", anchor: A }).state;
+    const afterScroll = reduce(s, { type: "scroll" });
+    assert.equal(afterScroll.state.focusedAnchor, null);
+    assert.equal(afterScroll.state.displayLeaf, null, "display leaf cleared, not repositioned");
+    assert.ok(types(afterScroll.effects).includes("conceal"));
+});
+
+test("reduce: scroll clears a matured hover so a later focusIn on another control still renders (no stale-hover suppression)", () => {
+    const A = { id: "A" };
+    const B = { id: "B" };
+    const afterScroll = reduce(matureHover(initialTooltipState(), A), { type: "scroll" });
+    assert.equal(afterScroll.state.hoveredAnchor, null, "scroll clears the matured hover");
+    const afterFocus = reduce(afterScroll.state, { type: "focusIn", anchor: B });
+    assert.equal(afterFocus.state.displayLeaf, B, "focusIn on B renders because no stale hover blocks it");
+    assert.ok(types(afterFocus.effects).includes("render"));
+});
+
+test("reduce: pointerDown dismisses a matured hover (native click-to-dismiss; no bubble stranded on a removed trigger)", () => {
+    const A = { id: "A" };
+    const clicked = reduce(matureHover(initialTooltipState(), A), { type: "pointerDown" });
+    assert.equal(clicked.state.hoveredAnchor, null, "the matured hover is cleared on click");
+    assert.equal(clicked.state.displayLeaf, null, "the display leaf is cleared so a detached trigger cannot strand the bubble");
+    assert.equal(clicked.state.displayedMode, null, "displayedMode is cleared to match the concealed DOM (reducer invariant)");
+    assert.equal(clicked.state.visible, false, "visible mirrors the concealed bubble (reducer invariant)");
+    assert.ok(types(clicked.effects).includes("conceal"), "the visible bubble is concealed");
+    assert.ok(types(clicked.effects).includes("cancelHideTimer"));
 });
 
 test("reduce: renderResolved only updates visibility for the current request (stale reports are ignored)", () => {

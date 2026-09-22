@@ -14,13 +14,17 @@
             Id="@ComponentId.For(Value.Id, ComponentIdScope.Predicate).Value"
             OnChanged="OnComparisonChanged" />
 
+        @if (!Value.IsComplete)
+        {
+            <span class="visually-hidden" id="@DoneHintId">@Localizer["FilterEditor_Predicate_DoneDisabledTitle"]</span>
+        }
         <Button Disabled="@(!Value.IsComplete)"
             IconClass="bi bi-check-circle"
             IconOnly
             OnClick="OnDoneClick"
+            aria-describedby="@(!Value.IsComplete ? DoneHintId : null)"
             aria-label="@Localizer["FilterEditor_Predicate_DoneAria"]"
-            data-tooltip="@(Value.IsComplete ? Localizer["FilterEditor_Predicate_DoneTitle"] : null)"
-            title="@(Value.IsComplete ? null : Localizer["FilterEditor_Predicate_DoneDisabledTitle"])" />
+            data-tooltip="@(Value.IsComplete ? Localizer["FilterEditor_Predicate_DoneTitle"] : Localizer["FilterEditor_Predicate_DoneDisabledTitle"])" />
 
         <DangerButton IconClass="bi bi-x-circle"
             IconOnly

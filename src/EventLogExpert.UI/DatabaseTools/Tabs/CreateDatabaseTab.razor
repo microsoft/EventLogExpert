@@ -86,10 +86,14 @@
                             <ValueSelectItem T="int?" Value="edition.Index">@FormatEditionLabel(edition)</ValueSelectItem>
                         }
                     </ValueSelect>
+                    @if (IsRunning || _isLoadingEditions)
+                    {
+                        <span class="visually-hidden" id="create-load-editions-help">@Localizer["Db_Create_LoadEditionsTitle"]</span>
+                    }
                     <Button Disabled="@(IsRunning || _isLoadingEditions)"
                         OnClick="LoadEditionsAsync"
-                        data-tooltip="@(!IsRunning && !_isLoadingEditions ? Localizer["Db_Create_LoadEditionsTitle"] : null)"
-                        title="@(!IsRunning && !_isLoadingEditions ? null : Localizer["Db_Create_LoadEditionsTitle"])">
+                        aria-describedby="@(IsRunning || _isLoadingEditions ? "create-load-editions-help" : null)"
+                        data-tooltip="@Localizer["Db_Create_LoadEditionsTitle"]">
                         @(_isLoadingEditions ? Localizer["Db_Create_LoadingEditions"] : Localizer["Db_Create_LoadEditions"])
                     </Button>
                 </div>
@@ -197,8 +201,7 @@
                     IconClass="@(WillElevate ? "bi bi-shield-lock" : "bi bi-play-fill")"
                     OnClick="RunCreateAsync"
                     aria-describedby="@(WillElevate ? "create-run-elevation-help" : null)"
-                    data-tooltip="@(CanRun && !IsRunning && !IsImportInProgress && !IsConfirming ? RunElevationTitle : null)"
-                    title="@(CanRun && !IsRunning && !IsImportInProgress && !IsConfirming ? null : RunElevationTitle)">
+                    data-tooltip="@RunElevationTitle">
                     @Localizer["DatabaseTools_Action_Run"]
                 </PrimaryButton>
             }

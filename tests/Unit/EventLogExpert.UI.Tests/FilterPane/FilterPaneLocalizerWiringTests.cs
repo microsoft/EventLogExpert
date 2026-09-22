@@ -252,15 +252,47 @@ public sealed class FilterPaneLocalizerWiringTests : BunitContext
     }
 
     [Fact]
+    public void HeaderChrome_ScenarioJsonButtons_KeepConstantFocusTooltipsWithoutNativeTitle()
+    {
+        var disabledComponent = Render<UI.FilterPane.FilterPane>();
+
+        var disabledCopyButton = disabledComponent.Find("button[aria-label='[[FilterPane_CopyScenarioJson_Aria]]']");
+        Assert.True(disabledCopyButton.HasAttribute("disabled"));
+        Assert.False(disabledCopyButton.HasAttribute("title"));
+        Assert.Equal("[[FilterPane_CopyScenarioJson_Title]]", disabledCopyButton.GetAttribute("data-tooltip"));
+
+        var disabledSaveButton = disabledComponent.Find("button[aria-label='[[FilterPane_SaveScenarioJson_Aria]]']");
+        Assert.True(disabledSaveButton.HasAttribute("disabled"));
+        Assert.False(disabledSaveButton.HasAttribute("title"));
+        Assert.Equal("[[FilterPane_SaveScenarioJson_Title]]", disabledSaveButton.GetAttribute("data-tooltip"));
+
+        _filters = [SavedFilter.TryCreate("Level == 4")! with { IsEnabled = true }];
+        _loadedNames = ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, "System");
+
+        var enabledComponent = Render<UI.FilterPane.FilterPane>();
+
+        var enabledCopyButton = enabledComponent.Find("button[aria-label='[[FilterPane_CopyScenarioJson_Aria]]']");
+        Assert.False(enabledCopyButton.HasAttribute("disabled"));
+        Assert.False(enabledCopyButton.HasAttribute("title"));
+        Assert.Equal("[[FilterPane_CopyScenarioJson_Title]]", enabledCopyButton.GetAttribute("data-tooltip"));
+
+        var enabledSaveButton = enabledComponent.Find("button[aria-label='[[FilterPane_SaveScenarioJson_Aria]]']");
+        Assert.False(enabledSaveButton.HasAttribute("disabled"));
+        Assert.False(enabledSaveButton.HasAttribute("title"));
+        Assert.Equal("[[FilterPane_SaveScenarioJson_Title]]", enabledSaveButton.GetAttribute("data-tooltip"));
+    }
+
+    [Fact]
     public void HeaderChrome_WhenStateChanges_RoutesBothEnabledAndDisabledTitleBranches()
     {
         var component = Render<UI.FilterPane.FilterPane>();
 
         Assert.True(component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").HasAttribute("disabled"));
-        Assert.Equal("[[FilterPane_SaveAsFilterSet_TitleDisabled]]", component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").GetAttribute("title"));
-        Assert.False(component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").HasAttribute("data-tooltip"));
+        Assert.False(component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").HasAttribute("title"));
+        Assert.Equal("[[FilterPane_SaveAsFilterSet_TitleDisabled]]", component.Find("button[aria-label='[[FilterPane_SaveAsFilterSet_Aria]]']").GetAttribute("data-tooltip"));
         Assert.True(component.Find("button[aria-label='[[FilterPane_ClearAll_Aria]]']").HasAttribute("disabled"));
-        Assert.Equal("[[FilterPane_ClearAll_TitleDisabled]]", component.Find("button[aria-label='[[FilterPane_ClearAll_Aria]]']").GetAttribute("title"));
+        Assert.False(component.Find("button[aria-label='[[FilterPane_ClearAll_Aria]]']").HasAttribute("title"));
+        Assert.Equal("[[FilterPane_ClearAll_TitleDisabled]]", component.Find("button[aria-label='[[FilterPane_ClearAll_Aria]]']").GetAttribute("data-tooltip"));
 
         _dateFilter = new DateFilter { IsEnabled = false };
         _filteredDateRange.Changed += Raise.Event<Action>();

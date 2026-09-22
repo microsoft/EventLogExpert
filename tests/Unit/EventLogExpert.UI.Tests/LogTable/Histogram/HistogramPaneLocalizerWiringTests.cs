@@ -148,6 +148,34 @@ public sealed class HistogramPaneLocalizerWiringTests : BunitContext
             s_wait);
     }
 
+    [Fact]
+    public async Task UndoZoomButton_DisabledAndEnabledBranchesUseFocusTooltipWithoutNativeTitle()
+    {
+        _cpuScheduler.NextHistogramData = MixedGroupHistogramData();
+
+        var cut = Render<HistogramPane>();
+        var disabledUndo = cut.Find("button[aria-label='[[Histogram_UndoZoomAria]]']");
+        Assert.True(disabledUndo.HasAttribute("disabled"));
+        Assert.False(disabledUndo.HasAttribute("title"));
+        Assert.Equal("[[Histogram_UndoZoomTitle]]", disabledUndo.GetAttribute("data-tooltip"));
+        Assert.Equal("histogram-undo-zoom-help", disabledUndo.GetAttribute("aria-describedby"));
+        Assert.Equal("[[Histogram_UndoZoomTitle]]", cut.Find("#histogram-undo-zoom-help").TextContent);
+
+        await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(420, 120));
+        cut.WaitForState(() => cut.FindAll("g[data-tip]").Count == 6, s_wait);
+        await cut.InvokeAsync(() => cut.Instance.OnHistogramDragSelected(0, 0.5, scope: false));
+
+        cut.WaitForAssertion(() =>
+        {
+            var enabledUndo = cut.Find("button[aria-label='[[Histogram_UndoZoomAria]]']");
+            Assert.False(enabledUndo.HasAttribute("disabled"));
+            Assert.False(enabledUndo.HasAttribute("title"));
+            Assert.Equal("[[Histogram_UndoZoomTitle]]", enabledUndo.GetAttribute("data-tooltip"));
+            Assert.False(enabledUndo.HasAttribute("aria-describedby"));
+            Assert.Empty(cut.FindAll("#histogram-undo-zoom-help"));
+        }, s_wait);
+    }
+
     private static HistogramData MixedGroupHistogramData()
     {
         IReadOnlyList<HistogramGroup> groups =

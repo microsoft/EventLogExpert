@@ -279,6 +279,31 @@ public sealed class DebugLogModalTests : BunitContext
     }
 
     [Fact]
+    public async Task DebugLogModal_ClearFiltersButton_KeepsTooltipWhenDisabledWithoutNativeTitle()
+    {
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(
+            DebugLogUtils.ToAsyncEnumerable([DebugLogUtils.BuildLine(LogLevel.Information, "alpha foo")]));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("1 of 1 entry", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        var disabledClearButton = component.Find("button[aria-label='Clear all filters']");
+        Assert.True(disabledClearButton.HasAttribute("disabled"));
+        Assert.False(disabledClearButton.HasAttribute("title"));
+        Assert.False(disabledClearButton.HasAttribute("aria-describedby"));
+        Assert.Equal("Clear all filters", disabledClearButton.GetAttribute("data-tooltip"));
+
+        await AddFilterAsync(component);
+
+        var enabledClearButton = component.Find("button[aria-label='Clear all filters']");
+        Assert.False(enabledClearButton.HasAttribute("disabled"));
+        Assert.False(enabledClearButton.HasAttribute("title"));
+        Assert.Equal("Clear all filters", enabledClearButton.GetAttribute("data-tooltip"));
+    }
+
+    [Fact]
     public async Task DebugLogModal_ClearFilters_RemovesAllRowsAndShowsAllEntries()
     {
         var lines = new[]
@@ -651,6 +676,38 @@ public sealed class DebugLogModalTests : BunitContext
 
         await component.WaitForAssertionAsync(() =>
             Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+    }
+
+    [Fact]
+    public async Task DebugLogModal_SaveFilterButton_DescribesDisabledReasonAndSwitchesTooltipWhenComplete()
+    {
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(
+            DebugLogUtils.ToAsyncEnumerable([DebugLogUtils.BuildLine(LogLevel.Information, "alpha foo")]));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("1 of 1 entry", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        await AddFilterAsync(component);
+
+        var disabledSaveButton = component.Find("button[aria-label='Save filter']");
+        Assert.True(disabledSaveButton.HasAttribute("disabled"));
+        Assert.False(disabledSaveButton.HasAttribute("title"));
+        Assert.Equal("Add a value to finish this filter", disabledSaveButton.GetAttribute("data-tooltip"));
+
+        string? hintId = disabledSaveButton.GetAttribute("aria-describedby");
+        Assert.NotNull(hintId);
+        Assert.Matches(@"^debug-filter-save-hint-[0-9a-f]{32}$", hintId);
+        Assert.Equal("Add a value to finish this filter", component.Find($"#{hintId}").TextContent);
+
+        await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
+
+        var enabledSaveButton = component.Find("button[aria-label='Save filter']");
+        Assert.False(enabledSaveButton.HasAttribute("disabled"));
+        Assert.False(enabledSaveButton.HasAttribute("title"));
+        Assert.Equal("Save filter", enabledSaveButton.GetAttribute("data-tooltip"));
+        Assert.False(enabledSaveButton.HasAttribute("aria-describedby"));
     }
 
     [Fact]

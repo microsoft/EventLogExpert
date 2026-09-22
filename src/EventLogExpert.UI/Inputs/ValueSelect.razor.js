@@ -80,23 +80,6 @@ export function registerDropdown(root, dotNetRef) {
     }, { signal: controller.signal });
     dropdown.addEventListener("blur", (e) => closeDropdown(e), { signal: controller.signal });
 
-    // Native title tooltip, only when the text is actually clipped (scrollWidth > clientWidth): recovers a long
-    // selected value or option that overflows the fixed dropdown width, and stays silent when it already fits.
-    root.addEventListener("mouseover", (e) => {
-        // e.target is an Element for mouseover in practice, but normalize defensively (a Text node has no closest).
-        const target = e.target instanceof Element ? e.target : e.target?.parentElement;
-        const el = target?.closest("input, [role='option']");
-        if (!el || !root.contains(el)) { return; }
-
-        const text = el.tagName === "INPUT" ? el.value : (el.textContent ?? "").trim();
-
-        if (text && el.scrollWidth > el.clientWidth) {
-            el.title = text;
-        } else if (el.hasAttribute("title")) {
-            el.removeAttribute("title");
-        }
-    }, { signal: controller.signal });
-
     // The open list is position: fixed and only repositions when it opens, so if a scrollable
     // ancestor (e.g. .page-content) scrolls or the viewport resizes, the combobox can move while the
     // list stays put and detaches. Close the list on those shifts; ignore scrolls that originate

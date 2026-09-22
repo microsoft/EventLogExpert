@@ -5,6 +5,8 @@
     aria-label="@AriaLabel"
     aria-selected="@IsSelected.ToString().ToLower()" class="@CssClass"
     data-highlight="@DataHighlight"
+    data-tooltip="@(ClearItem ? null : DisplayString)"
+    data-tooltip-overflow
     highlighted="@(IsHighlighted ? "" : null)"
     id="@ItemId" @onmousedown="SelectItem" @onmouseenter="HighlightItem" role="option">
 

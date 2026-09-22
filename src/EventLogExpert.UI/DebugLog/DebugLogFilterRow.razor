@@ -72,13 +72,17 @@
             </ValueSelect>
         }
 
+        @if (!draft.IsComplete)
+        {
+            <span class="visually-hidden" id="@_saveHintId">Add a value to finish this filter</span>
+        }
         <Button Disabled="@(!draft.IsComplete)"
             IconClass="bi bi-check-circle"
             IconOnly
             OnClick="OnSave"
+            aria-describedby="@(!draft.IsComplete ? _saveHintId : null)"
             aria-label="Save filter"
-            data-tooltip="@(draft.IsComplete ? "Save filter" : null)"
-            title="@(draft.IsComplete ? null : "Add a value to finish this filter")" />
+            data-tooltip="@(draft.IsComplete ? "Save filter" : "Add a value to finish this filter")" />
 
         <Button IconClass="bi bi-x-circle"
             IconOnly

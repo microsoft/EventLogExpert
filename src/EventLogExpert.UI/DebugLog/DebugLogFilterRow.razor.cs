@@ -4,6 +4,7 @@
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.DebugLog;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
@@ -30,6 +31,10 @@ public sealed partial class DebugLogFilterRow
         nameof(ProcessOrigin.InProcess),
         nameof(ProcessOrigin.ElevatedHelper),
     ];
+
+    // Per-row unique id so each open draft editor's disabled-save hint (aria-describedby target) stays unique
+    // across the multiple filter rows rendered in the modal.
+    private readonly string _saveHintId = ComponentId.NewUnique("debug-filter-save-hint").Value;
 
     private ChromelessButton? _chipEditButton;
     private Button? _editorFirstControl;

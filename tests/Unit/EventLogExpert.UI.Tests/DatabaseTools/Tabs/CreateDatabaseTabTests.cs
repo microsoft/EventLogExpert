@@ -231,6 +231,36 @@ public sealed class CreateDatabaseTabTests : BunitContext
     }
 
     [Fact]
+    public void LoadEditionsButton_WhenLoading_KeepsDisabledReasonInTooltipAndAccessibleDescription()
+    {
+        TaskCompletionSource<OfflineImageEditionsResult> loadingEditions = new();
+        Services.GetRequiredService<IElevatedDatabaseToolsRunner>()
+            .ListImageEditionsAsync(default!, default!, Arg.Any<CancellationToken>())
+            .ReturnsForAnyArgs(loadingEditions.Task);
+
+        var component = Render<CreateDatabaseTab>();
+        component.Find("#create-source-path").Input(@"C:\images\install.wim");
+
+        var enabledButton = component.FindAll("button").Single(button => button.TextContent.Contains("[[Db_Create_LoadEditions]]"));
+        Assert.False(enabledButton.HasAttribute("disabled"));
+        Assert.False(enabledButton.HasAttribute("title"));
+        Assert.Equal("[[Db_Create_LoadEditionsTitle]]", enabledButton.GetAttribute("data-tooltip"));
+        Assert.False(enabledButton.HasAttribute("aria-describedby"));
+
+        enabledButton.Click();
+
+        component.WaitForAssertion(() =>
+        {
+            var loadingButton = component.FindAll("button").Single(button => button.TextContent.Contains("[[Db_Create_LoadingEditions]]"));
+            Assert.True(loadingButton.HasAttribute("disabled"));
+            Assert.False(loadingButton.HasAttribute("title"));
+            Assert.Equal("[[Db_Create_LoadEditionsTitle]]", loadingButton.GetAttribute("data-tooltip"));
+            Assert.Equal("create-load-editions-help", loadingButton.GetAttribute("aria-describedby"));
+            Assert.Equal("[[Db_Create_LoadEditionsTitle]]", component.Find("#create-load-editions-help").TextContent);
+        });
+    }
+
+    [Fact]
     public void LoadEditions_FillsTheEmptyIndexBoxWithTheFirstEdition()
     {
         ConfigureEditionsListed(
@@ -350,6 +380,27 @@ public sealed class CreateDatabaseTabTests : BunitContext
 
         var runButton = component.Find(".button-green");
         Assert.True(runButton.HasAttribute("disabled"));
+    }
+
+    [Fact]
+    public void RunButton_ElevationBranch_UsesFocusTooltipWithoutNativeTitle()
+    {
+        var component = Render<CreateDatabaseTab>();
+
+        var plainRunButton = component.Find(".button-green");
+        Assert.True(plainRunButton.HasAttribute("disabled"));
+        Assert.False(plainRunButton.HasAttribute("title"));
+        Assert.False(plainRunButton.HasAttribute("data-tooltip"));
+        Assert.False(plainRunButton.HasAttribute("aria-describedby"));
+
+        component.Find("#create-include-protected").Change(true);
+
+        var elevatedRunButton = component.Find(".button-green");
+        Assert.True(elevatedRunButton.HasAttribute("disabled"));
+        Assert.False(elevatedRunButton.HasAttribute("title"));
+        Assert.Equal("[[DatabaseTools_Elevation_ProtectedProviders]]", elevatedRunButton.GetAttribute("data-tooltip"));
+        Assert.Equal("create-run-elevation-help", elevatedRunButton.GetAttribute("aria-describedby"));
+        Assert.Equal("[[DatabaseTools_Elevation_ProtectedProviders]]", component.Find("#create-run-elevation-help").TextContent);
     }
 
     [Fact]

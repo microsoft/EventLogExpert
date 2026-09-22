@@ -24,8 +24,8 @@
 
 const SHOW_DELAY_MS = 500;
 const HIDE_DELAY_MS = 100;
-const CURSOR_OFFSET_X = 14;
-const CURSOR_OFFSET_Y = 18;
+const CURSOR_OFFSET_X = 10;
+const CURSOR_OFFSET_Y = 15;
 const VIEWPORT_MARGIN = 4;
 
 let registered = false;
@@ -39,9 +39,6 @@ export function isClipped(el) {
     return (el.scrollWidth - el.clientWidth > 1) || (el.scrollHeight - el.clientHeight > 1);
 }
 
-// The control whose tooltip should show: a hovered control takes precedence over a focused one.
-export function selectAnchor(focused, hovered) { return hovered || focused; }
-
 function isOverflowAnchor(el) { return !!el && !!el.hasAttribute && el.hasAttribute("data-tooltip-overflow"); }
 
 // An overflow anchor shows its tooltip only when its text is actually clipped. Climb from the hovered/focused
@@ -51,7 +48,7 @@ function isOverflowAnchor(el) { return !!el && !!el.hasAttribute && el.hasAttrib
 export function resolveEffectiveAnchor(leaf, clipped) {
     let anchor = leaf;
     while (anchor && isOverflowAnchor(anchor) && !clipped(anchor)) {
-        anchor = anchor.parentElement ? anchor.parentElement.closest("[data-tooltip]") : null;
+        anchor = anchor.parentElement ? anchor.parentElement.closest('[data-tooltip]:not([data-tooltip=""]), [data-tooltip-overflow]') : null;
     }
     return anchor;
 }
@@ -129,6 +126,9 @@ export function initialTooltipState() {
 // DOM/timer side of each effect. Invariants: render(x,m) <=> displayLeaf=x,displayedMode=m; conceal/teardown
 // <=> displayLeaf=null,displayedMode=null; scheduleHide <=> hideScheduled=true, cancelHideTimer <=> false;
 // pendingAnchor is never displayed and never equals hoveredAnchor; visible mirrors real on-screen presence.
+// render, when emitted, is the LAST effect in the list: the adapter's render can re-enter dispatch (see
+// applyRender's detached-leaf path), so terminal ordering guarantees that re-entry runs against fully
+// committed state, which bounds the recursion.
 export function reduce(state, event) {
     const next = { ...state };
     const effects = [];
@@ -245,14 +245,19 @@ export function reduce(state, event) {
             break;
         }
         case "pointerDown": {
+            // Native tooltips dismiss on click. Clear every surfaced anchor (including a matured hover) and
+            // conceal synchronously: a top-layer bubble left showing would otherwise strand on a trigger that
+            // removes itself on mousedown (Chromium fires no pointerout for a node detached under a stationary
+            // pointer) and paint above a menu or dropdown opened under the cursor.
             next.focusedAnchor = null;
             next.pendingAnchor = null;
+            next.hoveredAnchor = null;
+            next.displayLeaf = null;
+            next.displayedMode = null;
+            next.visible = false;
+            next.hideScheduled = false;
             next.showGen++;
-            effects.push({ type: "cancelShowTimer" });
-            if (!next.hoveredAnchor && next.displayLeaf) {
-                next.hideScheduled = true;
-                effects.push({ type: "scheduleHide" });
-            }
+            effects.push({ type: "cancelShowTimer" }, { type: "cancelHideTimer" }, { type: "conceal" });
             break;
         }
         case "escape": {
@@ -412,6 +417,9 @@ export function registerFocusTooltip() {
         if (top + height > viewportHeight - VIEWPORT_MARGIN && rect.top - height >= VIEWPORT_MARGIN) {
             top = rect.top - height;
         }
+        // Clamp vertically too (not just horizontally): when the bubble fits neither below nor above (a tall
+        // wrapped tooltip in a short viewport), keep its top edge on screen so the text stays reachable.
+        top = Math.max(VIEWPORT_MARGIN, Math.min(top, viewportHeight - VIEWPORT_MARGIN - height));
         let left = rect.right - width;
         left = Math.max(VIEWPORT_MARGIN, Math.min(left, viewportWidth - VIEWPORT_MARGIN - width));
 
@@ -467,12 +475,20 @@ export function registerFocusTooltip() {
 
     function applyRender(rawLeaf, mode) {
         const element = ensureTip();
+        // A leaf removed from the DOM while displayed must be fully dropped, not concealed-in-place or
+        // repositioned: Chromium fires neither pointerout (a node detached under a stationary pointer) nor
+        // focusout (focus silently falls to <body>), so a stale hovered/focused anchor survives. dispatchScrollReset
+        // drops a dead focused anchor (so scroll CONCEALS instead of repositioning a zero-rect node into the
+        // corner) and clears a dead hovered anchor, while a hover-only dead leaf still transfers to a live focus.
+        if (rawLeaf && !rawLeaf.isConnected) { dispatchScrollReset(); return; }
         const effective = resolveEffectiveAnchor(rawLeaf, isClipped);
-        const text = effective ? effective.getAttribute("data-tooltip") : null;
+        // An overflow anchor shows its OWN clipped text: prefer an explicit data-tooltip (e.g. a richer label),
+        // else fall back to the rendered textContent (custom ChildContent / clear options carry no data-tooltip).
+        let text = effective ? effective.getAttribute("data-tooltip") : null;
+        if (effective && !text && isOverflowAnchor(effective)) { text = (effective.textContent || "").replace(/\s+/g, " ").trim(); }
         if (effective && text) {
             element.textContent = text;
-            element.classList.toggle("focus-tooltip--wide",
-                effective.hasAttribute("data-tooltip-overflow") || effective.hasAttribute("data-tooltip-wide"));
+            element.classList.toggle("focus-tooltip--wide", effective.hasAttribute("data-tooltip-overflow"));
             showTip(element, supportsPopover);
             hugToWrappedWidth(element);
             shownAnchor = effective;
@@ -481,7 +497,11 @@ export function registerFocusTooltip() {
             dispatch({ type: "renderResolved", anchor: rawLeaf, visible: isTipShown(element, supportsPopover) });
         } else {
             shownAnchor = null;
-            stopObserving();
+            // Keep watching the raw leaf while concealed: an overflow-gated anchor that is currently unclipped
+            // can become clipped when its own text changes (e.g. a focused ValueSelect's value updates without
+            // a fresh focusin), and the data-tooltip mutation must re-run the gate. Full teardown of the
+            // observer only happens on an actual dismissal (the `conceal` effect).
+            observe(rawLeaf, effective);
             hideTip(element, supportsPopover);
             dispatch({ type: "renderResolved", anchor: rawLeaf, visible: false });
         }
@@ -521,6 +541,8 @@ export function registerFocusTooltip() {
                 applyRender(effect.anchor, effect.mode);
                 break;
             case "reposition":
+                // dispatchScrollReset drops a detached focused anchor before every scroll, so reposition only
+                // ever runs for a connected shownAnchor.
                 if (shownAnchor && isTipShown(tip, supportsPopover)) { positionElement(shownAnchor, tip); }
                 break;
             case "conceal":
@@ -548,7 +570,15 @@ export function registerFocusTooltip() {
         for (const effect of result.effects) { applyEffect(effect); }
     }
 
-    function closestAnchor(node) { return node && node.closest ? node.closest("[data-tooltip]") : null; }
+    // Every scroll drops a detached focused anchor first: Chromium fires no focusout when a focused element is
+    // removed (focus falls silently to <body>), so a dead focusedAnchor would otherwise send `scroll` into its
+    // reposition branch and strand the bubble / leave stale reducer state. focusOut clears it so `scroll` conceals.
+    function dispatchScrollReset() {
+        if (state.focusedAnchor && !state.focusedAnchor.isConnected) { dispatch({ type: "focusOut", anchor: state.focusedAnchor }); }
+        dispatch({ type: "scroll" });
+    }
+
+    function closestAnchor(node) { return node && node.closest ? node.closest('[data-tooltip]:not([data-tooltip=""]), [data-tooltip-overflow]') : null; }
 
     document.addEventListener("pointermove", (e) => {
         if (e.pointerType === "touch") { return; }
@@ -634,19 +664,21 @@ export function registerFocusTooltip() {
     }
 
     document.addEventListener("scroll", () => {
-        if (hasActiveTooltipState()) { dispatch({ type: "scroll" }); }
+        if (hasActiveTooltipState()) { dispatchScrollReset(); }
     }, true);
 
     window.addEventListener("resize", () => {
         if (!hasActiveTooltipState()) { return; }
-        dispatch({ type: "scroll" });
-        // A resize (unlike a scroll) can change the wrap width - max-width is min(32rem, 90vw) - so the width
-        // hugToWrappedWidth locked is now stale. Re-hug a still-showing (keyboard-focus) tooltip; same
-        // synchronous task, so the left:0 measurement never paints, and the scroll path stays cheap (no
-        // re-hug there, where the wrap can't change).
-        if (shownAnchor && isTipShown(tip, supportsPopover)) {
-            hugToWrappedWidth(tip);
-            positionElement(shownAnchor, tip);
-        }
+        // Cancel a still-pending (not-yet-shown) hover: a drag-resize freezes the pointer coordinates, so the
+        // captured rest point can go stale while the show timer runs. Only when nothing is displayed - a shown
+        // leaf is re-resolved in place below rather than dropped.
+        if (state.pendingAnchor && !state.displayLeaf) { dispatchScrollReset(); }
+        // A resize can change both the wrap width the bubble hugged (max-width is min(32rem, 90vw)) AND whether
+        // an overflow-gated anchor's text is now clipped. Re-render the current display leaf - hover (cursor) or
+        // focus (element) - so it re-hugs and the overflow gate re-resolves: a newly-clipped anchor shows, a
+        // no-longer-clipped one hides. Unlike a scroll (which drops a cursor bubble pinned to a rest point that
+        // content has moved out from under), the pointer is stationary through a resize, so the cursor anchor
+        // stays valid and the hover bubble is re-resolved in place rather than dismissed.
+        dispatch({ type: "attrChange" });
     });
 }

@@ -357,11 +357,15 @@ else if (_report is not null)
                     @Localizer["Coverage_ShowOnlyUnresolved"]
                 </Button>
             }
+            @if (_copying)
+            {
+                <span class="visually-hidden" id="coverage-copy-help">@Localizer["Coverage_CopyTableTooltip"]</span>
+            }
             <Button CssClass="resolution-coverage-copy"
                 Disabled="@_copying"
                 OnClick="CopyTableAsync"
-                data-tooltip="@(_copying ? null : Localizer["Coverage_CopyTableTooltip"])"
-                title="@(_copying ? Localizer["Coverage_CopyTableTooltip"] : null)">
+                aria-describedby="@(_copying ? "coverage-copy-help" : null)"
+                data-tooltip="@Localizer["Coverage_CopyTableTooltip"]">
                 @Localizer["Coverage_CopyTable"]
             </Button>
             <span aria-live="polite" class="resolution-coverage-copied" role="status">
