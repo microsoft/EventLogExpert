@@ -39,12 +39,17 @@
                 Add Filter
             </Button>
 
+            @if (_rows.Count == 0)
+            {
+                <span class="visually-hidden" id="debug-clear-filters-hint">Add a filter to enable Clear Filters</span>
+            }
             <Button CssClass="debug-log-clear-filters"
                 Disabled="@(_rows.Count == 0)"
                 IconClass="bi bi-x-circle"
                 OnClick="ClearFilters"
+                aria-describedby="@(_rows.Count == 0 ? "debug-clear-filters-hint" : null)"
                 aria-label="Clear all filters"
-                data-tooltip="Clear all filters">
+                data-tooltip="@(_rows.Count == 0 ? "Add a filter to enable Clear Filters" : "Clear all filters")">
                 Clear Filters
             </Button>
         </div>
@@ -65,12 +70,24 @@
     <ExtraFooterContent>
         <div class="debug-log-footer">
             <div class="debug-log-footer-actions debug-log-footer-left">
+                @if (DebugExportDisabledReason is not null)
+                {
+                    <span class="visually-hidden" id="debug-export-hint">@DebugExportDisabledReason</span>
+                }
                 <Button Disabled="@(!_hasLoaded || _filteredEntryCount == 0)"
-                    OnClick="HandleExportAsync">
+                    OnClick="HandleExportAsync"
+                    aria-describedby="@(DebugExportDisabledReason is null ? null : "debug-export-hint")"
+                    data-tooltip="@DebugExportDisabledReason">
                     Export
                 </Button>
+                @if (DebugCopyDisabledReason is not null)
+                {
+                    <span class="visually-hidden" id="debug-copy-hint">@DebugCopyDisabledReason</span>
+                }
                 <Button Disabled="@(!_hasLoaded || _filteredEntryCount == 0)"
-                    OnClick="HandleCopyAsync">
+                    OnClick="HandleCopyAsync"
+                    aria-describedby="@(DebugCopyDisabledReason is null ? null : "debug-copy-hint")"
+                    data-tooltip="@DebugCopyDisabledReason">
                     Copy
                 </Button>
             </div>

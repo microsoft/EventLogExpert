@@ -292,8 +292,9 @@ public sealed class DebugLogModalTests : BunitContext
         var disabledClearButton = component.Find("button[aria-label='Clear all filters']");
         Assert.True(disabledClearButton.HasAttribute("disabled"));
         Assert.False(disabledClearButton.HasAttribute("title"));
-        Assert.False(disabledClearButton.HasAttribute("aria-describedby"));
-        Assert.Equal("Clear all filters", disabledClearButton.GetAttribute("data-tooltip"));
+        // Disabled because no filters exist yet: the tooltip explains how to enable it, wired for screen readers.
+        Assert.Equal("debug-clear-filters-hint", disabledClearButton.GetAttribute("aria-describedby"));
+        Assert.Equal("Add a filter to enable Clear Filters", disabledClearButton.GetAttribute("data-tooltip"));
 
         await AddFilterAsync(component);
 

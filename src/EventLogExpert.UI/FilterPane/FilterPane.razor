@@ -222,14 +222,23 @@
                     </ValueSelect>
                 </span>
 
-                <PrimaryButton Disabled="@(SelectedFilterSetId == default)" IconClass="bi bi-check-circle" OnClick="ApplyFilterSetSelection">
+                @if (SelectedFilterSetId == default)
+                {
+                    <span class="visually-hidden" id="filterset-apply-disabled-hint">@Localizer["FilterPane_FilterSet_ApplyDisabled"]</span>
+                }
+
+                <PrimaryButton Disabled="@(SelectedFilterSetId == default)" IconClass="bi bi-check-circle" OnClick="ApplyFilterSetSelection"
+                    aria-describedby="@(SelectedFilterSetId == default ? "filterset-apply-disabled-hint" : null)"
+                    data-tooltip="@(SelectedFilterSetId == default ? Localizer["FilterPane_FilterSet_ApplyDisabled"].Value : null)">
                     @Localizer["FilterPane_Action_Apply"]
                 </PrimaryButton>
 
                 <Button Disabled="@(SelectedFilterSetId == default)"
                     IconClass="bi bi-arrow-repeat"
                     OnClick="ReplaceFilterSetSelection"
-                    aria-label="@Localizer["FilterPane_FilterSet_ReplaceAria"]">
+                    aria-describedby="@(SelectedFilterSetId == default ? "filterset-apply-disabled-hint" : null)"
+                    aria-label="@Localizer["FilterPane_FilterSet_ReplaceAria"]"
+                    data-tooltip="@(SelectedFilterSetId == default ? Localizer["FilterPane_FilterSet_ApplyDisabled"].Value : null)">
                     @Localizer["FilterPane_Action_Replace"]
                 </Button>
             }
@@ -290,14 +299,23 @@
                     </ValueSelect>
                 </span>
 
-                <PrimaryButton Disabled="@(ResolvedScenario is null)" IconClass="bi bi-check-circle" OnClick="ApplyScenarioSelection">
+                @if (ResolvedScenario is null)
+                {
+                    <span class="visually-hidden" id="scenario-apply-disabled-hint">@Localizer["FilterPane_Scenario_ApplyDisabled"]</span>
+                }
+
+                <PrimaryButton Disabled="@(ResolvedScenario is null)" IconClass="bi bi-check-circle" OnClick="ApplyScenarioSelection"
+                    aria-describedby="@(ResolvedScenario is null ? "scenario-apply-disabled-hint" : null)"
+                    data-tooltip="@(ResolvedScenario is null ? Localizer["FilterPane_Scenario_ApplyDisabled"].Value : null)">
                     @Localizer["FilterPane_Action_Apply"]
                 </PrimaryButton>
 
                 <Button Disabled="@(ResolvedScenario is null)"
                     IconClass="bi bi-arrow-repeat"
                     OnClick="ReplaceScenarioSelection"
-                    aria-label="@Localizer["FilterPane_Scenario_ReplaceAria"]">
+                    aria-describedby="@(ResolvedScenario is null ? "scenario-apply-disabled-hint" : null)"
+                    aria-label="@Localizer["FilterPane_Scenario_ReplaceAria"]"
+                    data-tooltip="@(ResolvedScenario is null ? Localizer["FilterPane_Scenario_ApplyDisabled"].Value : null)">
                     @Localizer["FilterPane_Action_Replace"]
                 </Button>
             }

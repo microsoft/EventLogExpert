@@ -25,6 +25,10 @@ public sealed partial class MergeDatabaseTab : DatabaseToolsTabBase<MergeDatabas
 
     protected override string? ProducedDatabasePathCandidate => _targetPath.Trim();
 
+    protected override string? RunDisabledReason =>
+        string.IsNullOrWhiteSpace(_sourcePath) ? Localizer["Db_Merge_RunDisabled_NoSource"].Value :
+        string.IsNullOrWhiteSpace(_targetPath) ? Localizer["Db_Merge_RunDisabled_NoTarget"].Value : null;
+
     protected override MergeDatabaseRequest BuildRequest() =>
         new(_sourcePath.Trim(), _targetPath.Trim(), _overwriteMode == MergeOverwriteMode.Overwrite);
 

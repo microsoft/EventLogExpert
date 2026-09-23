@@ -39,6 +39,14 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
+    private string? DebugCopyDisabledReason =>
+        !_hasLoaded ? "Wait for the log to finish loading" : (_filteredEntryCount == 0 ? "No entries to copy" : null);
+
+    // Plain-English (DebugLog is un-localized dev tooling): why the footer Export/Copy buttons are disabled, or
+    // null when enabled. Non-null exactly when Disabled="@(!_hasLoaded || _filteredEntryCount == 0)" is true.
+    private string? DebugExportDisabledReason =>
+        !_hasLoaded ? "Wait for the log to finish loading" : (_filteredEntryCount == 0 ? "No entries to export" : null);
+
     [Inject] private IDebugLogReader DebugLogReader { get; init; } = null!;
 
     [Inject] private IFileSaveService FileSaveService { get; init; } = null!;

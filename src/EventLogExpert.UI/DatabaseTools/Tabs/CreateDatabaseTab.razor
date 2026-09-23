@@ -197,11 +197,16 @@
                     <span class="visually-hidden" id="create-run-elevation-help">@RunElevationTitle</span>
                 }
 
+                @if (RunDisabledReason is not null)
+                {
+                    <span class="visually-hidden" id="create-run-disabled-help">@RunDisabledReason</span>
+                }
+
                 <PrimaryButton Disabled="@(!CanRun || IsRunning || IsImportInProgress || IsConfirming)"
                     IconClass="@(WillElevate ? "bi bi-shield-lock" : "bi bi-play-fill")"
                     OnClick="RunCreateAsync"
-                    aria-describedby="@(WillElevate ? "create-run-elevation-help" : null)"
-                    data-tooltip="@RunElevationTitle">
+                    aria-describedby="@ComposeDescribedBy(RunDisabledReason is null ? null : "create-run-disabled-help", WillElevate ? "create-run-elevation-help" : null)"
+                    data-tooltip="@(RunDisabledReason ?? RunElevationTitle)">
                     @Localizer["DatabaseTools_Action_Run"]
                 </PrimaryButton>
             }

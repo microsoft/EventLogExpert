@@ -26,11 +26,19 @@
                 @ToolbarTrailingContent
             }
 
-            <Button Disabled="@(Entries.Count == 0)" IconClass="bi bi-clipboard" OnClick="CopyAllAsync">
+            @if (Entries.Count == 0)
+            {
+                <span class="visually-hidden" id="@_actionsDisabledHelpId">@Localizer["DatabaseTools_Log_ActionsDisabled"]</span>
+            }
+            <Button Disabled="@(Entries.Count == 0)" IconClass="bi bi-clipboard" OnClick="CopyAllAsync"
+                aria-describedby="@(Entries.Count == 0 ? _actionsDisabledHelpId : null)"
+                data-tooltip="@(Entries.Count == 0 ? Localizer["DatabaseTools_Log_ActionsDisabled"].Value : null)">
                 @Localizer["DatabaseTools_Log_Copy"]
             </Button>
 
-            <Button Disabled="@(Entries.Count == 0)" IconClass="bi bi-download" OnClick="ExportAsync">
+            <Button Disabled="@(Entries.Count == 0)" IconClass="bi bi-download" OnClick="ExportAsync"
+                aria-describedby="@(Entries.Count == 0 ? _actionsDisabledHelpId : null)"
+                data-tooltip="@(Entries.Count == 0 ? Localizer["DatabaseTools_Log_ActionsDisabled"].Value : null)">
                 @Localizer["Modal_Export"]
             </Button>
 
