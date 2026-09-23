@@ -170,10 +170,11 @@ public sealed class StatsPaneTests : BunitContext
                 Assert.Contains("Alpha", cut.Markup);
                 Assert.True(cut.Find("[aria-label='Exclude Source Alpha']").HasAttribute("disabled"));
                 Assert.False(cut.Find("[aria-label='Exclude Source Alpha']").HasAttribute("title"));
-                Assert.False(cut.Find("[aria-label='Exclude Source Alpha']").HasAttribute("data-tooltip"));
+                // The disabled action stays visible (dimmed) and keeps its tooltip label so it remains reachable on hover.
+                Assert.True(cut.Find("[aria-label='Exclude Source Alpha']").HasAttribute("data-tooltip"));
                 Assert.True(cut.Find("[aria-label='Filter to Source Alpha']").HasAttribute("disabled"));
                 Assert.False(cut.Find("[aria-label='Filter to Source Alpha']").HasAttribute("title"));
-                Assert.False(cut.Find("[aria-label='Filter to Source Alpha']").HasAttribute("data-tooltip"));
+                Assert.True(cut.Find("[aria-label='Filter to Source Alpha']").HasAttribute("data-tooltip"));
             }, s_wait);
         }
         finally

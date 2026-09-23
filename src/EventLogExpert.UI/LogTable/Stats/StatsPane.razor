@@ -80,7 +80,7 @@
                                         <span aria-label="@Localizer["Stats_RowActionsAria"]" class="stats-row-actions" role="group">
                                             <button aria-label="@Localizer["Stats_Row_IncludeAria", StatsDimensionLocalizer.Label(Localizer, section.Dimension), contributor.Value]"
                                                 class="stats-include"
-                                                data-tooltip="@(AreRowActionsDisabled(section) ? null : Localizer["Stats_Row_IncludeTitle"].Value)"
+                                                data-tooltip="@Localizer["Stats_Row_IncludeTitle"].Value"
                                                 disabled="@AreRowActionsDisabled(section)"
                                                 @onclick="() => IncludeContributor(section, contributor)"
                                                 type="button">
@@ -88,7 +88,7 @@
                                             </button>
                                             <button aria-label="@Localizer["Stats_Row_ExcludeAria", StatsDimensionLocalizer.Label(Localizer, section.Dimension), contributor.Value]"
                                                 class="stats-exclude"
-                                                data-tooltip="@(AreRowActionsDisabled(section) ? null : Localizer["Stats_Row_ExcludeTitle"].Value)"
+                                                data-tooltip="@Localizer["Stats_Row_ExcludeTitle"].Value"
                                                 disabled="@AreRowActionsDisabled(section)"
                                                 @onclick="() => ExcludeContributor(section, contributor)"
                                                 type="button">

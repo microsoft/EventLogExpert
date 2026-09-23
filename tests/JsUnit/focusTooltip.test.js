@@ -10,6 +10,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
     isClipped,
+    anchorSurfaces,
     resolveEffectiveAnchor,
     hoverTransferAnchor,
     activeDescendantTarget,
@@ -119,22 +120,65 @@ test("hoverTransferAnchor: returns null when the related anchor is the hovered a
 // --- activeDescendantTarget: keyboard combobox option surfacing decision (pure 4-branch table) ---
 
 test("activeDescendantTarget: not armed always conceals (mouse modality owns the list, hover system handles it)", () => {
-    assert.equal(activeDescendantTarget({ armed: false, expanded: true, optionAnchorPresent: true, optionClipped: true }), "conceal");
-    assert.equal(activeDescendantTarget({ armed: false, expanded: false, optionAnchorPresent: false, optionClipped: false }), "conceal");
+    assert.equal(activeDescendantTarget({ armed: false, expanded: true, optionAnchorPresent: true, optionSurfaces: true }), "conceal");
+    assert.equal(activeDescendantTarget({ armed: false, expanded: false, optionAnchorPresent: false, optionSurfaces: false }), "conceal");
 });
 
 test("activeDescendantTarget: armed + list closed surfaces the combobox's own value tooltip", () => {
-    assert.equal(activeDescendantTarget({ armed: true, expanded: false, optionAnchorPresent: true, optionClipped: true }), "combobox");
-    assert.equal(activeDescendantTarget({ armed: true, expanded: false, optionAnchorPresent: false, optionClipped: false }), "combobox");
+    assert.equal(activeDescendantTarget({ armed: true, expanded: false, optionAnchorPresent: true, optionSurfaces: true }), "combobox");
+    assert.equal(activeDescendantTarget({ armed: true, expanded: false, optionAnchorPresent: false, optionSurfaces: false }), "combobox");
 });
 
-test("activeDescendantTarget: armed + open + a clipped active option surfaces that option", () => {
-    assert.equal(activeDescendantTarget({ armed: true, expanded: true, optionAnchorPresent: true, optionClipped: true }), "option");
+test("activeDescendantTarget: armed + open + a surfacing active option surfaces that option", () => {
+    assert.equal(activeDescendantTarget({ armed: true, expanded: true, optionAnchorPresent: true, optionSurfaces: true }), "option");
 });
 
-test("activeDescendantTarget: armed + open + an unclipped or absent active option conceals (no bubble over the list)", () => {
-    assert.equal(activeDescendantTarget({ armed: true, expanded: true, optionAnchorPresent: true, optionClipped: false }), "conceal");
-    assert.equal(activeDescendantTarget({ armed: true, expanded: true, optionAnchorPresent: false, optionClipped: false }), "conceal");
+test("activeDescendantTarget: armed + open + a non-surfacing or absent active option conceals (no bubble over the list)", () => {
+    assert.equal(activeDescendantTarget({ armed: true, expanded: true, optionAnchorPresent: true, optionSurfaces: false }), "conceal");
+    assert.equal(activeDescendantTarget({ armed: true, expanded: true, optionAnchorPresent: false, optionSurfaces: false }), "conceal");
+});
+
+// --- anchorSurfaces: whether an anchor would show its tooltip right now (shared by the active-descendant resolver) ---
+
+test("anchorSurfaces: a non-overflow anchor with a data-tooltip always surfaces", () => {
+    assert.equal(anchorSurfaces({ hasAttribute: () => false, getAttribute: () => "Label" }), true);
+});
+
+test("anchorSurfaces: a non-overflow anchor with no data-tooltip does not surface", () => {
+    assert.equal(anchorSurfaces({ hasAttribute: () => false, getAttribute: () => null }), false);
+});
+
+test("anchorSurfaces: a null/undefined anchor does not surface (exported helper stays null-safe like isOverflowAnchor)", () => {
+    assert.equal(anchorSurfaces(null), false);
+    assert.equal(anchorSurfaces(undefined), false);
+});
+
+test("anchorSurfaces: an overflow anchor surfaces only when its own text is clipped", () => {
+    const overflow = (scrollWidth, clientWidth) => ({
+        hasAttribute: (name) => name === "data-tooltip-overflow",
+        getAttribute: () => "Label",
+        scrollWidth, clientWidth, scrollHeight: 0, clientHeight: 0,
+    });
+    assert.equal(anchorSurfaces(overflow(100, 50)), true);
+    assert.equal(anchorSurfaces(overflow(50, 50)), false);
+});
+
+// A ChildContent option (e.g. a filter-set row) exposes several overflow spans; the resolver picks the first
+// that surfaces, so the keyboard matches a mouse even when only a later (not the first) span is clipped.
+const overflowSpan = (scrollWidth, clientWidth) => ({
+    hasAttribute: (name) => name === "data-tooltip-overflow",
+    getAttribute: () => "Filter set",
+    scrollWidth, clientWidth, scrollHeight: 0, clientHeight: 0,
+});
+
+test("anchorSurfaces via find: a multi-anchor option resolves the clipped span even when it is not first", () => {
+    const name = overflowSpan(50, 50);   // not clipped
+    const meta = overflowSpan(100, 50);  // clipped
+    assert.equal([name, meta].find(anchorSurfaces), meta);
+});
+
+test("anchorSurfaces via find: no surfacing span returns undefined (resolver falls back to the option itself)", () => {
+    assert.equal([overflowSpan(50, 50), overflowSpan(50, 50)].find(anchorSurfaces), undefined);
 });
 
 // --- cursorPoint: placement geometry + pointer exclusion ---
