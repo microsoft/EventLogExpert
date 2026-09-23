@@ -12,6 +12,7 @@ import {
     isClipped,
     resolveEffectiveAnchor,
     hoverTransferAnchor,
+    activeDescendantTarget,
     cursorPoint,
     hugWidth,
     initialTooltipState,
@@ -113,6 +114,27 @@ test("hoverTransferAnchor: returns null when there is no related anchor", () => 
 test("hoverTransferAnchor: returns null when the related anchor is the hovered anchor itself", () => {
     const anchor = { contains: () => true };
     assert.equal(hoverTransferAnchor(anchor, anchor), null);
+});
+
+// --- activeDescendantTarget: keyboard combobox option surfacing decision (pure 4-branch table) ---
+
+test("activeDescendantTarget: not armed always conceals (mouse modality owns the list, hover system handles it)", () => {
+    assert.equal(activeDescendantTarget({ armed: false, expanded: true, optionAnchorPresent: true, optionClipped: true }), "conceal");
+    assert.equal(activeDescendantTarget({ armed: false, expanded: false, optionAnchorPresent: false, optionClipped: false }), "conceal");
+});
+
+test("activeDescendantTarget: armed + list closed surfaces the combobox's own value tooltip", () => {
+    assert.equal(activeDescendantTarget({ armed: true, expanded: false, optionAnchorPresent: true, optionClipped: true }), "combobox");
+    assert.equal(activeDescendantTarget({ armed: true, expanded: false, optionAnchorPresent: false, optionClipped: false }), "combobox");
+});
+
+test("activeDescendantTarget: armed + open + a clipped active option surfaces that option", () => {
+    assert.equal(activeDescendantTarget({ armed: true, expanded: true, optionAnchorPresent: true, optionClipped: true }), "option");
+});
+
+test("activeDescendantTarget: armed + open + an unclipped or absent active option conceals (no bubble over the list)", () => {
+    assert.equal(activeDescendantTarget({ armed: true, expanded: true, optionAnchorPresent: true, optionClipped: false }), "conceal");
+    assert.equal(activeDescendantTarget({ armed: true, expanded: true, optionAnchorPresent: false, optionClipped: false }), "conceal");
 });
 
 // --- cursorPoint: placement geometry + pointer exclusion ---

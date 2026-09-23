@@ -61,6 +61,18 @@ export function hoverTransferAnchor(leaf, relatedAnchor) {
     return relatedAnchor && relatedAnchor !== leaf && relatedAnchor.contains(leaf) ? relatedAnchor : null;
 }
 
+// Decide what a keyboard-focused combobox surfaces as the user arrows through its options. Pure so the adapter
+// resolves the DOM facts (armed = keyboard modality currently owns the list; expanded = the listbox is open;
+// optionAnchorPresent/optionClipped = the aria-activedescendant option is a live, clipped overflow anchor) and
+// this maps them to a render intent. `armed` gates everything: mouse-driven aria-activedescendant mutations
+// (hover highlights) never surface here - the hover system owns those. Exported for unit tests.
+export function activeDescendantTarget({ armed, expanded, optionAnchorPresent, optionClipped }) {
+    if (!armed) { return "conceal"; }
+    if (!expanded) { return "combobox"; }
+    if (optionAnchorPresent && optionClipped) { return "option"; }
+    return "conceal";
+}
+
 // Place a cursor-anchored bubble near the pointer rest point: offset down-right, flip to the left of the
 // cursor when it would overflow the right edge and above the cursor when it would overflow the bottom, then
 // clamp into the viewport. On each non-degenerate branch the returned box excludes the pointer (default:
@@ -372,6 +384,15 @@ export function registerFocusTooltip() {
     let pendingNode = null;
     let attributeObserver = null;
     let escapeConsumed = false;
+    // Keyboard combobox option surfacing (aria-activedescendant). activeCombobox is tracked on any combobox
+    // focusin (bookkeeping); comboboxSurfacingArmed gates whether the keyboard OWNS option surfacing right now
+    // - set by keyboard (focus / ArrowUp / ArrowDown), cleared by genuine pointer intent or Escape. pointerSeen
+    // defers the first coordinate delta so a synthetic boundary replay at the real parked point (module
+    // registered with the pointer pre-parked while pointerX/pointerY are still 0) can't read as movement.
+    let activeCombobox = null;
+    let activeDescendantObserver = null;
+    let comboboxSurfacingArmed = false;
+    let pointerSeen = false;
     // The Popover API (top-layer) shipped alongside the :popover-open selector in Chromium 114; WebView2
     // Evergreen is current Chromium. Detect once here (never at module top level - `node --test` imports this
     // DOM-free module and a top-level HTMLElement/document access would ReferenceError). Probe the SELECTOR
@@ -575,22 +596,119 @@ export function registerFocusTooltip() {
     // reposition branch and strand the bubble / leave stale reducer state. focusOut clears it so `scroll` conceals.
     function dispatchScrollReset() {
         if (state.focusedAnchor && !state.focusedAnchor.isConnected) { dispatch({ type: "focusOut", anchor: state.focusedAnchor }); }
+        // Same detached-node hazard for a keyboard-focused combobox unmounted mid-interaction: Chromium fires
+        // no focusout and the aria observer never sees a mutation on a removed node, so drop the dead combobox +
+        // its observer at this detached-leaf choke point rather than retaining it until the next combobox focus.
+        if (activeCombobox && !activeCombobox.isConnected) { deactivateCombobox(); }
         dispatch({ type: "scroll" });
     }
 
     function closestAnchor(node) { return node && node.closest ? node.closest('[data-tooltip]:not([data-tooltip=""]), [data-tooltip-overflow]') : null; }
 
+    function activeComboboxListbox() {
+        const id = activeCombobox ? activeCombobox.getAttribute("aria-controls") : null;
+        return id ? document.getElementById(id) : null;
+    }
+
+    function isInActiveComboboxList(node) {
+        const listbox = activeComboboxListbox();
+        return !!listbox && listbox.contains(node);
+    }
+
+    // The aria-activedescendant option, only when it is a live, rendered element in the controlled listbox (a
+    // display:none option on a closing list has a zero rect and is excluded). The option IS its own tooltip
+    // anchor (ValueSelectItem renders data-tooltip-overflow directly on it), so return it rather than climbing
+    // via closestAnchor: a combobox whose options are not anchors then resolves to a non-overflow element the
+    // isOverflowAnchor gate rejects, instead of surfacing an ancestor's label from outside the listbox.
+    function activeOptionAnchor() {
+        if (!activeCombobox) { return null; }
+        const id = activeCombobox.getAttribute("aria-activedescendant");
+        const option = id ? document.getElementById(id) : null;
+        if (!option || !option.isConnected || !isInActiveComboboxList(option)) { return null; }
+        const rect = option.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) { return null; }
+        return option;
+    }
+
+    function surfaceActiveDescendant() {
+        if (!activeCombobox) { return; }
+        if (!activeCombobox.isConnected) { deactivateCombobox(); return; }
+        const optionAnchor = activeOptionAnchor();
+        const target = activeDescendantTarget({
+            armed: comboboxSurfacingArmed,
+            expanded: activeCombobox.getAttribute("aria-expanded") === "true",
+            optionAnchorPresent: !!optionAnchor,
+            optionClipped: !!optionAnchor && isOverflowAnchor(optionAnchor) && isClipped(optionAnchor),
+        });
+        if (target === "combobox") { dispatch({ type: "focusIn", anchor: activeCombobox }); }
+        else if (target === "option") { dispatch({ type: "focusIn", anchor: optionAnchor }); }
+        else if (state.focusedAnchor) { dispatch({ type: "focusOut", anchor: state.focusedAnchor }); }
+    }
+
+    function activateCombobox(combobox) {
+        if (activeCombobox === combobox) { return; }
+        deactivateCombobox();
+        activeCombobox = combobox;
+        activeDescendantObserver ??= new MutationObserver(() => surfaceActiveDescendant());
+        activeDescendantObserver.observe(combobox, { attributes: true, attributeFilter: ["aria-activedescendant", "aria-expanded"] });
+    }
+
+    function deactivateCombobox() {
+        if (activeDescendantObserver) { activeDescendantObserver.disconnect(); }
+        activeCombobox = null;
+        comboboxSurfacingArmed = false;
+    }
+
+    function armComboboxSurfacing() {
+        if (!activeCombobox) { return; }
+        comboboxSurfacingArmed = true;
+        // Surfaces against the CURRENT aria-activedescendant; when armed from an Arrow keydown (before Blazor
+        // has updated the attribute) the observer re-runs a render later with the new highlight.
+        surfaceActiveDescendant();
+    }
+
+    // Returns whether it performed an armed -> disarmed transition, so a genuine pointermove with no boundary
+    // pointerover can start hover for the option now under the cursor exactly once.
+    function disarmComboboxSurfacing() {
+        if (!comboboxSurfacingArmed) { return false; }
+        comboboxSurfacingArmed = false;
+        // Clear only a virtual OPTION anchor; the combobox input's own value tooltip is a normal anchor left to
+        // the focusout path (so it survives pointer movement like every other control). Done before any
+        // mouse-out can reach hoverLeave's no-timer focus-fallback.
+        if (state.focusedAnchor && state.focusedAnchor !== activeCombobox) {
+            dispatch({ type: "focusOut", anchor: state.focusedAnchor });
+        }
+        return true;
+    }
+
     document.addEventListener("pointermove", (e) => {
         if (e.pointerType === "touch") { return; }
+        const moved = pointerSeen && (e.clientX !== pointerX || e.clientY !== pointerY);
+        pointerSeen = true;
         pointerX = e.clientX;
         pointerY = e.clientY;
+        // A genuine move that ITSELF performs the disarm means no boundary pointerover fired (the pointer
+        // stayed inside the element it was parked on), so start hover for whatever is now under the cursor.
+        if (moved && disarmComboboxSurfacing()) {
+            const anchor = closestAnchor(document.elementFromPoint(pointerX, pointerY));
+            if (anchor) { dispatch({ type: "hoverEnter", anchor }); }
+        }
     }, true);
 
     document.addEventListener("pointerover", (e) => {
         if (e.pointerType === "touch") { return; }
+        // Compute the delta BEFORE updating pointerX/pointerY (boundary events precede the pointermove that
+        // caused them, and pointerout does NOT write coordinates): a client-coord change is genuine pointer
+        // travel; unchanged coords are a scrollIntoView/wheel replay of an option moved under a parked cursor.
+        const moved = pointerSeen && (e.clientX !== pointerX || e.clientY !== pointerY);
+        pointerSeen = true;
         pointerX = e.clientX;
         pointerY = e.clientY;
+        if (moved) { disarmComboboxSurfacing(); }
         const anchor = closestAnchor(e.target);
+        // While the keyboard still owns an armed combobox list, suppress hover-intent for an option the list
+        // scrolled under the unmoved cursor; genuine travel disarmed just above, so it falls through.
+        if (comboboxSurfacingArmed && anchor && isInActiveComboboxList(anchor)) { return; }
         // A genuine enter comes from outside the anchor; movement within it (button <-> icon child) has a
         // relatedTarget already inside, and must not restart the timer or reopen after an Escape dismissal.
         if (anchor && !anchor.contains(e.relatedTarget)) { dispatch({ type: "hoverEnter", anchor }); }
@@ -598,6 +716,9 @@ export function registerFocusTooltip() {
 
     document.addEventListener("pointerout", (e) => {
         if (e.pointerType === "touch") { return; }
+        // INVARIANT: this handler must NOT write pointerX/pointerY or pointerSeen. The combobox modality
+        // discriminator relies on a boundary-crossing pointerover comparing the new point against the point
+        // from the last *move* (not the pre-crossing pointerout), so a genuine crossing reads as movement.
         const related = e.relatedTarget;
         // Match the leave against the stored raw nodes by containment (not a fresh attribute lookup), so it is
         // recognized even if the node lost data-tooltip while hovered.
@@ -618,18 +739,45 @@ export function registerFocusTooltip() {
         const active = document.activeElement;
         const keyboardFocused = !!anchor && (anchor.matches(":focus-visible") ||
             (anchor.contains(active) && !!active && active.matches?.(":focus-visible")));
+        // A combobox routes its own value tooltip (list closed) or the keyboard-active option (list open)
+        // through the active-descendant observer. TRACK it on any focusin (bookkeeping, surfaces nothing on its
+        // own - the latch governs surfacing); ARM only on keyboard focus so a mouse click never surfaces one.
+        // The early return skips the focusOut fallback below, which is safe because every route INTO a combobox
+        // is preceded by a pointerdown (blanket clear) or the prior element's focusout (explicit clear).
+        const combobox = e.target.closest?.('[role="combobox"]') || null;
+        if (combobox && combobox === anchor) {
+            activateCombobox(combobox);
+            if (keyboardFocused) { armComboboxSurfacing(); }
+            return;
+        }
+        if (activeCombobox) { deactivateCombobox(); }
         if (keyboardFocused) { dispatch({ type: "focusIn", anchor }); }
         else if (state.focusedAnchor) { dispatch({ type: "focusOut", anchor: state.focusedAnchor }); }
     }, true);
 
-    document.addEventListener("pointerdown", () => { dispatch({ type: "pointerDown" }); }, true);
+    document.addEventListener("pointerdown", () => { disarmComboboxSurfacing(); dispatch({ type: "pointerDown" }); }, true);
+
+    // Wheel/trackpad scroll is genuine pointer modality that moves list rows under a stationary pointer with no
+    // pointermove/pointerdown, so it hands an armed combobox list back to the hover system before the replay.
+    document.addEventListener("wheel", () => { disarmComboboxSurfacing(); }, true);
 
     document.addEventListener("focusout", (e) => {
+        // The combobox owns a virtual (option) focusedAnchor that closestAnchor(e.target) will not match, so
+        // clear it explicitly when the combobox loses focus.
+        if (activeCombobox && (e.target === activeCombobox || activeCombobox.contains(e.target))) {
+            const priorFocused = state.focusedAnchor;
+            deactivateCombobox();
+            if (priorFocused) { dispatch({ type: "focusOut", anchor: priorFocused }); }
+            return;
+        }
         const anchor = closestAnchor(e.target);
         if (anchor && anchor === state.focusedAnchor) { dispatch({ type: "focusOut", anchor }); }
     }, true);
 
     document.addEventListener("keydown", (e) => {
+        // ArrowUp/ArrowDown are the only keys ValueSelect uses to move the highlighted option, so they ARM
+        // active-descendant surfacing for the focused combobox.
+        if ((e.key === "ArrowUp" || e.key === "ArrowDown") && activeCombobox) { armComboboxSurfacing(); }
         if (e.key !== "Escape") { return; }
         // Dismiss on Escape without moving focus (WCAG 1.4.13 dismissable), and cancel a still-pending (not yet
         // shown) hover so it can't pop after the key. Only CONSUME the key when a bubble was actually visible,
@@ -637,7 +785,14 @@ export function registerFocusTooltip() {
         // keydowns from the same held press via the latch (cleared on keyup).
         const wasVisible = isTipShown(tip, supportsPopover);
         if (hasActiveTooltipState()) { dispatch({ type: "escape" }); }
-        if (wasVisible) { escapeConsumed = true; }
+        disarmComboboxSurfacing();
+        // Do NOT swallow Escape from a POPUP OWNER (aria-haspopup or role=combobox) whose list is open - it
+        // must reach the control to close the list. Disclosure buttons carrying only aria-expanded keep the
+        // pre-feature behavior (Escape dismisses the tooltip).
+        const activeEl = document.activeElement;
+        const activeOwnsOpenPopup = activeEl?.getAttribute?.("aria-expanded") === "true" &&
+            (activeEl.hasAttribute?.("aria-haspopup") || activeEl.getAttribute?.("role") === "combobox");
+        if (wasVisible && !activeOwnsOpenPopup) { escapeConsumed = true; }
         if (escapeConsumed) {
             e.stopPropagation();
             e.preventDefault();
@@ -664,10 +819,16 @@ export function registerFocusTooltip() {
     }
 
     document.addEventListener("scroll", () => {
+        // Reclaim a keyboard-focused combobox unmounted while nothing was surfaced (hasActiveTooltipState is
+        // then false, so the reset below wouldn't run): its aria observer never fires on the removed node, so a
+        // later scroll is the reclaim opportunity even with no tooltip showing.
+        if (activeCombobox && !activeCombobox.isConnected) { deactivateCombobox(); }
         if (hasActiveTooltipState()) { dispatchScrollReset(); }
     }, true);
 
     window.addEventListener("resize", () => {
+        // Reclaim a detached focused combobox (same as the scroll handler above), ahead of the state gate.
+        if (activeCombobox && !activeCombobox.isConnected) { deactivateCombobox(); }
         if (!hasActiveTooltipState()) { return; }
         // Cancel a still-pending (not-yet-shown) hover: a drag-resize freezes the pointer coordinates, so the
         // captured rest point can go stale while the show timer runs. Only when nothing is displayed - a shown
