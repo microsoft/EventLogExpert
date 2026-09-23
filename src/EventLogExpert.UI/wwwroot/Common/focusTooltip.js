@@ -41,6 +41,11 @@ export function isClipped(el) {
 
 function isOverflowAnchor(el) { return !!el && !!el.hasAttribute && el.hasAttribute("data-tooltip-overflow"); }
 
+// Whether an anchor would surface its tooltip right now: a non-overflow anchor always shows (its data-tooltip is
+// unconditional), an overflow anchor only when its own text is actually clipped. Shared by the keyboard
+// active-descendant resolver and its surfacing gate so the selected anchor and the gate decision cannot diverge.
+export function anchorSurfaces(el) { return !!el && (isOverflowAnchor(el) ? isClipped(el) : !!el.getAttribute("data-tooltip")); }
+
 // An overflow anchor shows its tooltip only when its text is actually clipped. Climb from the hovered/focused
 // leaf past any unclipped overflow anchors to the nearest ancestor [data-tooltip] that should show (a clipped
 // overflow anchor, or any non-overflow anchor); return null when nothing qualifies, so an unclipped inner
@@ -63,13 +68,13 @@ export function hoverTransferAnchor(leaf, relatedAnchor) {
 
 // Decide what a keyboard-focused combobox surfaces as the user arrows through its options. Pure so the adapter
 // resolves the DOM facts (armed = keyboard modality currently owns the list; expanded = the listbox is open;
-// optionAnchorPresent/optionClipped = the aria-activedescendant option is a live, clipped overflow anchor) and
-// this maps them to a render intent. `armed` gates everything: mouse-driven aria-activedescendant mutations
-// (hover highlights) never surface here - the hover system owns those. Exported for unit tests.
-export function activeDescendantTarget({ armed, expanded, optionAnchorPresent, optionClipped }) {
+// optionAnchorPresent/optionSurfaces = the aria-activedescendant option resolved a live anchor that would show
+// its tooltip) and this maps them to a render intent. `armed` gates everything: mouse-driven aria-activedescendant
+// mutations (hover highlights) never surface here - the hover system owns those. Exported for unit tests.
+export function activeDescendantTarget({ armed, expanded, optionAnchorPresent, optionSurfaces }) {
     if (!armed) { return "conceal"; }
     if (!expanded) { return "combobox"; }
-    if (optionAnchorPresent && optionClipped) { return "option"; }
+    if (optionAnchorPresent && optionSurfaces) { return "option"; }
     return "conceal";
 }
 
@@ -615,19 +620,24 @@ export function registerFocusTooltip() {
         return !!listbox && listbox.contains(node);
     }
 
-    // The aria-activedescendant option, only when it is a live, rendered element in the controlled listbox (a
-    // display:none option on a closing list has a zero rect and is excluded). The option IS its own tooltip
-    // anchor (ValueSelectItem renders data-tooltip-overflow directly on it), so return it rather than climbing
-    // via closestAnchor: a combobox whose options are not anchors then resolves to a non-overflow element the
-    // isOverflowAnchor gate rejects, instead of surfacing an ancestor's label from outside the listbox.
+    // The tooltip a mouse would surface for the aria-activedescendant option, only when the option is a live,
+    // rendered element in the controlled listbox (a display:none option on a closing list has a zero rect and is
+    // excluded). A ChildContent option renders its own inner data-tooltip anchors (e.g. a filter-set's name+meta
+    // spans) that the mouse resolves individually, so pick the first inner anchor that WOULD surface - matching
+    // the mouse, and surfacing a multi-anchor option when EITHER span is clipped. isClipped reads
+    // scrollWidth/clientWidth, so this stays correct in the arrow-before-scrollIntoView window that a hit-test
+    // would race. A plain or anchorless option has no surfacing inner anchor and falls back to the option itself
+    // (its own overflow gate), so a plain option stays its own tooltip anchor.
     function activeOptionAnchor() {
         if (!activeCombobox) { return null; }
         const id = activeCombobox.getAttribute("aria-activedescendant");
         const option = id ? document.getElementById(id) : null;
         if (!option || !option.isConnected || !isInActiveComboboxList(option)) { return null; }
-        const rect = option.getBoundingClientRect();
+        const inner = [...option.querySelectorAll('[data-tooltip]:not([data-tooltip=""]), [data-tooltip-overflow]')].find(anchorSurfaces);
+        const anchor = inner || option;
+        const rect = anchor.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) { return null; }
-        return option;
+        return anchor;
     }
 
     function surfaceActiveDescendant() {
@@ -638,7 +648,7 @@ export function registerFocusTooltip() {
             armed: comboboxSurfacingArmed,
             expanded: activeCombobox.getAttribute("aria-expanded") === "true",
             optionAnchorPresent: !!optionAnchor,
-            optionClipped: !!optionAnchor && isOverflowAnchor(optionAnchor) && isClipped(optionAnchor),
+            optionSurfaces: !!optionAnchor && anchorSurfaces(optionAnchor),
         });
         if (target === "combobox") { dispatch({ type: "focusIn", anchor: activeCombobox }); }
         else if (target === "option") { dispatch({ type: "focusIn", anchor: optionAnchor }); }
@@ -799,7 +809,20 @@ export function registerFocusTooltip() {
         }
     }, true);
 
-    document.addEventListener("keyup", (e) => { if (e.key === "Escape") { escapeConsumed = false; } }, true);
+    document.addEventListener("keyup", (e) => {
+        if (e.key === "Escape") { escapeConsumed = false; }
+        // A keyboard-activated control (Enter, or Space which natively activates a <button> on keyup) may remove
+        // itself or its subtree, and Chromium fires no focusout for a removed focused element. keyup is after every
+        // activation form (Enter's keydown-activation, Space's keyup-activation, LogTabBar's @onkeydown removal);
+        // defer past Blazor's async re-render (double rAF) and reclaim ONLY a displayed anchor that actually
+        // detached - a surviving toggle keeps the tooltip its data-tooltip mutation just refreshed, nothing
+        // connected is dismissed. Gated on an active anchor so a plain Enter/Space keystroke schedules nothing.
+        if ((e.key === "Enter" || e.key === " ") && state.focusedAnchor) {
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                if (state.focusedAnchor && !state.focusedAnchor.isConnected) { dispatchScrollReset(); }
+            }));
+        }
+    }, true);
 
     window.addEventListener("blur", () => { escapeConsumed = false; });
 

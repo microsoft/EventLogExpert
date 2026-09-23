@@ -293,12 +293,13 @@
     outline-offset: 1px;
 }
 
-/* While a scan is in flight the rows are provisional, so the filter actions stay hidden even on hover. */
+/* While a scan is in flight the row actions are disabled, but stay visible (dimmed) and hittable so their tooltip
+   label remains reachable on hover; native `disabled` still blocks activation. `.stats-row-actions` gates them to
+   row-hover/:focus-within, so the dimmed disabled state only shows while the user is already on the row. */
 .stats-include:disabled,
 .stats-exclude:disabled {
-    opacity: 0;
+    opacity: 0.45;
     cursor: default;
-    pointer-events: none;
 }
 
 .stats-actions-spacer { width: 40px; }
