@@ -252,17 +252,25 @@ input[type="search"]:focus-visible,
        center it, and width/height:fit-content sizes the box height against the *unwrapped* (max-content) text
        width - so a long tooltip paints a box too short for the text once it wraps, and the trailing line spills
        past the border. Restoring width/height:auto makes it a normal shrink-to-fit fixed box whose height
-       matches the wrapped text (max-width still caps how wide it grows); overflow:visible then only guards
-       against a phantom sub-pixel scrollbar. Harmless no-ops on the non-popover fallback path. */
+       matches the wrapped text (max-width still caps how wide it grows); the max-height below then bounds it to
+       the viewport and overflow:hidden hard-clips beyond that. Harmless no-ops on the non-popover fallback path. */
     inset: auto;
     margin: 0;
     width: auto;
     height: auto;
-    overflow: visible;
+    /* Bound the bubble to the viewport so a very long / multiline message can't paint a tail off-screen that,
+       being pointer-events:none and unfocusable, no one could scroll to. 8px = 2x the 4px VIEWPORT_MARGIN the
+       focusTooltip.js clamp keeps on each edge. overflow:hidden hard-clips beyond that (see the pointer-events
+       note for the accepted native-title-parity truncation) and also guards the phantom sub-pixel scrollbar
+       that width/height:auto could otherwise produce. */
+    max-height: calc(100dvh - 8px);
+    overflow: hidden;
 
     /* Inert like a native OS tooltip: it never intercepts the pointer (so it can't flicker or shadow the
-       control beneath) and is intentionally not hoverable - the text is duplicated on the control and exposed
-       via aria, so no information is lost. */
+       control beneath) and is intentionally not hoverable. The text is the control's own accessible NAME (this
+       bubble is a visual aid, deliberately NOT wired via aria-describedby - see the focusTooltip.js header), so
+       a screen-reader user gets it regardless. See the max-height note above for the extreme-length
+       visual-truncation tradeoff for sighted users. */
     pointer-events: none;
 
     /* Cap wide enough to read like a native OS tooltip (which isn't pinned to a narrow column) while still
@@ -295,8 +303,11 @@ input[type="search"]:focus-visible,
 
 /* Wide variant for overflow/rich-text tooltips (long paths, full messages, multiline detail):
    a larger cap with hard word-breaking so long unbroken strings wrap instead of overflowing. The bubble is
-   inert (pointer-events:none) and unfocusable, so it must NOT clip its content behind a scrollbar the user
-   could never reach; the viewport clamp keeps it on screen and the full text is also on the control + in aria.
+   inert (pointer-events:none) and unfocusable, so it can't be scrolled; the base rule's max-height bounds it to
+   the viewport and hard-clips anything past it. Accepted native-title-parity tradeoff: the START of the message
+   always stays on screen, but a multi-thousand-character line's tail is visually truncated and - for a handful
+   of virtualized log tooltips with no Details-pane surface (e.g. DatabaseToolsLogView, DebugLogModal) - not
+   otherwise reachable; still strictly better than the pre-fix unbounded bubble that painted off-screen.
    Intentional newlines in the source text are preserved. */
 .focus-tooltip--wide {
     max-width: min(40rem, 90vw);
