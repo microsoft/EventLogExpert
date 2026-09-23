@@ -136,6 +136,37 @@ public sealed class ResolutionCoverageModalTests : BunitContext
     }
 
     [Fact]
+    public void CopyButton_DescribesActionInBothEnabledAndCopyingStates_WithoutNativeTitle()
+    {
+        TaskCompletionSource copying = new();
+        _clipboard.CopyTextAsync(Arg.Any<string>()).Returns(copying.Task);
+        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
+        SetReport(Report(Row("Alpha", total: 5, noProvider: 5, status: CoverageStatus.None)));
+
+        var cut = Render<ResolutionCoverageModal>();
+        cut.WaitForState(() => cut.FindAll(".resolution-coverage-copy").Count > 0, s_wait);
+
+        var enabledCopyButton = cut.Find(".resolution-coverage-copy");
+        Assert.False(enabledCopyButton.HasAttribute("disabled"));
+        Assert.False(enabledCopyButton.HasAttribute("title"));
+        Assert.Equal("[[Coverage_CopyTableTooltip]]", enabledCopyButton.GetAttribute("data-tooltip"));
+        Assert.Equal("coverage-copy-help", enabledCopyButton.GetAttribute("aria-describedby"));
+        Assert.Equal("[[Coverage_CopyTableTooltip]]", cut.Find("#coverage-copy-help").TextContent);
+
+        enabledCopyButton.Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var disabledCopyButton = cut.Find(".resolution-coverage-copy");
+            Assert.True(disabledCopyButton.HasAttribute("disabled"));
+            Assert.False(disabledCopyButton.HasAttribute("title"));
+            Assert.Equal("[[Coverage_CopyTableTooltip]]", disabledCopyButton.GetAttribute("data-tooltip"));
+            Assert.Equal("coverage-copy-help", disabledCopyButton.GetAttribute("aria-describedby"));
+            Assert.Equal("[[Coverage_CopyTableTooltip]]", cut.Find("#coverage-copy-help").TextContent);
+        }, s_wait);
+    }
+
+    [Fact]
     public async Task CopyButton_UnderMarkerLocalizer_CopiesInvariantTable()
     {
         // The copied TSV is the invariant export seam: even when every visible string is localized (MarkerLocalizer wraps
@@ -158,36 +189,6 @@ public sealed class ResolutionCoverageModalTests : BunitContext
             payload != null &&
             payload.Contains("Provider\tEvents", StringComparison.Ordinal) &&
             !payload.Contains("[[", StringComparison.Ordinal)));
-    }
-
-    [Fact]
-    public void CopyButton_WhenCopying_DescribesDisabledReasonWithoutNativeTitle()
-    {
-        TaskCompletionSource copying = new();
-        _clipboard.CopyTextAsync(Arg.Any<string>()).Returns(copying.Task);
-        Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
-        SetReport(Report(Row("Alpha", total: 5, noProvider: 5, status: CoverageStatus.None)));
-
-        var cut = Render<ResolutionCoverageModal>();
-        cut.WaitForState(() => cut.FindAll(".resolution-coverage-copy").Count > 0, s_wait);
-
-        var enabledCopyButton = cut.Find(".resolution-coverage-copy");
-        Assert.False(enabledCopyButton.HasAttribute("disabled"));
-        Assert.False(enabledCopyButton.HasAttribute("title"));
-        Assert.Equal("[[Coverage_CopyTableTooltip]]", enabledCopyButton.GetAttribute("data-tooltip"));
-        Assert.False(enabledCopyButton.HasAttribute("aria-describedby"));
-
-        enabledCopyButton.Click();
-
-        cut.WaitForAssertion(() =>
-        {
-            var disabledCopyButton = cut.Find(".resolution-coverage-copy");
-            Assert.True(disabledCopyButton.HasAttribute("disabled"));
-            Assert.False(disabledCopyButton.HasAttribute("title"));
-            Assert.Equal("[[Coverage_CopyTableTooltip]]", disabledCopyButton.GetAttribute("data-tooltip"));
-            Assert.Equal("coverage-copy-help", disabledCopyButton.GetAttribute("aria-describedby"));
-            Assert.Equal("[[Coverage_CopyTableTooltip]]", cut.Find("#coverage-copy-help").TextContent);
-        }, s_wait);
     }
 
     [Fact]

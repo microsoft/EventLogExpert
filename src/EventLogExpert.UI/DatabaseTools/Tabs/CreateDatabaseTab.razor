@@ -86,13 +86,10 @@
                             <ValueSelectItem T="int?" Value="edition.Index">@FormatEditionLabel(edition)</ValueSelectItem>
                         }
                     </ValueSelect>
-                    @if (IsRunning || _isLoadingEditions)
-                    {
-                        <span class="visually-hidden" id="create-load-editions-help">@Localizer["Db_Create_LoadEditionsTitle"]</span>
-                    }
+                    <span class="visually-hidden" id="create-load-editions-help">@Localizer["Db_Create_LoadEditionsTitle"]</span>
                     <Button Disabled="@(IsRunning || _isLoadingEditions)"
                         OnClick="LoadEditionsAsync"
-                        aria-describedby="@(IsRunning || _isLoadingEditions ? "create-load-editions-help" : null)"
+                        aria-describedby="create-load-editions-help"
                         data-tooltip="@Localizer["Db_Create_LoadEditionsTitle"]">
                         @(_isLoadingEditions ? Localizer["Db_Create_LoadingEditions"] : Localizer["Db_Create_LoadEditions"])
                     </Button>

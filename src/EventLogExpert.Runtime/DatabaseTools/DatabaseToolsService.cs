@@ -14,7 +14,8 @@ using System.Diagnostics;
 
 namespace EventLogExpert.Runtime.DatabaseTools;
 
-internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factory) : IDatabaseToolsService
+internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factory, ITraceLogger? traceLogger)
+    : IDatabaseToolsService
 {
     public Task<DatabaseToolsResult> CreateAsync(
         CreateDatabaseRequest request,
@@ -56,7 +57,7 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
         bool verbose = false)
         => RunAsync(factory.Create(request), logProgress, progress, cancellationToken, verbose);
 
-    private static async Task<DatabaseToolsResult> RunAsync(
+    private async Task<DatabaseToolsResult> RunAsync(
         IDatabaseToolsOperation operation,
         IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress>? progress,
@@ -71,6 +72,7 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
 
         DatabaseToolsOutcome outcome;
         string? failureSummary = null;
+        bool diagnostic = false;
 
         try
         {
@@ -88,10 +90,14 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
         catch (Exception ex)
         {
             outcome = DatabaseToolsOutcome.Failed;
-            failureSummary = ex.Message;
-            logger.Error($"{ex}");
+            failureSummary = $"{ex.GetType().Name}: {ex.Message}";
+            diagnostic = true;
+            traceLogger?.Error($"{ex}");
         }
 
-        return new DatabaseToolsResult(outcome, failureSummary, Stopwatch.GetElapsedTime(startTimestamp));
+        return new DatabaseToolsResult(outcome, failureSummary, Stopwatch.GetElapsedTime(startTimestamp))
+        {
+            SummaryIsDiagnostic = diagnostic
+        };
     }
 }

@@ -9,6 +9,7 @@ using EventLogExpert.DatabaseTools.ShowProviders;
 using EventLogExpert.DatabaseTools.UpgradeDatabase;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.DatabaseTools;
+using EventLogExpert.Runtime.Tests.TestUtils;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Runtime.Tests.DatabaseTools;
@@ -72,18 +73,37 @@ public sealed class DatabaseToolsServiceTests
     }
 
     [Fact]
-    public async Task OperationThrowsException_ResultIsFailed_FailureSummarySet_ErrorLogged()
+    public async Task OperationThrowsException_NullTraceLogger_StillFailedDiagnostic_NoOperationLogError()
     {
         var fake = new RecordingOperation(_ => throw new InvalidOperationException("boom"));
-        var (service, _) = CreateSut(showOperation: () => fake);
+        var (service, _) = CreateSut(showOperation: () => fake, traceLogger: null);
         var logProgress = new ListProgress<LogRecord>();
 
         var result = await service.ShowAsync(
             new ShowProvidersRequest(null, null), logProgress, progress: null, CancellationToken.None);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.Equal("boom", result.FailureSummary);
-        Assert.Contains(logProgress.Entries, e => e.Level == LogLevel.Error);
+        Assert.Equal("InvalidOperationException: boom", result.FailureSummary);
+        Assert.True(result.SummaryIsDiagnostic);
+        Assert.DoesNotContain(logProgress.Entries, e => e.Level == LogLevel.Error);
+    }
+
+    [Fact]
+    public async Task OperationThrowsException_ResultIsFailedDiagnostic_FullExceptionToTraceLogger_NotOperationLog()
+    {
+        var fake = new RecordingOperation(_ => throw new InvalidOperationException("boom"));
+        var traceLogger = new LoggerUtils.RecordingTraceLogger();
+        var (service, _) = CreateSut(showOperation: () => fake, traceLogger: traceLogger);
+        var logProgress = new ListProgress<LogRecord>();
+
+        var result = await service.ShowAsync(
+            new ShowProvidersRequest(null, null), logProgress, progress: null, CancellationToken.None);
+
+        Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
+        Assert.Equal("InvalidOperationException: boom", result.FailureSummary);
+        Assert.True(result.SummaryIsDiagnostic);
+        Assert.DoesNotContain(logProgress.Entries, e => e.Level == LogLevel.Error);
+        Assert.Contains(traceLogger.ErrorMessages, m => m.Contains("InvalidOperationException") && m.Contains("boom"));
     }
 
     [Fact]
@@ -203,7 +223,8 @@ public sealed class DatabaseToolsServiceTests
         Func<IDatabaseToolsOperation>? createOperation = null,
         Func<IDatabaseToolsOperation>? mergeOperation = null,
         Func<IDatabaseToolsOperation>? diffOperation = null,
-        Func<IDatabaseToolsOperation>? upgradeOperation = null)
+        Func<IDatabaseToolsOperation>? upgradeOperation = null,
+        ITraceLogger? traceLogger = null)
     {
         var factory = new FakeOperationFactory
         {
@@ -214,7 +235,7 @@ public sealed class DatabaseToolsServiceTests
             UpgradeFactory = upgradeOperation ?? (() => new RecordingOperation(DatabaseToolsOutcome.Succeeded))
         };
 
-        return (new DatabaseToolsService(factory), factory);
+        return (new DatabaseToolsService(factory, traceLogger), factory);
     }
 
     private sealed class FakeOperationFactory : IDatabaseToolsOperationFactory

@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.DependencyInjection;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
@@ -103,7 +104,10 @@ public static class RuntimeServiceCollectionExtensions
             ArgumentNullException.ThrowIfNull(services);
 
             services.AddDatabaseToolsServices();
-            services.TryAddSingleton<IDatabaseToolsService, DatabaseToolsService>();
+            // Explicit factory: the built-in ServiceProvider ignores defaulted ctor params, so the optional logger is supplied here; the helper root has no ILogSourceFactory and passes null.
+            services.TryAddSingleton<IDatabaseToolsService>(static sp => new DatabaseToolsService(
+                sp.GetRequiredService<IDatabaseToolsOperationFactory>(),
+                sp.GetService<ILogSourceFactory>()?.ForCategory(LogCategories.DatabaseTools)));
 
             return services;
         }
@@ -269,7 +273,10 @@ public static class RuntimeServiceCollectionExtensions
 
             // Database tools
             services.AddDatabaseToolsServices();
-            services.TryAddSingleton<IDatabaseToolsService, DatabaseToolsService>();
+            // Explicit factory: the built-in ServiceProvider ignores defaulted ctor params, so the optional logger is supplied here; the helper root has no ILogSourceFactory and passes null.
+            services.TryAddSingleton<IDatabaseToolsService>(static sp => new DatabaseToolsService(
+                sp.GetRequiredService<IDatabaseToolsOperationFactory>(),
+                sp.GetService<ILogSourceFactory>()?.ForCategory(LogCategories.DatabaseTools)));
 
             // Scenarios and channels
             services.AddSingleton<IScenarioSource, BuiltInScenarioSource>();

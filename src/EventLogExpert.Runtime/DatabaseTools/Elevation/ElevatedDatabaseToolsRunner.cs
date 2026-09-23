@@ -245,6 +245,14 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         await WriteJsonLineAsync(pipe, writeLock, json, cancellationToken);
     }
 
+    private DatabaseToolsResult DiagnosticFailure(string summary, TimeSpan elapsed, Exception? detail = null)
+    {
+        string logMessage = detail is null ? summary : $"{summary}{Environment.NewLine}{detail}";
+        _traceLogger.Error($"{logMessage}");
+
+        return new DatabaseToolsResult(DatabaseToolsOutcome.Failed, summary, elapsed) { SummaryIsDiagnostic = true };
+    }
+
     private void HandleCallerCancellation(Stream pipeStream, SemaphoreSlim writeLock, IElevatedHelperProcess process, KillState killState)
     {
         if (!killState.MarkCancelRequested()) { return; }
@@ -383,9 +391,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             }
             catch (FileNotFoundException fnf)
             {
-                _traceLogger.Error($"Helper executable not found: {fnf.Message}");
-
-                return new DatabaseToolsResult(DatabaseToolsOutcome.Failed, $"Elevation helper not found: {fnf.Message}", stopwatch.Elapsed);
+                return DiagnosticFailure($"Elevation helper not found: {fnf.Message}", stopwatch.Elapsed);
             }
 
             _traceLogger.Trace($"Helper process started; PID={process.ProcessId}.");
@@ -424,6 +430,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
                     if (hello.ProtocolVersion != HelloMessage.CurrentProtocolVersion)
                     {
+                        // Kept English and not marked diagnostic: this is actionable user guidance (reinstall the MSIX), not internal detail.
                         return new DatabaseToolsResult(
                             DatabaseToolsOutcome.Failed,
                             $"Helper IPC protocol version mismatch: helper sent {hello.ProtocolVersion}, runner expected {HelloMessage.CurrentProtocolVersion}. The helper EXE may be from a different app version - reinstall the MSIX so the main app and helper ship together.",
@@ -432,8 +439,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 }
                 else
                 {
-                    return new DatabaseToolsResult(
-                        DatabaseToolsOutcome.Failed,
+                    return DiagnosticFailure(
                         $"Helper sent {first.GetType().Name} instead of HelloMessage as its first message.",
                         stopwatch.Elapsed);
                 }
@@ -444,15 +450,13 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             }
             catch (OperationCanceledException)
             {
-                return new DatabaseToolsResult(
-                    DatabaseToolsOutcome.Failed,
+                return DiagnosticFailure(
                     $"Helper did not send Hello message within {_helloTimeout.TotalSeconds:N0}s.",
                     stopwatch.Elapsed);
             }
             catch (ChannelClosedException)
             {
-                return new DatabaseToolsResult(
-                    DatabaseToolsOutcome.Failed,
+                return DiagnosticFailure(
                     "Pipe closed before helper sent Hello message (helper likely crashed during startup).",
                     stopwatch.Elapsed);
             }
@@ -587,9 +591,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         }
         catch (Exception ex)
         {
-            _traceLogger.Error($"Unhandled exception in runner: {ex}");
-
-            return new DatabaseToolsResult(DatabaseToolsOutcome.Failed, $"{ex.GetType().Name}: {ex.Message}", stopwatch.Elapsed);
+            return DiagnosticFailure($"{ex.GetType().Name}: {ex.Message}", stopwatch.Elapsed, detail: ex);
         }
         finally
         {
@@ -670,24 +672,38 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
     {
         if (result is not null)
         {
-            return new DatabaseToolsResult(
-                result.Outcome,
-                result.FailureSummary,
-                TimeSpan.FromMilliseconds(result.DurationMs));
+            var helperDuration = TimeSpan.FromMilliseconds(result.DurationMs);
+
+            if (result is { Outcome: DatabaseToolsOutcome.Failed, SummaryIsDiagnostic: true })
+            {
+                // Mark only, no re-log: MirrorMessageToDebugLog already logged this on receipt.
+                return new DatabaseToolsResult(
+                    DatabaseToolsOutcome.Failed,
+                    result.FailureSummary ?? "Helper reported a failure with no summary.",
+                    helperDuration)
+                {
+                    SummaryIsDiagnostic = true
+                };
+            }
+
+            return new DatabaseToolsResult(result.Outcome, result.FailureSummary, helperDuration);
         }
 
         if (fatal is not null)
         {
+            // Mark only, no re-log: MirrorMessageToDebugLog already logged this on receipt.
             return new DatabaseToolsResult(
                 DatabaseToolsOutcome.Failed,
                 $"Helper threw {fatal.ExceptionType}: {fatal.Message}",
-                elapsed);
+                elapsed)
+            {
+                SummaryIsDiagnostic = true
+            };
         }
 
         if (!cancellationToken.IsCancellationRequested)
         {
-            return new DatabaseToolsResult(
-                DatabaseToolsOutcome.Failed,
+            return DiagnosticFailure(
                 $"Helper exited (code {exitCode}) without sending a Result message.",
                 elapsed);
         }

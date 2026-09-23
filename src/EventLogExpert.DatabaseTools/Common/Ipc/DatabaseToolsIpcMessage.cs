@@ -43,7 +43,11 @@ public sealed record LogMessage(
 
 public sealed record ProgressMessage(int Processed, int? Total, string? CurrentItem) : DatabaseToolsIpcMessage;
 
-public sealed record ResultMessage(DatabaseToolsOutcome Outcome, string? FailureSummary, long DurationMs) : DatabaseToolsIpcMessage;
+public sealed record ResultMessage(DatabaseToolsOutcome Outcome, string? FailureSummary, long DurationMs)
+    : DatabaseToolsIpcMessage
+{
+    public bool SummaryIsDiagnostic { get; init; }
+}
 
 public sealed record FatalMessage(string ExceptionType, string Message, string StackTrace) : DatabaseToolsIpcMessage;
 

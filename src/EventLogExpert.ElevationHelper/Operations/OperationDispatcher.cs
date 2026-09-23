@@ -34,6 +34,7 @@ internal static class OperationDispatcher
         return await DestructiveRecovery.WrapAsync(
             request,
             (req, ct) => RawDispatchAsync(service, req, logProgress, progress, ct),
+            logProgress,
             cancellationToken);
     }
 

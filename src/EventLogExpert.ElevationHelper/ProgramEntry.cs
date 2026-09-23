@@ -49,6 +49,13 @@ internal static class ProgramEntry
         }
     }
 
+    // Extracted (not inlined) so a unit test can guard the SummaryIsDiagnostic copy: dropping it would silently leak helper-side thrown-exception detail into the localized operation log.
+    internal static ResultMessage BuildResultMessage(DatabaseToolsResult result) =>
+        new(result.Outcome, result.FailureSummary, (long)result.Duration.TotalMilliseconds)
+        {
+            SummaryIsDiagnostic = result.SummaryIsDiagnostic
+        };
+
     private static async Task<int> RunOperationModeAsync(IpcMessageReader reader, IpcMessageWriter writer)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -153,8 +160,7 @@ internal static class ProgramEntry
 
         try { await controlReaderTask.WaitAsync(s_controlReaderDrainTimeout); } catch { /* Best-effort control-reader drain. */ }
 
-        await TryWriteTerminalAsync(writer,
-            new ResultMessage(result.Outcome, result.FailureSummary, (long)result.Duration.TotalMilliseconds));
+        await TryWriteTerminalAsync(writer, BuildResultMessage(result));
 
         return 0;
     }

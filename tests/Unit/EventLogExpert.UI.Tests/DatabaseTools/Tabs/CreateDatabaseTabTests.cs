@@ -231,7 +231,7 @@ public sealed class CreateDatabaseTabTests : BunitContext
     }
 
     [Fact]
-    public void LoadEditionsButton_WhenLoading_KeepsDisabledReasonInTooltipAndAccessibleDescription()
+    public void LoadEditionsButton_DescribesActionInBothEnabledAndLoadingStates_WithoutNativeTitle()
     {
         TaskCompletionSource<OfflineImageEditionsResult> loadingEditions = new();
         Services.GetRequiredService<IElevatedDatabaseToolsRunner>()
@@ -245,7 +245,8 @@ public sealed class CreateDatabaseTabTests : BunitContext
         Assert.False(enabledButton.HasAttribute("disabled"));
         Assert.False(enabledButton.HasAttribute("title"));
         Assert.Equal("[[Db_Create_LoadEditionsTitle]]", enabledButton.GetAttribute("data-tooltip"));
-        Assert.False(enabledButton.HasAttribute("aria-describedby"));
+        Assert.Equal("create-load-editions-help", enabledButton.GetAttribute("aria-describedby"));
+        Assert.Equal("[[Db_Create_LoadEditionsTitle]]", component.Find("#create-load-editions-help").TextContent);
 
         enabledButton.Click();
 
