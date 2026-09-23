@@ -65,12 +65,7 @@
         <div class="histogram-buttons">
             <button aria-label="@Localizer["Histogram_ZoomOut"]" class="histogram-button" data-tooltip="@Localizer["Histogram_ZoomOut"]" @onclick="() => ZoomFromControl(ZoomOutFactor)" type="button">-</button>
             <button aria-label="@Localizer["Histogram_ZoomIn"]" class="histogram-button" data-tooltip="@Localizer["Histogram_ZoomIn"]" @onclick="() => ZoomFromControl(ZoomInFactor)" type="button">+</button>
-            @if (_windowHistory.Count == 0)
-            {
-                <span class="visually-hidden" id="histogram-undo-zoom-help">@Localizer["Histogram_UndoZoomTitle"].Value</span>
-            }
-            <button aria-describedby="@(_windowHistory.Count == 0 ? "histogram-undo-zoom-help" : null)"
-                aria-label="@Localizer["Histogram_UndoZoomAria"]"
+            <button aria-label="@Localizer["Histogram_UndoZoomAria"]"
                 class="histogram-button"
                 data-tooltip="@Localizer["Histogram_UndoZoomTitle"].Value"
                 disabled="@(_windowHistory.Count == 0)"

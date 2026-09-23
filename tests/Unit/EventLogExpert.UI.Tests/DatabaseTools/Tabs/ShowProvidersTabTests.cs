@@ -3,12 +3,16 @@
 
 using Bunit;
 using EventLogExpert.DatabaseTools.Common.Operations;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using EventLogExpert.UI.DatabaseTools.Tabs;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
+using TestContext = Xunit.TestContext;
 
 namespace EventLogExpert.UI.Tests.DatabaseTools.Tabs;
 
@@ -113,6 +117,60 @@ public sealed class ShowProvidersTabTests : BunitContext
         Assert.Equal("[[DatabaseTools_Elevation_ProtectedProviders]]", component.Find("#show-run-elevation-help").TextContent);
     }
 
+    [Fact]
+    public void RunReturnsDiagnosticFailure_LogShowsGenericSeeDebugLog_WithoutDiagnosticText()
+    {
+        Services.GetRequiredService<IDatabaseToolsService>()
+            .ShowAsync(default!, default!, default, TestContext.Current.CancellationToken)
+            .ReturnsForAnyArgs(Task.FromResult(
+                new DatabaseToolsResult(DatabaseToolsOutcome.Failed, "SqliteException: disk full", TimeSpan.Zero) { SummaryIsDiagnostic = true }));
+
+        var component = Render<ShowProvidersTab>();
+        component.Find(".button-green").Click();
+
+        component.WaitForAssertion(() =>
+        {
+            Assert.Contains("DatabaseTools_OutcomeMessage_FailedSeeDebugLog", component.Markup);
+            Assert.DoesNotContain("SqliteException", component.Markup);
+        });
+    }
+
+    [Fact]
+    public void RunReturnsNonDiagnosticFailure_LogShowsTheOperationSummary()
+    {
+        Services.GetRequiredService<IDatabaseToolsService>()
+            .ShowAsync(default!, default!, default, TestContext.Current.CancellationToken)
+            .ReturnsForAnyArgs(Task.FromResult(
+                new DatabaseToolsResult(DatabaseToolsOutcome.Failed, "3 providers failed to import", TimeSpan.Zero)));
+
+        var component = Render<ShowProvidersTab>();
+        component.Find(".button-green").Click();
+
+        component.WaitForAssertion(() =>
+            Assert.Contains("DatabaseTools_OutcomeMessage_FailedWithSummary(3 providers failed to import)", component.Markup));
+    }
+
+    [Fact]
+    public void RunThrows_LogShowsGenericSeeDebugLog_FullExceptionTracedNotShown()
+    {
+        var recordingLogger = new RecordingTraceLogger();
+        Services.AddSingleton<ITraceLogger>(recordingLogger);
+        Services.GetRequiredService<IDatabaseToolsService>()
+            .ShowAsync(default!, default!, default, TestContext.Current.CancellationToken)
+            .ReturnsForAnyArgs(Task.FromException<DatabaseToolsResult>(new InvalidOperationException("kaboom")));
+
+        var component = Render<ShowProvidersTab>();
+        component.Find(".button-green").Click();
+
+        component.WaitForAssertion(() =>
+        {
+            Assert.Contains("DatabaseTools_OutcomeMessage_FailedSeeDebugLog", component.Markup);
+            Assert.DoesNotContain("kaboom", component.Markup);
+            Assert.Contains(recordingLogger.ErrorMessages, m => m.Contains("kaboom"));
+            Assert.Contains(LogCategories.DatabaseToolsShow, recordingLogger.Categories);
+        });
+    }
+
     private void AssertShowRoutedThroughElevatedHelper(IElevatedDatabaseToolsRunner elevatedRunner)
     {
         elevatedRunner.ReceivedWithAnyArgs(1).ShowAsync(default!, default!, default, default);
@@ -126,5 +184,34 @@ public sealed class ShowProvidersTabTests : BunitContext
         elevatedRunner.ShowAsync(default!, default!, default, default)
             .ReturnsForAnyArgs(Task.FromResult(new DatabaseToolsResult(DatabaseToolsOutcome.Succeeded, null, TimeSpan.Zero)));
         return elevatedRunner;
+    }
+
+    private sealed class RecordingTraceLogger : ITraceLogger
+    {
+        public List<string> Categories { get; } = [];
+
+        public List<string> ErrorMessages { get; } = [];
+
+        public LogLevel MinimumLevel => LogLevel.Trace;
+
+        public void Critical(CriticalLogHandler handler) => handler.ToStringAndClear();
+
+        public void Debug(DebugLogHandler handler) => handler.ToStringAndClear();
+
+        public void Error(ErrorLogHandler handler) => ErrorMessages.Add(handler.ToStringAndClear());
+
+        // Capture the requested category; the default ForCategory returns this silently, so without recording it a dropped category stamp on the diagnostic would go undetected.
+        public ITraceLogger ForCategory(string category)
+        {
+            Categories.Add(category);
+
+            return this;
+        }
+
+        public void Information(InformationLogHandler handler) => handler.ToStringAndClear();
+
+        public void Trace(TraceLogHandler handler) => handler.ToStringAndClear();
+
+        public void Warning(WarningLogHandler handler) => handler.ToStringAndClear();
     }
 }

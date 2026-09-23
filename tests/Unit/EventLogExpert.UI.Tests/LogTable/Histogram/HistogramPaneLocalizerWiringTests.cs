@@ -158,8 +158,8 @@ public sealed class HistogramPaneLocalizerWiringTests : BunitContext
         Assert.True(disabledUndo.HasAttribute("disabled"));
         Assert.False(disabledUndo.HasAttribute("title"));
         Assert.Equal("[[Histogram_UndoZoomTitle]]", disabledUndo.GetAttribute("data-tooltip"));
-        Assert.Equal("histogram-undo-zoom-help", disabledUndo.GetAttribute("aria-describedby"));
-        Assert.Equal("[[Histogram_UndoZoomTitle]]", cut.Find("#histogram-undo-zoom-help").TextContent);
+        Assert.False(disabledUndo.HasAttribute("aria-describedby"));
+        Assert.Empty(cut.FindAll("#histogram-undo-zoom-help"));
 
         await cut.InvokeAsync(() => cut.Instance.OnHistogramResized(420, 120));
         cut.WaitForState(() => cut.FindAll("g[data-tip]").Count == 6, s_wait);

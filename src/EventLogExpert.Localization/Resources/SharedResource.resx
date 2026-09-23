@@ -4334,10 +4334,6 @@
     <value>The database import did not complete.</value>
     <comment>Database tools UI text. Log detail shown when a post-build auto-import finishes with failures.</comment>
   </data>
-  <data name="DatabaseTools_Log_UnexpectedError" xml:space="preserve">
-    <value>Unexpected error: {0}</value>
-    <comment>Database tools UI text.</comment>
-  </data>
   <!-- Database Tools shared tab actions, fields, filters, elevation, and pickers. -->
   <data name="DatabaseTools_Action_Browse" xml:space="preserve">
     <value>Browse…</value>

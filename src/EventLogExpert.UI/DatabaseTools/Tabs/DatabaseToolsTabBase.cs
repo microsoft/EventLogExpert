@@ -99,6 +99,8 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
     protected bool ShouldShowImportDatabaseButton =>
         Outcome?.Outcome == DatabaseToolsOutcome.Succeeded && ProducedDatabasePath is not null;
 
+    [Inject] protected ITraceLogger TraceLogger { get; init; } = null!;
+
     private protected AutoImportMode AutoImportMode { get; set; } = AutoImportMode.Off;
 
     public void CancelIfRunning()
@@ -177,7 +179,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         {
             DatabaseToolsOutcome.Succeeded => Localizer["DatabaseTools_OutcomeMessage_Succeeded", durationSeconds],
             DatabaseToolsOutcome.Cancelled => Localizer["DatabaseTools_OutcomeMessage_Cancelled", durationSeconds],
-            DatabaseToolsOutcome.Failed => string.IsNullOrWhiteSpace(result.FailureSummary) ?
+            DatabaseToolsOutcome.Failed => string.IsNullOrWhiteSpace(result.FailureSummary) || result.SummaryIsDiagnostic ?
                 Localizer["DatabaseTools_OutcomeMessage_FailedSeeDebugLog"] :
                 Localizer["DatabaseTools_OutcomeMessage_FailedWithSummary", result.FailureSummary],
             _ => string.Empty
@@ -387,9 +389,16 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         }
         catch (Exception ex)
         {
-            var failedOutcome = new DatabaseToolsResult(DatabaseToolsOutcome.Failed, ex.Message, Stopwatch.GetElapsedTime(startTimestamp));
+            var failedOutcome = new DatabaseToolsResult(DatabaseToolsOutcome.Failed,
+                ex.Message,
+                Stopwatch.GetElapsedTime(startTimestamp))
+            {
+                SummaryIsDiagnostic = true
+            };
+
             Outcome = failedOutcome;
-            AppendEntry(new LogRecord(DateTime.UtcNow, LogLevel.Error, Localizer["DatabaseTools_Log_UnexpectedError", ex.Message]));
+            // Required logger (unlike the service's optional one): the UI has no second log channel, so an unlogged diagnostic would leave "see debug log" pointing at nothing. Stamp the tab's category so the entry is findable under the same Debug Log category filter as the operation's own log lines.
+            TraceLogger.ForCategory(LogCategory).Error($"{ex}");
             AppendOutcome(failedOutcome);
         }
         finally

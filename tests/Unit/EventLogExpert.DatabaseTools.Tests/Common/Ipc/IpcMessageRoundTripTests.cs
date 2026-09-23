@@ -190,6 +190,18 @@ public sealed class IpcMessageRoundTripTests
         Assert.Equal(outcome, result.Outcome);
         Assert.Equal(failureSummary, result.FailureSummary);
         Assert.Equal(12345L, result.DurationMs);
+        Assert.False(result.SummaryIsDiagnostic);
+    }
+
+    [Fact]
+    public void ResultMessage_RoundTrips_PreservesSummaryIsDiagnostic()
+    {
+        var original = new ResultMessage(DatabaseToolsOutcome.Failed, "boom", DurationMs: 500) { SummaryIsDiagnostic = true };
+
+        var roundTripped = SerializeDeserialize(original, out _);
+
+        var result = Assert.IsType<ResultMessage>(roundTripped);
+        Assert.True(result.SummaryIsDiagnostic);
     }
 
     private static void AssertDiscriminator(string json, string expected)

@@ -176,6 +176,41 @@ public sealed class DestructiveRecoveryTests
             Assert.Equal(OriginalContents, restored);
             Assert.False(File.Exists(bakPath),
                 $"Backup at {bakPath} must be deleted after destructive recovery restored from it.");
+            Assert.Contains(logProgress.Entries, e => e.Message.Contains("restored from backup"));
+        }
+        finally
+        {
+            TryDeleteDir(tempDir);
+        }
+    }
+
+    [Fact]
+    public async Task UpgradeDatabase_PreExistingBackupButMissingTarget_FailsWithoutTouchingBackup()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var tempDir = CreateTempDir();
+        var dbPath = Path.Combine(tempDir, "missing-target.db");
+        var bakPath = dbPath + ".bak";
+
+        const string PreExistingBakContents = "USER_RECOVERY_SNAPSHOT_DO_NOT_TOUCH";
+        await File.WriteAllTextAsync(bakPath, PreExistingBakContents, ct);
+
+        var logger = new IntegrationTraceLogger();
+        var host = new TestElevatedHelperProcessHost(logger);
+        var runner = new ElevatedDatabaseToolsRunner(host, logger);
+        var logProgress = new ListProgress<LogRecord>();
+
+        try
+        {
+            var result = await runner.UpgradeAsync(
+                new UpgradeDatabaseRequest(dbPath), logProgress, progress: null, ct);
+
+            Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
+            Assert.False(File.Exists(dbPath),
+                $"Target {dbPath} did not exist before the call and must NOT be materialized from a pre-existing .bak this run did not create.");
+            Assert.True(File.Exists(bakPath),
+                $"Pre-existing recovery backup at {bakPath} must NOT be deleted when this run did not create it.");
+            Assert.Equal(PreExistingBakContents, await File.ReadAllTextAsync(bakPath, ct));
         }
         finally
         {
@@ -211,40 +246,6 @@ public sealed class DestructiveRecoveryTests
             Assert.Contains("recovery backup", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
             Assert.Equal(TargetContents, await File.ReadAllTextAsync(dbPath, ct));
             Assert.Equal(BakContents, await File.ReadAllTextAsync(bakPath, ct));
-        }
-        finally
-        {
-            TryDeleteDir(tempDir);
-        }
-    }
-
-    [Fact]
-    public async Task UpgradeDatabase_PreExistingBackupButMissingTarget_FailsWithoutTouchingBackup()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var tempDir = CreateTempDir();
-        var dbPath = Path.Combine(tempDir, "missing-target.db");
-        var bakPath = dbPath + ".bak";
-
-        const string PreExistingBakContents = "USER_RECOVERY_SNAPSHOT_DO_NOT_TOUCH";
-        await File.WriteAllTextAsync(bakPath, PreExistingBakContents, ct);
-
-        var logger = new IntegrationTraceLogger();
-        var host = new TestElevatedHelperProcessHost(logger);
-        var runner = new ElevatedDatabaseToolsRunner(host, logger);
-        var logProgress = new ListProgress<LogRecord>();
-
-        try
-        {
-            var result = await runner.UpgradeAsync(
-                new UpgradeDatabaseRequest(dbPath), logProgress, progress: null, ct);
-
-            Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-            Assert.False(File.Exists(dbPath),
-                $"Target {dbPath} did not exist before the call and must NOT be materialized from a pre-existing .bak this run did not create.");
-            Assert.True(File.Exists(bakPath),
-                $"Pre-existing recovery backup at {bakPath} must NOT be deleted when this run did not create it.");
-            Assert.Equal(PreExistingBakContents, await File.ReadAllTextAsync(bakPath, ct));
         }
         finally
         {

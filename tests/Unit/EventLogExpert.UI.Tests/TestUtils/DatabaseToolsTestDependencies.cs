@@ -40,7 +40,13 @@ internal static class DatabaseToolsTestDependencies
             services.AddSingleton(Substitute.For<IAlertDialogService>());
             services.AddSingleton(Substitute.For<ICurrentVersionProvider>());
             services.AddSingleton(Substitute.For<IMenuActionService>());
-            services.AddSingleton(Substitute.For<ITraceLogger>());
+
+            // ForCategory returns the same substitute so the tabs' category-stamped diagnostic logging (the RunCore
+            // catch) records against this double instead of NRE-ing on NSubstitute's default null.
+            var traceLogger = Substitute.For<ITraceLogger>();
+            traceLogger.ForCategory(Arg.Any<string>()).Returns(traceLogger);
+            services.AddSingleton(traceLogger);
+
             services.AddOperationLogProgressFactoryMock();
             services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 

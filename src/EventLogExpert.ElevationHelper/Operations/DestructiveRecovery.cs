@@ -8,6 +8,8 @@ using EventLogExpert.DatabaseTools.DiffDatabase;
 using EventLogExpert.DatabaseTools.MergeDatabase;
 using EventLogExpert.DatabaseTools.ShowProviders;
 using EventLogExpert.DatabaseTools.UpgradeDatabase;
+using EventLogExpert.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.ElevationHelper.Operations;
 
@@ -47,25 +49,22 @@ internal static class DestructiveRecovery
     public static async Task<DatabaseToolsResult> WrapAsync(
         DatabaseToolsIpcRequest request,
         Func<DatabaseToolsIpcRequest, CancellationToken, Task<DatabaseToolsResult>> dispatch,
+        IProgress<LogRecord> logProgress,
         CancellationToken cancellationToken)
     {
         return request switch
         {
-            UpgradeDatabaseIpcRequest u => await WrapUpgradeAsync(u.Request.DatabasePath, request, dispatch, cancellationToken),
+            UpgradeDatabaseIpcRequest u => await WrapUpgradeAsync(u.Request.DatabasePath,
+                request,
+                dispatch,
+                logProgress,
+                cancellationToken),
             _ => await dispatch(request, cancellationToken)
         };
     }
 
-    private static DatabaseToolsResult AppendToSummary(DatabaseToolsResult original, string? extra)
-    {
-        if (string.IsNullOrWhiteSpace(extra)) { return original; }
-
-        var combined = string.IsNullOrWhiteSpace(original.FailureSummary)
-            ? extra
-            : $"{original.FailureSummary} | {extra}";
-
-        return original with { FailureSummary = combined };
-    }
+    private static void ReportRecovery(IProgress<LogRecord> logProgress, LogLevel level, string message) =>
+        logProgress.Report(new LogRecord(DateTime.UtcNow, level, message));
 
     private static void TryDelete(string path)
     {
@@ -79,6 +78,7 @@ internal static class DestructiveRecovery
         string targetPath,
         DatabaseToolsIpcRequest request,
         Func<DatabaseToolsIpcRequest, CancellationToken, Task<DatabaseToolsResult>> dispatch,
+        IProgress<LogRecord> logProgress,
         CancellationToken cancellationToken)
     {
         var backupPath = targetPath + ".bak";
@@ -120,7 +120,9 @@ internal static class DestructiveRecovery
 
         if (!backupCreated || !File.Exists(backupPath))
         {
-            return AppendToSummary(result, "No backup was created (target file did not exist before the upgrade attempt).");
+            ReportRecovery(logProgress, LogLevel.Information, "No backup was created (target file did not exist before the upgrade attempt).");
+
+            return result;
         }
 
         try
@@ -128,11 +130,15 @@ internal static class DestructiveRecovery
             File.Copy(backupPath, targetPath, overwrite: true);
             File.Delete(backupPath);
 
-            return AppendToSummary(result, $"Original database restored from backup ({backupPath}).");
+            ReportRecovery(logProgress, LogLevel.Information, $"Original database restored from backup ({backupPath}).");
+
+            return result;
         }
         catch (Exception ex)
         {
-            return AppendToSummary(result, $"Restore from backup failed: {ex.GetType().Name}: {ex.Message}. Backup remains at {backupPath} - rename manually to recover.");
+            ReportRecovery(logProgress, LogLevel.Warning, $"Restore from backup failed: {ex.GetType().Name}: {ex.Message}. Backup remains at {backupPath} - rename manually to recover.");
+
+            return result;
         }
     }
 }

@@ -224,6 +224,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         Assert.Contains("protocol version mismatch", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(futureVersion.ToString(), result.FailureSummary);
         Assert.Contains(HelloMessage.CurrentProtocolVersion.ToString(), result.FailureSummary);
+        Assert.False(result.SummaryIsDiagnostic);
     }
 
     [Fact]
@@ -366,7 +367,69 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         Assert.NotNull(result.FailureSummary);
         Assert.Contains("Elevation helper not found", result.FailureSummary);
         Assert.Contains("eventlogexpert-elevated.exe", result.FailureSummary);
-        Assert.Contains(logger.ErrorMessages, m => m.Contains("Helper executable not found"));
+        Assert.True(result.SummaryIsDiagnostic);
+        Assert.Contains(logger.ErrorMessages, m => m.Contains("Elevation helper not found"));
+    }
+
+    [Fact]
+    public async Task HelperSendsDiagnosticFailedResult_RunnerMarksDiagnostic_NoAdditionalDebugEntryBeyondMirror()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
+        var fakeProcess = new FakeElevatedHelperProcess(server, processId: 3131);
+        var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
+        var logger = new LoggerUtils.RecordingTraceLogger();
+        var runner = CreateRunner(host, logger);
+        var logProgress = new ListProgress<LogRecord>();
+
+        await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
+        using var clientReader = new StreamReader(client, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
+
+        var runTask = runner.ShowAsync(
+            new ShowProvidersRequest(null, null), logProgress, progress: null, ct);
+
+        await WriteMessageAsync(clientWriter, new HelloMessage(3131, HelloMessage.CurrentProtocolVersion), ct);
+        await ReadRequestAsync(clientReader, ct);
+        await WriteMessageAsync(clientWriter,
+            new ResultMessage(DatabaseToolsOutcome.Failed, "SqliteException: disk full", 200) { SummaryIsDiagnostic = true }, ct);
+        fakeProcess.SignalExited(0);
+
+        var result = await runTask;
+
+        Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
+        Assert.True(result.SummaryIsDiagnostic);
+        Assert.Equal("SqliteException: disk full", result.FailureSummary);
+        Assert.Single(logger.ErrorMessages, m => m.Contains("SqliteException: disk full"));
+    }
+
+    [Fact]
+    public async Task HelperSendsNonDiagnosticFailedResult_RunnerPassesThrough_NotMarkedDiagnostic()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
+        var fakeProcess = new FakeElevatedHelperProcess(server, processId: 3232);
+        var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
+        var logger = new LoggerUtils.RecordingTraceLogger();
+        var runner = CreateRunner(host, logger);
+        var logProgress = new ListProgress<LogRecord>();
+
+        await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
+        using var clientReader = new StreamReader(client, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
+
+        var runTask = runner.ShowAsync(
+            new ShowProvidersRequest(null, null), logProgress, progress: null, ct);
+
+        await WriteMessageAsync(clientWriter, new HelloMessage(3232, HelloMessage.CurrentProtocolVersion), ct);
+        await ReadRequestAsync(clientReader, ct);
+        await WriteMessageAsync(clientWriter,
+            new ResultMessage(DatabaseToolsOutcome.Failed, "3 providers failed to import", 200), ct);
+        fakeProcess.SignalExited(0);
+
+        var result = await runTask;
+
+        Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
+        Assert.False(result.SummaryIsDiagnostic);
+        Assert.Equal("3 providers failed to import", result.FailureSummary);
     }
 
     [Fact]
@@ -394,6 +457,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
         Assert.NotNull(result.FailureSummary);
         Assert.Contains("LogMessage instead of HelloMessage", result.FailureSummary);
+        Assert.True(result.SummaryIsDiagnostic);
     }
 
     [Fact]
@@ -426,6 +490,8 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         Assert.NotNull(result.FailureSummary);
         Assert.Contains("Helper threw System.Text.Json.JsonException", result.FailureSummary);
         Assert.Contains("Malformed message from helper", result.FailureSummary);
+        Assert.True(result.SummaryIsDiagnostic);
+        Assert.All(logger.ErrorMessages, m => Assert.StartsWith("Helper fatal", m));
     }
 
     [Fact]
