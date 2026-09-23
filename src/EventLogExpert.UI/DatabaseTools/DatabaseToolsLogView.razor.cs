@@ -7,6 +7,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Common.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Localization;
@@ -18,6 +19,7 @@ namespace EventLogExpert.UI.DatabaseTools;
 
 public sealed partial class DatabaseToolsLogView : IAsyncDisposable
 {
+    private readonly string _actionsDisabledHelpId = ComponentId.NewUnique("db-log-actions-disabled").Value;
     private readonly DotNetObjectReference<DatabaseToolsLogView> _selfRef;
 
     private volatile bool _disposed;

@@ -35,7 +35,18 @@
             }
             else
             {
-                <PrimaryButton Disabled="@(!CanRun)" IconClass="bi bi-play-fill" OnClick="RunAsync">@Localizer["DatabaseTools_Action_Run"]</PrimaryButton>
+                @if (RunDisabledReason is not null)
+                {
+                    <span class="visually-hidden" id="upgrade-run-disabled-help">@RunDisabledReason</span>
+                }
+
+                <PrimaryButton Disabled="@(!CanRun)"
+                    IconClass="bi bi-play-fill"
+                    OnClick="RunAsync"
+                    aria-describedby="@(RunDisabledReason is null ? null : "upgrade-run-disabled-help")"
+                    data-tooltip="@RunDisabledReason">
+                    @Localizer["DatabaseTools_Action_Run"]
+                </PrimaryButton>
             }
         </ToolbarLeadingContent>
     </DatabaseToolsLogView>

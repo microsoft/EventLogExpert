@@ -90,6 +90,12 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 
     protected virtual string? ProducedDatabasePathCandidate => null;
 
+    // Presentational only: the actionable "how to enable" hint for a disabled Run button, or null. INVARIANT:
+    // null whenever CanRun is true (each override tests a strict subset of that tab's CanRun conjuncts), and
+    // intentionally null for obvious busy states (loading/importing) that CanRun still blocks - so the button
+    // stays disabled and the RunCoreAsync guard still fires, but no tooltip is shown for a self-evident state.
+    protected virtual string? RunDisabledReason => null;
+
     protected bool ShouldShowImportDatabaseButton =>
         Outcome?.Outcome == DatabaseToolsOutcome.Succeeded && ProducedDatabasePath is not null;
 
@@ -115,16 +121,27 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         GC.SuppressFinalize(this);
     }
 
+    // Space-joins the present hint ids for a Run button's aria-describedby (disabled-reason + elevation), or
+    // null when neither applies - an empty string would render aria-describedby="" (an empty IDREF list).
+    protected static string? ComposeDescribedBy(string? first, string? second)
+    {
+        if (string.IsNullOrEmpty(first)) { return string.IsNullOrEmpty(second) ? null : second; }
+
+        return string.IsNullOrEmpty(second) ? first : $"{first} {second}";
+    }
+
     // Buffers high-rate log entries into 50ms UI batches; late callbacks after disposal are dropped.
     protected void AppendEntry(LogRecord entry)
     {
         if (_disposed) { return; }
 
         bool needsSchedule;
+
         lock (_pendingLock)
         {
             _pendingEntries.Add(entry);
             needsSchedule = !_flushScheduled;
+
             if (needsSchedule) { _flushScheduled = true; }
         }
 

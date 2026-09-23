@@ -94,9 +94,16 @@
             }
             else
             {
+                @if (RunDisabledReason is not null)
+                {
+                    <span class="visually-hidden" id="merge-run-disabled-help">@RunDisabledReason</span>
+                }
+
                 <PrimaryButton Disabled="@(!CanRun || IsRunning || IsImportInProgress || IsConfirming)"
                     IconClass="bi bi-play-fill"
-                    OnClick="RunAsync">
+                    OnClick="RunAsync"
+                    aria-describedby="@(RunDisabledReason is null ? null : "merge-run-disabled-help")"
+                    data-tooltip="@RunDisabledReason">
                     @Localizer["DatabaseTools_Action_Run"]
                 </PrimaryButton>
             }

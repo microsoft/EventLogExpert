@@ -592,6 +592,10 @@
     <value>Upgrade</value>
     <comment>Provider database row upgrade button text.</comment>
   </data>
+  <data name="Db_Entry_UpgradeInProgress" xml:space="preserve">
+    <value>Wait for the current upgrade to finish</value>
+    <comment>Tooltip explaining why a provider database row's upgrade/retry/restore button is disabled.</comment>
+  </data>
   <data name="Db_Entry_RetryUpgrade" xml:space="preserve">
     <value>Retry Upgrade</value>
     <comment>Provider database row retry-upgrade button text.</comment>
@@ -3157,6 +3161,14 @@
   <data name="FilterPane_Action_Apply" xml:space="preserve">
     <value>Apply</value>
   </data>
+  <data name="FilterPane_FilterSet_ApplyDisabled" xml:space="preserve">
+    <value>Select a filter set to apply</value>
+    <comment>Tooltip explaining why the filter-set Apply/Replace buttons are disabled.</comment>
+  </data>
+  <data name="FilterPane_Scenario_ApplyDisabled" xml:space="preserve">
+    <value>Select a scenario to apply</value>
+    <comment>Tooltip explaining why the scenario Apply/Replace buttons are disabled.</comment>
+  </data>
   <data name="FilterPane_Action_Remove" xml:space="preserve">
     <value>Remove</value>
   </data>
@@ -4281,6 +4293,10 @@
     <value>Copy</value>
     <comment>Database tools UI text.</comment>
   </data>
+  <data name="DatabaseTools_Log_ActionsDisabled" xml:space="preserve">
+    <value>Run an operation to generate log output first</value>
+    <comment>Database tools UI text. Tooltip explaining why the log Copy/Export buttons are disabled.</comment>
+  </data>
   <data name="DatabaseTools_Log_JumpToLatest" xml:space="preserve">
     <value>Jump to latest</value>
     <comment>Database tools UI text.</comment>
@@ -4400,6 +4416,10 @@
     <value>Required. Path to a new .db file to create.</value>
     <comment>Database tools UI text.</comment>
   </data>
+  <data name="Db_Create_RunDisabled_NoTarget" xml:space="preserve">
+    <value>Choose a target database path</value>
+    <comment>Database tools UI text. Tooltip explaining why the Create Run button is disabled.</comment>
+  </data>
   <data name="Db_Create_SourceHelp" xml:space="preserve">
     <value>Optional. Leave empty to use local providers. Accepts a .db or .evtx path, a folder, or an offline image (.wim, .esd, .iso, or .vhdx/.vhd). When an image is given, providers are read from it, fully offline.</value>
     <comment>Database tools UI text.</comment>
@@ -4497,6 +4517,18 @@
     <value>Required. Path to a new .db file that will receive the providers found only in the second source.</value>
     <comment>Database tools UI text.</comment>
   </data>
+  <data name="Db_Diff_RunDisabled_NoFirst" xml:space="preserve">
+    <value>Choose the first source</value>
+    <comment>Database tools UI text. Tooltip explaining why the Diff Run button is disabled.</comment>
+  </data>
+  <data name="Db_Diff_RunDisabled_NoSecond" xml:space="preserve">
+    <value>Choose the second source</value>
+    <comment>Database tools UI text. Tooltip explaining why the Diff Run button is disabled.</comment>
+  </data>
+  <data name="Db_Diff_RunDisabled_NoNewDb" xml:space="preserve">
+    <value>Choose the new database path</value>
+    <comment>Database tools UI text. Tooltip explaining why the Diff Run button is disabled.</comment>
+  </data>
   <data name="Db_Diff_Picker_FirstSource" xml:space="preserve">
     <value>Pick first source (.db or .evtx)</value>
     <comment>Database tools UI text.</comment>
@@ -4517,6 +4549,14 @@
   <data name="Db_Merge_TargetHelp" xml:space="preserve">
     <value>Required. Path to the existing target .db that will receive the merged providers.</value>
     <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Merge_RunDisabled_NoSource" xml:space="preserve">
+    <value>Choose a source file</value>
+    <comment>Database tools UI text. Tooltip explaining why the Merge Run button is disabled.</comment>
+  </data>
+  <data name="Db_Merge_RunDisabled_NoTarget" xml:space="preserve">
+    <value>Choose the target database</value>
+    <comment>Database tools UI text. Tooltip explaining why the Merge Run button is disabled.</comment>
   </data>
   <data name="Db_Merge_ExistingProviders" xml:space="preserve">
     <value>Existing providers</value>
@@ -4539,6 +4579,10 @@
   <data name="Db_Upgrade_DatabaseHelp" xml:space="preserve">
     <value>Required. Path to the .db whose schema will be upgraded to the current version.</value>
     <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Upgrade_RunDisabled_NoDatabase" xml:space="preserve">
+    <value>Choose a database to upgrade</value>
+    <comment>Database tools UI text. Tooltip explaining why the Upgrade Run button is disabled.</comment>
   </data>
   <data name="Db_Upgrade_Picker_Database" xml:space="preserve">
     <value>Pick .db to upgrade</value>

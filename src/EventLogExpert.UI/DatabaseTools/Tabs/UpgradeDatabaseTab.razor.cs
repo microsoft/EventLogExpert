@@ -19,6 +19,9 @@ public sealed partial class UpgradeDatabaseTab : DatabaseToolsTabBase<UpgradeDat
 
     protected override string LogCategory => LogCategories.DatabaseToolsUpgrade;
 
+    protected override string? RunDisabledReason =>
+        string.IsNullOrWhiteSpace(_dbPath) ? Localizer["Db_Upgrade_RunDisabled_NoDatabase"].Value : null;
+
     protected override UpgradeDatabaseRequest BuildRequest() => new(_dbPath.Trim());
 
     protected override Task<DatabaseToolsResult> DispatchAsync(

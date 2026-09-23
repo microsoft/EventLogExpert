@@ -25,6 +25,11 @@ public sealed partial class DiffDatabasesTab : DatabaseToolsTabBase<DiffDatabase
 
     protected override string LogCategory => LogCategories.DatabaseToolsDiff;
 
+    protected override string? RunDisabledReason =>
+        string.IsNullOrWhiteSpace(_firstPath) ? Localizer["Db_Diff_RunDisabled_NoFirst"].Value :
+        string.IsNullOrWhiteSpace(_secondPath) ? Localizer["Db_Diff_RunDisabled_NoSecond"].Value :
+        string.IsNullOrWhiteSpace(_newDbPath) ? Localizer["Db_Diff_RunDisabled_NoNewDb"].Value : null;
+
     protected override DiffDatabaseRequest BuildRequest() =>
         new(_firstPath.Trim(), _secondPath.Trim(), _newDbPath.Trim());
 

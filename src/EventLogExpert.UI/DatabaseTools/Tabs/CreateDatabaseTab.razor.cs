@@ -6,8 +6,8 @@ using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
 using EventLogExpert.Eventing.OfflineImaging.Wim;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.Common.Versioning;
+using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using EventLogExpert.UI.Alerts;
 using Microsoft.AspNetCore.Components;
@@ -47,6 +47,9 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
     protected override string LogCategory => LogCategories.DatabaseToolsCreate;
 
     protected override string? ProducedDatabasePathCandidate => _targetPath.Trim();
+
+    protected override string? RunDisabledReason =>
+        string.IsNullOrWhiteSpace(_targetPath) ? Localizer["Db_Create_RunDisabled_NoTarget"].Value : null;
 
     [Inject] private ICurrentVersionProvider CurrentVersionProvider { get; init; } = null!;
 

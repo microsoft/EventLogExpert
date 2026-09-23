@@ -26,6 +26,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     private readonly string _nameButtonId = ComponentId.NewUnique("db-row-name").Value;
     private readonly string _pendingStatusId = ComponentId.NewUnique("db-row-pending").Value;
+    private readonly string _upgradeBlockedHelpId = ComponentId.NewUnique("db-row-upgrade-blocked").Value;
 
     private IReadOnlyList<ProviderDatabaseOsStamp> _meaningfulOsStamps = [];
     private ChromelessButton? _nameButton;

@@ -86,28 +86,47 @@
                     break;
 
                 case ActionKind.Upgrade:
+                    @if (IsUpgradeBlocked)
+                    {
+                        <span class="visually-hidden" id="@_upgradeBlockedHelpId">@Localizer["Db_Entry_UpgradeInProgress"]</span>
+                    }
+
                     <Button CssClass="db-entry-upgrade-btn"
                         Disabled="@IsUpgradeBlocked"
                         IconClass="bi bi-arrow-up-circle"
                         OnClick="@(() => OnUpgrade.InvokeAsync())"
-                        aria-label="@Localizer["Db_Entry_Aria_Upgrade", Entry.FileName]">
+                        aria-describedby="@(IsUpgradeBlocked ? _upgradeBlockedHelpId : null)"
+                        aria-label="@Localizer["Db_Entry_Aria_Upgrade", Entry.FileName]"
+                        data-tooltip="@(IsUpgradeBlocked ? Localizer["Db_Entry_UpgradeInProgress"].Value : null)">
                         @Localizer["Db_Entry_Upgrade"]
                     </Button>
 
                     break;
 
                 case ActionKind.Retry:
+                    @if (IsUpgradeBlocked)
+                    {
+                        <span class="visually-hidden" id="@_upgradeBlockedHelpId">@Localizer["Db_Entry_UpgradeInProgress"]</span>
+                    }
+
                     <DangerButton CssClass="db-entry-upgrade-btn"
                         Disabled="@IsUpgradeBlocked"
                         IconClass="bi bi-arrow-clockwise"
                         OnClick="@(() => OnUpgrade.InvokeAsync())"
-                        aria-label="@Localizer["Db_Entry_Aria_RetryUpgrade", Entry.FileName]">
+                        aria-describedby="@(IsUpgradeBlocked ? _upgradeBlockedHelpId : null)"
+                        aria-label="@Localizer["Db_Entry_Aria_RetryUpgrade", Entry.FileName]"
+                        data-tooltip="@(IsUpgradeBlocked ? Localizer["Db_Entry_UpgradeInProgress"].Value : null)">
                         @Localizer["Db_Entry_RetryUpgrade"]
                     </DangerButton>
 
                     break;
 
                 case ActionKind.RestoreFromBackup:
+                    @if (IsRestoreBlocked)
+                    {
+                        <span class="visually-hidden" id="@_upgradeBlockedHelpId">@Localizer["Db_Entry_UpgradeInProgress"]</span>
+                    }
+
                     <Button CssClass="db-entry-restore-btn"
                         Disabled="@IsRestoreBlocked"
                         IconClass="bi bi-arrow-counterclockwise"
@@ -115,7 +134,9 @@
                                  {
                                      if (!IsRestoreBlocked) { await OnRestoreFromBackup.InvokeAsync(); }
                                  })"
-                        aria-label="@Localizer["Db_Entry_Aria_Restore", Entry.FileName]">
+                        aria-describedby="@(IsRestoreBlocked ? _upgradeBlockedHelpId : null)"
+                        aria-label="@Localizer["Db_Entry_Aria_Restore", Entry.FileName]"
+                        data-tooltip="@(IsRestoreBlocked ? Localizer["Db_Entry_UpgradeInProgress"].Value : null)">
                         @Localizer["Db_Entry_Restore"]
                     </Button>
 

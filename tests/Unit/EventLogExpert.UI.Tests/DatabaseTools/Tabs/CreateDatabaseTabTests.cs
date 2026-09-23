@@ -390,17 +390,21 @@ public sealed class CreateDatabaseTabTests : BunitContext
         var plainRunButton = component.Find(".button-green");
         Assert.True(plainRunButton.HasAttribute("disabled"));
         Assert.False(plainRunButton.HasAttribute("title"));
-        Assert.False(plainRunButton.HasAttribute("data-tooltip"));
-        Assert.False(plainRunButton.HasAttribute("aria-describedby"));
+        // Disabled for a missing target path: the disabled-reason hint shows even before elevation is in play.
+        Assert.Equal("[[Db_Create_RunDisabled_NoTarget]]", plainRunButton.GetAttribute("data-tooltip"));
+        Assert.Equal("create-run-disabled-help", plainRunButton.GetAttribute("aria-describedby"));
 
         component.Find("#create-include-protected").Change(true);
 
         var elevatedRunButton = component.Find(".button-green");
         Assert.True(elevatedRunButton.HasAttribute("disabled"));
         Assert.False(elevatedRunButton.HasAttribute("title"));
-        Assert.Equal("[[DatabaseTools_Elevation_ProtectedProviders]]", elevatedRunButton.GetAttribute("data-tooltip"));
-        Assert.Equal("create-run-elevation-help", elevatedRunButton.GetAttribute("aria-describedby"));
+        // Still disabled for the missing target: the disabled-reason wins the single-valued data-tooltip, and
+        // aria-describedby carries BOTH the disabled-reason and the elevation hint ids.
+        Assert.Equal("[[Db_Create_RunDisabled_NoTarget]]", elevatedRunButton.GetAttribute("data-tooltip"));
+        Assert.Equal("create-run-disabled-help create-run-elevation-help", elevatedRunButton.GetAttribute("aria-describedby"));
         Assert.Equal("[[DatabaseTools_Elevation_ProtectedProviders]]", component.Find("#create-run-elevation-help").TextContent);
+        Assert.Equal("[[Db_Create_RunDisabled_NoTarget]]", component.Find("#create-run-disabled-help").TextContent);
     }
 
     [Fact]

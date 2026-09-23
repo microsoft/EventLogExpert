@@ -911,6 +911,25 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.Equal(0, invocationCount);
     }
 
+    [Fact]
+    public void UpgradeButton_WhenUpgradeBlocked_ExplainsTheInProgressUpgrade()
+    {
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
+
+        var component = Render<DatabaseEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.IsUpgradeBlocked, true));
+
+        var upgradeButton = component.Find(".db-entry-upgrade-btn");
+        Assert.True(upgradeButton.HasAttribute("disabled"));
+        Assert.False(upgradeButton.HasAttribute("title"));
+        Assert.Equal("[[Db_Entry_UpgradeInProgress]]", upgradeButton.GetAttribute("data-tooltip"));
+
+        var hintId = upgradeButton.GetAttribute("aria-describedby");
+        Assert.False(string.IsNullOrEmpty(hintId));
+        Assert.Equal("[[Db_Entry_UpgradeInProgress]]", component.Find($"#{hintId}").TextContent);
+    }
+
     private static IReadOnlyList<ProviderDatabaseOsStamp> MakeDistinctStamps(int count) =>
         [.. Enumerable.Range(0, count).Select(index =>
             new ProviderDatabaseOsStamp(20000 + index, index, $"Edition{index}", $"Ver{index}"))];
