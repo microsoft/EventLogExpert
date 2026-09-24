@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Ipc;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
@@ -30,8 +31,8 @@ namespace EventLogExpert.ElevationHelper.Operations;
 ///         <item>
 ///             <see cref="UpgradeDatabaseRequest" />: copy <c>target.db</c> → <c>target.db.bak</c> BEFORE the operation.
 ///             On Outcome != Succeeded, restore from <c>.bak</c> (copy back + delete) and delete it. On Succeeded, delete
-///             <c>.bak</c>. Hard-kill mid-operation leaves the <c>.bak</c> file in place; the runner's FailureSummary
-///             surfaces this case.
+///             <c>.bak</c>. Hard-kill mid-operation leaves the <c>.bak</c> file in place; the runner surfaces this case
+///             via a localized recovery-guidance log line.
 ///         </item>
 ///         <item>
 ///             <see cref="MergeDatabaseRequest" />: NO new safety code. The operation already wraps destructive work in
@@ -63,8 +64,19 @@ internal static class DestructiveRecovery
         };
     }
 
-    private static void ReportRecovery(IProgress<LogRecord> logProgress, LogLevel level, string message) =>
-        logProgress.Report(new LogRecord(DateTime.UtcNow, level, message));
+    private static void ReportRecovery(
+        IProgress<LogRecord> logProgress,
+        LogLevel level,
+        string key,
+        Exception? exception = null,
+        params string[] args) =>
+        logProgress.Report(new LogRecord(
+            DateTime.UtcNow,
+            level,
+            string.Empty,
+            MessageKey: key,
+            MessageArgs: args,
+            DebugDetail: exception?.ToString()));
 
     private static void TryDelete(string path)
     {
@@ -87,7 +99,7 @@ internal static class DestructiveRecovery
         {
             return new DatabaseToolsResult(
                 DatabaseToolsOutcome.Failed,
-                $"A previous upgrade left an unresolved recovery backup at {backupPath}. Inspect / rename / delete it before retrying the upgrade so the recovery snapshot is not overwritten.",
+                new LocalizableText(DatabaseToolsLogKeys.RecoveryBackupAlreadyPresent, [backupPath]),
                 TimeSpan.Zero);
         }
 
@@ -104,8 +116,11 @@ internal static class DestructiveRecovery
             {
                 return new DatabaseToolsResult(
                     DatabaseToolsOutcome.Failed,
-                    $"Refused to start upgrade: pre-operation backup at {backupPath} failed ({ex.GetType().Name}: {ex.Message}). The original target was not modified.",
-                    TimeSpan.Zero);
+                    new LocalizableText(DatabaseToolsLogKeys.RecoveryPreOperationBackupFailed, [backupPath]),
+                    TimeSpan.Zero)
+                {
+                    DiagnosticDetail = ex.ToString()
+                };
             }
         }
 
@@ -120,7 +135,10 @@ internal static class DestructiveRecovery
 
         if (!backupCreated || !File.Exists(backupPath))
         {
-            ReportRecovery(logProgress, LogLevel.Information, "No backup was created (target file did not exist before the upgrade attempt).");
+            ReportRecovery(
+                logProgress,
+                LogLevel.Information,
+                DatabaseToolsLogKeys.RecoveryNoBackupCreated);
 
             return result;
         }
@@ -130,13 +148,23 @@ internal static class DestructiveRecovery
             File.Copy(backupPath, targetPath, overwrite: true);
             File.Delete(backupPath);
 
-            ReportRecovery(logProgress, LogLevel.Information, $"Original database restored from backup ({backupPath}).");
+            ReportRecovery(
+                logProgress,
+                LogLevel.Information,
+                DatabaseToolsLogKeys.RecoveryOriginalRestored,
+                null,
+                backupPath);
 
             return result;
         }
         catch (Exception ex)
         {
-            ReportRecovery(logProgress, LogLevel.Warning, $"Restore from backup failed: {ex.GetType().Name}: {ex.Message}. Backup remains at {backupPath} - rename manually to recover.");
+            ReportRecovery(
+                logProgress,
+                LogLevel.Warning,
+                DatabaseToolsLogKeys.RecoveryRestoreFailed,
+                ex,
+                backupPath);
 
             return result;
         }

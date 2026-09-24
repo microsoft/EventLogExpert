@@ -10,14 +10,14 @@ public sealed class UIStreamingSink(IProgress<LogRecord> progress, LogLevel mini
 {
     private readonly IProgress<LogRecord> _progress = progress ?? throw new ArgumentNullException(nameof(progress));
 
-    public LogLevel MinimumLevelFor(string category) => minimumLevel;
-
     public void Emit(LogRecord record)
     {
         ArgumentNullException.ThrowIfNull(record);
 
         if (record.Level < minimumLevel) { return; }
 
-        _progress.Report(record);
+        _progress.Report(record with { DebugDetail = null });
     }
+
+    public LogLevel MinimumLevelFor(string category) => minimumLevel;
 }

@@ -123,7 +123,11 @@ public sealed class ShowProvidersTabTests : BunitContext
         Services.GetRequiredService<IDatabaseToolsService>()
             .ShowAsync(default!, default!, default, TestContext.Current.CancellationToken)
             .ReturnsForAnyArgs(Task.FromResult(
-                new DatabaseToolsResult(DatabaseToolsOutcome.Failed, "SqliteException: disk full", TimeSpan.Zero) { SummaryIsDiagnostic = true }));
+                new DatabaseToolsResult(
+                    DatabaseToolsOutcome.Failed,
+                    new LocalizableText("DatabaseTools_Op_TestDiagnostic", []),
+                    TimeSpan.Zero)
+                { SummaryIsDiagnostic = true }));
 
         var component = Render<ShowProvidersTab>();
         component.Find(".button-green").Click();
@@ -141,13 +145,16 @@ public sealed class ShowProvidersTabTests : BunitContext
         Services.GetRequiredService<IDatabaseToolsService>()
             .ShowAsync(default!, default!, default, TestContext.Current.CancellationToken)
             .ReturnsForAnyArgs(Task.FromResult(
-                new DatabaseToolsResult(DatabaseToolsOutcome.Failed, "3 providers failed to import", TimeSpan.Zero)));
+                new DatabaseToolsResult(
+                    DatabaseToolsOutcome.Failed,
+                    new LocalizableText("DatabaseTools_Op_TestFailure", ["3"]),
+                    TimeSpan.Zero)));
 
         var component = Render<ShowProvidersTab>();
         component.Find(".button-green").Click();
 
         component.WaitForAssertion(() =>
-            Assert.Contains("DatabaseTools_OutcomeMessage_FailedWithSummary(3 providers failed to import)", component.Markup));
+            Assert.Contains("DatabaseTools_OutcomeMessage_FailedWithSummary([[DatabaseTools_Op_TestFailure(3)]])", component.Markup));
     }
 
     [Fact]

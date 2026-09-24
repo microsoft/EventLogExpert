@@ -34,6 +34,11 @@ public sealed class ConsoleSink(LogLevel minimumLevel = LogLevel.Information) : 
                 if (color is { } foreground) { Console.ForegroundColor = foreground; }
 
                 Console.WriteLine(line);
+
+                if (record.Level is LogLevel.Error or LogLevel.Critical && record.DebugDetail is { Length: > 0 } debugDetail)
+                {
+                    Console.WriteLine(debugDetail);
+                }
             }
             catch (IOException) { }
             finally

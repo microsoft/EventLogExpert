@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
 using EventLogExpert.DatabaseTools.DiffDatabase;
@@ -14,7 +15,7 @@ using System.Diagnostics;
 
 namespace EventLogExpert.Runtime.DatabaseTools;
 
-internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factory, ITraceLogger? traceLogger)
+internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factory)
     : IDatabaseToolsService
 {
     public Task<DatabaseToolsResult> CreateAsync(
@@ -67,21 +68,21 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
         ArgumentNullException.ThrowIfNull(operation);
         ArgumentNullException.ThrowIfNull(logProgress);
 
-        ITraceLogger logger = new StreamingTraceLogger(logProgress, verbose ? LogLevel.Trace : LogLevel.Information);
+        IOperationLog operationLog = new StreamingOperationLog(logProgress, verbose ? LogLevel.Trace : LogLevel.Information);
         var startTimestamp = Stopwatch.GetTimestamp();
 
         DatabaseToolsOutcome outcome;
-        string? failureSummary = null;
+        LocalizableText? summary = null;
         bool diagnostic = false;
+        string? diagnosticDetail = null;
 
         try
         {
             outcome = await Task.Run(
-                () => operation.ExecuteAsync(logger, progress, cancellationToken),
+                () => operation.ExecuteAsync(operationLog, progress, cancellationToken),
                 cancellationToken);
 
-            // FailureSummary carries actionable UI text when operations fail without throwing.
-            failureSummary = operation.FailureSummary;
+            summary = operation.FailureSummary;
         }
         catch (OperationCanceledException)
         {
@@ -90,14 +91,15 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
         catch (Exception ex)
         {
             outcome = DatabaseToolsOutcome.Failed;
-            failureSummary = $"{ex.GetType().Name}: {ex.Message}";
+            summary = new LocalizableText(DatabaseToolsLogKeys.GenericDiagnosticFailure, []);
             diagnostic = true;
-            traceLogger?.Error($"{ex}");
+            diagnosticDetail = ex.ToString();
         }
 
-        return new DatabaseToolsResult(outcome, failureSummary, Stopwatch.GetElapsedTime(startTimestamp))
+        return new DatabaseToolsResult(outcome, summary, Stopwatch.GetElapsedTime(startTimestamp))
         {
-            SummaryIsDiagnostic = diagnostic
+            SummaryIsDiagnostic = diagnostic,
+            DiagnosticDetail = diagnosticDetail
         };
     }
 }

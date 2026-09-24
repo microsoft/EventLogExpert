@@ -21,8 +21,14 @@ public sealed class ConsoleSinkTests
     }
 
     [Fact]
-    public void Emit_NullRecord_Throws() =>
-        Assert.Throws<ArgumentNullException>(static () => new ConsoleSink(LogLevel.Trace).Emit(null!));
+    public void Emit_ErrorWithDebugDetail_WritesDebugDetailContinuation()
+    {
+        var sink = new ConsoleSink(LogLevel.Trace);
+
+        string output = CaptureConsoleOut(() => sink.Emit(new LogRecord(DateTime.UtcNow, LogLevel.Error, "boom", DebugDetail: "System.Exception: boom")));
+
+        Assert.Equal($"[Error] boom{Environment.NewLine}System.Exception: boom{Environment.NewLine}", output);
+    }
 
     [Fact]
     public void Emit_InformationLevel_WritesBareMessage_WithoutLevelPrefix()
@@ -43,6 +49,10 @@ public sealed class ConsoleSinkTests
 
         Assert.Equal($"[Warning] careful{Environment.NewLine}", output);
     }
+
+    [Fact]
+    public void Emit_NullRecord_Throws() =>
+        Assert.Throws<ArgumentNullException>(static () => new ConsoleSink(LogLevel.Trace).Emit(null!));
 
     [Fact]
     public void Emit_WhenConsoleWriteThrowsIOException_DoesNotPropagate()

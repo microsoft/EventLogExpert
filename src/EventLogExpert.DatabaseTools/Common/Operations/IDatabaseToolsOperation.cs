@@ -7,7 +7,10 @@ namespace EventLogExpert.DatabaseTools.Common.Operations;
 
 public interface IDatabaseToolsOperation
 {
-    string? FailureSummary => null;
+    LocalizableText? FailureSummary => null;
 
-    Task<DatabaseToolsOutcome> ExecuteAsync(ITraceLogger logger, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken);
+    Task<DatabaseToolsOutcome> ExecuteAsync(
+        IOperationLog log,
+        IProgress<DatabaseToolsProgress>? progress,
+        CancellationToken cancellationToken);
 }

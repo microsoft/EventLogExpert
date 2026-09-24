@@ -1,13 +1,17 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Logging;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Routing;
 using EventLogExpert.Logging.Sinks;
 
 namespace EventLogExpert.Runtime.DebugLog;
 
-internal sealed class OperationLogProgressFactory(FileLogSink fileSink, LogRoutingPolicy routingPolicy)
+internal sealed class OperationLogProgressFactory(
+    FileLogSink fileSink,
+    LogRoutingPolicy routingPolicy,
+    INeutralTextResolver neutralTextResolver)
     : IOperationLogProgressFactory
 {
     public IProgress<LogRecord> Create(IProgress<LogRecord> uiProgress, string category, bool verbose)
@@ -17,6 +21,6 @@ internal sealed class OperationLogProgressFactory(FileLogSink fileSink, LogRouti
 
         List<ILogSink> sinks = [new UIStreamingSink(uiProgress, routingPolicy.UIMinimumFor(verbose)), fileSink];
 
-        return new BroadcastLogProgress(sinks, category);
+        return new LocalizingLogProgress(neutralTextResolver, new BroadcastLogProgress(sinks, category));
     }
 }

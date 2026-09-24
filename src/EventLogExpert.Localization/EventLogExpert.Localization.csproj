@@ -9,4 +9,8 @@
     <PackageReference Include="Microsoft.Extensions.Localization" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\EventLogExpert.Logging\EventLogExpert.Logging.csproj" />
+  </ItemGroup>
+
 </Project>

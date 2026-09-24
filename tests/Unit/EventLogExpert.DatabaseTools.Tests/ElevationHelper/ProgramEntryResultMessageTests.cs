@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.ElevationHelper;
+using EventLogExpert.Logging.Abstractions;
 
 namespace EventLogExpert.DatabaseTools.Tests.ElevationHelper;
 
@@ -13,7 +14,7 @@ public sealed class ProgramEntryResultMessageTests
     {
         var result = new DatabaseToolsResult(
             DatabaseToolsOutcome.Failed,
-            "IOException: The device is not ready.",
+            new LocalizableText("DatabaseTools_Op_TestFailure", ["device"]),
             TimeSpan.FromMilliseconds(1234))
         {
             SummaryIsDiagnostic = true
@@ -22,7 +23,8 @@ public sealed class ProgramEntryResultMessageTests
         var message = ProgramEntry.BuildResultMessage(result);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, message.Outcome);
-        Assert.Equal("IOException: The device is not ready.", message.FailureSummary);
+        Assert.Equal("DatabaseTools_Op_TestFailure", message.SummaryKey);
+        Assert.Equal(["device"], message.SummaryArgs);
         Assert.Equal(1234, message.DurationMs);
 
         // Guards the cross-process copy: if the flag were dropped/hardcoded here, a helper-side thrown-exception
@@ -35,7 +37,7 @@ public sealed class ProgramEntryResultMessageTests
     {
         var result = new DatabaseToolsResult(
             DatabaseToolsOutcome.Failed,
-            "3 providers failed to import.",
+            new LocalizableText("DatabaseTools_Op_TestActionable", ["3"]),
             TimeSpan.Zero)
         {
             SummaryIsDiagnostic = false
@@ -44,7 +46,8 @@ public sealed class ProgramEntryResultMessageTests
         var message = ProgramEntry.BuildResultMessage(result);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, message.Outcome);
-        Assert.Equal("3 providers failed to import.", message.FailureSummary);
+        Assert.Equal("DatabaseTools_Op_TestActionable", message.SummaryKey);
+        Assert.Equal(["3"], message.SummaryArgs);
         Assert.False(message.SummaryIsDiagnostic);
     }
 }

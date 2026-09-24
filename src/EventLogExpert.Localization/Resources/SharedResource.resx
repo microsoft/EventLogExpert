@@ -4309,6 +4309,335 @@
     <value>Export Failed</value>
     <comment>Database tools UI text.</comment>
   </data>
+  <data name="DatabaseTools_Log_ExportFailed_Message" xml:space="preserve">
+    <value>The operation log could not be exported. See the debug log for details.</value>
+  </data>
+  <data name="DatabaseTools_Op_CancelHelperForceStopped" xml:space="preserve">
+    <value>Cancelled. The elevated helper did not respond to the cancel request within the grace period and was force-stopped. If a database Upgrade or overwrite was interrupted, a .bak backup of the original may remain next to the target file - rename it to recover.</value>
+    <comment>Shown when a cancelled elevated operation had to be force-stopped. Keep .bak literal; Upgrade is an operation name.</comment>
+  </data>
+  <data name="DatabaseTools_Op_CancelHelperOrphaned" xml:space="preserve">
+    <value>Cancelled. The elevated helper did not respond to the cancel request and could not be stopped; it may still be running as an orphan process. If a database Upgrade or overwrite was interrupted, a .bak backup of the original may remain next to the target file - rename it to recover.</value>
+    <comment>Shown when a cancelled elevated operation could not be stopped and may be orphaned. Keep .bak literal; Upgrade is an operation name.</comment>
+  </data>
+  <data name="DatabaseTools_Op_CancelHelperSelfTerminated" xml:space="preserve">
+    <value>Cancelled. The elevated helper stopped itself after a native operation ignored the cancel request. If a database Upgrade or overwrite was interrupted, a .bak backup of the original may remain next to the target file - rename it to recover.</value>
+    <comment>Shown when the elevated helper self-terminated because a native operation ignored cancellation. Keep .bak literal; Upgrade is an operation name.</comment>
+  </data>
+  <data name="DatabaseTools_Op_CliInvalidFilterRegex" xml:space="preserve">
+    <value>Invalid --filter regex '{0}': {1}</value>
+    <comment>EventDbTool CLI validation error. {0} is the regex the user passed; {1} is the parser error. Keep --filter literal.</comment>
+  </data>
+  <data name="DatabaseTools_Op_CliInvalidImageKind" xml:space="preserve">
+    <value>Invalid --image-kind '{0}'. Valid values: directory, wim, iso, vhdx.</value>
+    <comment>EventDbTool CLI validation error. {0} is the value the user passed. Keep --image-kind and the value list literal.</comment>
+  </data>
+  <data name="DatabaseTools_Op_CreateCannotWriteControlledFolderAccess" xml:space="preserve">
+    <value>Cannot write to '{0}'. This is often Controlled Folder Access (Windows ransomware protection) blocking {1}. Allow it under Windows Security -&gt; Virus &amp; threat protection -&gt; Ransomware protection -&gt; Allow an app through Controlled folder access, or choose a different destination.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateCannotWriteIo" xml:space="preserve">
+    <value>Cannot write to '{0}'. See the debug log for details.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateCannotWritePermissions" xml:space="preserve">
+    <value>Cannot write to '{0}'. Choose a different destination or adjust its permissions.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateCouldNotDetermineOfflineImageKind" xml:space="preserve">
+    <value>Could not determine the offline image kind for '{0}'. Pass --image-kind directory or wim (.wim/.esd) or iso (.iso) or vhdx (.vhdx/.vhd), or point at a mounted volume / extracted image folder.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateCouldNotExtractWim" xml:space="preserve">
+    <value>Could not extract image {0} from {1}.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateCouldNotMountIso" xml:space="preserve">
+    <value>Could not mount {0} (if this is an access-denied error, re-run elevated).</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateCouldNotMountVhdx" xml:space="preserve">
+    <value>Could not mount {0} (if this is an access-denied error, re-run elevated).</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateDeleteOverwriteBackupFailed" xml:space="preserve">
+    <value>Could not delete the overwrite backup at {0}. Delete it manually before the next overwrite of {1}.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateDone" xml:space="preserve">
+    <value>Done!</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateExistingDatabasePreserved" xml:space="preserve">
+    <value>Existing database was preserved: restored from backup after the rebuild did not complete.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateFailureNoProvidersResolved" xml:space="preserve">
+    <value>No providers could be resolved from the source, so no database was created.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateImageKindRequiresOfflineImage" xml:space="preserve">
+    <value>--image-kind requires an offline image (--offline-image).</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateIsoImageFileNotFound" xml:space="preserve">
+    <value>ISO image file not found: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateIsoKindExpectsIso" xml:space="preserve">
+    <value>--image-kind iso expects a .iso file: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateIsoNoInstallImage" xml:space="preserve">
+    <value>{0} has no sources\install.wim or install.esd; only a Windows install ISO is supported.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateNoProvidersResolved" xml:space="preserve">
+    <value>No provider details could be resolved from the source. Database was not created.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateNotReadableIso" xml:space="preserve">
+    <value>{0} is not a readable ISO image.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateNotReadableVhdx" xml:space="preserve">
+    <value>{0} is not a readable VHD/VHDX image.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateNotReadableWim" xml:space="preserve">
+    <value>{0} is not a readable WIM or ESD image.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateOfflineImageDirectoryNotFound" xml:space="preserve">
+    <value>Offline image directory not found: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateOfflineImageKindNotSupported" xml:space="preserve">
+    <value>Offline image kind {0} is not supported.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateOfflineImagePathIsFile" xml:space="preserve">
+    <value>Offline image path is a file, not a directory: {0}. For a .wim/.esd file, add --image-kind wim --wim-index N.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateRecoveryBackupExists" xml:space="preserve">
+    <value>A recovery backup from an interrupted overwrite already exists at {0}. Inspect, rename, or delete it before retrying so the snapshot is not overwritten.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateRegexTimedOut" xml:space="preserve">
+    <value>The provider-name regex timed out. The pattern may cause catastrophic backtracking.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateRestoreOriginalDatabaseFailed" xml:space="preserve">
+    <value>Could not restore the original database from backup. The backup remains at {0}; rename it back to {1} to recover.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateSavingDatabase" xml:space="preserve">
+    <value>Saving database. Please wait...</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateSkippedProvidersMany" xml:space="preserve">
+    <value>Found {0} providers in {1}. These will not be included in the new database.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateSkippedProvidersOne" xml:space="preserve">
+    <value>Found {0} provider in {1}. It will not be included in the new database.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateSourceOrOfflineImage" xml:space="preserve">
+    <value>Specify a source OR an offline image, not both.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateTargetAlreadyExists" xml:space="preserve">
+    <value>Cannot create database because file already exists: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateTargetExtensionMustBeDb" xml:space="preserve">
+    <value>File extension must be .db.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateUnexpectedError" xml:space="preserve">
+    <value>Unexpected error creating database.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateVhdxImageFileNotFound" xml:space="preserve">
+    <value>VHD/VHDX image file not found: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateVhdxKindExpectsVhdOrVhdx" xml:space="preserve">
+    <value>--image-kind vhdx expects a .vhdx or .vhd file: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateVhdxMultipleWindowsVolumes" xml:space="preserve">
+    <value>{0} contains more than one Windows volume; selecting one is ambiguous, so no database was created.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateVhdxNoWindowsVolume" xml:space="preserve">
+    <value>{0} has no readable Windows volume (\Windows\System32); the disk may be data-only or BitLocker-encrypted.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateWimExtractionNeedsElevation" xml:space="preserve">
+    <value>Extracting an image from {0} requires administrator privileges. Re-run elevated.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateWimImageFileNotFound" xml:space="preserve">
+    <value>WIM image file not found: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateWimIndexAppliesToWimOrIso" xml:space="preserve">
+    <value>--wim-index applies only to --image-kind wim or iso.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateWimIndexNotForVhdx" xml:space="preserve">
+    <value>--wim-index applies only to --image-kind wim or iso, not vhdx.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateWimIndexOutOfRange" xml:space="preserve">
+    <value>Image index {0} is not in {1}.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateWimIndexRequiredForIso" xml:space="preserve">
+    <value>--wim-index is required for --image-kind iso (sources\install.wim is a multi-edition image). Pass --wim-index 1 for the default edition, or extract sources\install.wim and run --image-kind wim to list editions.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateWimIndexRequiredForWim" xml:space="preserve">
+    <value>--wim-index is required for --image-kind wim. Choose an image:</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateWimIndexRequiresOfflineImage" xml:space="preserve">
+    <value>--wim-index requires an offline image (--offline-image) pointing at a .wim/.esd file.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateWimInsufficientSpace" xml:space="preserve">
+    <value>Not enough free disk space to extract image {0} from {1}.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateWimKindExpectsWimOrEsd" xml:space="preserve">
+    <value>--image-kind wim expects a .wim or .esd file: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_DiffCopyingProvider" xml:space="preserve">
+    <value>Copying {0} because it is present in second source but not first.</value>
+  </data>
+  <data name="DatabaseTools_Op_DiffFileAlreadyExists" xml:space="preserve">
+    <value>File already exists: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_DiffNewDbPathMustBeDb" xml:space="preserve">
+    <value>New db path must have a .db extension.</value>
+  </data>
+  <data name="DatabaseTools_Op_DiffNoMissingProviders" xml:space="preserve">
+    <value>No providers in the second source are missing from the first. Database was not created.</value>
+  </data>
+  <data name="DatabaseTools_Op_DiffProvidersCopiedHeader" xml:space="preserve">
+    <value>Providers copied to new database:</value>
+  </data>
+  <data name="DatabaseTools_Op_DiffSkippingSecondSourceDuplicates" xml:space="preserve">
+    <value>Skipping up to {0} provider version(s) from the second source that also appear in the first source.</value>
+  </data>
+  <data name="DatabaseTools_Op_DiffUnexpectedError" xml:space="preserve">
+    <value>Unexpected error diffing databases.</value>
+  </data>
+  <data name="DatabaseTools_Op_DispatcherUnknownRequestType" xml:space="preserve">
+    <value>Unknown request type: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_EditionsCancelled" xml:space="preserve">
+    <value>Cancelled while listing image editions.</value>
+  </data>
+  <data name="DatabaseTools_Op_EditionsIsoFileNotFound" xml:space="preserve">
+    <value>ISO image file not found: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_EditionsIsoMountFailed" xml:space="preserve">
+    <value>The ISO '{0}' could not be mounted.</value>
+  </data>
+  <data name="DatabaseTools_Op_EditionsIsoMountFailedWithStatus" xml:space="preserve">
+    <value>The ISO '{0}' could not be mounted (status: {1}).</value>
+  </data>
+  <data name="DatabaseTools_Op_EditionsIsoNoInstallImage" xml:space="preserve">
+    <value>The ISO '{0}' does not contain a sources\install.wim or install.esd to list editions from.</value>
+  </data>
+  <data name="DatabaseTools_Op_EditionsIsoNotValid" xml:space="preserve">
+    <value>The file '{0}' is not a valid ISO image.</value>
+  </data>
+  <data name="DatabaseTools_Op_EditionsNoReadableWindowsImage" xml:space="preserve">
+    <value>The image '{0}' does not contain a readable Windows image (WIM/ESD) to list editions from.</value>
+  </data>
+  <data name="DatabaseTools_Op_EditionsUnsupportedImageFile" xml:space="preserve">
+    <value>Editions can only be listed for a .wim, .esd, or .iso file; '{0}' is not one of those.</value>
+  </data>
+  <data name="DatabaseTools_Op_EditionsWimFileNotFound" xml:space="preserve">
+    <value>WIM image file not found: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_GenericDiagnosticFailure" xml:space="preserve">
+    <value>An unexpected database tools error occurred. See the debug log for details.</value>
+  </data>
+  <data name="DatabaseTools_Op_MergeCannotOpenTarget" xml:space="preserve">
+    <value>Cannot merge into '{0}'.</value>
+  </data>
+  <data name="DatabaseTools_Op_MergeCopiedVersions" xml:space="preserve">
+    <value>Copied {0} provider version(s).</value>
+  </data>
+  <data name="DatabaseTools_Op_MergeCopyingVersions" xml:space="preserve">
+    <value>Copying provider versions from the source...</value>
+  </data>
+  <data name="DatabaseTools_Op_MergeFailureNoProvidersDiscovered" xml:space="preserve">
+    <value>No providers were discovered in the source, so the database was not modified.</value>
+  </data>
+  <data name="DatabaseTools_Op_MergeNoProvidersDiscovered" xml:space="preserve">
+    <value>No providers were discovered in the source.</value>
+  </data>
+  <data name="DatabaseTools_Op_MergeOpenTargetFailed" xml:space="preserve">
+    <value>Failed to merge into database '{0}'.</value>
+  </data>
+  <data name="DatabaseTools_Op_MergeRemovalCompleted" xml:space="preserve">
+    <value>Removal of {0} provider version(s) completed.</value>
+  </data>
+  <data name="DatabaseTools_Op_MergeRemovingVersions" xml:space="preserve">
+    <value>Removing these provider version(s) from the target database...</value>
+  </data>
+  <data name="DatabaseTools_Op_MergeTargetContainsVersions" xml:space="preserve">
+    <value>The target database already contains {0} of the source's provider version(s).</value>
+  </data>
+  <data name="DatabaseTools_Op_MergeTargetFileNotFound" xml:space="preserve">
+    <value>File not found: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_MergeTargetNeedsUpgrade" xml:space="preserve">
+    <value>Target database '{0}' is at schema v{1} but v{2} is required. Run the 'upgrade' command first.</value>
+  </data>
+  <data name="DatabaseTools_Op_MergeVersionsSkipped" xml:space="preserve">
+    <value>These provider version(s) will not be copied from the source.</value>
+  </data>
+  <data name="DatabaseTools_Op_OperationDeletePartialFailed" xml:space="preserve">
+    <value>Could not delete partial database at {0}. Delete manually before next run.</value>
+  </data>
+  <data name="DatabaseTools_Op_ProviderSourceCannotOpenDatabase" xml:space="preserve">
+    <value>Cannot open source database '{0}'.</value>
+  </data>
+  <data name="DatabaseTools_Op_ProviderSourceCannotReadDatabase" xml:space="preserve">
+    <value>Cannot read source database '{0}'.</value>
+  </data>
+  <data name="DatabaseTools_Op_ProviderSourceCannotReadFolder" xml:space="preserve">
+    <value>Cannot read source folder '{0}'.</value>
+  </data>
+  <data name="DatabaseTools_Op_SchemaUnrecognizedDefault" xml:space="preserve">
+    <value>Database '{0}' has an unrecognized schema. The file may be corrupt or from a newer or incompatible version of EventLogExpert. Delete or replace the file.</value>
+  </data>
+  <data name="DatabaseTools_Op_SchemaUnrecognizedSource" xml:space="preserve">
+    <value>Source database '{0}' has an unrecognized schema. The file may be corrupt or from a newer or incompatible version of EventLogExpert. Delete or replace the file.</value>
+  </data>
+  <data name="DatabaseTools_Op_SchemaUnrecognizedTarget" xml:space="preserve">
+    <value>Target database '{0}' has an unrecognized schema. The file may be corrupt or from a newer or incompatible version of EventLogExpert. Delete or replace the file.</value>
+  </data>
+  <data name="DatabaseTools_Op_ProviderSourceNeedsUpgrade" xml:space="preserve">
+    <value>Source database '{0}' is at schema v{1} but v{2} is required. Run the 'upgrade' command on the source first.</value>
+  </data>
+  <data name="DatabaseTools_Op_ProviderSourceNotFound" xml:space="preserve">
+    <value>Source not found: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_ProviderSourceSkippingInvalidDatabase" xml:space="preserve">
+    <value>Skipping invalid database file '{0}'.</value>
+  </data>
+  <data name="DatabaseTools_Op_ProviderSourceSkippingUnsupportedFile" xml:space="preserve">
+    <value>Skipping unsupported source file: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_ProviderSourceUnsupportedExtension" xml:space="preserve">
+    <value>Unsupported source file extension '{0}'. Expected .db, .evtx, or a folder containing them.</value>
+  </data>
+  <data name="DatabaseTools_Op_RecoveryBackupAlreadyPresent" xml:space="preserve">
+    <value>A previous upgrade left an unresolved recovery backup at {0}. Inspect / rename / delete it before retrying the upgrade so the recovery snapshot is not overwritten.</value>
+  </data>
+  <data name="DatabaseTools_Op_RecoveryNoBackupCreated" xml:space="preserve">
+    <value>No backup was created (target file did not exist before the upgrade attempt).</value>
+  </data>
+  <data name="DatabaseTools_Op_RecoveryOriginalRestored" xml:space="preserve">
+    <value>Original database restored from backup ({0}).</value>
+  </data>
+  <data name="DatabaseTools_Op_RecoveryPreOperationBackupFailed" xml:space="preserve">
+    <value>Refused to start upgrade: pre-operation backup at {0} failed. The original target was not modified.</value>
+  </data>
+  <data name="DatabaseTools_Op_RecoveryRestoreFailed" xml:space="preserve">
+    <value>Restore from backup failed. Backup remains at {0} - rename manually to recover.</value>
+  </data>
+  <data name="DatabaseTools_Op_RunnerProtocolMismatch" xml:space="preserve">
+    <value>Helper IPC protocol version mismatch: helper sent {0}, runner expected {1}. The helper EXE may be from a different app version - reinstall the MSIX so the main app and helper ship together.</value>
+  </data>
+  <data name="DatabaseTools_Op_ShowNoProvidersFound" xml:space="preserve">
+    <value>No providers found.</value>
+  </data>
+  <data name="DatabaseTools_Op_ShowRegexTimedOut" xml:space="preserve">
+    <value>The provider-name regex timed out. The pattern may cause catastrophic backtracking.</value>
+  </data>
+  <data name="DatabaseTools_Op_UpgradeCannotOpenDatabase" xml:space="preserve">
+    <value>Cannot upgrade '{0}'.</value>
+  </data>
+  <data name="DatabaseTools_Op_UpgradeDatabaseUpgradeFailed" xml:space="preserve">
+    <value>Database upgrade failed.</value>
+  </data>
+  <data name="DatabaseTools_Op_UpgradeFileNotFound" xml:space="preserve">
+    <value>File not found: {0}</value>
+  </data>
+  <data name="DatabaseTools_Op_UpgradeNotNeeded" xml:space="preserve">
+    <value>This database does not need to be upgraded.</value>
+  </data>
+  <data name="DatabaseTools_Op_UpgradeOpenDatabaseFailed" xml:space="preserve">
+    <value>Failed to upgrade database '{0}'.</value>
+  </data>
+  <data name="DatabaseTools_Op_UpgradeUnsupportedV1OrV2Schema" xml:space="preserve">
+    <value>Database '{0}' is at schema v{1}; this version is no longer supported. Upgrade through an older EventLogExpert release that supports v3 first, or delete the file.</value>
+  </data>
   <!-- Database Tools operation outcome and diagnostic log messages. -->
   <data name="DatabaseTools_OutcomeMessage_Succeeded" xml:space="preserve">
     <value>Completed in {0}s.</value>
@@ -4462,10 +4791,6 @@
   </data>
   <data name="Db_Create_Editions_Failed" xml:space="preserve">
     <value>Failed to list image editions.</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="Db_Create_Editions_FailedWithDetail" xml:space="preserve">
-    <value>Failed to list image editions: {0}</value>
     <comment>Database tools UI text.</comment>
   </data>
   <data name="Db_Create_Picker_SkipSource" xml:space="preserve">

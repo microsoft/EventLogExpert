@@ -199,13 +199,21 @@ public sealed partial class CreateDatabaseTab : DatabaseToolsTabBase<CreateDatab
             }
             else if (result.Outcome != DatabaseToolsOutcome.Cancelled)
             {
-                _editionsError = result.FailureSummary ?? Localizer["Db_Create_Editions_Failed"].Value;
+                MirrorDiagnostic(new DatabaseToolsResult(result.Outcome, result.Summary, TimeSpan.Zero)
+                {
+                    SummaryIsDiagnostic = result.SummaryIsDiagnostic,
+                    DiagnosticDetail = result.DiagnosticDetail
+                });
+                _editionsError = result.SummaryIsDiagnostic || result.Summary is null ?
+                    Localizer["Db_Create_Editions_Failed"].Value :
+                    LocalizableTextResolver.Resolve(Localizer, result.Summary);
             }
         }
         catch (OperationCanceledException) { /* Superseded or cancelled; leave state for the newer request. */ }
         catch (Exception ex)
         {
-            _editionsError = Localizer["Db_Create_Editions_FailedWithDetail", ex.Message].Value;
+            _editionsError = Localizer["Db_Create_Editions_Failed"].Value;
+            TraceLogger.ForCategory(LogCategory).Error($"{ex}");
         }
         finally
         {

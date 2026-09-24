@@ -39,14 +39,14 @@ public sealed class IpcMessageRoundTripTests
     [Fact]
     public void HelloMessage_RoundTrips_PreservesPidAndProtocolVersion()
     {
-        var original = new HelloMessage(HelperProcessId: 12345, ProtocolVersion: 1);
+        var original = new HelloMessage(HelperProcessId: 12345, ProtocolVersion: HelloMessage.CurrentProtocolVersion);
 
         var roundTripped = SerializeDeserialize(original, out var json);
 
         AssertDiscriminator(json, "hello");
         var hello = Assert.IsType<HelloMessage>(roundTripped);
         Assert.Equal(12345, hello.HelperProcessId);
-        Assert.Equal(1, hello.ProtocolVersion);
+        Assert.Equal(4, hello.ProtocolVersion);
     }
 
     [Fact]
@@ -85,7 +85,14 @@ public sealed class IpcMessageRoundTripTests
     public void LogMessage_RoundTrips_PreservesCategoryAndProcessOrigin()
     {
         var ts = new DateTime(2025, 6, 2, 14, 5, 0, DateTimeKind.Utc);
-        var original = new LogMessage(ts, LogLevel.Warning, "provider X failed", "Offline.Wim");
+        var original = new LogMessage(
+            ts,
+            LogLevel.Warning,
+            "provider X failed",
+            "Offline.Wim",
+            MessageKey: "DatabaseTools_Op_Test",
+            MessageArgs: ["provider X"],
+            DebugDetail: "System.Exception: boom");
 
         var roundTripped = SerializeDeserialize(original, out var json);
 
@@ -93,6 +100,9 @@ public sealed class IpcMessageRoundTripTests
         var log = Assert.IsType<LogMessage>(roundTripped);
         Assert.Equal("Offline.Wim", log.Category);
         Assert.Equal(ProcessOrigin.ElevatedHelper, log.ProcessOrigin);
+        Assert.Equal("DatabaseTools_Op_Test", log.MessageKey);
+        Assert.Equal(["provider X"], log.MessageArgs);
+        Assert.Equal("System.Exception: boom", log.DebugDetail);
         Assert.DoesNotContain("ElevatedHelper", json);
     }
 
@@ -176,19 +186,19 @@ public sealed class IpcMessageRoundTripTests
 
     [Theory]
     [InlineData(DatabaseToolsOutcome.Succeeded, null)]
-    [InlineData(DatabaseToolsOutcome.Cancelled, "user cancelled")]
-    [InlineData(DatabaseToolsOutcome.Failed, "InvalidOperationException: boom")]
-    public void ResultMessage_RoundTrips_PreservesOutcomeFailureSummaryAndDuration(
-        DatabaseToolsOutcome outcome, string? failureSummary)
+    [InlineData(DatabaseToolsOutcome.Cancelled, "DatabaseTools_Op_CancelHelperSelfTerminated")]
+    [InlineData(DatabaseToolsOutcome.Failed, "DatabaseTools_Op_TestSummary")]
+    public void ResultMessage_RoundTrips_PreservesOutcomeSummaryKeyAndDuration(
+        DatabaseToolsOutcome outcome, string? summaryKey)
     {
-        var original = new ResultMessage(outcome, failureSummary, DurationMs: 12345);
+        var original = new ResultMessage(outcome, DurationMs: 12345) { SummaryKey = summaryKey };
 
         var roundTripped = SerializeDeserialize(original, out var json);
 
         AssertDiscriminator(json, "result");
         var result = Assert.IsType<ResultMessage>(roundTripped);
         Assert.Equal(outcome, result.Outcome);
-        Assert.Equal(failureSummary, result.FailureSummary);
+        Assert.Equal(summaryKey, result.SummaryKey);
         Assert.Equal(12345L, result.DurationMs);
         Assert.False(result.SummaryIsDiagnostic);
     }
@@ -196,12 +206,21 @@ public sealed class IpcMessageRoundTripTests
     [Fact]
     public void ResultMessage_RoundTrips_PreservesSummaryIsDiagnostic()
     {
-        var original = new ResultMessage(DatabaseToolsOutcome.Failed, "boom", DurationMs: 500) { SummaryIsDiagnostic = true };
+        var original = new ResultMessage(DatabaseToolsOutcome.Failed, DurationMs: 500)
+        {
+            SummaryIsDiagnostic = true,
+            SummaryKey = "DatabaseTools_Op_TestSummary",
+            SummaryArgs = ["alpha", "beta"],
+            DiagnosticDetail = "System.Exception: boom"
+        };
 
         var roundTripped = SerializeDeserialize(original, out _);
 
         var result = Assert.IsType<ResultMessage>(roundTripped);
         Assert.True(result.SummaryIsDiagnostic);
+        Assert.Equal("DatabaseTools_Op_TestSummary", result.SummaryKey);
+        Assert.Equal(["alpha", "beta"], result.SummaryArgs);
+        Assert.Equal("System.Exception: boom", result.DiagnosticDetail);
     }
 
     private static void AssertDiscriminator(string json, string expected)

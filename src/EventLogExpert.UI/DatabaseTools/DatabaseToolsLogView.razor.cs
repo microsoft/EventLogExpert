@@ -73,6 +73,8 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
 
     private string OutcomeChipText => Outcome is null ? string.Empty : DatabaseToolsOutcomeLocalizer.Label(Localizer, Outcome.Outcome);
 
+    [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
+
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
@@ -209,7 +211,8 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            await AlertDialogService.ShowAlert(Localizer["DatabaseTools_Log_ExportFailed_Title"], ex.Message, Localizer["Modal_Accept"]);
+            TraceLogger.ForCategory(LogCategories.DatabaseTools).Error($"{ex}");
+            await AlertDialogService.ShowAlert(Localizer["DatabaseTools_Log_ExportFailed_Title"], Localizer["DatabaseTools_Log_ExportFailed_Message"], Localizer["Modal_Accept"]);
         }
     }
 

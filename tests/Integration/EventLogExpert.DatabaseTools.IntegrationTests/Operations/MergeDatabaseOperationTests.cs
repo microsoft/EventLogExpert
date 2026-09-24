@@ -1,14 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.MergeDatabase;
 using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Eventing.TestUtils.Constants;
-using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Provider.Database.Context;
-using NSubstitute;
+using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.DatabaseTools.IntegrationTests.Operations;
 
@@ -25,124 +24,6 @@ public sealed class MergeDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task MergeDatabase_WithCorruptTarget_LogsErrorWithoutThrowing()
-    {
-        var source = CreateTempDb();
-        var target = CreateTempDb();
-
-        DatabaseTestUtils.CreateV4Database(source,
-            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
-        File.WriteAllBytes(target, [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
-
-        var logger = Substitute.For<ITraceLogger>();
-
-        await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false)).ExecuteAsync(logger, null, CancellationToken.None);
-
-        logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
-            handler.ToString().Contains("Failed to merge into database") && handler.ToString().Contains(target)));
-    }
-
-    [Fact]
-    public async Task MergeDatabase_WithEmptyTargetFile_LogsUnrecognizedSchemaWithoutCreatingTables()
-    {
-        var source = CreateTempDb();
-        var target = CreateTempDb();
-
-        DatabaseTestUtils.CreateV4Database(source,
-            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
-        File.WriteAllBytes(target, []);
-
-        var logger = Substitute.For<ITraceLogger>();
-
-        await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false)).ExecuteAsync(logger, null, CancellationToken.None);
-
-        logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
-            handler.ToString().Contains("unrecognized schema") && handler.ToString().Contains(target)));
-    }
-
-    [Fact]
-    public async Task MergeDatabase_WithSourceNeedingUpgrade_FailsInsteadOfReportingSuccess()
-    {
-        var source = CreateTempDb();
-        var target = CreateTempDb();
-
-        // Pre-stamp sources must fail clearly instead of reporting success while copying nothing.
-        DatabaseTestUtils.CreateV3Database(source);
-        DatabaseTestUtils.CreateV4Database(target, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
-
-        var logger = Substitute.For<ITraceLogger>();
-
-        var outcome = await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false))
-            .ExecuteAsync(logger, null, CancellationToken.None);
-
-        Assert.Equal(DatabaseToolsOutcome.Failed, outcome);
-        logger.Received().Error(Arg.Is<ErrorLogHandler>(handler => handler.ToString().Contains(source)));
-    }
-
-    [Fact]
-    public async Task MergeDatabase_WithUnknownSchemaTarget_LogsErrorWithoutThrowing()
-    {
-        var source = CreateTempDb();
-        var target = CreateTempDb();
-
-        DatabaseTestUtils.CreateV4Database(source,
-            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
-        DatabaseTestUtils.CreateUnknownShapeDatabase(target);
-
-        var logger = Substitute.For<ITraceLogger>();
-
-        await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false)).ExecuteAsync(logger, null, CancellationToken.None);
-
-        logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
-            handler.ToString().Contains("unrecognized schema") && handler.ToString().Contains(target)));
-    }
-
-    [Fact]
-    public async Task MergeDatabase_WithZeroSourceProviders_FailsInsteadOfReportingSuccess()
-    {
-        var source = CreateTempDb();
-        var target = CreateTempDb();
-
-        // Zero source providers must fail truthfully instead of reporting success while modifying nothing.
-        DatabaseTestUtils.CreateV4Database(source);
-        DatabaseTestUtils.CreateV4Database(target, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
-
-        var logger = Substitute.For<ITraceLogger>();
-
-        var operation = new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false));
-        var outcome = await operation.ExecuteAsync(logger, null, CancellationToken.None);
-
-        Assert.Equal(DatabaseToolsOutcome.Failed, outcome);
-        Assert.Equal("No providers were discovered in the source, so the database was not modified.", operation.FailureSummary);
-        logger.Received().Warning(Arg.Is<WarningLogHandler>(handler =>
-            handler.ToString().Contains("No providers were discovered in the source")));
-    }
-
-    [Fact]
-    public async Task MergeDatabaseWithoutOverwrite_CopiesNewVersionOfExistingProviderName()
-    {
-        var source = CreateTempDb();
-        var target = CreateTempDb();
-
-        var targetV1 = DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName);
-        targetV1.VersionKey = "vk1";
-        DatabaseTestUtils.CreateV4Database(target, targetV1);
-
-        var sourceV1 = DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName);
-        sourceV1.VersionKey = "vk1";
-        var sourceV2 = DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName);
-        sourceV2.VersionKey = "vk2";
-        DatabaseTestUtils.CreateV4Database(source, sourceV1, sourceV2);
-
-        var logger = Substitute.For<ITraceLogger>();
-
-        // Without overwrite, skip by composite identity; a name-level skip would drop vk2.
-        await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false)).ExecuteAsync(logger, null, CancellationToken.None);
-
-        Assert.Equal(["vk1", "vk2"], ReadVersionKeys(target, Constants.FirstProviderName));
-    }
-
-    [Fact]
     public async Task MergeDatabaseWithOverwrite_NonAsciiCaseVariantNames_DoesNotCollide()
     {
         var source = CreateTempDb();
@@ -156,7 +37,7 @@ public sealed class MergeDatabaseCommandTests : IDisposable
             DatabaseTestUtils.BuildProviderDetails("Provider-\u00c4"),
             DatabaseTestUtils.BuildProviderDetails("Provider-\u00e4"));
 
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, true)).ExecuteAsync(logger, null, CancellationToken.None);
 
@@ -186,12 +67,126 @@ public sealed class MergeDatabaseCommandTests : IDisposable
         sourceV1.VersionKey = "vk1";
         DatabaseTestUtils.CreateV4Database(source, sourceV1);
 
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         // Overwrite must delete by composite identity; a name-level delete would drop target vk2.
         await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, true)).ExecuteAsync(logger, null, CancellationToken.None);
 
         Assert.Equal(["vk1", "vk2"], ReadVersionKeys(target, Constants.FirstProviderName));
+    }
+
+    [Fact]
+    public async Task MergeDatabaseWithoutOverwrite_CopiesNewVersionOfExistingProviderName()
+    {
+        var source = CreateTempDb();
+        var target = CreateTempDb();
+
+        var targetV1 = DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName);
+        targetV1.VersionKey = "vk1";
+        DatabaseTestUtils.CreateV4Database(target, targetV1);
+
+        var sourceV1 = DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName);
+        sourceV1.VersionKey = "vk1";
+        var sourceV2 = DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName);
+        sourceV2.VersionKey = "vk2";
+        DatabaseTestUtils.CreateV4Database(source, sourceV1, sourceV2);
+
+        var logger = new CapturingTraceLogger();
+
+        // Without overwrite, skip by composite identity; a name-level skip would drop vk2.
+        await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false)).ExecuteAsync(logger, null, CancellationToken.None);
+
+        Assert.Equal(["vk1", "vk2"], ReadVersionKeys(target, Constants.FirstProviderName));
+    }
+
+    [Fact]
+    public async Task MergeDatabase_WithCorruptTarget_LogsErrorWithoutThrowing()
+    {
+        var source = CreateTempDb();
+        var target = CreateTempDb();
+
+        DatabaseTestUtils.CreateV4Database(source,
+            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
+        File.WriteAllBytes(target, [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
+
+        var logger = new CapturingTraceLogger();
+
+        await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false)).ExecuteAsync(logger, null, CancellationToken.None);
+
+        Assert.True(logger.Contains(LogLevel.Error, "Failed to merge into database", target));
+    }
+
+    [Fact]
+    public async Task MergeDatabase_WithEmptyTargetFile_LogsUnrecognizedSchemaWithoutCreatingTables()
+    {
+        var source = CreateTempDb();
+        var target = CreateTempDb();
+
+        DatabaseTestUtils.CreateV4Database(source,
+            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
+        File.WriteAllBytes(target, []);
+
+        var logger = new CapturingTraceLogger();
+
+        await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false)).ExecuteAsync(logger, null, CancellationToken.None);
+
+        Assert.True(logger.Contains(LogLevel.Error, "unrecognized schema", target));
+    }
+
+    [Fact]
+    public async Task MergeDatabase_WithSourceNeedingUpgrade_FailsInsteadOfReportingSuccess()
+    {
+        var source = CreateTempDb();
+        var target = CreateTempDb();
+
+        // Pre-stamp sources must fail clearly instead of reporting success while copying nothing.
+        DatabaseTestUtils.CreateV3Database(source);
+        DatabaseTestUtils.CreateV4Database(target, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
+
+        var logger = new CapturingTraceLogger();
+
+        var outcome = await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false))
+            .ExecuteAsync(logger, null, CancellationToken.None);
+
+        Assert.Equal(DatabaseToolsOutcome.Failed, outcome);
+        Assert.True(logger.Contains(LogLevel.Error, source));
+    }
+
+    [Fact]
+    public async Task MergeDatabase_WithUnknownSchemaTarget_LogsErrorWithoutThrowing()
+    {
+        var source = CreateTempDb();
+        var target = CreateTempDb();
+
+        DatabaseTestUtils.CreateV4Database(source,
+            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
+        DatabaseTestUtils.CreateUnknownShapeDatabase(target);
+
+        var logger = new CapturingTraceLogger();
+
+        await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false)).ExecuteAsync(logger, null, CancellationToken.None);
+
+        Assert.True(logger.Contains(LogLevel.Error, "unrecognized schema", target));
+    }
+
+    [Fact]
+    public async Task MergeDatabase_WithZeroSourceProviders_FailsInsteadOfReportingSuccess()
+    {
+        var source = CreateTempDb();
+        var target = CreateTempDb();
+
+        // Zero source providers must fail truthfully instead of reporting success while modifying nothing.
+        DatabaseTestUtils.CreateV4Database(source);
+        DatabaseTestUtils.CreateV4Database(target, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
+
+        var logger = new CapturingTraceLogger();
+
+        var operation = new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false));
+        var outcome = await operation.ExecuteAsync(logger, null, CancellationToken.None);
+
+        Assert.Equal(DatabaseToolsOutcome.Failed, outcome);
+        Assert.Equal(DatabaseToolsLogKeys.MergeFailureNoProvidersDiscovered, operation.FailureSummary?.Key);
+        Assert.True(logger.Contains(LogLevel.Warning, "No providers were discovered in the source"));
     }
 
     private static string[] ReadVersionKeys(string databasePath, string providerName)

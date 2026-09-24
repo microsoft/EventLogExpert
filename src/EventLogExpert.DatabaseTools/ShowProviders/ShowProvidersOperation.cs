@@ -1,9 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Resolution;
+using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.DatabaseTools.ShowProviders;
@@ -13,7 +15,7 @@ internal sealed class ShowProvidersOperation(ShowProvidersRequest request) : Ope
     private const int HeaderBatchSize = 100;
 
     public async Task<DatabaseToolsOutcome> ExecuteAsync(
-        ITraceLogger logger,
+        IOperationLog logger,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken)
     {
@@ -74,7 +76,7 @@ internal sealed class ShowProvidersOperation(ShowProvidersRequest request) : Ope
 
             if (processed == 0)
             {
-                logger.Warning($"No providers found.");
+                logger.User(LogLevel.Warning, new LocalizableText(DatabaseToolsLogKeys.ShowNoProvidersFound, []));
             }
 
             return DatabaseToolsOutcome.Succeeded;
@@ -91,13 +93,13 @@ internal sealed class ShowProvidersOperation(ShowProvidersRequest request) : Ope
         }
         catch (RegexMatchTimeoutException)
         {
-            logger.Error($"The provider-name regex timed out. The pattern may cause catastrophic backtracking.");
+            logger.User(LogLevel.Error, new LocalizableText(DatabaseToolsLogKeys.ShowRegexTimedOut, []));
 
             return DatabaseToolsOutcome.Failed;
         }
     }
 
-    private void FlushHeaderAndBuffer(ITraceLogger logger, List<ProviderDetails> buffer)
+    private void FlushHeaderAndBuffer(IOperationLog logger, List<ProviderDetails> buffer)
     {
         LogProviderDetailHeader(logger, buffer.Select(p => p.ProviderName));
 

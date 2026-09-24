@@ -23,7 +23,10 @@ internal static class DebugLogFormatter
         string originTag = record.ProcessOrigin == ProcessOrigin.ElevatedHelper ? "[ElevatedHelper] " : string.Empty;
         string message = EscapeLeadingBracket(record.Message);
 
-        return $"[{record.TimestampUtc.ToLocalTime():o}] [{Environment.CurrentManagedThreadId}] [{record.Level}] {categoryTag}{originTag}{message}";
+        string line =
+            $"[{record.TimestampUtc.ToLocalTime():o}] [{Environment.CurrentManagedThreadId}] [{record.Level}] {categoryTag}{originTag}{message}";
+
+        return record.DebugDetail is { Length: > 0 } debugDetail ? $"{line}{Environment.NewLine}{debugDetail}" : line;
     }
 
     // A message starting with '[' would otherwise be read back as a category/origin tag; a leading '\' escapes it (and

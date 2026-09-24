@@ -1,10 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Schema;
+using Microsoft.Extensions.Logging;
 using System.Data.Common;
 
 namespace EventLogExpert.DatabaseTools.UpgradeDatabase;
@@ -16,13 +18,14 @@ namespace EventLogExpert.DatabaseTools.UpgradeDatabase;
 internal sealed class UpgradeDatabaseOperation(UpgradeDatabaseRequest request) : OperationBase, IDatabaseToolsOperation
 {
     public async Task<DatabaseToolsOutcome> ExecuteAsync(
-        ITraceLogger logger,
+        IOperationLog logger,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken)
     {
         if (!File.Exists(request.DatabasePath))
         {
-            logger.Error($"File not found: {request.DatabasePath}");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.UpgradeFileNotFound, [request.DatabasePath]));
 
             return DatabaseToolsOutcome.Failed;
         }
@@ -31,39 +34,46 @@ internal sealed class UpgradeDatabaseOperation(UpgradeDatabaseRequest request) :
 
         try
         {
-            await using var probe = new ProviderDbContext(request.DatabasePath, false, false, logger);
+            await using var probe = new ProviderDbContext(request.DatabasePath, false, false, logger.Trace);
             state = probe.IsUpgradeNeeded();
         }
         catch (DbException ex)
         {
-            logger.Error($"Failed to upgrade database '{request.DatabasePath}': {ex.Message}");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.UpgradeOpenDatabaseFailed, [request.DatabasePath]),
+                ex);
 
             return DatabaseToolsOutcome.Failed;
         }
         catch (SchemaLockTimeoutException ex)
         {
-            logger.Error($"Cannot upgrade '{request.DatabasePath}': {ex.Message}");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.UpgradeCannotOpenDatabase, [request.DatabasePath]),
+                ex);
 
             return DatabaseToolsOutcome.Failed;
         }
 
         if (!state.NeedsUpgrade)
         {
-            logger.Information($"This database does not need to be upgraded.");
+            logger.User(LogLevel.Information, new LocalizableText(DatabaseToolsLogKeys.UpgradeNotNeeded, []));
 
             return DatabaseToolsOutcome.Succeeded;
         }
 
         if (state.CurrentVersion == DatabaseSchemaVersion.Unknown)
         {
-            logger.Error($"{SchemaStateMessages.UnrecognizedSchema(SchemaStateMessages.DefaultLabel, request.DatabasePath)}");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.SchemaUnrecognizedDefault, [request.DatabasePath]));
 
             return DatabaseToolsOutcome.Failed;
         }
 
         if (state.CurrentVersion is 1 or 2)
         {
-            logger.Error($"{SchemaStateMessages.UnsupportedV1OrV2Schema(request.DatabasePath, state.CurrentVersion)}");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.UpgradeUnsupportedV1OrV2Schema,
+                    [request.DatabasePath, state.CurrentVersion.ToString()]));
 
             return DatabaseToolsOutcome.Failed;
         }
@@ -72,7 +82,7 @@ internal sealed class UpgradeDatabaseOperation(UpgradeDatabaseRequest request) :
 
         try
         {
-            await using var upgradeContext = new ProviderDbContext(request.DatabasePath, false, false, logger);
+            await using var upgradeContext = new ProviderDbContext(request.DatabasePath, false, false, logger.Trace);
 
             upgradeContext.PerformUpgradeIfNeeded();
 
@@ -84,13 +94,15 @@ internal sealed class UpgradeDatabaseOperation(UpgradeDatabaseRequest request) :
         }
         catch (DatabaseUpgradeException ex)
         {
-            logger.Error($"{ex.Message}");
+            logger.User(LogLevel.Error, new LocalizableText(DatabaseToolsLogKeys.UpgradeDatabaseUpgradeFailed, []), ex);
 
             return DatabaseToolsOutcome.Failed;
         }
         catch (SchemaLockTimeoutException ex)
         {
-            logger.Error($"Cannot upgrade '{request.DatabasePath}': {ex.Message}");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.UpgradeCannotOpenDatabase, [request.DatabasePath]),
+                ex);
 
             return DatabaseToolsOutcome.Failed;
         }

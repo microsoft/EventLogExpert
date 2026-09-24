@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Ipc;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
@@ -61,7 +62,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var nextMessage = await ReadMessageAsync(clientReader, ct);
         Assert.IsType<CancelMessage>(nextMessage);
 
-        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Cancelled, "operation cancelled", 100), ct);
+        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Cancelled, 100), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
@@ -106,8 +107,8 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
             Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
             Assert.True(fakeProcess.WasKilled, "Helper failed to respond within grace; runner must force-kill.");
-            Assert.NotNull(result.FailureSummary);
-            Assert.Contains("force-killed", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
+            Assert.Null(result.Summary);
+            Assert.Contains(logProgress.Entries, e => e.MessageKey == DatabaseToolsLogKeys.CancelHelperForceStopped);
         }
         finally
         {
@@ -178,7 +179,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         await WriteMessageAsync(clientWriter, new LogMessage(ts1, LogLevel.Information, "first"), ct);
         await WriteMessageAsync(clientWriter, new ProgressMessage(1, 10, "item-1"), ct);
         await WriteMessageAsync(clientWriter, new LogMessage(ts2, LogLevel.Warning, "second"), ct);
-        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, null, 250), ct);
+        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, 250), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
@@ -220,11 +221,35 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var result = await runTask;
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.NotNull(result.FailureSummary);
-        Assert.Contains("protocol version mismatch", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(futureVersion.ToString(), result.FailureSummary);
-        Assert.Contains(HelloMessage.CurrentProtocolVersion.ToString(), result.FailureSummary);
+        Assert.Equal(DatabaseToolsLogKeys.RunnerProtocolMismatch, result.Summary?.Key);
+        Assert.Equal([futureVersion.ToString(), HelloMessage.CurrentProtocolVersion.ToString()], result.Summary?.Args);
         Assert.False(result.SummaryIsDiagnostic);
+    }
+
+    [Fact]
+    public async Task HelloMessageWithV3ProtocolVersion_RunnerRejectsHelper()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
+        var fakeProcess = new FakeElevatedHelperProcess(server, processId: 9091);
+        var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
+        var logger = new LoggerUtils.RecordingTraceLogger();
+        var runner = CreateRunner(host, logger);
+        var logProgress = new ListProgress<LogRecord>();
+
+        await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
+
+        var runTask = runner.ShowAsync(
+            new ShowProvidersRequest(null, null), logProgress, progress: null, ct);
+
+        await WriteMessageAsync(clientWriter, new HelloMessage(9091, ProtocolVersion: 3), ct);
+        fakeProcess.SignalExited(0);
+
+        var result = await runTask;
+
+        Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
+        Assert.Equal(DatabaseToolsLogKeys.RunnerProtocolMismatch, result.Summary?.Key);
+        Assert.Equal(["3", "4"], result.Summary?.Args);
     }
 
     [Fact]
@@ -246,8 +271,8 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var result = await runTask;
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.NotNull(result.FailureSummary);
-        Assert.Contains("did not send Hello message within", result.FailureSummary);
+        Assert.NotNull(result.DiagnosticDetail);
+        Assert.Contains("did not send Hello message within", result.DiagnosticDetail);
 
         await client.DisposeAsync();
     }
@@ -272,8 +297,8 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var result = await runTask;
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.NotNull(result.FailureSummary);
-        Assert.Contains("Pipe closed before helper sent Hello", result.FailureSummary);
+        Assert.NotNull(result.DiagnosticDetail);
+        Assert.Contains("Pipe closed before helper sent Hello", result.DiagnosticDetail);
     }
 
     [Fact]
@@ -304,8 +329,8 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             var result = await runTask;
 
             Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-            Assert.NotNull(result.FailureSummary);
-            Assert.Contains("exited (code 42) without sending a Result", result.FailureSummary);
+            Assert.NotNull(result.DiagnosticDetail);
+            Assert.Contains("exited (code 42) without sending a Result", result.DiagnosticDetail);
         }
         finally
         {
@@ -338,7 +363,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
         var ts = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         await WriteMessageAsync(clientWriter, new LogMessage(ts, LogLevel.Warning, "wim probe failed", "Offline.Wim"), ct);
-        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, null, 250), ct);
+        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, 250), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
@@ -364,11 +389,11 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new ShowProvidersRequest(null, null), logProgress, progress: null, ct);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.NotNull(result.FailureSummary);
-        Assert.Contains("Elevation helper not found", result.FailureSummary);
-        Assert.Contains("eventlogexpert-elevated.exe", result.FailureSummary);
+        Assert.NotNull(result.DiagnosticDetail);
+        Assert.Contains("Elevation helper not found", result.DiagnosticDetail);
+        Assert.Contains("eventlogexpert-elevated.exe", result.DiagnosticDetail);
         Assert.True(result.SummaryIsDiagnostic);
-        Assert.Contains(logger.ErrorMessages, m => m.Contains("Elevation helper not found"));
+        Assert.Empty(logger.ErrorMessages);
     }
 
     [Fact]
@@ -391,15 +416,19 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         await WriteMessageAsync(clientWriter, new HelloMessage(3131, HelloMessage.CurrentProtocolVersion), ct);
         await ReadRequestAsync(clientReader, ct);
         await WriteMessageAsync(clientWriter,
-            new ResultMessage(DatabaseToolsOutcome.Failed, "SqliteException: disk full", 200) { SummaryIsDiagnostic = true }, ct);
+            new ResultMessage(DatabaseToolsOutcome.Failed, 200)
+            {
+                SummaryIsDiagnostic = true,
+                SummaryKey = DatabaseToolsLogKeys.GenericDiagnosticFailure
+            }, ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
         Assert.True(result.SummaryIsDiagnostic);
-        Assert.Equal("SqliteException: disk full", result.FailureSummary);
-        Assert.Single(logger.ErrorMessages, m => m.Contains("SqliteException: disk full"));
+        Assert.Equal(DatabaseToolsLogKeys.GenericDiagnosticFailure, result.Summary?.Key);
+        Assert.Single(logger.ErrorMessages, m => m.Contains(DatabaseToolsLogKeys.GenericDiagnosticFailure));
     }
 
     [Fact]
@@ -422,14 +451,14 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         await WriteMessageAsync(clientWriter, new HelloMessage(3232, HelloMessage.CurrentProtocolVersion), ct);
         await ReadRequestAsync(clientReader, ct);
         await WriteMessageAsync(clientWriter,
-            new ResultMessage(DatabaseToolsOutcome.Failed, "3 providers failed to import", 200), ct);
+            new ResultMessage(DatabaseToolsOutcome.Failed, 200), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
         Assert.False(result.SummaryIsDiagnostic);
-        Assert.Equal("3 providers failed to import", result.FailureSummary);
+        Assert.Null(result.Summary);
     }
 
     [Fact]
@@ -455,8 +484,8 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var result = await runTask;
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.NotNull(result.FailureSummary);
-        Assert.Contains("LogMessage instead of HelloMessage", result.FailureSummary);
+        Assert.NotNull(result.DiagnosticDetail);
+        Assert.Contains("LogMessage instead of HelloMessage", result.DiagnosticDetail);
         Assert.True(result.SummaryIsDiagnostic);
     }
 
@@ -487,11 +516,10 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var result = await runTask;
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.NotNull(result.FailureSummary);
-        Assert.Contains("Helper threw System.Text.Json.JsonException", result.FailureSummary);
-        Assert.Contains("Malformed message from helper", result.FailureSummary);
+        Assert.Null(result.DiagnosticDetail);
         Assert.True(result.SummaryIsDiagnostic);
-        Assert.All(logger.ErrorMessages, m => Assert.StartsWith("Helper fatal", m));
+        Assert.Contains(logger.ErrorMessages, message => message.Contains("Helper fatal exception", StringComparison.Ordinal) && message.Contains("System.Text.Json.JsonException", StringComparison.Ordinal));
+        Assert.Contains(logger.ErrorMessages, message => message.Contains("Malformed message from helper", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -523,7 +551,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
                 new ProgressMessage(i, 20, $"OPERATION_PROGRESS_ITEM_{i:000}"), ct);
         }
 
-        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, null, 100), ct);
+        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, 100), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
@@ -566,7 +594,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new ShowProvidersRequest(null, null), logProgress, progress: null, preCancelledCts.Token);
 
         Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
-        Assert.Equal("Cancelled before helper spawn completed.", result.FailureSummary);
+        Assert.Null(result.Summary);
     }
 
     [Fact]
@@ -625,7 +653,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var result = await runTask.WaitAsync(s_testTimeout, ct);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.Contains("HelloMessage", result.FailureSummary);
+        Assert.Contains("HelloMessage", result.DiagnosticDetail);
         Assert.True(fakeProcess.WasKilled);
     }
 
@@ -652,7 +680,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var result = await runTask.WaitAsync(s_testTimeout, ct);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.Contains("Hello", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Hello", result.DiagnosticDetail, StringComparison.OrdinalIgnoreCase);
         Assert.True(fakeProcess.WasKilled);
     }
 
@@ -691,8 +719,9 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             var result = await runTask.WaitAsync(s_testTimeout, ct);
 
             Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
-            Assert.Contains("force-killed", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
+            Assert.Null(result.Summary);
             Assert.True(fakeProcess.WasKilled);
+            Assert.Contains(logProgress.Entries, e => e.MessageKey == DatabaseToolsLogKeys.CancelHelperForceStopped);
         }
         finally
         {
@@ -734,8 +763,9 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var result = await runTask.WaitAsync(s_testTimeout, ct);
 
         Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
-        Assert.Contains("could not be terminated", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(result.Summary);
         Assert.True(fakeProcess.WasKilled);
+        Assert.Contains(logProgress.Entries, e => e.MessageKey == DatabaseToolsLogKeys.CancelHelperOrphaned);
     }
 
     [Fact]
@@ -764,7 +794,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var result = await runTask.WaitAsync(s_testTimeout, ct);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.Contains("Pipe closed", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Pipe closed", result.DiagnosticDetail, StringComparison.OrdinalIgnoreCase);
         Assert.True(fakeProcess.WasKilled);
     }
 
@@ -795,7 +825,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var result = await runTask.WaitAsync(s_testTimeout, ct);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.Contains("protocol version", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(DatabaseToolsLogKeys.RunnerProtocolMismatch, result.Summary?.Key);
         Assert.True(fakeProcess.WasKilled);
     }
 
@@ -821,7 +851,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
         await WriteMessageAsync(clientWriter,
             new LogMessage(DateTime.UtcNow, LogLevel.Information, "boom-trigger"), ct);
-        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, null, 100), ct);
+        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, 100), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
@@ -844,7 +874,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
             new ShowProvidersRequest(null, null), logProgress, progress: null, ct);
 
         Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
-        Assert.Equal("User declined the UAC prompt.", result.FailureSummary);
+        Assert.Null(result.Summary);
         Assert.Contains(logger.InfoMessages, m => m.Contains("declined the UAC prompt"));
     }
 
@@ -873,7 +903,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         Assert.True(create.Verbose);
         Assert.Equal(@"C:\out.db", create.Request.TargetPath);
 
-        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, null, 50), ct);
+        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, 50), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
@@ -904,19 +934,19 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         Assert.IsType(expectedRequestType, request);
         Assert.Equal(expectVerbose, request.Verbose);
 
-        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, null, 100), ct);
+        await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, 100), ct);
         fakeProcess.SignalExited(0);
 
         var result = await runTask;
         Assert.Equal(DatabaseToolsOutcome.Succeeded, result.Outcome);
-        Assert.Null(result.FailureSummary);
+        Assert.Null(result.Summary);
     }
 
     private static ElevatedDatabaseToolsRunner CreateRunner(IElevatedHelperProcessHost host, ITraceLogger logger) =>
-        new(host, logger, s_testHelloTimeout, s_testGrace, s_testExitGrace);
+        new(host, logger, new TestNeutralTextResolver(), s_testHelloTimeout, s_testGrace, s_testExitGrace);
 
     private static ElevatedDatabaseToolsRunner CreateRunner(IElevatedHelperProcessHost host, ITraceLogger logger, TimeSpan helloTimeout) =>
-        new(host, logger, helloTimeout, s_testGrace, s_testExitGrace);
+        new(host, logger, new TestNeutralTextResolver(), helloTimeout, s_testGrace, s_testExitGrace);
 
     private static void DisposeSafely(IDisposable disposable)
     {
@@ -956,5 +986,10 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         var json = JsonSerializer.Serialize(message, DatabaseToolsIpcSerializer.Options);
         await writer.WriteLineAsync(json.AsMemory(), ct);
         await writer.FlushAsync(ct);
+    }
+
+    private sealed class TestNeutralTextResolver : INeutralTextResolver
+    {
+        public string Resolve(string key, IReadOnlyList<string> args) => key;
     }
 }

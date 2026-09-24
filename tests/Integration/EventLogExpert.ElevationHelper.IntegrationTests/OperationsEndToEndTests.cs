@@ -133,7 +133,7 @@ public sealed class OperationsEndToEndTests
             logProgress, progress: null, ct);
 
         Assert.True(result.Outcome == DatabaseToolsOutcome.Succeeded,
-            $"Expected Succeeded but got {result.Outcome}. FailureSummary: {result.FailureSummary}. Trace:\n  {string.Join("\n  ", logger.Messages)}");
+            $"Expected Succeeded but got {result.Outcome}. Summary: {result.Summary?.Key}. Trace:\n  {string.Join("\n  ", logger.Messages)}");
         Assert.NotEmpty(logProgress.Entries);
     }
 

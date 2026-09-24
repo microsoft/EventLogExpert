@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Ipc;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
@@ -23,7 +24,9 @@ internal static class ListImageEditionsHandler
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
-        var logger = new StreamingTraceLogger(new IpcLogForwarder(writer), verbose ? LogLevel.Trace : LogLevel.Information);
+
+        IOperationLog logger = new StreamingOperationLog(
+            new IpcLogForwarder(writer), verbose ? LogLevel.Trace : LogLevel.Information);
 
         OfflineImageKind? kind = OfflineImageKindResolver.ResolveFromPath(request.ImagePath);
 
@@ -31,7 +34,7 @@ internal static class ListImageEditionsHandler
         {
             return new DatabaseToolsResult(
                 DatabaseToolsOutcome.Failed,
-                $"Editions can only be listed for a .wim, .esd, or .iso file; '{request.ImagePath}' is not one of those.",
+                new LocalizableText(DatabaseToolsLogKeys.EditionsUnsupportedImageFile, [request.ImagePath]),
                 stopwatch.Elapsed);
         }
 
@@ -41,7 +44,10 @@ internal static class ListImageEditionsHandler
 
             return new DatabaseToolsResult(
                 DatabaseToolsOutcome.Failed,
-                $"{imageKindName} image file not found: {request.ImagePath}",
+                new LocalizableText(kind is OfflineImageKind.Iso ?
+                        DatabaseToolsLogKeys.EditionsIsoFileNotFound :
+                        DatabaseToolsLogKeys.EditionsWimFileNotFound,
+                    [request.ImagePath]),
                 stopwatch.Elapsed);
         }
 
@@ -53,7 +59,8 @@ internal static class ListImageEditionsHandler
 
             if (kind is OfflineImageKind.Iso)
             {
-                OfflineIsoMountResult mount = OfflineIsoImage.TryMount(request.ImagePath, logger.ForCategory(LogCategories.OfflineIso));
+                OfflineIsoMountResult mount = OfflineIsoImage.TryMount(request.ImagePath,
+                    logger.ForCategory(LogCategories.OfflineIso).Trace);
 
                 if (mount.Status != OfflineIsoMountStatus.Mounted)
                 {
@@ -72,23 +79,27 @@ internal static class ListImageEditionsHandler
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            WimImageList imageList = OfflineWimImage.ReadIndexList(wimPath, logger.ForCategory(LogCategories.OfflineWim));
+            WimImageList imageList =
+                OfflineWimImage.ReadIndexList(wimPath, logger.ForCategory(LogCategories.OfflineWim).Trace);
 
             if (imageList.Status != WimImageListStatus.Ok)
             {
                 return new DatabaseToolsResult(
                     DatabaseToolsOutcome.Failed,
-                    $"The image '{request.ImagePath}' does not contain a readable Windows image (WIM/ESD) to list editions from.",
+                    new LocalizableText(DatabaseToolsLogKeys.EditionsNoReadableWindowsImage, [request.ImagePath]),
                     stopwatch.Elapsed);
             }
 
             await writer.WriteAsync(new ImageEditionsMessage(imageList.Status, imageList.Images), cancellationToken);
 
-            return new DatabaseToolsResult(DatabaseToolsOutcome.Succeeded, FailureSummary: null, stopwatch.Elapsed);
+            return new DatabaseToolsResult(DatabaseToolsOutcome.Succeeded, null, stopwatch.Elapsed);
         }
         catch (OperationCanceledException)
         {
-            return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, "Cancelled while listing image editions.", stopwatch.Elapsed);
+            return new DatabaseToolsResult(
+                DatabaseToolsOutcome.Cancelled,
+                new LocalizableText(DatabaseToolsLogKeys.EditionsCancelled, []),
+                stopwatch.Elapsed);
         }
         finally
         {
@@ -96,11 +107,15 @@ internal static class ListImageEditionsHandler
         }
     }
 
-    private static string DescribeIsoMountFailure(OfflineIsoMountStatus status, string isoPath) => status switch
-    {
-        OfflineIsoMountStatus.NotAnIso => $"The file '{isoPath}' is not a valid ISO image.",
-        OfflineIsoMountStatus.NoInstallImage => $"The ISO '{isoPath}' does not contain a sources\\install.wim or install.esd to list editions from.",
-        OfflineIsoMountStatus.MountFailed => $"The ISO '{isoPath}' could not be mounted.",
-        _ => $"The ISO '{isoPath}' could not be mounted (status: {status})."
-    };
+    private static LocalizableText DescribeIsoMountFailure(OfflineIsoMountStatus status, string isoPath) =>
+        status switch
+        {
+            OfflineIsoMountStatus.NotAnIso => new LocalizableText(DatabaseToolsLogKeys.EditionsIsoNotValid, [isoPath]),
+            OfflineIsoMountStatus.NoInstallImage => new LocalizableText(DatabaseToolsLogKeys.EditionsIsoNoInstallImage,
+                [isoPath]),
+            OfflineIsoMountStatus.MountFailed => new LocalizableText(DatabaseToolsLogKeys.EditionsIsoMountFailed,
+                [isoPath]),
+            _ => new LocalizableText(DatabaseToolsLogKeys.EditionsIsoMountFailedWithStatus,
+                [isoPath, status.ToString()])
+        };
 }

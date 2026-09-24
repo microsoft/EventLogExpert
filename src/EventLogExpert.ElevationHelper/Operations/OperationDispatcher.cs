@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Ipc;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.ElevationHelper.Ipc;
@@ -43,15 +44,37 @@ internal static class OperationDispatcher
         DatabaseToolsIpcRequest request,
         IProgress<LogRecord> logProgress,
         IProgress<DatabaseToolsProgress> progress,
-        CancellationToken cancellationToken)
-        => request switch
+        CancellationToken cancellationToken) =>
+        request switch
         {
-            ShowProvidersIpcRequest s => service.ShowAsync(s.Request, logProgress, progress, cancellationToken, s.Verbose),
-            CreateDatabaseIpcRequest c => service.CreateAsync(c.Request, logProgress, progress, cancellationToken, c.Verbose),
-            MergeDatabaseIpcRequest m => service.MergeAsync(m.Request, logProgress, progress, cancellationToken, m.Verbose),
-            DiffDatabaseIpcRequest d => service.DiffAsync(d.Request, logProgress, progress, cancellationToken, d.Verbose),
-            UpgradeDatabaseIpcRequest u => service.UpgradeAsync(u.Request, logProgress, progress, cancellationToken, u.Verbose),
-            _ => Task.FromResult(new DatabaseToolsResult(DatabaseToolsOutcome.Failed, $"Unknown request type: {request.GetType().Name}", TimeSpan.Zero))
+            ShowProvidersIpcRequest s => service.ShowAsync(s.Request,
+                logProgress,
+                progress,
+                cancellationToken,
+                s.Verbose),
+            CreateDatabaseIpcRequest c => service.CreateAsync(c.Request,
+                logProgress,
+                progress,
+                cancellationToken,
+                c.Verbose),
+            MergeDatabaseIpcRequest m => service.MergeAsync(m.Request,
+                logProgress,
+                progress,
+                cancellationToken,
+                m.Verbose),
+            DiffDatabaseIpcRequest d => service.DiffAsync(d.Request,
+                logProgress,
+                progress,
+                cancellationToken,
+                d.Verbose),
+            UpgradeDatabaseIpcRequest u => service.UpgradeAsync(u.Request,
+                logProgress,
+                progress,
+                cancellationToken,
+                u.Verbose),
+            _ => Task.FromResult(new DatabaseToolsResult(
+                DatabaseToolsOutcome.Failed,
+                new LocalizableText(DatabaseToolsLogKeys.DispatcherUnknownRequestType, [request.GetType().Name]),
+                TimeSpan.Zero))
         };
 }
-

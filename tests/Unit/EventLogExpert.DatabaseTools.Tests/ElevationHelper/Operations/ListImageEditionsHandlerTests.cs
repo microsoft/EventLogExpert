@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
 using EventLogExpert.ElevationHelper.Ipc;
@@ -11,9 +12,9 @@ namespace EventLogExpert.DatabaseTools.Tests.ElevationHelper.Operations;
 public sealed class ListImageEditionsHandlerTests
 {
     [Theory]
-    [InlineData("missing.iso", "ISO image file not found:")]
-    [InlineData("missing.wim", "WIM image file not found:")]
-    public async Task HandleAsync_WhenImageFileDoesNotExist_ReturnsFileNotFoundFailure(string fileName, string expectedPrefix)
+    [InlineData("missing.iso")]
+    [InlineData("missing.wim")]
+    public async Task HandleAsync_WhenImageFileDoesNotExist_ReturnsFileNotFoundFailure(string fileName)
     {
         string imagePath = Path.Combine(AppContext.BaseDirectory, Guid.NewGuid().ToString("N") + "_" + fileName);
         await using IpcMessageWriter writer = new(new MemoryStream());
@@ -26,7 +27,11 @@ public sealed class ListImageEditionsHandlerTests
             TestContext.Current.CancellationToken);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.StartsWith(expectedPrefix, result.FailureSummary, StringComparison.Ordinal);
-        Assert.Contains(imagePath, result.FailureSummary, StringComparison.Ordinal);
+        Assert.Equal(
+            fileName.EndsWith(".iso", StringComparison.Ordinal) ?
+                DatabaseToolsLogKeys.EditionsIsoFileNotFound :
+                DatabaseToolsLogKeys.EditionsWimFileNotFound,
+            result.Summary?.Key);
+        Assert.Equal([imagePath], result.Summary?.Args);
     }
 }

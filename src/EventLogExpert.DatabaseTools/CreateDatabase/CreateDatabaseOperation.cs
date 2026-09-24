@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Eventing.OfflineImaging;
 using EventLogExpert.Eventing.OfflineImaging.Iso;
@@ -12,6 +13,7 @@ using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Database.Hashing;
 using EventLogExpert.Provider.Resolution;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.DatabaseTools.CreateDatabase;
@@ -28,13 +30,13 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
     internal enum CreateDatabaseMode { Local, FileSource, OfflineImage }
 
     public async Task<DatabaseToolsOutcome> ExecuteAsync(
-        ITraceLogger logger,
+        IOperationLog logger,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken)
     {
         if (!string.Equals(Path.GetExtension(request.TargetPath), ".db", StringComparison.OrdinalIgnoreCase))
         {
-            logger.Error($"File extension must be .db.");
+            logger.User(LogLevel.Error, new LocalizableText(DatabaseToolsLogKeys.CreateTargetExtensionMustBeDb, []));
 
             return DatabaseToolsOutcome.Failed;
         }
@@ -45,7 +47,8 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
             if (File.Exists(backupPath))
             {
-                logger.Error($"A recovery backup from an interrupted overwrite already exists at {backupPath}. Inspect, rename, or delete it before retrying so the snapshot is not overwritten.");
+                logger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateRecoveryBackupExists, [backupPath]));
 
                 return DatabaseToolsOutcome.Failed;
             }
@@ -53,7 +56,8 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
         if (File.Exists(request.TargetPath) && !request.Overwrite)
         {
-            logger.Error($"Cannot create database because file already exists: {request.TargetPath}");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.CreateTargetAlreadyExists, [request.TargetPath]));
 
             return DatabaseToolsOutcome.Failed;
         }
@@ -69,8 +73,9 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
         if (targetBlocked is not null)
         {
-            logger.Error($"{targetBlocked}");
-            SetFailureSummary(targetBlocked);
+            var summary = MapWritableProbeFailure(targetBlocked);
+            LogWritableProbeFailure(logger, summary, targetBlocked);
+            SetFailureSummary(summary);
 
             return DatabaseToolsOutcome.Failed;
         }
@@ -84,12 +89,19 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 return DatabaseToolsOutcome.Failed;
             }
 
-            foreach (var name in await ProviderSource.LoadProviderNamesAsync(request.SkipProvidersInFile, logger, cancellationToken: cancellationToken))
+            foreach (var name in await ProviderSource.LoadProviderNamesAsync(request.SkipProvidersInFile,
+                logger,
+                cancellationToken: cancellationToken))
             {
                 excludeProviderNames.Add(name);
             }
 
-            logger.Information($"{FormatSkippedProvidersMessage(excludeProviderNames.Count, request.SkipProvidersInFile)}");
+            logger.User(LogLevel.Information,
+                new LocalizableText(
+                    excludeProviderNames.Count == 1 ?
+                        DatabaseToolsLogKeys.CreateSkippedProvidersOne :
+                        DatabaseToolsLogKeys.CreateSkippedProvidersMany,
+                    [excludeProviderNames.Count.ToString(), request.SkipProvidersInFile]));
         }
 
         var filterRegex = EnsureBoundedTimeout(request.FilterRegex);
@@ -105,238 +117,250 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
         async Task<DatabaseToolsOutcome> CreateCoreAsync()
         {
-        var count = 0;
-        var headerLogged = false;
-        var pendingForHeader = new List<ProviderDetails>(BatchSize);
+            var count = 0;
+            var headerLogged = false;
+            var pendingForHeader = new List<ProviderDetails>(BatchSize);
 
-        var stampedIdentities = new HashSet<ProviderIdentity>();
+            var stampedIdentities = new HashSet<ProviderIdentity>();
 #if DEBUG
-        var firstByIdentity = new Dictionary<ProviderIdentity, ProviderDetails>();
+            var firstByIdentity = new Dictionary<ProviderIdentity, ProviderDetails>();
 #endif
 
-        ProviderDbContext? dbContext = null;
-        OfflineWimImage? wimImage = null;
-        OfflineIsoImage? isoImage = null;
-        OfflineVhdxImage? vhdxImage = null;
+            ProviderDbContext? dbContext = null;
+            OfflineWimImage? wimImage = null;
+            OfflineIsoImage? isoImage = null;
+            OfflineVhdxImage? vhdxImage = null;
 
-        try
-        {
-            var mode = SelectMode(request);
-
-            string? effectiveOfflineImagePath = request.OfflineImagePath;
-            OfflineImageKind? kind = mode == CreateDatabaseMode.OfflineImage ? ResolveImageKind(request) : null;
-
-            if (kind is OfflineImageKind.Wim or OfflineImageKind.Iso)
+            try
             {
-                string? scratchBlocked = OfflineScratch.ProbeWritable(OfflineScratch.Root);
+                var mode = SelectMode(request);
 
-                if (scratchBlocked is not null)
+                string? effectiveOfflineImagePath = request.OfflineImagePath;
+                OfflineImageKind? kind = mode == CreateDatabaseMode.OfflineImage ? ResolveImageKind(request) : null;
+
+                if (kind is OfflineImageKind.Wim or OfflineImageKind.Iso)
                 {
-                    logger.ForCategory(LogCategories.OfflineWim).Error($"{scratchBlocked}");
-                    SetFailureSummary(scratchBlocked);
+                    string? scratchBlocked = OfflineScratch.ProbeWritable(OfflineScratch.Root);
+
+                    if (scratchBlocked is not null)
+                    {
+                        var summary = MapWritableProbeFailure(scratchBlocked);
+                        LogWritableProbeFailure(logger.ForCategory(LogCategories.OfflineWim), summary, scratchBlocked);
+                        SetFailureSummary(summary);
+
+                        return DatabaseToolsOutcome.Failed;
+                    }
+                }
+
+                if (kind is OfflineImageKind.Iso)
+                {
+                    IOperationLog isoLogger = logger.ForCategory(LogCategories.OfflineIso);
+                    OfflineIsoMountResult mount = OfflineIsoImage.TryMount(request.OfflineImagePath!, isoLogger.Trace);
+
+                    if (mount.Status != OfflineIsoMountStatus.Mounted)
+                    {
+                        return HandleIsoMountFailure(mount.Status, request.OfflineImagePath!, isoLogger);
+                    }
+
+                    isoImage = mount.Image;
+                }
+
+                if (kind is OfflineImageKind.Vhdx)
+                {
+                    IOperationLog vhdxLogger = logger.ForCategory(LogCategories.OfflineVhdx);
+
+                    OfflineVhdxMountResult mount =
+                        OfflineVhdxImage.TryMount(request.OfflineImagePath!, vhdxLogger.Trace);
+
+                    if (mount.Status != OfflineVhdxMountStatus.Mounted)
+                    {
+                        return HandleVhdxMountFailure(mount.Status, request.OfflineImagePath!, vhdxLogger);
+                    }
+
+                    vhdxImage = mount.Image;
+                    effectiveOfflineImagePath = vhdxImage!.VolumeRoot;
+                }
+
+                if (kind is OfflineImageKind.Wim or OfflineImageKind.Iso)
+                {
+                    IOperationLog wimLogger = logger.ForCategory(LogCategories.OfflineWim);
+                    string wimSourcePath = isoImage?.InstallImagePath ?? request.OfflineImagePath!;
+
+                    OfflineWimExtractResult extraction = await OfflineWimImage.TryExtractAsync(
+                        wimSourcePath,
+                        request.WimIndex!.Value,
+                        OfflineScratch.Root,
+                        wimLogger.Trace,
+                        cancellationToken);
+
+                    if (extraction.Status != OfflineWimExtractStatus.Extracted)
+                    {
+                        return HandleWimExtractionFailure(extraction.Status,
+                            wimSourcePath,
+                            request.WimIndex!.Value,
+                            wimLogger);
+                    }
+
+                    wimImage = extraction.Image;
+                    effectiveOfflineImagePath = wimImage!.ExtractedRoot;
+                }
+
+                IAsyncEnumerable<ProviderDetails> providersToAdd;
+                SourceOsProvenance? sourceOsProvenance;
+
+                switch (mode)
+                {
+                    case CreateDatabaseMode.OfflineImage:
+                        providersToAdd = LoadOfflineImageProvidersAsync(effectiveOfflineImagePath!,
+                            logger,
+                            filterRegex,
+                            excludeProviderNames,
+                            cancellationToken);
+
+                        sourceOsProvenance = null;
+
+                        break;
+                    case CreateDatabaseMode.Local:
+                        providersToAdd =
+                            LoadLocalProvidersAsync(logger, filterRegex, excludeProviderNames, cancellationToken);
+
+                        sourceOsProvenance = SourceOsProvenance.Read(logger.Trace);
+
+                        break;
+                    default:
+                        providersToAdd = ProviderSource.LoadProvidersAsync(request.SourcePath!,
+                            logger,
+                            filterRegex,
+                            excludeProviderNames,
+                            cancellationToken: cancellationToken);
+
+                        sourceOsProvenance = null;
+
+                        break;
+                }
+
+                await foreach (var details in providersToAdd.WithCancellation(cancellationToken))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    details.VersionKey = VersionKeyCalculator.Compute(details);
+
+                    var identity = ProviderIdentity.Of(details);
+
+                    if (!stampedIdentities.Add(identity))
+                    {
+#if DEBUG
+                        AssertContentEquivalent(firstByIdentity[identity], details);
+#endif
+
+                        continue;
+                    }
+
+#if DEBUG
+                    firstByIdentity[identity] = details;
+#endif
+
+                    if (sourceOsProvenance is not null)
+                    {
+                        details.SourceOsBuild = sourceOsProvenance.Build;
+                        details.SourceOsRevision = sourceOsProvenance.Revision;
+                        details.SourceOsEdition = sourceOsProvenance.Edition;
+                        details.SourceOsDisplayVersion = sourceOsProvenance.DisplayVersion;
+                    }
+
+                    if (!headerLogged)
+                    {
+                        pendingForHeader.Add(details);
+
+                        if (pendingForHeader.Count < BatchSize) { continue; }
+
+                        dbContext ??= GetOrCreateContext();
+                        count += pendingForHeader.Count;
+                        await FlushHeaderAndBufferAsync(logger, dbContext, pendingForHeader, cancellationToken);
+                        headerLogged = true;
+                        progress?.Report(new DatabaseToolsProgress(count, null, details.ProviderName));
+
+                        continue;
+                    }
+
+                    dbContext ??= GetOrCreateContext();
+                    dbContext.ProviderDetails.Add(details);
+                    LogProviderDetails(logger, details);
+                    count++;
+                    progress?.Report(new DatabaseToolsProgress(count, null, details.ProviderName));
+
+                    if (count % BatchSize != 0) { continue; }
+
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                    dbContext.ChangeTracker.Clear();
+                }
+
+                if (!headerLogged && pendingForHeader.Count > 0)
+                {
+                    dbContext ??= GetOrCreateContext();
+                    var lastName = pendingForHeader[^1].ProviderName;
+                    count += pendingForHeader.Count;
+                    await FlushHeaderAndBufferAsync(logger, dbContext, pendingForHeader, cancellationToken);
+                    progress?.Report(new DatabaseToolsProgress(count, null, lastName));
+                }
+
+                if (dbContext is null)
+                {
+                    logger.User(LogLevel.Warning,
+                        new LocalizableText(DatabaseToolsLogKeys.CreateNoProvidersResolved, []));
+
+                    SetFailureSummary(new LocalizableText(DatabaseToolsLogKeys.CreateFailureNoProvidersResolved, []));
 
                     return DatabaseToolsOutcome.Failed;
                 }
-            }
 
-            if (kind is OfflineImageKind.Iso)
-            {
-                ITraceLogger isoLogger = logger.ForCategory(LogCategories.OfflineIso);
-                OfflineIsoMountResult mount = OfflineIsoImage.TryMount(request.OfflineImagePath!, isoLogger);
-
-                if (mount.Status != OfflineIsoMountStatus.Mounted)
-                {
-                    return HandleIsoMountFailure(mount.Status, request.OfflineImagePath!, isoLogger);
-                }
-
-                isoImage = mount.Image;
-            }
-
-            if (kind is OfflineImageKind.Vhdx)
-            {
-                ITraceLogger vhdxLogger = logger.ForCategory(LogCategories.OfflineVhdx);
-                OfflineVhdxMountResult mount = OfflineVhdxImage.TryMount(request.OfflineImagePath!, vhdxLogger);
-
-                if (mount.Status != OfflineVhdxMountStatus.Mounted)
-                {
-                    return HandleVhdxMountFailure(mount.Status, request.OfflineImagePath!, vhdxLogger);
-                }
-
-                vhdxImage = mount.Image;
-                effectiveOfflineImagePath = vhdxImage!.VolumeRoot;
-            }
-
-            if (kind is OfflineImageKind.Wim or OfflineImageKind.Iso)
-            {
-                ITraceLogger wimLogger = logger.ForCategory(LogCategories.OfflineWim);
-                string wimSourcePath = isoImage?.InstallImagePath ?? request.OfflineImagePath!;
-
-                OfflineWimExtractResult extraction = await OfflineWimImage.TryExtractAsync(
-                    wimSourcePath, request.WimIndex!.Value, OfflineScratch.Root, wimLogger, cancellationToken);
-
-                if (extraction.Status != OfflineWimExtractStatus.Extracted)
-                {
-                    return HandleWimExtractionFailure(extraction.Status, wimSourcePath, request.WimIndex!.Value, wimLogger);
-                }
-
-                wimImage = extraction.Image;
-                effectiveOfflineImagePath = wimImage!.ExtractedRoot;
-            }
-
-            IAsyncEnumerable<ProviderDetails> providersToAdd;
-            SourceOsProvenance? sourceOsProvenance;
-
-            switch (mode)
-            {
-                case CreateDatabaseMode.OfflineImage:
-                    providersToAdd = LoadOfflineImageProvidersAsync(effectiveOfflineImagePath!,
-                        logger,
-                        filterRegex,
-                        excludeProviderNames,
-                        cancellationToken);
-
-                    sourceOsProvenance = null;
-
-                    break;
-                case CreateDatabaseMode.Local:
-                    providersToAdd =
-                        LoadLocalProvidersAsync(logger, filterRegex, excludeProviderNames, cancellationToken);
-
-                    sourceOsProvenance = SourceOsProvenance.Read(logger);
-
-                    break;
-                default:
-                    providersToAdd = ProviderSource.LoadProvidersAsync(request.SourcePath!,
-                        logger,
-                        filterRegex,
-                        excludeProviderNames,
-                        cancellationToken: cancellationToken);
-
-                    sourceOsProvenance = null;
-
-                    break;
-            }
-
-            await foreach (var details in providersToAdd.WithCancellation(cancellationToken))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                details.VersionKey = VersionKeyCalculator.Compute(details);
-
-                var identity = ProviderIdentity.Of(details);
-
-                if (!stampedIdentities.Add(identity))
-                {
-#if DEBUG
-                    AssertContentEquivalent(firstByIdentity[identity], details);
-#endif
-
-                    continue;
-                }
-
-#if DEBUG
-                firstByIdentity[identity] = details;
-#endif
-
-                if (sourceOsProvenance is not null)
-                {
-                    details.SourceOsBuild = sourceOsProvenance.Build;
-                    details.SourceOsRevision = sourceOsProvenance.Revision;
-                    details.SourceOsEdition = sourceOsProvenance.Edition;
-                    details.SourceOsDisplayVersion = sourceOsProvenance.DisplayVersion;
-                }
-
-                if (!headerLogged)
-                {
-                    pendingForHeader.Add(details);
-
-                    if (pendingForHeader.Count < BatchSize) { continue; }
-
-                    dbContext ??= GetOrCreateContext();
-                    count += pendingForHeader.Count;
-                    await FlushHeaderAndBufferAsync(logger, dbContext, pendingForHeader, cancellationToken);
-                    headerLogged = true;
-                    progress?.Report(new DatabaseToolsProgress(count, null, details.ProviderName));
-
-                    continue;
-                }
-
-                dbContext ??= GetOrCreateContext();
-                dbContext.ProviderDetails.Add(details);
-                LogProviderDetails(logger, details);
-                count++;
-                progress?.Report(new DatabaseToolsProgress(count, null, details.ProviderName));
-
-                if (count % BatchSize != 0) { continue; }
+                logger.Data(LogLevel.Information, string.Empty);
+                logger.User(LogLevel.Information, new LocalizableText(DatabaseToolsLogKeys.CreateSavingDatabase, []));
 
                 await dbContext.SaveChangesAsync(cancellationToken);
-                dbContext.ChangeTracker.Clear();
-            }
 
-            if (!headerLogged && pendingForHeader.Count > 0)
-            {
-                dbContext ??= GetOrCreateContext();
-                var lastName = pendingForHeader[^1].ProviderName;
-                count += pendingForHeader.Count;
-                await FlushHeaderAndBufferAsync(logger, dbContext, pendingForHeader, cancellationToken);
-                progress?.Report(new DatabaseToolsProgress(count, null, lastName));
-            }
+                logger.User(LogLevel.Information, new LocalizableText(DatabaseToolsLogKeys.CreateDone, []));
 
-            if (dbContext is null)
+                return DatabaseToolsOutcome.Succeeded;
+            }
+            catch (OperationCanceledException)
             {
-                logger.Warning($"No provider details could be resolved from the source. Database was not created.");
-                SetFailureSummary("No providers could be resolved from the source, so no database was created.");
+                await CleanupPartialUnlessUnmovedOriginalAsync();
+                dbContext = null;
+
+                return DatabaseToolsOutcome.Cancelled;
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                logger.User(LogLevel.Error, new LocalizableText(DatabaseToolsLogKeys.CreateRegexTimedOut, []));
+                await CleanupPartialUnlessUnmovedOriginalAsync();
+                dbContext = null;
 
                 return DatabaseToolsOutcome.Failed;
             }
+            catch (Exception ex)
+            {
+                logger.User(LogLevel.Error, new LocalizableText(DatabaseToolsLogKeys.CreateUnexpectedError, []), ex);
+                await CleanupPartialUnlessUnmovedOriginalAsync();
+                dbContext = null;
 
-            logger.Information($"");
-            logger.Information($"Saving database. Please wait...");
+                return DatabaseToolsOutcome.Failed;
+            }
+            finally
+            {
+                if (dbContext is not null) { await dbContext.DisposeAsync(); }
 
-            await dbContext.SaveChangesAsync(cancellationToken);
+                wimImage?.Dispose();
+                isoImage?.Dispose();
+                vhdxImage?.Dispose();
+            }
 
-            logger.Information($"Done!");
+            async Task CleanupPartialUnlessUnmovedOriginalAsync()
+            {
+                if (_overwriteBackupTaken && !_overwriteBackupCompleted) { return; }
 
-            return DatabaseToolsOutcome.Succeeded;
-        }
-        catch (OperationCanceledException)
-        {
-            await CleanupPartialUnlessUnmovedOriginalAsync();
-            dbContext = null;
-
-            return DatabaseToolsOutcome.Cancelled;
-        }
-        catch (RegexMatchTimeoutException)
-        {
-            logger.Error($"The provider-name regex timed out. The pattern may cause catastrophic backtracking.");
-            await CleanupPartialUnlessUnmovedOriginalAsync();
-            dbContext = null;
-
-            return DatabaseToolsOutcome.Failed;
-        }
-        catch (Exception ex)
-        {
-            logger.Error($"Unexpected error creating database: {ex.Message}");
-            await CleanupPartialUnlessUnmovedOriginalAsync();
-            dbContext = null;
-
-            return DatabaseToolsOutcome.Failed;
-        }
-        finally
-        {
-            if (dbContext is not null) { await dbContext.DisposeAsync(); }
-
-            wimImage?.Dispose();
-            isoImage?.Dispose();
-            vhdxImage?.Dispose();
-        }
-
-        async Task CleanupPartialUnlessUnmovedOriginalAsync()
-        {
-            if (_overwriteBackupTaken && !_overwriteBackupCompleted) { return; }
-
-            await CleanupPartialDatabaseAsync(logger, dbContext, request.TargetPath);
-        }
+                await CleanupPartialDatabaseAsync(logger, dbContext, request.TargetPath);
+            }
         }
 
         ProviderDbContext GetOrCreateContext()
@@ -348,42 +372,37 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 _overwriteBackupCompleted = true;
             }
 
-            return new ProviderDbContext(request.TargetPath, false, logger);
+            return new ProviderDbContext(request.TargetPath, false, logger.Trace);
         }
-    }
-
-    internal static string FormatSkippedProvidersMessage(int providerCount, string skipProvidersInFile)
-    {
-        var providerNoun = providerCount == 1 ? "provider" : "providers";
-        var providerSubject = providerCount == 1 ? "It" : "These";
-
-        return $"Found {providerCount} {providerNoun} in {skipProvidersInFile}. {providerSubject} will not be included in the new database.";
     }
 
     internal static OfflineImageKind? ResolveImageKind(CreateDatabaseRequest request) =>
         OfflineImageKindResolver.ResolveFromPath(request.OfflineImagePath, request.ImageKind);
 
     internal static CreateDatabaseMode SelectMode(CreateDatabaseRequest request) =>
-        !string.IsNullOrWhiteSpace(request.OfflineImagePath) ? CreateDatabaseMode.OfflineImage
-        : request.SourcePath is null ? CreateDatabaseMode.Local
-        : CreateDatabaseMode.FileSource;
+        !string.IsNullOrWhiteSpace(request.OfflineImagePath) ?
+            CreateDatabaseMode.OfflineImage :
+            request.SourcePath is null ?
+                CreateDatabaseMode.Local : CreateDatabaseMode.FileSource;
 
-    internal static bool ValidateOfflineImageRequest(CreateDatabaseRequest request, ITraceLogger logger)
+    internal static bool ValidateOfflineImageRequest(CreateDatabaseRequest request, IOperationLog logger)
     {
-        ITraceLogger offlineLogger = logger.ForCategory(LogCategories.Offline);
+        IOperationLog offlineLogger = logger.ForCategory(LogCategories.Offline);
 
         if (string.IsNullOrWhiteSpace(request.OfflineImagePath))
         {
             if (request.ImageKind is not null)
             {
-                offlineLogger.Error($"--image-kind requires an offline image (--offline-image).");
+                offlineLogger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateImageKindRequiresOfflineImage, []));
 
                 return false;
             }
 
             if (request.WimIndex is not null)
             {
-                offlineLogger.Error($"--wim-index requires an offline image (--offline-image) pointing at a .wim/.esd file.");
+                offlineLogger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateWimIndexRequiresOfflineImage, []));
 
                 return false;
             }
@@ -393,7 +412,8 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
         if (request.SourcePath is not null)
         {
-            offlineLogger.Error($"Specify a source OR an offline image, not both.");
+            offlineLogger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.CreateSourceOrOfflineImage, []));
 
             return false;
         }
@@ -401,147 +421,173 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         switch (ResolveImageKind(request))
         {
             case OfflineImageKind.Directory:
-            {
-                ITraceLogger directoryLogger = logger.ForCategory(LogCategories.OfflineProviders);
-
-                if (request.WimIndex is not null)
                 {
-                    directoryLogger.Error($"--wim-index applies only to --image-kind wim or iso.");
+                    IOperationLog directoryLogger = logger.ForCategory(LogCategories.OfflineProviders);
+
+                    if (request.WimIndex is not null)
+                    {
+                        directoryLogger.User(LogLevel.Error,
+                            new LocalizableText(DatabaseToolsLogKeys.CreateWimIndexAppliesToWimOrIso, []));
+
+                        return false;
+                    }
+
+                    if (Directory.Exists(request.OfflineImagePath)) { return true; }
+
+                    if (File.Exists(request.OfflineImagePath))
+                    {
+                        directoryLogger.User(LogLevel.Error,
+                            new LocalizableText(DatabaseToolsLogKeys.CreateOfflineImagePathIsFile,
+                                [request.OfflineImagePath]));
+                    }
+                    else
+                    {
+                        directoryLogger.User(LogLevel.Error,
+                            new LocalizableText(DatabaseToolsLogKeys.CreateOfflineImageDirectoryNotFound,
+                                [request.OfflineImagePath]));
+                    }
 
                     return false;
                 }
-
-                if (Directory.Exists(request.OfflineImagePath)) { return true; }
-
-                if (File.Exists(request.OfflineImagePath))
-                {
-                    directoryLogger.Error($"Offline image path is a file, not a directory: {request.OfflineImagePath}. For a .wim/.esd file, add --image-kind wim --wim-index N.");
-                }
-                else
-                {
-                    directoryLogger.Error($"Offline image directory not found: {request.OfflineImagePath}");
-                }
-
-                return false;
-            }
 
             case OfflineImageKind.Wim:
-            {
-                ITraceLogger wimLogger = logger.ForCategory(LogCategories.OfflineWim);
-
-                if (!File.Exists(request.OfflineImagePath))
                 {
-                    wimLogger.Error($"WIM image file not found: {request.OfflineImagePath}");
+                    IOperationLog wimLogger = logger.ForCategory(LogCategories.OfflineWim);
 
-                    return false;
+                    if (!File.Exists(request.OfflineImagePath))
+                    {
+                        wimLogger.User(LogLevel.Error,
+                            new LocalizableText(DatabaseToolsLogKeys.CreateWimImageFileNotFound,
+                                [request.OfflineImagePath]));
+
+                        return false;
+                    }
+
+                    if (!IsWimImageFile(request.OfflineImagePath))
+                    {
+                        wimLogger.User(LogLevel.Error,
+                            new LocalizableText(DatabaseToolsLogKeys.CreateWimKindExpectsWimOrEsd,
+                                [request.OfflineImagePath]));
+
+                        return false;
+                    }
+
+                    if (request.WimIndex is null)
+                    {
+                        wimLogger.User(LogLevel.Error,
+                            new LocalizableText(DatabaseToolsLogKeys.CreateWimIndexRequiredForWim, []));
+
+                        LogAvailableWimIndices(request.OfflineImagePath, wimLogger);
+
+                        return false;
+                    }
+
+                    return true;
                 }
-
-                if (!IsWimImageFile(request.OfflineImagePath))
-                {
-                    wimLogger.Error($"--image-kind wim expects a .wim or .esd file: {request.OfflineImagePath}");
-
-                    return false;
-                }
-
-                if (request.WimIndex is null)
-                {
-                    wimLogger.Error($"--wim-index is required for --image-kind wim. Choose an image:");
-                    LogAvailableWimIndices(request.OfflineImagePath, wimLogger);
-
-                    return false;
-                }
-
-                return true;
-            }
 
             case OfflineImageKind.Iso:
-            {
-                ITraceLogger isoLogger = logger.ForCategory(LogCategories.OfflineIso);
-
-                if (!File.Exists(request.OfflineImagePath))
                 {
-                    isoLogger.Error($"ISO image file not found: {request.OfflineImagePath}");
+                    IOperationLog isoLogger = logger.ForCategory(LogCategories.OfflineIso);
 
-                    return false;
+                    if (!File.Exists(request.OfflineImagePath))
+                    {
+                        isoLogger.User(LogLevel.Error,
+                            new LocalizableText(DatabaseToolsLogKeys.CreateIsoImageFileNotFound,
+                                [request.OfflineImagePath]));
+
+                        return false;
+                    }
+
+                    if (!IsIsoFile(request.OfflineImagePath))
+                    {
+                        isoLogger.User(LogLevel.Error,
+                            new LocalizableText(DatabaseToolsLogKeys.CreateIsoKindExpectsIso,
+                                [request.OfflineImagePath]));
+
+                        return false;
+                    }
+
+                    if (request.WimIndex is null)
+                    {
+                        isoLogger.User(LogLevel.Error,
+                            new LocalizableText(DatabaseToolsLogKeys.CreateWimIndexRequiredForIso, []));
+
+                        return false;
+                    }
+
+                    return true;
                 }
-
-                if (!IsIsoFile(request.OfflineImagePath))
-                {
-                    isoLogger.Error($"--image-kind iso expects a .iso file: {request.OfflineImagePath}");
-
-                    return false;
-                }
-
-                if (request.WimIndex is null)
-                {
-                    isoLogger.Error(
-                        $"--wim-index is required for --image-kind iso (sources\\install.wim is a multi-edition image). " +
-                        $"Pass --wim-index 1 for the default edition, or extract sources\\install.wim and run --image-kind wim to list editions.");
-
-                    return false;
-                }
-
-                return true;
-            }
 
             case OfflineImageKind.Vhdx:
-            {
-                ITraceLogger vhdxLogger = logger.ForCategory(LogCategories.OfflineVhdx);
-
-                if (!File.Exists(request.OfflineImagePath))
                 {
-                    vhdxLogger.Error($"VHD/VHDX image file not found: {request.OfflineImagePath}");
+                    IOperationLog vhdxLogger = logger.ForCategory(LogCategories.OfflineVhdx);
 
-                    return false;
+                    if (!File.Exists(request.OfflineImagePath))
+                    {
+                        vhdxLogger.User(LogLevel.Error,
+                            new LocalizableText(DatabaseToolsLogKeys.CreateVhdxImageFileNotFound,
+                                [request.OfflineImagePath]));
+
+                        return false;
+                    }
+
+                    if (!IsVhdxFile(request.OfflineImagePath))
+                    {
+                        vhdxLogger.User(LogLevel.Error,
+                            new LocalizableText(DatabaseToolsLogKeys.CreateVhdxKindExpectsVhdOrVhdx,
+                                [request.OfflineImagePath]));
+
+                        return false;
+                    }
+
+                    if (request.WimIndex is not null)
+                    {
+                        vhdxLogger.User(LogLevel.Error,
+                            new LocalizableText(DatabaseToolsLogKeys.CreateWimIndexNotForVhdx, []));
+
+                        return false;
+                    }
+
+                    return true;
                 }
-
-                if (!IsVhdxFile(request.OfflineImagePath))
-                {
-                    vhdxLogger.Error($"--image-kind vhdx expects a .vhdx or .vhd file: {request.OfflineImagePath}");
-
-                    return false;
-                }
-
-                if (request.WimIndex is not null)
-                {
-                    vhdxLogger.Error($"--wim-index applies only to --image-kind wim or iso, not vhdx.");
-
-                    return false;
-                }
-
-                return true;
-            }
 
             case null:
-                offlineLogger.Error(
-                    $"Could not determine the offline image kind for '{request.OfflineImagePath}'. Pass --image-kind " +
-                    $"directory or wim (.wim/.esd) or iso (.iso) or vhdx (.vhdx/.vhd), or point at a mounted volume / extracted image folder.");
+                offlineLogger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateCouldNotDetermineOfflineImageKind,
+                        [request.OfflineImagePath]));
 
                 return false;
 
             default:
-                offlineLogger.Error($"Offline image kind {ResolveImageKind(request)} is not supported.");
+                offlineLogger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateOfflineImageKindNotSupported,
+                        [ResolveImageKind(request)?.ToString() ?? string.Empty]));
 
                 return false;
         }
     }
 
-    private static DatabaseToolsOutcome HandleIsoMountFailure(OfflineIsoMountStatus status, string isoPath, ITraceLogger logger)
+    private static DatabaseToolsOutcome HandleIsoMountFailure(
+        OfflineIsoMountStatus status,
+        string isoPath,
+        IOperationLog logger)
     {
         string isoName = Path.GetFileName(isoPath);
 
         switch (status)
         {
             case OfflineIsoMountStatus.NotAnIso:
-                logger.Error($"{isoPath} is not a readable ISO image.");
+                logger.User(LogLevel.Error, new LocalizableText(DatabaseToolsLogKeys.CreateNotReadableIso, [isoPath]));
 
                 break;
             case OfflineIsoMountStatus.NoInstallImage:
-                logger.Error($"{isoName} has no sources\\install.wim or install.esd; only a Windows install ISO is supported.");
+                logger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateIsoNoInstallImage, [isoName]));
 
                 break;
             default:
-                logger.Error($"Could not mount {isoName} (if this is an access-denied error, re-run elevated).");
+                logger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateCouldNotMountIso, [isoName]));
 
                 break;
         }
@@ -549,26 +595,33 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         return DatabaseToolsOutcome.Failed;
     }
 
-    private static DatabaseToolsOutcome HandleVhdxMountFailure(OfflineVhdxMountStatus status, string vhdxPath, ITraceLogger logger)
+    private static DatabaseToolsOutcome HandleVhdxMountFailure(
+        OfflineVhdxMountStatus status,
+        string vhdxPath,
+        IOperationLog logger)
     {
         string vhdxName = Path.GetFileName(vhdxPath);
 
         switch (status)
         {
             case OfflineVhdxMountStatus.NotAVhdx:
-                logger.Error($"{vhdxPath} is not a readable VHD/VHDX image.");
+                logger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateNotReadableVhdx, [vhdxPath]));
 
                 break;
             case OfflineVhdxMountStatus.NoWindowsVolume:
-                logger.Error($"{vhdxName} has no readable Windows volume (\\Windows\\System32); the disk may be data-only or BitLocker-encrypted.");
+                logger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateVhdxNoWindowsVolume, [vhdxName]));
 
                 break;
             case OfflineVhdxMountStatus.MultipleWindowsVolumes:
-                logger.Error($"{vhdxName} contains more than one Windows volume; selecting one is ambiguous, so no database was created.");
+                logger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateVhdxMultipleWindowsVolumes, [vhdxName]));
 
                 break;
             default:
-                logger.Error($"Could not mount {vhdxName} (if this is an access-denied error, re-run elevated).");
+                logger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateCouldNotMountVhdx, [vhdxName]));
 
                 break;
         }
@@ -577,7 +630,10 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
     }
 
     private static DatabaseToolsOutcome HandleWimExtractionFailure(
-        OfflineWimExtractStatus status, string wimPath, int wimIndex, ITraceLogger logger)
+        OfflineWimExtractStatus status,
+        string wimPath,
+        int wimIndex,
+        IOperationLog logger)
     {
         string wimName = Path.GetFileName(wimPath);
 
@@ -586,24 +642,30 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             case OfflineWimExtractStatus.Cancelled:
                 return DatabaseToolsOutcome.Cancelled;
             case OfflineWimExtractStatus.NeedsElevation:
-                logger.Error($"Extracting an image from {wimName} requires administrator privileges. Re-run elevated.");
+                logger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateWimExtractionNeedsElevation, [wimName]));
 
                 break;
             case OfflineWimExtractStatus.IndexOutOfRange:
-                logger.Error($"Image index {wimIndex} is not in {wimName}.");
+                logger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateWimIndexOutOfRange, [wimIndex.ToString(), wimName]));
+
                 LogAvailableWimIndices(wimPath, logger);
 
                 break;
             case OfflineWimExtractStatus.InsufficientSpace:
-                logger.Error($"Not enough free disk space to extract image {wimIndex} from {wimName}.");
+                logger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateWimInsufficientSpace,
+                        [wimIndex.ToString(), wimName]));
 
                 break;
             case OfflineWimExtractStatus.NotAWim:
-                logger.Error($"{wimPath} is not a readable WIM or ESD image.");
+                logger.User(LogLevel.Error, new LocalizableText(DatabaseToolsLogKeys.CreateNotReadableWim, [wimPath]));
 
                 break;
             default:
-                logger.Error($"Could not extract image {wimIndex} from {wimName}.");
+                logger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateCouldNotExtractWim, [wimIndex.ToString(), wimName]));
 
                 break;
         }
@@ -618,31 +680,71 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
     {
         string extension = Path.GetExtension(path);
 
-        return string.Equals(extension, ".vhdx", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(extension, ".vhd", StringComparison.OrdinalIgnoreCase);
+        return string.Equals(extension, ".vhdx", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(extension, ".vhd", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsWimImageFile(string path)
     {
         string extension = Path.GetExtension(path);
 
-        return string.Equals(extension, ".wim", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(extension, ".esd", StringComparison.OrdinalIgnoreCase);
+        return string.Equals(extension, ".wim", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(extension, ".esd", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static void LogAvailableWimIndices(string wimPath, ITraceLogger logger)
+    private static void LogAvailableWimIndices(string wimPath, IOperationLog logger)
     {
-        WimImageList imageList = OfflineWimImage.ReadIndexList(wimPath, logger);
+        WimImageList imageList = OfflineWimImage.ReadIndexList(wimPath, logger.Trace);
 
         if (imageList.Status != WimImageListStatus.Ok || imageList.Images.Count == 0) { return; }
 
         foreach (WimImageEntry image in imageList.Images)
         {
-            logger.Information($"  --wim-index {image.Index}  {image.Name} ({image.Edition})");
+            logger.Data(LogLevel.Information, $"  --wim-index {image.Index}  {image.Name} ({image.Edition})");
         }
     }
 
-    private void DeleteOverwriteBackups(ITraceLogger logger)
+    private static void LogWritableProbeFailure(IOperationLog logger, LocalizableText summary, string rawMessage)
+    {
+        if (summary.Key == DatabaseToolsLogKeys.CreateCannotWriteIo)
+        {
+            var detail = rawMessage[(rawMessage.IndexOf(": ", StringComparison.Ordinal) + 2)..];
+            logger.User(LogLevel.Error, new LocalizableText(summary.Key, summary.Args), new IOException(detail));
+
+            return;
+        }
+
+        logger.User(LogLevel.Error, new LocalizableText(summary.Key, summary.Args));
+    }
+
+    private static LocalizableText MapWritableProbeFailure(string message)
+    {
+        const string prefix = "Cannot write to '";
+        string directory = string.Empty;
+
+        if (message.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            var end = message.IndexOf('\'', prefix.Length);
+            if (end > prefix.Length) { directory = message[prefix.Length..end]; }
+        }
+
+        if (message.Contains(": ", StringComparison.Ordinal))
+        {
+            return new LocalizableText(DatabaseToolsLogKeys.CreateCannotWriteIo, [directory]);
+        }
+
+        if (message.Contains("Controlled Folder Access", StringComparison.Ordinal))
+        {
+            var executable = Path.GetFileName(Environment.ProcessPath ?? "EventLogExpert");
+
+            return new LocalizableText(DatabaseToolsLogKeys.CreateCannotWriteControlledFolderAccess,
+                [directory, executable]);
+        }
+
+        return new LocalizableText(DatabaseToolsLogKeys.CreateCannotWritePermissions, [directory]);
+    }
+
+    private void DeleteOverwriteBackups(IOperationLog logger)
     {
         foreach (var suffix in s_databaseFileSuffixes)
         {
@@ -653,13 +755,16 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             try { File.Delete(backup); }
             catch (Exception ex)
             {
-                logger.Warning($"Could not delete the overwrite backup at {backup}: {ex.Message}. Delete it manually before the next overwrite of {request.TargetPath}.");
+                logger.User(LogLevel.Warning,
+                    new LocalizableText(DatabaseToolsLogKeys.CreateDeleteOverwriteBackupFailed,
+                        [backup, request.TargetPath]),
+                    ex);
             }
         }
     }
 
     private async Task FlushHeaderAndBufferAsync(
-        ITraceLogger logger,
+        IOperationLog logger,
         ProviderDbContext dbContext,
         List<ProviderDetails> buffer,
         CancellationToken cancellationToken)
@@ -677,7 +782,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         buffer.Clear();
     }
 
-    private void RestoreOverwriteBackups(ITraceLogger logger)
+    private void RestoreOverwriteBackups(IOperationLog logger)
     {
         var mainBackup = request.TargetPath + ".bak";
 
@@ -704,11 +809,15 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 if (File.Exists(backup)) { File.Move(backup, request.TargetPath + suffix); }
             }
 
-            logger.Information($"Existing database was preserved: restored from backup after the rebuild did not complete.");
+            logger.User(LogLevel.Information,
+                new LocalizableText(DatabaseToolsLogKeys.CreateExistingDatabasePreserved, []));
         }
         catch (Exception ex)
         {
-            logger.Error($"Could not restore the original database from backup ({ex.GetType().Name}: {ex.Message}). The backup remains at {mainBackup}; rename it back to {request.TargetPath} to recover.");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.CreateRestoreOriginalDatabaseFailed,
+                    [mainBackup, request.TargetPath]),
+                ex);
         }
     }
 
@@ -779,7 +888,8 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
         foreach ((string key, ValueMapDefinition map) in first)
         {
-            if (!second.TryGetValue(key, out ValueMapDefinition? other) || !ProviderContentMerge.MapsAreEquivalent(map, other))
+            if (!second.TryGetValue(key, out ValueMapDefinition? other) ||
+                !ProviderContentMerge.MapsAreEquivalent(map, other))
             {
                 return false;
             }

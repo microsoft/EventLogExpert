@@ -9,6 +9,7 @@
     <ProjectReference Include="..\..\..\src\EventLogExpert.DatabaseTools\EventLogExpert.DatabaseTools.csproj" />
     <ProjectReference Include="..\..\..\src\EventLogExpert.ElevationHelper\EventLogExpert.ElevationHelper.csproj" />
     <ProjectReference Include="..\..\..\src\EventLogExpert.Eventing.OfflineImaging\EventLogExpert.Eventing.OfflineImaging.csproj" />
+    <ProjectReference Include="..\..\..\src\EventLogExpert.Localization\EventLogExpert.Localization.csproj" />
   </ItemGroup>
 
 </Project>

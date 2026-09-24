@@ -47,6 +47,14 @@ public sealed class DebugLogEntryParserTests
         Assert.Equal(message, entry.RawLine[entry.MessageStartIndex..]);
     }
 
+    [Fact]
+    public void Format_WithDebugDetail_AppendsContinuationLine()
+    {
+        var line = DebugLogFormatter.Format(new LogRecord(DateTime.UtcNow, LogLevel.Error, "visible", DebugDetail: "System.Exception: boom"));
+
+        Assert.EndsWith($"visible{Environment.NewLine}System.Exception: boom", line);
+    }
+
     [Theory]
     [InlineData("\\Device\\Harddisk0 a legacy path-leading message")]
     [InlineData("\\t literal-backslash-t, not a real tab")]
@@ -328,30 +336,6 @@ public sealed class DebugLogEntryParserTests
     }
 
     [Fact]
-    public void Parse_WhenMultipleEntries_ShouldReturnInOrder()
-    {
-        // Arrange
-        string[] lines =
-        [
-            BuildLine(Constants.DebugLogTestTimestamp, Constants.DebugLogTestThreadId, nameof(LogLevel.Trace), Constants.DebugLogFirstMessage),
-            BuildLine(Constants.DebugLogTestTimestamp, Constants.DebugLogTestThreadId, nameof(LogLevel.Information), Constants.DebugLogSecondMessage),
-            BuildLine(Constants.DebugLogTestTimestamp, Constants.DebugLogTestThreadId, nameof(LogLevel.Error), Constants.DebugLogThirdMessage)
-        ];
-
-        // Act
-        var entries = DebugLogEntryParser.Parse(lines);
-
-        // Assert
-        Assert.Equal(3, entries.Count);
-        Assert.Equal(LogLevel.Trace, entries[0].Level);
-        Assert.Equal(Constants.DebugLogFirstMessage, entries[0].Message);
-        Assert.Equal(LogLevel.Information, entries[1].Level);
-        Assert.Equal(Constants.DebugLogSecondMessage, entries[1].Message);
-        Assert.Equal(LogLevel.Error, entries[2].Level);
-        Assert.Equal(Constants.DebugLogThirdMessage, entries[2].Message);
-    }
-
-    [Fact]
     public void Parse_WhenMultipleEntriesEachWithContinuations_ShouldFoldContinuationsIntoTheirRespectiveEntry()
     {
         // Arrange
@@ -388,6 +372,30 @@ public sealed class DebugLogEntryParserTests
         Assert.Equal(
             $"{secondStart}\n{secondContinuationOne}\n{secondContinuationTwo}",
             entries[1].RawLine);
+    }
+
+    [Fact]
+    public void Parse_WhenMultipleEntries_ShouldReturnInOrder()
+    {
+        // Arrange
+        string[] lines =
+        [
+            BuildLine(Constants.DebugLogTestTimestamp, Constants.DebugLogTestThreadId, nameof(LogLevel.Trace), Constants.DebugLogFirstMessage),
+            BuildLine(Constants.DebugLogTestTimestamp, Constants.DebugLogTestThreadId, nameof(LogLevel.Information), Constants.DebugLogSecondMessage),
+            BuildLine(Constants.DebugLogTestTimestamp, Constants.DebugLogTestThreadId, nameof(LogLevel.Error), Constants.DebugLogThirdMessage)
+        ];
+
+        // Act
+        var entries = DebugLogEntryParser.Parse(lines);
+
+        // Assert
+        Assert.Equal(3, entries.Count);
+        Assert.Equal(LogLevel.Trace, entries[0].Level);
+        Assert.Equal(Constants.DebugLogFirstMessage, entries[0].Message);
+        Assert.Equal(LogLevel.Information, entries[1].Level);
+        Assert.Equal(Constants.DebugLogSecondMessage, entries[1].Message);
+        Assert.Equal(LogLevel.Error, entries[2].Level);
+        Assert.Equal(Constants.DebugLogThirdMessage, entries[2].Message);
     }
 
     [Fact]

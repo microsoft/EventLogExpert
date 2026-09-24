@@ -19,7 +19,7 @@ public sealed class CreateDatabaseOfflineCategoryTests
         using var workspace = new TempImageFiles();
         string iso = workspace.CreateFile("image.iso");
         var captured = new List<LogRecord>();
-        ITraceLogger logger = new StreamingTraceLogger(new RecordingProgress(captured.Add), LogLevel.Trace);
+        IOperationLog logger = new StreamingOperationLog(new RecordingProgress(captured.Add), LogLevel.Trace);
         var request = Request(offlineImagePath: iso, kind: OfflineImageKind.Iso);
 
         Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
@@ -31,7 +31,7 @@ public sealed class CreateDatabaseOfflineCategoryTests
     public void ValidateOfflineImageRequest_WhenOrphanImageKindWithoutImage_StampsTheOfflineRootCategory()
     {
         var captured = new List<LogRecord>();
-        ITraceLogger logger = new StreamingTraceLogger(new RecordingProgress(captured.Add), LogLevel.Trace);
+        IOperationLog logger = new StreamingOperationLog(new RecordingProgress(captured.Add), LogLevel.Trace);
         var request = Request(offlineImagePath: null, kind: OfflineImageKind.Wim);
 
         Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
@@ -45,7 +45,7 @@ public sealed class CreateDatabaseOfflineCategoryTests
         using var workspace = new TempImageFiles();
         string vhdx = workspace.CreateFile("disk.vhdx");
         var captured = new List<LogRecord>();
-        ITraceLogger logger = new StreamingTraceLogger(new RecordingProgress(captured.Add), LogLevel.Trace);
+        IOperationLog logger = new StreamingOperationLog(new RecordingProgress(captured.Add), LogLevel.Trace);
         var request = Request(offlineImagePath: vhdx, kind: OfflineImageKind.Vhdx, wimIndex: 1);
 
         Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
@@ -59,7 +59,7 @@ public sealed class CreateDatabaseOfflineCategoryTests
         using var workspace = new TempImageFiles();
         string wim = workspace.CreateFile("image.wim");
         var captured = new List<LogRecord>();
-        ITraceLogger logger = new StreamingTraceLogger(new RecordingProgress(captured.Add), LogLevel.Trace);
+        IOperationLog logger = new StreamingOperationLog(new RecordingProgress(captured.Add), LogLevel.Trace);
         var request = Request(offlineImagePath: wim, kind: OfflineImageKind.Wim);
 
         Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));

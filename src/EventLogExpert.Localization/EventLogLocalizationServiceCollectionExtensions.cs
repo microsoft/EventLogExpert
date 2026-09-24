@@ -1,6 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
+using EventLogExpert.Logging.Abstractions;
+
 namespace Microsoft.Extensions.DependencyInjection;
 
 public static class EventLogLocalizationServiceCollectionExtensions
@@ -17,6 +20,7 @@ public static class EventLogLocalizationServiceCollectionExtensions
             ArgumentNullException.ThrowIfNull(services);
 
             services.AddLocalization(options => options.ResourcesPath = "Resources");
+            services.AddSingleton<INeutralTextResolver, SharedResourceNeutralResolver>();
 
             return services;
         }

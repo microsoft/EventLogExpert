@@ -22,7 +22,7 @@ public abstract record DatabaseToolsIpcMessage;
 
 public sealed record HelloMessage(int HelperProcessId, int ProtocolVersion) : DatabaseToolsIpcMessage
 {
-    public const int CurrentProtocolVersion = 3;
+    public const int CurrentProtocolVersion = 4;
 }
 
 public sealed record ProbeMessage(
@@ -39,18 +39,28 @@ public sealed record LogMessage(
     LogLevel Level,
     string Message,
     string Category = "",
-    ProcessOrigin ProcessOrigin = ProcessOrigin.ElevatedHelper) : DatabaseToolsIpcMessage;
+    ProcessOrigin ProcessOrigin = ProcessOrigin.ElevatedHelper,
+    string? MessageKey = null,
+    IReadOnlyList<string>? MessageArgs = null,
+    string? DebugDetail = null) : DatabaseToolsIpcMessage;
 
 public sealed record ProgressMessage(int Processed, int? Total, string? CurrentItem) : DatabaseToolsIpcMessage;
 
-public sealed record ResultMessage(DatabaseToolsOutcome Outcome, string? FailureSummary, long DurationMs)
+public sealed record ResultMessage(DatabaseToolsOutcome Outcome, long DurationMs)
     : DatabaseToolsIpcMessage
 {
     public bool SummaryIsDiagnostic { get; init; }
+
+    public string? SummaryKey { get; init; }
+
+    public IReadOnlyList<string>? SummaryArgs { get; init; }
+
+    public string? DiagnosticDetail { get; init; }
 }
 
 public sealed record FatalMessage(string ExceptionType, string Message, string StackTrace) : DatabaseToolsIpcMessage;
 
 public sealed record CancelMessage : DatabaseToolsIpcMessage;
 
-public sealed record ImageEditionsMessage(WimImageListStatus Status, IReadOnlyList<WimImageEntry> Images) : DatabaseToolsIpcMessage;
+public sealed record ImageEditionsMessage(WimImageListStatus Status, IReadOnlyList<WimImageEntry> Images)
+    : DatabaseToolsIpcMessage;
