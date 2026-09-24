@@ -19,6 +19,7 @@ public static class DatabaseToolsLogKeys
     public const string CreateDeleteOverwriteBackupFailed = "DatabaseTools_Op_CreateDeleteOverwriteBackupFailed";
     public const string CreateDone = "DatabaseTools_Op_CreateDone";
     public const string CreateExistingDatabasePreserved = "DatabaseTools_Op_CreateExistingDatabasePreserved";
+    public const string CreateExtractingWimIndex = "DatabaseTools_Op_CreateExtractingWimIndex";
     public const string CreateFailureNoProvidersResolved = "DatabaseTools_Op_CreateFailureNoProvidersResolved";
     public const string CreateImageKindRequiresOfflineImage = "DatabaseTools_Op_CreateImageKindRequiresOfflineImage";
     public const string CreateIsoImageFileNotFound = "DatabaseTools_Op_CreateIsoImageFileNotFound";
@@ -37,6 +38,7 @@ public static class DatabaseToolsLogKeys
     public const string CreateSavingDatabase = "DatabaseTools_Op_CreateSavingDatabase";
     public const string CreateSkippedProvidersMany = "DatabaseTools_Op_CreateSkippedProvidersMany";
     public const string CreateSkippedProvidersOne = "DatabaseTools_Op_CreateSkippedProvidersOne";
+    public const string CreateSourceHiveNotCleanlyFlushed = "DatabaseTools_Op_CreateSourceHiveNotCleanlyFlushed";
     public const string CreateSourceOrOfflineImage = "DatabaseTools_Op_CreateSourceOrOfflineImage";
     public const string CreateTargetAlreadyExists = "DatabaseTools_Op_CreateTargetAlreadyExists";
     public const string CreateTargetExtensionMustBeDb = "DatabaseTools_Op_CreateTargetExtensionMustBeDb";

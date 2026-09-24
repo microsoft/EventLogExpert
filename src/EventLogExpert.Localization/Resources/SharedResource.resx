@@ -4359,6 +4359,9 @@
   <data name="DatabaseTools_Op_CreateExistingDatabasePreserved" xml:space="preserve">
     <value>Existing database was preserved: restored from backup after the rebuild did not complete.</value>
   </data>
+  <data name="DatabaseTools_Op_CreateExtractingWimIndex" xml:space="preserve">
+    <value>Extracting image index {0} (this can take several minutes)...</value>
+  </data>
   <data name="DatabaseTools_Op_CreateFailureNoProvidersResolved" xml:space="preserve">
     <value>No providers could be resolved from the source, so no database was created.</value>
   </data>
@@ -4412,6 +4415,9 @@
   </data>
   <data name="DatabaseTools_Op_CreateSkippedProvidersOne" xml:space="preserve">
     <value>Found {0} provider in {1}. It will not be included in the new database.</value>
+  </data>
+  <data name="DatabaseTools_Op_CreateSourceHiveNotCleanlyFlushed" xml:space="preserve">
+    <value>The offline image's registry hive was not cleanly flushed; some providers may be missing from the database.</value>
   </data>
   <data name="DatabaseTools_Op_CreateSourceOrOfflineImage" xml:space="preserve">
     <value>Specify a source OR an offline image, not both.</value>

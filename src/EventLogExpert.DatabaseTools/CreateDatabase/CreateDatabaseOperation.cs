@@ -135,7 +135,11 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
             {
                 var mode = SelectMode(request);
 
-                string? effectiveOfflineImagePath = request.OfflineImagePath;
+                string effectiveOfflineImagePath = mode == CreateDatabaseMode.OfflineImage ?
+                    request.OfflineImagePath ??
+                    throw new InvalidOperationException("OfflineImagePath must be set for offline-image mode.") :
+                    string.Empty;
+
                 OfflineImageKind? kind = mode == CreateDatabaseMode.OfflineImage ? ResolveImageKind(request) : null;
 
                 if (kind is OfflineImageKind.Wim or OfflineImageKind.Iso)
@@ -155,11 +159,11 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 if (kind is OfflineImageKind.Iso)
                 {
                     IOperationLog isoLogger = logger.ForCategory(LogCategories.OfflineIso);
-                    OfflineIsoMountResult mount = OfflineIsoImage.TryMount(request.OfflineImagePath!, isoLogger.Trace);
+                    OfflineIsoMountResult mount = OfflineIsoImage.TryMount(effectiveOfflineImagePath, isoLogger.Trace);
 
                     if (mount.Status != OfflineIsoMountStatus.Mounted)
                     {
-                        return HandleIsoMountFailure(mount.Status, request.OfflineImagePath!, isoLogger);
+                        return HandleIsoMountFailure(mount.Status, effectiveOfflineImagePath, isoLogger);
                     }
 
                     isoImage = mount.Image;
@@ -170,25 +174,35 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                     IOperationLog vhdxLogger = logger.ForCategory(LogCategories.OfflineVhdx);
 
                     OfflineVhdxMountResult mount =
-                        OfflineVhdxImage.TryMount(request.OfflineImagePath!, vhdxLogger.Trace);
+                        OfflineVhdxImage.TryMount(effectiveOfflineImagePath, vhdxLogger.Trace);
 
                     if (mount.Status != OfflineVhdxMountStatus.Mounted)
                     {
-                        return HandleVhdxMountFailure(mount.Status, request.OfflineImagePath!, vhdxLogger);
+                        return HandleVhdxMountFailure(mount.Status, effectiveOfflineImagePath, vhdxLogger);
                     }
 
-                    vhdxImage = mount.Image;
-                    effectiveOfflineImagePath = vhdxImage!.VolumeRoot;
+                    vhdxImage = mount.Image ??
+                        throw new InvalidOperationException("A mounted VHDX must expose an image.");
+                    effectiveOfflineImagePath = vhdxImage.VolumeRoot;
                 }
 
                 if (kind is OfflineImageKind.Wim or OfflineImageKind.Iso)
                 {
                     IOperationLog wimLogger = logger.ForCategory(LogCategories.OfflineWim);
-                    string wimSourcePath = isoImage?.InstallImagePath ?? request.OfflineImagePath!;
+                    string wimSourcePath = isoImage?.InstallImagePath ?? effectiveOfflineImagePath;
+
+                    int wimIndex = request.WimIndex ??
+                        throw new InvalidOperationException("WimIndex must be set for WIM or ISO offline images.");
+
+                    wimLogger.User(
+                        LogLevel.Information,
+                        new LocalizableText(
+                            DatabaseToolsLogKeys.CreateExtractingWimIndex,
+                            [wimIndex.ToString()]));
 
                     OfflineWimExtractResult extraction = await OfflineWimImage.TryExtractAsync(
                         wimSourcePath,
-                        request.WimIndex!.Value,
+                        wimIndex,
                         OfflineScratch.Root,
                         wimLogger.Trace,
                         cancellationToken);
@@ -197,12 +211,13 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                     {
                         return HandleWimExtractionFailure(extraction.Status,
                             wimSourcePath,
-                            request.WimIndex!.Value,
+                            wimIndex,
                             wimLogger);
                     }
 
-                    wimImage = extraction.Image;
-                    effectiveOfflineImagePath = wimImage!.ExtractedRoot;
+                    wimImage = extraction.Image ??
+                        throw new InvalidOperationException("A completed WIM extraction must expose an image.");
+                    effectiveOfflineImagePath = wimImage.ExtractedRoot;
                 }
 
                 IAsyncEnumerable<ProviderDetails> providersToAdd;
@@ -211,7 +226,7 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
                 switch (mode)
                 {
                     case CreateDatabaseMode.OfflineImage:
-                        providersToAdd = LoadOfflineImageProvidersAsync(effectiveOfflineImagePath!,
+                        providersToAdd = LoadOfflineImageProvidersAsync(effectiveOfflineImagePath,
                             logger,
                             filterRegex,
                             excludeProviderNames,
@@ -228,7 +243,10 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
                         break;
                     default:
-                        providersToAdd = ProviderSource.LoadProvidersAsync(request.SourcePath!,
+                        string sourcePath = request.SourcePath ??
+                            throw new InvalidOperationException("SourcePath must be set for file-source mode.");
+
+                        providersToAdd = ProviderSource.LoadProvidersAsync(sourcePath,
                             logger,
                             filterRegex,
                             excludeProviderNames,

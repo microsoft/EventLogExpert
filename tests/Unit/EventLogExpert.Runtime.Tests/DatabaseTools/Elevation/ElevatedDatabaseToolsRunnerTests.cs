@@ -178,7 +178,7 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
         await WriteMessageAsync(clientWriter, new LogMessage(ts1, LogLevel.Information, "first"), ct);
         await WriteMessageAsync(clientWriter, new ProgressMessage(1, 10, "item-1"), ct);
-        await WriteMessageAsync(clientWriter, new LogMessage(ts2, LogLevel.Warning, "second"), ct);
+        await WriteMessageAsync(clientWriter, new LogMessage(ts2, LogLevel.Warning, "second", Audience: LogAudience.Diagnostic), ct);
         await WriteMessageAsync(clientWriter, new ResultMessage(DatabaseToolsOutcome.Succeeded, 250), ct);
         fakeProcess.SignalExited(0);
 
@@ -191,6 +191,10 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         Assert.Equal(ts1, logProgress.Entries[0].TimestampUtc);
         Assert.Equal("second", logProgress.Entries[1].Message);
         Assert.Equal(LogLevel.Warning, logProgress.Entries[1].Level);
+
+        // Audience must survive the IPC hop so the app-side UI sink can drop helper diagnostics while showing user output.
+        Assert.Equal(LogAudience.User, logProgress.Entries[0].Audience);
+        Assert.Equal(LogAudience.Diagnostic, logProgress.Entries[1].Audience);
 
         Assert.Single(progress.Entries);
         Assert.Equal(1, progress.Entries[0].Processed);

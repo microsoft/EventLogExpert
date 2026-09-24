@@ -14,14 +14,15 @@ public static class OfflineImageProviderSource
         string imageRootPath,
         ITraceLogger logger,
         Regex? regex = null,
-        IReadOnlySet<string>? excludeProviderNames = null)
+        IReadOnlySet<string>? excludeProviderNames = null,
+        Action? onSourceHiveNotCleanlyFlushed = null)
     {
         // Keep hives loaded for the lazy enumeration and unload them when iteration ends.
         using IOfflineImageProviderExtractor? extractor = TryCreateExtractor(imageRootPath, logger);
 
         if (extractor is null) { yield break; }
 
-        foreach (ProviderDetails details in Enumerate(extractor, regex, excludeProviderNames))
+        foreach (ProviderDetails details in Enumerate(extractor, regex, excludeProviderNames, onSourceHiveNotCleanlyFlushed))
         {
             yield return details;
         }
@@ -31,8 +32,12 @@ public static class OfflineImageProviderSource
     internal static IEnumerable<ProviderDetails> Enumerate(
         IOfflineImageProviderExtractor extractor,
         Regex? regex,
-        IReadOnlySet<string>? excludeProviderNames)
+        IReadOnlySet<string>? excludeProviderNames,
+        Action? onSourceHiveNotCleanlyFlushed = null)
     {
+        // A dirty hive still yields its last-flushed providers, so warn the operator once before enumerating.
+        if (extractor.SourceHiveNotCleanlyFlushed) { onSourceHiveNotCleanlyFlushed?.Invoke(); }
+
         SourceOsProvenance provenance = extractor.ReadImageProvenance();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 

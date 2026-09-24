@@ -35,6 +35,8 @@ internal sealed class OfflineImageProviderExtractor : IOfflineImageProviderExtra
         _logger = logger;
     }
 
+    public bool SourceHiveNotCleanlyFlushed => _softwareHive.IsDirty || _systemHive.IsDirty;
+
     public static OfflineImageProviderExtractor? TryCreate(OfflineImageRoot imageRoot, ITraceLogger? logger)
     {
         // Guard hive paths before opening so a config junction cannot redirect reads outside the image.

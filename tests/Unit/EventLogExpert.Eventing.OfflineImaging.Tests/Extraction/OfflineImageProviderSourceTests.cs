@@ -1,9 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.OfflineImaging;
 using EventLogExpert.Eventing.OfflineImaging.Extraction;
-using EventLogExpert.Eventing.ProviderMetadata;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Provider.Resolution;
@@ -116,6 +114,28 @@ public sealed class OfflineImageProviderSourceTests
     }
 
     [Fact]
+    public void Enumerate_SourceHiveCleanlyFlushed_DoesNotInvokeTheDirtyHiveCallback()
+    {
+        var extractor = new FakeExtractor { SourceHiveNotCleanlyFlushed = false };
+        int callbackCount = 0;
+
+        Enumerate(extractor, onSourceHiveNotCleanlyFlushed: () => callbackCount++);
+
+        Assert.Equal(0, callbackCount);
+    }
+
+    [Fact]
+    public void Enumerate_SourceHiveNotCleanlyFlushed_InvokesTheDirtyHiveCallbackOnce()
+    {
+        var extractor = new FakeExtractor { SourceHiveNotCleanlyFlushed = true };
+        int callbackCount = 0;
+
+        Enumerate(extractor, onSourceHiveNotCleanlyFlushed: () => callbackCount++);
+
+        Assert.Equal(1, callbackCount);
+    }
+
+    [Fact]
     public void Enumerate_YieldsModernThenLegacy_StampedWithImageProvenance()
     {
         var extractor = new FakeExtractor
@@ -180,8 +200,9 @@ public sealed class OfflineImageProviderSourceTests
     private static List<ProviderDetails> Enumerate(
         FakeExtractor extractor,
         Regex? regex = null,
-        IReadOnlySet<string>? excludeProviderNames = null) =>
-        OfflineImageProviderSource.Enumerate(extractor, regex, excludeProviderNames).ToList();
+        IReadOnlySet<string>? excludeProviderNames = null,
+        Action? onSourceHiveNotCleanlyFlushed = null) =>
+        OfflineImageProviderSource.Enumerate(extractor, regex, excludeProviderNames, onSourceHiveNotCleanlyFlushed).ToList();
 
     private static ProviderDetails NonEmpty(string providerName) =>
         new() { ProviderName = providerName, Keywords = new Dictionary<long, string> { [1] = "keyword" } };
@@ -245,6 +266,8 @@ public sealed class OfflineImageProviderSourceTests
         public List<OfflinePublisherRegistration> ModernRegistrations { get; init; } = [];
 
         public SourceOsProvenance Provenance { get; init; } = SourceOsProvenance.Empty;
+
+        public bool SourceHiveNotCleanlyFlushed { get; init; }
 
         public void Dispose() => Disposed = true;
 

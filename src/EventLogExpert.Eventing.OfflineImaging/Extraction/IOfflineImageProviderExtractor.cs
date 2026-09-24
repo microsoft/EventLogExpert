@@ -7,6 +7,8 @@ namespace EventLogExpert.Eventing.OfflineImaging.Extraction;
 
 internal interface IOfflineImageProviderExtractor : IDisposable
 {
+    bool SourceHiveNotCleanlyFlushed { get; }
+
     IReadOnlyList<string> EnumerateLegacyProviderNames();
 
     SourceOsProvenance ReadImageProvenance();

@@ -39,7 +39,8 @@ internal sealed class IpcLogForwarder(IpcMessageWriter writer) : IProgress<LogRe
                         ProcessOrigin.ElevatedHelper,
                         value.MessageKey,
                         value.MessageArgs,
-                        value.DebugDetail),
+                        value.DebugDetail,
+                        value.Audience),
                     CancellationToken.None)
                 .GetAwaiter()
                 .GetResult();

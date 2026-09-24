@@ -70,6 +70,6 @@ public sealed class StreamingTraceLogger(
 
         if (string.IsNullOrEmpty(message)) { return; }
 
-        _progress.Report(new LogRecord(DateTime.UtcNow, level, message, category));
+        _progress.Report(new LogRecord(DateTime.UtcNow, level, message, category, Audience: LogAudience.Diagnostic));
     }
 }

@@ -613,7 +613,8 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                                     log.ProcessOrigin,
                                     log.MessageKey,
                                     log.MessageArgs ?? [],
-                                    log.DebugDetail));
+                                    log.DebugDetail,
+                                    log.Audience));
 
                             break;
 

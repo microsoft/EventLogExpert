@@ -42,7 +42,8 @@ public sealed record LogMessage(
     ProcessOrigin ProcessOrigin = ProcessOrigin.ElevatedHelper,
     string? MessageKey = null,
     IReadOnlyList<string>? MessageArgs = null,
-    string? DebugDetail = null) : DatabaseToolsIpcMessage;
+    string? DebugDetail = null,
+    LogAudience Audience = LogAudience.User) : DatabaseToolsIpcMessage;
 
 public sealed record ProgressMessage(int Processed, int? Total, string? CurrentItem) : DatabaseToolsIpcMessage;
 
