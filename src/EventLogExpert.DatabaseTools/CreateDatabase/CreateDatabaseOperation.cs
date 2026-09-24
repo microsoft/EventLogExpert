@@ -706,9 +706,9 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
     private static void LogWritableProbeFailure(IOperationLog logger, OfflineWriteProbeResult probe, LocalizableText summary)
     {
-        if (probe.Status == OfflineWriteProbeStatus.IoError)
+        if (probe.IoException is not null)
         {
-            logger.User(LogLevel.Error, summary, new IOException(probe.IoDetail ?? string.Empty));
+            logger.User(LogLevel.Error, summary, probe.IoException);
 
             return;
         }

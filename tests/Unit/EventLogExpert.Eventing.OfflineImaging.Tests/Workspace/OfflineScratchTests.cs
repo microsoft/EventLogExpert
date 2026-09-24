@@ -38,7 +38,7 @@ public sealed class OfflineScratchTests
             Assert.False(probe.IsWritable);
             Assert.Equal(OfflineWriteProbeStatus.IoError, probe.Status);
             Assert.Equal(filePath, probe.Directory);
-            Assert.NotNull(probe.IoDetail);
+            Assert.NotNull(probe.IoException);
         }
         finally
         {
