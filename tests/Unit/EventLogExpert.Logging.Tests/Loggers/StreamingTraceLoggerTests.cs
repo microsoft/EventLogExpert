@@ -66,6 +66,19 @@ public sealed class StreamingTraceLoggerTests
     }
 
     [Fact]
+    public void Emit_MarksRecordsAsDiagnosticAudience()
+    {
+        // The Trace channel is developer diagnostics; records must be tagged Diagnostic so the UI sink drops them.
+        var captured = new List<LogRecord>();
+        var sink = new SynchronousProgress<LogRecord>(captured.Add);
+        ITraceLogger logger = new StreamingTraceLogger(sink, LogLevel.Trace);
+
+        logger.Information($"info");
+
+        Assert.Equal(LogAudience.Diagnostic, Assert.Single(captured).Audience);
+    }
+
+    [Fact]
     public void Emit_PreservesInsertionOrder_OnSingleThread()
     {
         var captured = new List<LogRecord>();

@@ -16,6 +16,10 @@ public sealed class UIStreamingSink(IProgress<LogRecord> progress, LogLevel mini
 
         if (record.Level < minimumLevel) { return; }
 
+        // Diagnostic records (the Trace channel) carry unlocalized English and raw exception text; they belong in the
+        // debug/file log only, never the localized user-facing operation log.
+        if (record.Audience == LogAudience.Diagnostic) { return; }
+
         _progress.Report(record with { DebugDetail = null });
     }
 

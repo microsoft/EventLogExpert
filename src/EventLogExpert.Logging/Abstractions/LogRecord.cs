@@ -13,4 +13,5 @@ public sealed record LogRecord(
     ProcessOrigin ProcessOrigin = ProcessOrigin.InProcess,
     string? MessageKey = null,
     IReadOnlyList<string>? MessageArgs = null,
-    string? DebugDetail = null);
+    string? DebugDetail = null,
+    LogAudience Audience = LogAudience.User);

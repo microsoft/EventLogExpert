@@ -110,7 +110,10 @@ internal abstract class OperationBase
         foreach (var details in OfflineImageProviderSource.LoadProviders(offlineImagePath,
             logger.Trace,
             regex,
-            excludeProviderNames))
+            excludeProviderNames,
+            onSourceHiveNotCleanlyFlushed: () => logger.User(
+                LogLevel.Warning,
+                new LocalizableText(DatabaseToolsLogKeys.CreateSourceHiveNotCleanlyFlushed, []))))
         {
             cancellationToken.ThrowIfCancellationRequested();
 

@@ -92,7 +92,8 @@ public sealed class IpcMessageRoundTripTests
             "Offline.Wim",
             MessageKey: "DatabaseTools_Op_Test",
             MessageArgs: ["provider X"],
-            DebugDetail: "System.Exception: boom");
+            DebugDetail: "System.Exception: boom",
+            Audience: LogAudience.Diagnostic);
 
         var roundTripped = SerializeDeserialize(original, out var json);
 
@@ -103,6 +104,7 @@ public sealed class IpcMessageRoundTripTests
         Assert.Equal("DatabaseTools_Op_Test", log.MessageKey);
         Assert.Equal(["provider X"], log.MessageArgs);
         Assert.Equal("System.Exception: boom", log.DebugDetail);
+        Assert.Equal(LogAudience.Diagnostic, log.Audience);
         Assert.DoesNotContain("ElevatedHelper", json);
     }
 

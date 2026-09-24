@@ -25,6 +25,26 @@ public sealed class OperationLogProgressFactoryTests : IDisposable
     }
 
     [Fact]
+    public void Create_DiagnosticRecord_IsWrittenToFileButHiddenFromTheUi()
+    {
+        // Trace-channel diagnostics (LogAudience.Diagnostic) must stay in the debug/file log and never surface in the
+        // localized user-facing operation log.
+        var policy = new LogRoutingPolicy(LoggingOptions.CreateShippedDefaults(), LogLevel.Information);
+        using var fileSink = new FileLogSink(_testLogPath, policy, DebugLogFormatter.Format);
+        var factory = new OperationLogProgressFactory(fileSink, policy, new KeyEchoNeutralTextResolver());
+        var uiCaptured = new List<LogRecord>();
+
+        IProgress<LogRecord> logProgress = factory.Create(
+            new CapturingProgress(uiCaptured), LogCategories.DatabaseTools, verbose: false);
+
+        logProgress.Report(new LogRecord(
+            DateTime.UtcNow, LogLevel.Warning, "diagnostic-only", Audience: LogAudience.Diagnostic));
+
+        Assert.Empty(uiCaptured);
+        Assert.Contains("diagnostic-only", ReadLogFile());
+    }
+
+    [Fact]
     public void Create_EmptyCategory_Throws()
     {
         var policy = new LogRoutingPolicy(LoggingOptions.CreateShippedDefaults(), LogLevel.Information);
