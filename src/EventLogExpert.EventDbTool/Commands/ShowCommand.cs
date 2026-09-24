@@ -6,6 +6,7 @@ using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.ShowProviders;
 using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.CommandLine;
 
 namespace EventLogExpert.EventDbTool.Commands;
@@ -44,13 +45,15 @@ public class ShowCommand
         showCommand.SetAction(async (action, cancellationToken) =>
         {
             await using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
-            var logger = sp.GetRequiredService<ITraceLogger>();
+            var logger = sp.GetRequiredService<IOperationLog>();
 
             var filterValue = action.GetValue(filterOption);
 
             if (!FilterRegexFactory.TryCreate(filterValue, out var regex, out var error))
             {
-                logger.Error($"Invalid --filter regex '{filterValue}': {error}");
+                logger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CliInvalidFilterRegex,
+                        [filterValue ?? string.Empty, error ?? string.Empty]));
 
                 return 1;
             }

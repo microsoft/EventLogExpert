@@ -3,6 +3,9 @@
 
 using EventLogExpert.DatabaseTools.DependencyInjection;
 using EventLogExpert.EventDbTool.Commands;
+using EventLogExpert.Logging;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Loggers;
 using EventLogExpert.Logging.Routing;
 using EventLogExpert.Logging.Sinks;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,9 +19,17 @@ internal class Program
 {
     internal static ServiceProvider BuildServiceProvider(bool verbose) =>
         new ServiceCollection()
-            .AddSingleton(
-                new LogSourceFactory([new ConsoleSink(verbose ? LogLevel.Trace : LogLevel.Information)])
+            .AddSingleton(new ConsoleSink(verbose ? LogLevel.Trace : LogLevel.Information))
+            .AddEventLogLocalization()
+            .AddSingleton<ITraceLogger>(static sp =>
+                new LogSourceFactory([sp.GetRequiredService<ConsoleSink>()])
                     .ForCategory(LogSourceFactory.DefaultCategory))
+            .AddSingleton<IOperationLog>(sp =>
+                new StreamingOperationLog(
+                    new LocalizingLogProgress(
+                        sp.GetRequiredService<INeutralTextResolver>(),
+                        new SinkProgress(sp.GetRequiredService<ConsoleSink>())),
+                    verbose ? LogLevel.Trace : LogLevel.Information))
             .AddDatabaseToolsServices()
             .BuildServiceProvider();
 
@@ -48,5 +59,10 @@ internal class Program
         rootCommand.Subcommands.Add(UpgradeDatabaseCommand.GetCommand());
 
         return await rootCommand.Parse(args).InvokeAsync();
+    }
+
+    private sealed class SinkProgress(ConsoleSink sink) : IProgress<LogRecord>
+    {
+        public void Report(LogRecord value) => sink.Emit(value);
     }
 }

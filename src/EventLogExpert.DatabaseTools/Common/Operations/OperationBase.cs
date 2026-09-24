@@ -8,6 +8,7 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Resolution;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
@@ -20,10 +21,10 @@ internal abstract class OperationBase
 
     private string _providerDetailFormat = "{0, -14} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8} {6, 8}";
 
-    public string? FailureSummary { get; private set; }
+    public LocalizableText? FailureSummary { get; private set; }
 
     protected static async Task CleanupPartialDatabaseAsync(
-        ITraceLogger logger,
+        IOperationLog logger,
         ProviderDbContext? dbContext,
         string targetPath)
     {
@@ -45,35 +46,42 @@ internal abstract class OperationBase
             }
             catch (IOException ex)
             {
-                logger.Warning($"Could not delete partial database at {databasePath}: {ex.Message}. Delete manually before next run.");
+                logger.User(LogLevel.Warning,
+                    new LocalizableText(DatabaseToolsLogKeys.OperationDeletePartialFailed, [databasePath]),
+                    ex);
             }
             catch (UnauthorizedAccessException ex)
             {
-                logger.Warning($"Could not delete partial database at {databasePath}: {ex.Message}. Delete manually before next run.");
+                logger.User(LogLevel.Warning,
+                    new LocalizableText(DatabaseToolsLogKeys.OperationDeletePartialFailed, [databasePath]),
+                    ex);
             }
         }
     }
 
-    protected static Regex? EnsureBoundedTimeout(Regex? regex) => EnsureBoundedTimeout(regex, DefaultFilterRegexTimeout);
+    protected static Regex? EnsureBoundedTimeout(Regex? regex) =>
+        EnsureBoundedTimeout(regex, DefaultFilterRegexTimeout);
 
     protected static Regex? EnsureBoundedTimeout(Regex? regex, TimeSpan defaultTimeout)
     {
         if (regex is null) { return null; }
 
-        return regex.MatchTimeout == Regex.InfiniteMatchTimeout
-            ? new Regex(regex.ToString(), regex.Options, defaultTimeout)
-            : regex;
+        return regex.MatchTimeout == Regex.InfiniteMatchTimeout ?
+            new Regex(regex.ToString(), regex.Options, defaultTimeout) :
+            regex;
     }
 
     protected static List<string> GetLocalProviderNames(Regex? regex)
     {
-        var providers = new List<string>(EventLogSession.GlobalSession.GetProviderNames().Distinct().OrderBy(name => name));
+        var providers = new List<string>(EventLogSession.GlobalSession.GetProviderNames()
+            .Distinct()
+            .OrderBy(name => name));
 
-        return regex is null ? providers : providers.Where(p => regex.IsMatch(p)).ToList();
+        return regex is null ? providers : [.. providers.Where(p => regex.IsMatch(p))];
     }
 
     protected static async IAsyncEnumerable<ProviderDetails> LoadLocalProvidersAsync(
-        ITraceLogger logger,
+        IOperationLog logger,
         Regex? regex,
         IReadOnlySet<string>? excludeProviderNames = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -86,20 +94,23 @@ internal abstract class OperationBase
 
             if (excludeProviderNames is not null && excludeProviderNames.Contains(providerName)) { continue; }
 
-            yield return new EventMessageProvider(providerName, logger: logger).LoadProviderDetails();
+            yield return new EventMessageProvider(providerName, logger: logger.Trace).LoadProviderDetails();
         }
     }
 
     protected static async IAsyncEnumerable<ProviderDetails> LoadOfflineImageProvidersAsync(
         string offlineImagePath,
-        ITraceLogger logger,
+        IOperationLog logger,
         Regex? regex,
         IReadOnlySet<string>? excludeProviderNames = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await Task.CompletedTask;
 
-        foreach (var details in OfflineImageProviderSource.LoadProviders(offlineImagePath, logger, regex, excludeProviderNames))
+        foreach (var details in OfflineImageProviderSource.LoadProviders(offlineImagePath,
+            logger.Trace,
+            regex,
+            excludeProviderNames))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -107,23 +118,34 @@ internal abstract class OperationBase
         }
     }
 
-    protected void LogProviderDetailHeader(ITraceLogger logger, IEnumerable<string> providerNames)
+    protected void LogProviderDetailHeader(IOperationLog logger, IEnumerable<string> providerNames)
     {
-        var names = providerNames as IReadOnlyList<string> ?? providerNames.ToList();
+        var names = providerNames as IReadOnlyList<string> ?? [.. providerNames];
         var maxNameLength = names.Count > 0 ? names.Max(providerName => providerName.Length) : 14;
 
         if (maxNameLength < 14) { maxNameLength = 14; }
 
         _providerDetailFormat = "{0, -" + maxNameLength + "} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8} {6, 8}";
 
+        // Intentional English residual (not a localization miss): this is a fixed-width provider-detail data table
+        // whose column layout is computed at runtime from the provider names, emitted verbatim through Data() rather
+        // than the keyed User() path. Localizing variable-length column labels through the deferred key-based pipeline
+        // would break the alignment and mix a localized header with English data rows, so the table chrome stays
+        // English by design.
         var header = string.Format(
             _providerDetailFormat,
-            "Provider Name", "Events", "Parameters", "Keywords", "Opcodes", "Tasks", "Messages");
+            "Provider Name",
+            "Events",
+            "Parameters",
+            "Keywords",
+            "Opcodes",
+            "Tasks",
+            "Messages");
 
-        logger.Information($"{header}");
+        logger.Data(LogLevel.Information, header);
     }
 
-    protected void LogProviderDetails(ITraceLogger logger, ProviderDetails details)
+    protected void LogProviderDetails(IOperationLog logger, ProviderDetails details)
     {
         var line = string.Format(
             _providerDetailFormat,
@@ -135,8 +157,8 @@ internal abstract class OperationBase
             details.Tasks.Count,
             details.Messages.Count);
 
-        logger.Information($"{line}");
+        logger.Data(LogLevel.Information, line);
     }
 
-    protected void SetFailureSummary(string summary) => FailureSummary = summary;
+    protected void SetFailureSummary(LocalizableText summary) => FailureSummary = summary;
 }

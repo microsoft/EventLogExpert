@@ -4,10 +4,8 @@
 using EventLogExpert.DatabaseTools.DiffDatabase;
 using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Eventing.TestUtils.Constants;
-using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Provider.Database.Context;
-using NSubstitute;
+using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.DatabaseTools.IntegrationTests.Operations;
 
@@ -34,7 +32,7 @@ public sealed class DiffDatabaseCommandTests : IDisposable
 
         File.Delete(output);
 
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         // The diff skips by identity, so the second source's new vk2 version of a name also in the first source (only
         // as vk1) is still treated as "missing from first" and copied. A name-level skip would drop it entirely.
@@ -52,7 +50,7 @@ public sealed class DiffDatabaseCommandTests : IDisposable
     [Fact]
     public async Task DiffDatabase_PreservesResolvedFromOwningPublisher()
     {
-        // Arrange — first source has Shared, second source has Shared and Second.
+        // Arrange - first source has Shared, second source has Shared and Second.
         // The diff output should contain only Second, with its ResolvedFromOwningPublisher value
         // intact. This locks in the Add(details) projection in DiffDatabase: a hand-projection that
         // forgot ResolvedFromOwningPublisher (or any future ProviderDetails member) would fail this.
@@ -69,7 +67,7 @@ public sealed class DiffDatabaseCommandTests : IDisposable
 
         File.Delete(output);
 
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         // Act
         await new DiffDatabaseOperation(new DiffDatabaseRequest(first, second, output)).ExecuteAsync(logger, null, CancellationToken.None);
@@ -87,7 +85,7 @@ public sealed class DiffDatabaseCommandTests : IDisposable
     [Fact]
     public async Task DiffDatabase_WithObsoleteSecondSource_AbortsWithoutCreatingOutput()
     {
-        // Arrange — V3 schema in second source. Diff aborts on stale-but-known schema too.
+        // Arrange - V3 schema in second source. Diff aborts on stale-but-known schema too.
         var first = CreateTempDb();
         var second = CreateTempDb();
         var output = CreateTempDb();
@@ -98,21 +96,20 @@ public sealed class DiffDatabaseCommandTests : IDisposable
 
         File.Delete(output);
 
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         // Act
         await new DiffDatabaseOperation(new DiffDatabaseRequest(first, second, output)).ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         Assert.False(File.Exists(output), "Diff must not create an output database when a source is obsolete.");
-        logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
-            handler.ToString().Contains("schema v3") && handler.ToString().Contains(second) && handler.ToString().Contains("upgrade")));
+        Assert.True(logger.Contains(LogLevel.Error, "schema v3", second, "upgrade"));
     }
 
     [Fact]
     public async Task DiffDatabase_WithUnknownFirstSource_AbortsWithoutCreatingOutput()
     {
-        // Arrange — without the upfront ValidateSourceSchemas check, the schema-rejected first
+        // Arrange - without the upfront ValidateSourceSchemas check, the schema-rejected first
         // source would silently yield zero providers, the second source's full contents would be
         // copied to output as "missing from first", and the user would get a wrong result with
         // only a single error log line buried earlier in the output.
@@ -126,15 +123,14 @@ public sealed class DiffDatabaseCommandTests : IDisposable
 
         File.Delete(output);
 
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         // Act
         await new DiffDatabaseOperation(new DiffDatabaseRequest(first, second, output)).ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         Assert.False(File.Exists(output), "Diff must not create an output database when a source is invalid.");
-        logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
-            handler.ToString().Contains("unrecognized schema") && handler.ToString().Contains(first)));
+        Assert.True(logger.Contains(LogLevel.Error, "unrecognized schema", first));
     }
 
     public void Dispose()

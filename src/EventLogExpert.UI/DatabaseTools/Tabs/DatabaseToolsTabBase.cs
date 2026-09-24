@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
@@ -141,7 +142,10 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 
         lock (_pendingLock)
         {
-            _pendingEntries.Add(entry);
+            _pendingEntries.Add(entry with
+            {
+                Message = LocalizableTextResolver.Resolve(Localizer, entry.MessageKey, entry.MessageArgs, entry.Message)
+            });
             needsSchedule = !_flushScheduled;
 
             if (needsSchedule) { _flushScheduled = true; }
@@ -179,9 +183,9 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         {
             DatabaseToolsOutcome.Succeeded => Localizer["DatabaseTools_OutcomeMessage_Succeeded", durationSeconds],
             DatabaseToolsOutcome.Cancelled => Localizer["DatabaseTools_OutcomeMessage_Cancelled", durationSeconds],
-            DatabaseToolsOutcome.Failed => string.IsNullOrWhiteSpace(result.FailureSummary) || result.SummaryIsDiagnostic ?
+            DatabaseToolsOutcome.Failed => result.Summary is null || result.SummaryIsDiagnostic ?
                 Localizer["DatabaseTools_OutcomeMessage_FailedSeeDebugLog"] :
-                Localizer["DatabaseTools_OutcomeMessage_FailedWithSummary", result.FailureSummary],
+                Localizer["DatabaseTools_OutcomeMessage_FailedWithSummary", ResolveSummary(result)],
             _ => string.Empty
         };
 
@@ -222,6 +226,14 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
     protected Task ImportProducedDatabaseAsync() =>
         RequestProducedDatabaseImportAsync(AutoImportMode == AutoImportMode.ImportAndEnable);
 
+    protected void MirrorDiagnostic(DatabaseToolsResult result)
+    {
+        if (result.DiagnosticDetail is { Length: > 0 } diagnosticDetail)
+        {
+            TraceLogger.ForCategory(LogCategory).Error($"{diagnosticDetail}");
+        }
+    }
+
     protected virtual async Task OnRunSucceededAsync(DatabaseToolsResult result, CancellationToken cancellationToken)
     {
         if (AutoImportMode == AutoImportMode.Off ||
@@ -258,6 +270,9 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 
         return path;
     }
+
+    protected string ResolveSummary(DatabaseToolsResult result) =>
+        result.Summary is null ? string.Empty : LocalizableTextResolver.Resolve(Localizer, result.Summary);
 
     protected Task RunAsync() => RunCoreAsync((request, logProgress, ct) => DispatchAsync(request, logProgress, ct));
 
@@ -330,7 +345,9 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         }
         catch (Exception ex)
         {
-            AppendEntry(new LogRecord(DateTime.UtcNow, LogLevel.Warning, Localizer["DatabaseTools_Log_ImportFailed", ex.Message]));
+            var failedSummary = new LocalizableText(DatabaseToolsLogKeys.GenericDiagnosticFailure, []);
+            TraceLogger.ForCategory(LogCategory).Error($"{ex}");
+            AppendEntry(new LogRecord(DateTime.UtcNow, LogLevel.Warning, Localizer["DatabaseTools_Log_ImportFailed", LocalizableTextResolver.Resolve(Localizer, failedSummary)]));
             _autoImportState = AutoImportState.Failed;
         }
     }
@@ -385,20 +402,21 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         {
             var result = await dispatcher(request, logProgress, Cts.Token);
             Outcome = result;
+            MirrorDiagnostic(result);
             AppendOutcome(result);
         }
         catch (Exception ex)
         {
             var failedOutcome = new DatabaseToolsResult(DatabaseToolsOutcome.Failed,
-                ex.Message,
+                new LocalizableText(DatabaseToolsLogKeys.GenericDiagnosticFailure, []),
                 Stopwatch.GetElapsedTime(startTimestamp))
             {
-                SummaryIsDiagnostic = true
+                SummaryIsDiagnostic = true,
+                DiagnosticDetail = ex.ToString()
             };
 
             Outcome = failedOutcome;
-            // Required logger (unlike the service's optional one): the UI has no second log channel, so an unlogged diagnostic would leave "see debug log" pointing at nothing. Stamp the tab's category so the entry is findable under the same Debug Log category filter as the operation's own log lines.
-            TraceLogger.ForCategory(LogCategory).Error($"{ex}");
+            MirrorDiagnostic(failedOutcome);
             AppendOutcome(failedOutcome);
         }
         finally

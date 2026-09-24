@@ -1,10 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Resolution;
+using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.DatabaseTools.DiffDatabase;
 
@@ -16,7 +18,7 @@ namespace EventLogExpert.DatabaseTools.DiffDatabase;
 internal sealed class DiffDatabaseOperation(DiffDatabaseRequest request) : OperationBase, IDatabaseToolsOperation
 {
     public async Task<DatabaseToolsOutcome> ExecuteAsync(
-        ITraceLogger logger,
+        IOperationLog logger,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken)
     {
@@ -30,25 +32,29 @@ internal sealed class DiffDatabaseOperation(DiffDatabaseRequest request) : Opera
 
         if (File.Exists(request.NewDatabasePath))
         {
-            logger.Error($"File already exists: {request.NewDatabasePath}");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.DiffFileAlreadyExists, [request.NewDatabasePath]));
 
             return DatabaseToolsOutcome.Failed;
         }
 
         if (!string.Equals(Path.GetExtension(request.NewDatabasePath), ".db", StringComparison.OrdinalIgnoreCase))
         {
-            logger.Error($"New db path must have a .db extension.");
+            logger.User(LogLevel.Error, new LocalizableText(DatabaseToolsLogKeys.DiffNewDbPathMustBeDb, []));
 
             return DatabaseToolsOutcome.Failed;
         }
 
         var firstIdentities = (await ProviderSource.LoadProviderIdentitiesAsync(
-            request.FirstSourcePath, logger, cancellationToken: cancellationToken)).ToHashSet();
+            request.FirstSourcePath,
+            logger,
+            cancellationToken: cancellationToken)).ToHashSet();
 
         var providersCopied = new List<ProviderDetails>();
 
-        logger.Information(
-            $"Skipping up to {firstIdentities.Count} provider version(s) from the second source that also appear in the first source.");
+        logger.User(LogLevel.Information,
+            new LocalizableText(DatabaseToolsLogKeys.DiffSkippingSecondSourceDuplicates,
+                [firstIdentities.Count.ToString()]));
 
         ProviderDbContext? newDbContext = null;
 
@@ -62,10 +68,10 @@ internal sealed class DiffDatabaseOperation(DiffDatabaseRequest request) : Opera
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                logger.Information(
-                    $"Copying {details.ProviderName} because it is present in second source but not first.");
+                logger.User(LogLevel.Information,
+                    new LocalizableText(DatabaseToolsLogKeys.DiffCopyingProvider, [details.ProviderName]));
 
-                newDbContext ??= new ProviderDbContext(request.NewDatabasePath, false, logger);
+                newDbContext ??= new ProviderDbContext(request.NewDatabasePath, false, logger.Trace);
 
                 newDbContext.ProviderDetails.Add(details);
 
@@ -76,16 +82,15 @@ internal sealed class DiffDatabaseOperation(DiffDatabaseRequest request) : Opera
 
             if (newDbContext is null)
             {
-                logger.Warning(
-                    $"No providers in the second source are missing from the first. Database was not created.");
+                logger.User(LogLevel.Warning, new LocalizableText(DatabaseToolsLogKeys.DiffNoMissingProviders, []));
 
                 return DatabaseToolsOutcome.Succeeded;
             }
 
             await newDbContext.SaveChangesAsync(cancellationToken);
 
-            logger.Information($"Providers copied to new database:");
-            logger.Information($"");
+            logger.User(LogLevel.Information, new LocalizableText(DatabaseToolsLogKeys.DiffProvidersCopiedHeader, []));
+            logger.Data(LogLevel.Information, string.Empty);
             LogProviderDetailHeader(logger, providersCopied.Select(p => p.ProviderName));
 
             foreach (var provider in providersCopied)
@@ -105,7 +110,7 @@ internal sealed class DiffDatabaseOperation(DiffDatabaseRequest request) : Opera
         catch (Exception ex)
         {
             // Any non-cancellation failure (e.g., EF/SQLite errors mid-save) - no stub .db.
-            logger.Error($"Unexpected error diffing databases: {ex.Message}");
+            logger.User(LogLevel.Error, new LocalizableText(DatabaseToolsLogKeys.DiffUnexpectedError, []), ex);
             await CleanupPartialDatabaseAsync(logger, newDbContext, request.NewDatabasePath);
             newDbContext = null;
 

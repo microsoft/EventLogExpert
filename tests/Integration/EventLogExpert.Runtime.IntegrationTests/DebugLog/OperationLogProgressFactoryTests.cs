@@ -29,7 +29,7 @@ public sealed class OperationLogProgressFactoryTests : IDisposable
     {
         var policy = new LogRoutingPolicy(LoggingOptions.CreateShippedDefaults(), LogLevel.Information);
         using var fileSink = new FileLogSink(_testLogPath, policy, DebugLogFormatter.Format);
-        var factory = new OperationLogProgressFactory(fileSink, policy);
+        var factory = new OperationLogProgressFactory(fileSink, policy, new KeyEchoNeutralTextResolver());
 
         Assert.Throws<ArgumentException>(() => factory.Create(new CapturingProgress([]), string.Empty, verbose: false));
     }
@@ -39,7 +39,7 @@ public sealed class OperationLogProgressFactoryTests : IDisposable
     {
         var policy = new LogRoutingPolicy(LoggingOptions.CreateShippedDefaults(), LogLevel.Information);
         using var fileSink = new FileLogSink(_testLogPath, policy, DebugLogFormatter.Format);
-        var factory = new OperationLogProgressFactory(fileSink, policy);
+        var factory = new OperationLogProgressFactory(fileSink, policy, new KeyEchoNeutralTextResolver());
 
         Assert.Throws<ArgumentNullException>(() => factory.Create(null!, LogCategories.DatabaseTools, verbose: false));
     }
@@ -51,7 +51,7 @@ public sealed class OperationLogProgressFactoryTests : IDisposable
         settings.LogLevel.Returns(LogLevel.Information);
         var policy = new LogRoutingPolicy(LoggingOptions.CreateShippedDefaults(), settings.LogLevel);
         using var fileSink = new FileLogSink(_testLogPath, policy, DebugLogFormatter.Format);
-        var factory = new OperationLogProgressFactory(fileSink, policy);
+        var factory = new OperationLogProgressFactory(fileSink, policy, new KeyEchoNeutralTextResolver());
         var uiCaptured = new List<LogRecord>();
 
         IProgress<LogRecord> logProgress = factory.Create(
@@ -99,5 +99,10 @@ public sealed class OperationLogProgressFactoryTests : IDisposable
     private sealed class CapturingProgress(List<LogRecord> captured) : IProgress<LogRecord>
     {
         public void Report(LogRecord value) => captured.Add(value);
+    }
+
+    private sealed class KeyEchoNeutralTextResolver : INeutralTextResolver
+    {
+        public string Resolve(string key, IReadOnlyList<string> args) => key;
     }
 }

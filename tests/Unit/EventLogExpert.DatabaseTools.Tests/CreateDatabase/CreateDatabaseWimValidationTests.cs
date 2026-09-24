@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.DatabaseTools.CreateDatabase;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,18 @@ namespace EventLogExpert.DatabaseTools.Tests.CreateDatabase;
 
 public sealed class CreateDatabaseWimValidationTests
 {
+    [Fact]
+    public void Validate_AutoDetectUnknownExtension_Rejects()
+    {
+        using var workspace = new TempFiles();
+        string unknown = workspace.CreateFile("image.dat");
+        var logger = new CapturingTraceLogger();
+        var request = Request(offlineImagePath: unknown, kind: null);
+
+        Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
+        Assert.Contains(logger.Errors, error => error.Contains("determine", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Fact]
     public void Validate_AutoDetectsDirectory_WhenNoKindGiven_Accepts()
     {
@@ -74,18 +87,6 @@ public sealed class CreateDatabaseWimValidationTests
 
         Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
         Assert.Contains(logger.Errors, error => error.Contains("--wim-index", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void Validate_AutoDetectUnknownExtension_Rejects()
-    {
-        using var workspace = new TempFiles();
-        string unknown = workspace.CreateFile("image.dat");
-        var logger = new CapturingTraceLogger();
-        var request = Request(offlineImagePath: unknown, kind: null);
-
-        Assert.False(CreateDatabaseOperation.ValidateOfflineImageRequest(request, logger));
-        Assert.Contains(logger.Errors, error => error.Contains("determine", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -296,23 +297,47 @@ public sealed class CreateDatabaseWimValidationTests
         int? wimIndex = null) =>
         new(@"C:\out.db", source, FilterRegex: null, SkipProvidersInFile: null, offlineImagePath, kind, wimIndex);
 
-    private sealed class CapturingTraceLogger : ITraceLogger
+    private sealed class CapturingTraceLogger : IOperationLog
     {
+        private static readonly SharedResourceNeutralResolver s_neutralResolver = new();
+
         public List<string> Errors { get; } = [];
 
-        public LogLevel MinimumLevel => LogLevel.Trace;
+        public ITraceLogger Trace => new CapturingTrace(Errors);
 
-        public void Critical(CriticalLogHandler handler) => handler.ToStringAndClear();
+        public void Data(LogLevel level, string text) { }
 
-        public void Debug(DebugLogHandler handler) => handler.ToStringAndClear();
+        public IOperationLog ForCategory(string category) => this;
 
-        public void Error(ErrorLogHandler handler) => Errors.Add(handler.ToStringAndClear());
+        public void User(LogLevel level, LocalizableText message)
+        {
+            if (level >= LogLevel.Error) { Errors.Add(CapturedMessage(message)); }
+        }
 
-        public void Information(InformationLogHandler handler) => handler.ToStringAndClear();
+        public void User(LogLevel level, LocalizableText message, Exception diagnostic)
+        {
+            if (level >= LogLevel.Error) { Errors.Add(CapturedMessage(message)); }
+        }
 
-        public void Trace(TraceLogHandler handler) => handler.ToStringAndClear();
+        private static string CapturedMessage(LocalizableText message) =>
+            s_neutralResolver.Resolve(message.Key, message.Args);
 
-        public void Warning(WarningLogHandler handler) => handler.ToStringAndClear();
+        private sealed class CapturingTrace(List<string> errors) : ITraceLogger
+        {
+            public LogLevel MinimumLevel => LogLevel.Trace;
+
+            public void Critical(CriticalLogHandler handler) => handler.ToStringAndClear();
+
+            public void Debug(DebugLogHandler handler) => handler.ToStringAndClear();
+
+            public void Error(ErrorLogHandler handler) => errors.Add(handler.ToStringAndClear());
+
+            public void Information(InformationLogHandler handler) => handler.ToStringAndClear();
+
+            public void Trace(TraceLogHandler handler) => handler.ToStringAndClear();
+
+            public void Warning(WarningLogHandler handler) => handler.ToStringAndClear();
+        }
     }
 
     private sealed class TempFiles : IDisposable

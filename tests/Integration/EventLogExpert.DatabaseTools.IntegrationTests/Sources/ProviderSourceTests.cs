@@ -4,10 +4,8 @@
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Eventing.TestUtils.Constants;
-using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Provider.Resolution;
-using NSubstitute;
+using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.DatabaseTools.IntegrationTests.Sources;
 
@@ -39,7 +37,7 @@ public sealed class ProviderSourceTests : IDisposable
         DatabaseTestUtils.CreateV4Database(dbPath,
             DatabaseTestUtils.BuildProviderDetails("Provider-\u00e9"),
             DatabaseTestUtils.BuildProviderDetails("Provider-\u00c9"));
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         var identities = await ProviderSource.LoadProviderIdentitiesAsync(
             dbPath, logger, cancellationToken: TestContext.Current.CancellationToken);
@@ -60,7 +58,7 @@ public sealed class ProviderSourceTests : IDisposable
         var lower = DatabaseTestUtils.BuildProviderDetails("Provider-\u00e9");
         var upper = DatabaseTestUtils.BuildProviderDetails("Provider-\u00c9");
         DatabaseTestUtils.CreateV4Database(dbPath, lower, upper);
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         // Act
         var loaded = new List<ProviderDetails>();
@@ -95,7 +93,7 @@ public sealed class ProviderSourceTests : IDisposable
 
         DatabaseTestUtils.CreateV4Database(first, firstVersion);
         DatabaseTestUtils.CreateV4Database(second, secondVersion);
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         // Act
         var loaded = new List<ProviderDetails>();
@@ -118,14 +116,14 @@ public sealed class ProviderSourceTests : IDisposable
         // Arrange
         var dbPath = CreateTempDb();
         DatabaseTestUtils.CreateV4Database(dbPath, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         // Act
         var result = await ProviderSource.ValidateSourceSchemasAsync(dbPath, logger, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(result);
-        logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
     }
 
     [Fact]
@@ -137,16 +135,14 @@ public sealed class ProviderSourceTests : IDisposable
         var bad = Path.Combine(dir, "bad.db");
         DatabaseTestUtils.CreateV4Database(good, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
         DatabaseTestUtils.CreateUnknownShapeDatabase(bad);
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         // Act
         var result = await ProviderSource.ValidateSourceSchemasAsync(dir, logger, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.False(result);
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(handler =>
-            handler.ToString().Contains("unrecognized schema") &&
-            handler.ToString().Contains(bad)));
+        Assert.True(logger.Contains(LogLevel.Error, "unrecognized schema", bad));
     }
 
     [Fact]
@@ -158,14 +154,14 @@ public sealed class ProviderSourceTests : IDisposable
         var evtxPath = Path.Combine(dir, "ignored.evtx");
         DatabaseTestUtils.CreateV4Database(dbPath, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
         File.WriteAllBytes(evtxPath, new byte[] { 0x00 });
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         // Act
         var result = await ProviderSource.ValidateSourceSchemasAsync(dir, logger, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(result);
-        logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
     }
 
     [Fact]
@@ -177,14 +173,14 @@ public sealed class ProviderSourceTests : IDisposable
         var second = Path.Combine(dir, "second.db");
         DatabaseTestUtils.CreateV4Database(first, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
         DatabaseTestUtils.CreateV4Database(second, DatabaseTestUtils.BuildProviderDetails(Constants.SecondProviderName));
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         // Act
         var result = await ProviderSource.ValidateSourceSchemasAsync(dir, logger, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(result);
-        logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
     }
 
     [Fact]
@@ -194,14 +190,14 @@ public sealed class ProviderSourceTests : IDisposable
         // entirely (the evtx-specific load path goes through MtaProviderSource elsewhere).
         var evtxPath = CreateTempPath(".evtx");
         File.WriteAllBytes(evtxPath, new byte[] { 0x00 });
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         // Act
         var result = await ProviderSource.ValidateSourceSchemasAsync(evtxPath, logger, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(result);
-        logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
     }
 
     [Fact]
@@ -210,17 +206,14 @@ public sealed class ProviderSourceTests : IDisposable
         // Arrange
         var dbPath = CreateTempDb();
         DatabaseTestUtils.CreateV3Database(dbPath);
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         // Act
         var result = await ProviderSource.ValidateSourceSchemasAsync(dbPath, logger, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.False(result);
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(handler =>
-            handler.ToString().Contains("schema v3") &&
-            handler.ToString().Contains(dbPath) &&
-            handler.ToString().Contains("upgrade")));
+        Assert.True(logger.Contains(LogLevel.Error, "schema v3", dbPath, "upgrade"));
     }
 
     [Fact]
@@ -229,16 +222,14 @@ public sealed class ProviderSourceTests : IDisposable
         // Arrange
         var dbPath = CreateTempDb();
         DatabaseTestUtils.CreateUnknownShapeDatabase(dbPath);
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         // Act
         var result = await ProviderSource.ValidateSourceSchemasAsync(dbPath, logger, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.False(result);
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(handler =>
-            handler.ToString().Contains("unrecognized schema") &&
-            handler.ToString().Contains(dbPath)));
+        Assert.True(logger.Contains(LogLevel.Error, "unrecognized schema", dbPath));
     }
 
     private string CreateTempDb()

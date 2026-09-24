@@ -10,6 +10,10 @@ namespace EventLogExpert.Logging.Tests.Sinks;
 public sealed class UIStreamingSinkTests
 {
     [Fact]
+    public void Constructor_NullProgress_Throws() =>
+        Assert.Throws<ArgumentNullException>(static () => new UIStreamingSink(null!, LogLevel.Information));
+
+    [Fact]
     public void Emit_AtOrAboveMinimum_ReportsTheRecord()
     {
         var captured = new List<LogRecord>();
@@ -18,7 +22,7 @@ public sealed class UIStreamingSinkTests
 
         sink.Emit(record);
 
-        Assert.Same(record, Assert.Single(captured));
+        Assert.Equal(record, Assert.Single(captured));
     }
 
     [Fact]
@@ -33,24 +37,31 @@ public sealed class UIStreamingSinkTests
     }
 
     [Fact]
+    public void Emit_NullRecord_Throws()
+    {
+        var sink = new UIStreamingSink(new CapturingProgress([]), LogLevel.Information);
+
+        Assert.Throws<ArgumentNullException>(() => sink.Emit(null!));
+    }
+
+    [Fact]
+    public void Emit_WithDebugDetail_StripsDebugDetailBeforeReporting()
+    {
+        var captured = new List<LogRecord>();
+        var sink = new UIStreamingSink(new CapturingProgress(captured), LogLevel.Information);
+
+        sink.Emit(new LogRecord(DateTime.UtcNow, LogLevel.Error, "visible", DebugDetail: "hidden stack"));
+
+        Assert.Null(Assert.Single(captured).DebugDetail);
+    }
+
+    [Fact]
     public void MinimumLevelFor_ReturnsTheConfiguredLevel_RegardlessOfCategory()
     {
         var sink = new UIStreamingSink(new CapturingProgress([]), LogLevel.Trace);
 
         Assert.Equal(LogLevel.Trace, sink.MinimumLevelFor("DatabaseTools.Create"));
         Assert.Equal(LogLevel.Trace, sink.MinimumLevelFor("App"));
-    }
-
-    [Fact]
-    public void Constructor_NullProgress_Throws() =>
-        Assert.Throws<ArgumentNullException>(static () => new UIStreamingSink(null!, LogLevel.Information));
-
-    [Fact]
-    public void Emit_NullRecord_Throws()
-    {
-        var sink = new UIStreamingSink(new CapturingProgress([]), LogLevel.Information);
-
-        Assert.Throws<ArgumentNullException>(() => sink.Emit(null!));
     }
 
     private sealed class CapturingProgress(List<LogRecord> captured) : IProgress<LogRecord>

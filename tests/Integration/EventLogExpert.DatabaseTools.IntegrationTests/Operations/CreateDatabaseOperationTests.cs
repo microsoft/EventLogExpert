@@ -1,16 +1,15 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
 using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Eventing.TestUtils.Constants;
-using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Database.Hashing;
 using Microsoft.Data.Sqlite;
-using NSubstitute;
+using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.DatabaseTools.IntegrationTests.Operations;
@@ -34,7 +33,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         DatabaseTestUtils.CreateV4Database(Path.Combine(dir, "b.db"), stamped);
 
         var path = CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, dir, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
@@ -44,7 +43,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var single = Assert.Single(verify.ProviderDetails.ToList());
         Assert.Equal(Constants.FirstProviderName, single.ProviderName);
         Assert.StartsWith(VersionKeyCalculator.SchemePrefix, single.VersionKey);
-        logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
     }
 
     [Fact]
@@ -68,7 +67,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
             .ToArray();
         DatabaseTestUtils.CreateV4Database(source, providers);
 
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         var outcome = await new CreateDatabaseOperation(new CreateDatabaseRequest(
                 path, source, FilterRegex: null, SkipProvidersInFile: null, Overwrite: true))
@@ -98,7 +97,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
             .ToArray();
         DatabaseTestUtils.CreateV4Database(source, providers);
 
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
         using var cts = new CancellationTokenSource();
         var progress = new CancelWhenProcessedReaches(100, cts);
 
@@ -137,7 +136,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
 
         var backupPath = path + ".bak";
         _tempPaths.Add(backupPath);
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
         using var cts = new CancellationTokenSource();
         FileStream? backupLock = null;
         var progress = new LockBackupThenCancel(100, cts, backupPath, stream => backupLock = stream);
@@ -150,9 +149,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
 
             Assert.Equal(DatabaseToolsOutcome.Cancelled, outcome);
             Assert.True(File.Exists(backupPath), "Backup must be preserved when the restore is blocked.");
-            logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
-                h.ToString().Contains("Could not restore the original database from backup") &&
-                h.ToString().Contains(backupPath)));
+            Assert.True(logger.Contains(LogLevel.Error, "Could not restore the original database from backup", backupPath));
         }
         finally
         {
@@ -170,7 +167,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var source = CreateTempPath();
         DatabaseTestUtils.CreateV4Database(source, DatabaseTestUtils.BuildProviderDetails(Constants.SecondProviderName));
 
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         var outcome = await new CreateDatabaseOperation(new CreateDatabaseRequest(
                 path, source, new Regex("ZZZ_NoMatch_ZZZ", RegexOptions.IgnoreCase), SkipProvidersInFile: null, Overwrite: true))
@@ -193,7 +190,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         DatabaseTestUtils.CreateV4Database(source, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
 
         var path = CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
@@ -210,15 +207,14 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     {
         // Mutual-exclusivity validation must beat source validation for a clear user error.
         var path = CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
-        logger.ForCategory(Arg.Any<string>()).Returns(logger);
+        var logger = new CapturingTraceLogger();
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(
             path, SourcePath: @"C:\src.db", FilterRegex: null, SkipProvidersInFile: null, OfflineImagePath: @"X:\"))
             .ExecuteAsync(logger, null, CancellationToken.None);
 
         Assert.False(File.Exists(path), "No file should be written when a source and an offline image are both given.");
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h => h.ToString().Contains("source OR an offline image")));
+        Assert.True(logger.Contains(LogLevel.Error, "source OR an offline image"));
     }
 
     [Fact]
@@ -226,13 +222,12 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     {
         var path = DatabaseTestUtils.CreateTempPath(".txt");
         _tempPaths.Add(path);
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, null, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
         Assert.False(File.Exists(path), "No file should be written when the extension is wrong.");
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
-            h.ToString().Contains("File extension must be .db")));
+        Assert.True(logger.Contains(LogLevel.Error, "File extension must be .db"));
     }
 
     [Fact]
@@ -245,18 +240,16 @@ public sealed class CreateDatabaseCommandTests : IDisposable
             DatabaseTestUtils.BuildProviderDetails(Constants.SecondProviderName));
 
         var path = CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         var operation = new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, new Regex("ZZZ_NoMatch_ZZZ", RegexOptions.IgnoreCase), null));
         var outcome = await operation.ExecuteAsync(logger, null, CancellationToken.None);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, outcome);
-        Assert.Equal("No providers could be resolved from the source, so no database was created.", operation.FailureSummary);
+        Assert.Equal(DatabaseToolsLogKeys.CreateFailureNoProvidersResolved, operation.FailureSummary?.Key);
         Assert.False(File.Exists(path), "No file should be written when zero providers were resolved.");
-        logger.Received(1).Warning(Arg.Is<WarningLogHandler>(h =>
-            h.ToString().Contains("No provider details could be resolved") &&
-            h.ToString().Contains("Database was not created")));
-        logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
+        Assert.True(logger.Contains(LogLevel.Warning, "No provider details could be resolved", "Database was not created"));
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
     }
 
     [Fact]
@@ -271,7 +264,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         DatabaseTestUtils.CreateV4Database(source, providers);
 
         var path = CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
@@ -283,8 +276,8 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var lastName = verify.ProviderDetails.OrderBy(r => r.ProviderName).Last().ProviderName;
         Assert.Equal("Provider-0000", firstName);
         Assert.Equal($"Provider-{ProviderCount - 1:D4}", lastName);
-        logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
-        logger.DidNotReceive().Warning(Arg.Any<WarningLogHandler>());
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Warning);
     }
 
     [Fact]
@@ -302,18 +295,16 @@ public sealed class CreateDatabaseCommandTests : IDisposable
             DatabaseTestUtils.BuildProviderDetails(Constants.SecondProviderName));
 
         var path = CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         var operation = new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, skipSource));
         var outcome = await operation.ExecuteAsync(logger, null, CancellationToken.None);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, outcome);
-        Assert.Equal("No providers could be resolved from the source, so no database was created.", operation.FailureSummary);
+        Assert.Equal(DatabaseToolsLogKeys.CreateFailureNoProvidersResolved, operation.FailureSummary?.Key);
         Assert.False(File.Exists(path), "No file should be written when the skip-set excludes all providers.");
-        logger.Received(1).Warning(Arg.Is<WarningLogHandler>(h =>
-            h.ToString().Contains("No provider details could be resolved") &&
-            h.ToString().Contains("Database was not created")));
-        logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
+        Assert.True(logger.Contains(LogLevel.Warning, "No provider details could be resolved", "Database was not created"));
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
     }
 
     [Fact]
@@ -330,7 +321,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
             DatabaseTestUtils.BuildProviderDetails(Constants.SharedProviderName));
 
         var path = CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, skipSource)).ExecuteAsync(logger, null, CancellationToken.None);
 
@@ -339,8 +330,8 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         using var verify = new ProviderDbContext(path, readOnly: true, ensureCreated: false);
         var names = verify.ProviderDetails.Select(r => r.ProviderName).OrderBy(n => n).ToList();
         Assert.Equal(new[] { Constants.FirstProviderName, Constants.SecondProviderName }, names);
-        logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
-        logger.DidNotReceive().Warning(Arg.Any<WarningLogHandler>());
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Warning);
     }
 
     [Fact]
@@ -353,13 +344,12 @@ public sealed class CreateDatabaseCommandTests : IDisposable
             DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
 
         var missingSkipSource = DatabaseTestUtils.CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, missingSkipSource)).ExecuteAsync(logger, null, CancellationToken.None);
 
         Assert.False(File.Exists(path), "No file should be written when the skip-source is missing.");
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
-            h.ToString().Contains("Source not found") && h.ToString().Contains(missingSkipSource)));
+        Assert.True(logger.Contains(LogLevel.Error, "Source not found", missingSkipSource));
     }
 
     [Fact]
@@ -367,13 +357,12 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     {
         var path = CreateTempPath();
         var missingSource = DatabaseTestUtils.CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, missingSource, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
         Assert.False(File.Exists(path), "No file should be written when the source is missing.");
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
-            h.ToString().Contains("Source not found") && h.ToString().Contains(missingSource)));
+        Assert.True(logger.Contains(LogLevel.Error, "Source not found", missingSource));
     }
 
     [Fact]
@@ -385,7 +374,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
             DatabaseTestUtils.BuildProviderDetails(Constants.SecondProviderName, Constants.OwningPublisherName));
 
         var path = CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
@@ -399,8 +388,8 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         Assert.Equal(Constants.SecondProviderName, rows[1].ProviderName);
         Assert.Equal(Constants.OwningPublisherName, rows[1].ResolvedFromOwningPublisher);
         // Success must not emit stale zero-provider warnings.
-        logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
-        logger.DidNotReceive().Warning(Arg.Any<WarningLogHandler>());
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Warning);
     }
 
     [Fact]
@@ -415,7 +404,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var source = CreateTempPath();
         DatabaseTestUtils.CreateV4Database(source, DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
 
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         var outcome = await new CreateDatabaseOperation(new CreateDatabaseRequest(
                 path, source, FilterRegex: null, SkipProvidersInFile: null, Overwrite: true))
@@ -425,7 +414,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         Assert.False(File.Exists(path), "Target must not be created while a stale .bak is present.");
         Assert.True(File.Exists(backupPath), "The stale backup must be left untouched.");
         Assert.Equal("STALE_BACKUP_CONTENT", File.ReadAllText(backupPath));
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h => h.ToString().Contains("recovery backup")));
+        Assert.True(logger.Contains(LogLevel.Error, "recovery backup"));
     }
 
     [Fact]
@@ -434,28 +423,26 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var path = CreateTempPath();
         var sentinel = new byte[] { 0xDE, 0xAD, 0xBE, 0xEF };
         File.WriteAllBytes(path, sentinel);
-        var logger = Substitute.For<ITraceLogger>();
+        var logger = new CapturingTraceLogger();
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(path, null, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
         Assert.Equal(sentinel, File.ReadAllBytes(path));
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
-            h.ToString().Contains("file already exists") && h.ToString().Contains(path)));
+        Assert.True(logger.Contains(LogLevel.Error, "file already exists", path));
     }
 
     [Fact]
     public async Task CreateDatabase_WhenWimImageFileMissing_LogsErrorAndDoesNotCreateFile()
     {
         var path = CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
-        logger.ForCategory(Arg.Any<string>()).Returns(logger);
+        var logger = new CapturingTraceLogger();
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(
             path, SourcePath: null, FilterRegex: null, SkipProvidersInFile: null, OfflineImagePath: @"X:\missing.wim",
             ImageKind: OfflineImageKind.Wim, WimIndex: 1)).ExecuteAsync(logger, null, CancellationToken.None);
 
         Assert.False(File.Exists(path), "A missing WIM file is rejected; no file should be written.");
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h => h.ToString().Contains("WIM image file not found")));
+        Assert.True(logger.Contains(LogLevel.Error, "WIM image file not found"));
     }
 
     [Fact]
@@ -463,15 +450,14 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     {
         // WimIndex on a directory image must fail instead of being silently ignored.
         var path = CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
-        logger.ForCategory(Arg.Any<string>()).Returns(logger);
+        var logger = new CapturingTraceLogger();
 
         await new CreateDatabaseOperation(new CreateDatabaseRequest(
             path, SourcePath: null, FilterRegex: null, SkipProvidersInFile: null, OfflineImagePath: @"X:\",
             ImageKind: OfflineImageKind.Directory, WimIndex: 1)).ExecuteAsync(logger, null, CancellationToken.None);
 
         Assert.False(File.Exists(path), "WimIndex applies only to WIM images; no file should be written.");
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h => h.ToString().Contains("--wim-index applies only to")));
+        Assert.True(logger.Contains(LogLevel.Error, "--wim-index applies only to"));
     }
 
     public void Dispose()

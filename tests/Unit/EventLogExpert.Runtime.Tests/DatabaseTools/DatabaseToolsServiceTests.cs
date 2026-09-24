@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
 using EventLogExpert.DatabaseTools.DiffDatabase;
@@ -9,7 +10,6 @@ using EventLogExpert.DatabaseTools.ShowProviders;
 using EventLogExpert.DatabaseTools.UpgradeDatabase;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.DatabaseTools;
-using EventLogExpert.Runtime.Tests.TestUtils;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Runtime.Tests.DatabaseTools;
@@ -21,9 +21,9 @@ public sealed class DatabaseToolsServiceTests
     {
         var fake = new RecordingOperation(logger =>
         {
-            logger.Information($"one");
-            logger.Information($"two");
-            logger.Warning($"three");
+            logger.Data(LogLevel.Information, "one");
+            logger.Data(LogLevel.Information, "two");
+            logger.Data(LogLevel.Warning, "three");
             return Task.FromResult(DatabaseToolsOutcome.Succeeded);
         });
         var (service, _) = CreateSut(showOperation: () => fake);
@@ -69,41 +69,25 @@ public sealed class DatabaseToolsServiceTests
             new ShowProvidersRequest(null, null), logProgress, progress: null, CancellationToken.None);
 
         Assert.Equal(DatabaseToolsOutcome.Succeeded, result.Outcome);
-        Assert.Null(result.FailureSummary);
+        Assert.Null(result.Summary);
     }
 
     [Fact]
-    public async Task OperationThrowsException_NullTraceLogger_StillFailedDiagnostic_NoOperationLogError()
+    public async Task OperationThrowsException_ResultIsFailedDiagnostic_NoOperationLogError()
     {
         var fake = new RecordingOperation(_ => throw new InvalidOperationException("boom"));
-        var (service, _) = CreateSut(showOperation: () => fake, traceLogger: null);
+        var (service, _) = CreateSut(showOperation: () => fake);
         var logProgress = new ListProgress<LogRecord>();
 
         var result = await service.ShowAsync(
             new ShowProvidersRequest(null, null), logProgress, progress: null, CancellationToken.None);
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.Equal("InvalidOperationException: boom", result.FailureSummary);
+        Assert.Equal(DatabaseToolsLogKeys.GenericDiagnosticFailure, result.Summary?.Key);
         Assert.True(result.SummaryIsDiagnostic);
+        Assert.Contains("InvalidOperationException", result.DiagnosticDetail);
+        Assert.Contains("boom", result.DiagnosticDetail);
         Assert.DoesNotContain(logProgress.Entries, e => e.Level == LogLevel.Error);
-    }
-
-    [Fact]
-    public async Task OperationThrowsException_ResultIsFailedDiagnostic_FullExceptionToTraceLogger_NotOperationLog()
-    {
-        var fake = new RecordingOperation(_ => throw new InvalidOperationException("boom"));
-        var traceLogger = new LoggerUtils.RecordingTraceLogger();
-        var (service, _) = CreateSut(showOperation: () => fake, traceLogger: traceLogger);
-        var logProgress = new ListProgress<LogRecord>();
-
-        var result = await service.ShowAsync(
-            new ShowProvidersRequest(null, null), logProgress, progress: null, CancellationToken.None);
-
-        Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-        Assert.Equal("InvalidOperationException: boom", result.FailureSummary);
-        Assert.True(result.SummaryIsDiagnostic);
-        Assert.DoesNotContain(logProgress.Entries, e => e.Level == LogLevel.Error);
-        Assert.Contains(traceLogger.ErrorMessages, m => m.Contains("InvalidOperationException") && m.Contains("boom"));
     }
 
     [Fact]
@@ -117,7 +101,7 @@ public sealed class DatabaseToolsServiceTests
             new ShowProvidersRequest(null, null), logProgress, progress: null, CancellationToken.None);
 
         Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
-        Assert.Null(result.FailureSummary);
+        Assert.Null(result.Summary);
     }
 
     [Fact]
@@ -191,8 +175,8 @@ public sealed class DatabaseToolsServiceTests
     {
         var fake = new RecordingOperation(logger =>
         {
-            logger.Trace($"trace-line");
-            logger.Information($"info-line");
+            logger.Data(LogLevel.Trace, "trace-line");
+            logger.Data(LogLevel.Information, "info-line");
             return Task.FromResult(DatabaseToolsOutcome.Succeeded);
         });
         var (service, _) = CreateSut(showOperation: () => fake);
@@ -223,8 +207,7 @@ public sealed class DatabaseToolsServiceTests
         Func<IDatabaseToolsOperation>? createOperation = null,
         Func<IDatabaseToolsOperation>? mergeOperation = null,
         Func<IDatabaseToolsOperation>? diffOperation = null,
-        Func<IDatabaseToolsOperation>? upgradeOperation = null,
-        ITraceLogger? traceLogger = null)
+        Func<IDatabaseToolsOperation>? upgradeOperation = null)
     {
         var factory = new FakeOperationFactory
         {
@@ -235,7 +218,7 @@ public sealed class DatabaseToolsServiceTests
             UpgradeFactory = upgradeOperation ?? (() => new RecordingOperation(DatabaseToolsOutcome.Succeeded))
         };
 
-        return (new DatabaseToolsService(factory, traceLogger), factory);
+        return (new DatabaseToolsService(factory), factory);
     }
 
     private sealed class FakeOperationFactory : IDatabaseToolsOperationFactory
@@ -280,20 +263,20 @@ public sealed class DatabaseToolsServiceTests
 
     private sealed class RecordingOperation : IDatabaseToolsOperation
     {
-        private readonly Func<ITraceLogger, Task<DatabaseToolsOutcome>> _body;
+        private readonly Func<IOperationLog, Task<DatabaseToolsOutcome>> _body;
 
         public RecordingOperation(DatabaseToolsOutcome outcome)
             : this(_ => Task.FromResult(outcome)) { }
 
-        public RecordingOperation(Func<ITraceLogger, Task<DatabaseToolsOutcome>> body) => _body = body;
+        public RecordingOperation(Func<IOperationLog, Task<DatabaseToolsOutcome>> body) => _body = body;
 
-        public RecordingOperation(Action<ITraceLogger> body)
+        public RecordingOperation(Action<IOperationLog> body)
             : this(logger => { body(logger); return Task.FromResult(DatabaseToolsOutcome.Succeeded); }) { }
 
         public bool WasInvoked { get; private set; }
 
         public Task<DatabaseToolsOutcome> ExecuteAsync(
-            ITraceLogger logger,
+            IOperationLog logger,
             IProgress<DatabaseToolsProgress>? progress,
             CancellationToken cancellationToken)
         {

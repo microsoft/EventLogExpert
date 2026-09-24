@@ -46,7 +46,7 @@ public sealed class MergeDatabaseCommand
         mergeDatabaseCommand.SetAction(async (action, cancellationToken) =>
         {
             await using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
-            var logger = sp.GetRequiredService<ITraceLogger>();
+            var logger = sp.GetRequiredService<IOperationLog>();
 
             var request = new MergeDatabaseRequest(
                 action.GetRequiredValue(sourceArgument),

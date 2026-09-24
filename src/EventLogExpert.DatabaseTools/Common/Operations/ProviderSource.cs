@@ -7,6 +7,7 @@ using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.Provider.Schema;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Data.Common;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -39,7 +40,7 @@ internal static class ProviderSource
     /// </summary>
     public static async Task<IReadOnlyList<ProviderIdentity>> LoadProviderIdentitiesAsync(
         string path,
-        ITraceLogger logger,
+        IOperationLog logger,
         Regex? regex = null,
         CancellationToken cancellationToken = default)
     {
@@ -55,11 +56,13 @@ internal static class ProviderSource
             }
         }
 
-        return identities
-            .OrderBy(identity => identity.ProviderName, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(identity => identity.ProviderName, StringComparer.Ordinal)
-            .ThenBy(identity => identity.VersionKey, StringComparer.Ordinal)
-            .ToList();
+        return
+        [
+            .. identities
+                .OrderBy(identity => identity.ProviderName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(identity => identity.ProviderName, StringComparer.Ordinal)
+                .ThenBy(identity => identity.VersionKey, StringComparer.Ordinal)
+        ];
     }
 
     /// <summary>
@@ -69,7 +72,7 @@ internal static class ProviderSource
     /// </summary>
     public static async Task<IReadOnlyList<string>> LoadProviderNamesAsync(
         string path,
-        ITraceLogger logger,
+        IOperationLog logger,
         Regex? regex = null,
         CancellationToken cancellationToken = default)
     {
@@ -85,7 +88,7 @@ internal static class ProviderSource
             }
         }
 
-        return regex is null ? names.ToList() : names.Where(n => regex.IsMatch(n)).ToList();
+        return regex is null ? [.. names] : [.. names.Where(n => regex.IsMatch(n))];
     }
 
     /// <summary>
@@ -96,16 +99,22 @@ internal static class ProviderSource
     /// </summary>
     public static IAsyncEnumerable<ProviderDetails> LoadProvidersAsync(
         string path,
-        ITraceLogger logger,
+        IOperationLog logger,
         Regex? regex = null,
         IReadOnlySet<string>? excludeProviderNames = null,
         IReadOnlySet<ProviderIdentity>? skipIdentities = null,
         IReadOnlyList<string>? preDiscoveredProviderNames = null,
         CancellationToken cancellationToken = default) =>
-        LoadProvidersIteratorAsync(path, logger, regex, excludeProviderNames, skipIdentities, preDiscoveredProviderNames, cancellationToken);
+        LoadProvidersIteratorAsync(path,
+            logger,
+            regex,
+            excludeProviderNames,
+            skipIdentities,
+            preDiscoveredProviderNames,
+            cancellationToken);
 
     /// <summary>Validates that <paramref name="path" /> exists and has a recognized form.</summary>
-    public static bool TryValidate(string path, ITraceLogger logger)
+    public static bool TryValidate(string path, IOperationLog logger)
     {
         if (Directory.Exists(path))
         {
@@ -115,18 +124,23 @@ internal static class ProviderSource
             try
             {
                 Directory.GetFiles(path);
+
                 return true;
             }
             catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
             {
-                logger.Error($"Cannot read source folder '{path}': {ex.Message}");
+                logger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.ProviderSourceCannotReadFolder, [path]),
+                    ex);
+
                 return false;
             }
         }
 
         if (!File.Exists(path))
         {
-            logger.Error($"Source not found: {path}");
+            logger.User(LogLevel.Error, new LocalizableText(DatabaseToolsLogKeys.ProviderSourceNotFound, [path]));
+
             return false;
         }
 
@@ -138,11 +152,13 @@ internal static class ProviderSource
             return true;
         }
 
-        logger.Error($"Unsupported source file extension '{extension}'. Expected .db, .evtx, or a folder containing them.");
+        logger.User(LogLevel.Error,
+            new LocalizableText(DatabaseToolsLogKeys.ProviderSourceUnsupportedExtension, [extension]));
+
         return false;
     }
 
-    public static async Task<bool> ValidateSourceSchemasAsync(string path, ITraceLogger logger, CancellationToken cancellationToken = default)
+    public static async Task<bool> ValidateSourceSchemasAsync(string path, IOperationLog logger, CancellationToken cancellationToken = default)
     {
         var allOk = true;
 
@@ -157,7 +173,7 @@ internal static class ProviderSource
 
             try
             {
-                await using var providerContext = new ProviderDbContext(file, true, false, logger);
+                await using var providerContext = new ProviderDbContext(file, true, false, logger.Trace);
 
                 if (!IsSourceSchemaCurrent(providerContext, file, logger))
                 {
@@ -166,7 +182,10 @@ internal static class ProviderSource
             }
             catch (DbException ex)
             {
-                logger.Error($"Cannot open source database '{file}': {ex.Message}");
+                logger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.ProviderSourceCannotOpenDatabase, [file]),
+                    ex);
+
                 allOk = false;
             }
         }
@@ -178,11 +197,12 @@ internal static class ProviderSource
     ///     Expands <paramref name="path" /> into the ordered list of source files: a single .db or .evtx when given a
     ///     file; or all *.db files (sorted) followed by all *.evtx files (sorted) when given a folder.
     /// </summary>
-    private static IEnumerable<string> EnumerateSourceFiles(string path, ITraceLogger logger)
+    private static IEnumerable<string> EnumerateSourceFiles(string path, IOperationLog logger)
     {
         if (!Directory.Exists(path))
         {
             yield return path;
+
             yield break;
         }
 
@@ -198,7 +218,10 @@ internal static class ProviderSource
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
         {
-            logger.Error($"Cannot read source folder '{path}': {ex.Message}");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.ProviderSourceCannotReadFolder, [path]),
+                ex);
+
             yield break;
         }
 
@@ -221,7 +244,7 @@ internal static class ProviderSource
         foreach (var f in evtxFiles) { yield return f; }
     }
 
-    private static bool IsSourceSchemaCurrent(ProviderDbContext context, string file, ITraceLogger logger)
+    private static bool IsSourceSchemaCurrent(ProviderDbContext context, string file, IOperationLog logger)
     {
         DatabaseSchemaState state;
 
@@ -231,30 +254,28 @@ internal static class ProviderSource
         }
         catch (SchemaLockTimeoutException ex)
         {
-            logger.Error($"Cannot read source database '{file}': {ex.Message}");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.ProviderSourceCannotReadDatabase, [file]),
+                ex);
 
             return false;
         }
 
         if (!state.NeedsUpgrade) { return true; }
 
-        if (state.CurrentVersion == DatabaseSchemaVersion.Unknown)
-        {
-            logger.Error(
-                $"{SchemaStateMessages.UnrecognizedSchema(SchemaStateMessages.SourceLabel, file)}");
-        }
-        else
-        {
-            logger.Error(
-                $"Source database '{file}' is at schema v{state.CurrentVersion} but v{DatabaseSchemaVersion.Current} is required. Run the 'upgrade' command on the source first.");
-        }
+        logger.User(LogLevel.Error,
+            state.CurrentVersion == DatabaseSchemaVersion.Unknown ?
+                new LocalizableText(DatabaseToolsLogKeys.SchemaUnrecognizedSource, [file]) :
+                new LocalizableText(
+                    DatabaseToolsLogKeys.ProviderSourceNeedsUpgrade,
+                    [file, state.CurrentVersion.ToString(), DatabaseSchemaVersion.Current.ToString()]));
 
         return false;
     }
 
     private static async Task<IReadOnlyList<ProviderDetails>> LoadDbDetailsAsync(
         string file,
-        ITraceLogger logger,
+        IOperationLog logger,
         Regex? regex,
         IReadOnlySet<string>? excludeProviderNames,
         IReadOnlySet<ProviderIdentity>? skipIdentities,
@@ -263,7 +284,7 @@ internal static class ProviderSource
     {
         try
         {
-            await using var context = new ProviderDbContext(file, true, false, logger);
+            await using var context = new ProviderDbContext(file, true, false, logger.Trace);
 
             if (!IsSourceSchemaCurrent(context, file, logger)) { return []; }
 
@@ -337,7 +358,9 @@ internal static class ProviderSource
         }
         catch (Exception ex) when (ex is DbException or JsonException or InvalidDataException)
         {
-            logger.Warning($"Skipping invalid database file '{file}': {ex.Message}");
+            logger.User(LogLevel.Warning,
+                new LocalizableText(DatabaseToolsLogKeys.ProviderSourceSkippingInvalidDatabase, [file]),
+                ex);
 
             return [];
         }
@@ -345,7 +368,7 @@ internal static class ProviderSource
 
     private static async Task<IReadOnlyList<ProviderIdentity>> LoadIdentitiesFromFileAsync(
         string file,
-        ITraceLogger logger,
+        IOperationLog logger,
         CancellationToken cancellationToken)
     {
         var ext = Path.GetExtension(file);
@@ -354,7 +377,7 @@ internal static class ProviderSource
         {
             try
             {
-                await using var providerContext = new ProviderDbContext(file, true, false, logger);
+                await using var providerContext = new ProviderDbContext(file, true, false, logger.Trace);
 
                 if (!IsSourceSchemaCurrent(providerContext, file, logger)) { return []; }
 
@@ -363,11 +386,13 @@ internal static class ProviderSource
                     .Select(p => new { p.ProviderName, p.VersionKey })
                     .ToListAsync(cancellationToken);
 
-                return pairs.Select(p => new ProviderIdentity(p.ProviderName, p.VersionKey)).ToList();
+                return [.. pairs.Select(p => new ProviderIdentity(p.ProviderName, p.VersionKey))];
             }
             catch (DbException ex)
             {
-                logger.Warning($"Skipping invalid database file '{file}': {ex.Message}");
+                logger.User(LogLevel.Warning,
+                    new LocalizableText(DatabaseToolsLogKeys.ProviderSourceSkippingInvalidDatabase, [file]),
+                    ex);
 
                 return [];
             }
@@ -376,17 +401,20 @@ internal static class ProviderSource
         if (string.Equals(ext, EvtxExtension, StringComparison.OrdinalIgnoreCase))
         {
             // Live providers from an exported log expose only a name (no content version), so their identity is (name, empty).
-            return MtaProviderSource.DiscoverProviderNames(file, logger)
-                .Select(name => new ProviderIdentity(name, string.Empty))
-                .ToList();
+            return
+            [
+                .. MtaProviderSource.DiscoverProviderNames(file, logger.Trace)
+                    .Select(name => new ProviderIdentity(name, string.Empty))
+            ];
         }
 
-        logger.Warning($"Skipping unsupported source file: {file}");
+        logger.User(LogLevel.Warning,
+            new LocalizableText(DatabaseToolsLogKeys.ProviderSourceSkippingUnsupportedFile, [file]));
 
         return [];
     }
 
-    private static async Task<IReadOnlyList<string>> LoadNamesFromFileAsync(string file, ITraceLogger logger, CancellationToken cancellationToken)
+    private static async Task<IReadOnlyList<string>> LoadNamesFromFileAsync(string file, IOperationLog logger, CancellationToken cancellationToken)
     {
         var ext = Path.GetExtension(file);
 
@@ -394,14 +422,18 @@ internal static class ProviderSource
         {
             try
             {
-                await using var providerContext = new ProviderDbContext(file, true, false, logger);
+                await using var providerContext = new ProviderDbContext(file, true, false, logger.Trace);
 
                 return !IsSourceSchemaCurrent(providerContext, file, logger) ? [] :
-                    await providerContext.ProviderDetails.AsNoTracking().Select(p => p.ProviderName).ToListAsync(cancellationToken);
+                    await providerContext.ProviderDetails.AsNoTracking()
+                        .Select(p => p.ProviderName)
+                        .ToListAsync(cancellationToken);
             }
             catch (DbException ex)
             {
-                logger.Warning($"Skipping invalid database file '{file}': {ex.Message}");
+                logger.User(LogLevel.Warning,
+                    new LocalizableText(DatabaseToolsLogKeys.ProviderSourceSkippingInvalidDatabase, [file]),
+                    ex);
 
                 return [];
             }
@@ -409,17 +441,18 @@ internal static class ProviderSource
 
         if (string.Equals(ext, EvtxExtension, StringComparison.OrdinalIgnoreCase))
         {
-            return MtaProviderSource.DiscoverProviderNames(file, logger);
+            return MtaProviderSource.DiscoverProviderNames(file, logger.Trace);
         }
 
-        logger.Warning($"Skipping unsupported source file: {file}");
+        logger.User(LogLevel.Warning,
+            new LocalizableText(DatabaseToolsLogKeys.ProviderSourceSkippingUnsupportedFile, [file]));
 
         return [];
     }
 
     private static async IAsyncEnumerable<ProviderDetails> LoadProvidersIteratorAsync(
         string path,
-        ITraceLogger logger,
+        IOperationLog logger,
         Regex? regex,
         IReadOnlySet<string>? excludeProviderNames,
         IReadOnlySet<ProviderIdentity>? skipIdentities,
@@ -432,9 +465,9 @@ internal static class ProviderSource
         // preDiscoveredProviderNames optimization only applies for single-file .evtx sources. For folders and .db
         // sources, name attribution is per-file or not the bottleneck, so we ignore the hint and fall back to per-file
         // discovery. This keeps the optimization scope-local and safe.
-        var canUsePreDiscovered = preDiscoveredProviderNames is not null
-            && files.Count == 1
-            && string.Equals(Path.GetExtension(files[0]), EvtxExtension, StringComparison.OrdinalIgnoreCase);
+        var canUsePreDiscovered = preDiscoveredProviderNames is not null &&
+            files.Count == 1 &&
+            string.Equals(Path.GetExtension(files[0]), EvtxExtension, StringComparison.OrdinalIgnoreCase);
 
         foreach (var file in files)
         {
@@ -446,7 +479,13 @@ internal static class ProviderSource
             {
                 // Materialize the full per-file result before yielding so a mid-read DbException yields nothing for
                 // this file and does not corrupt the cross-file `seen` set. C# also forbids `yield` inside try/catch.
-                var loaded = await LoadDbDetailsAsync(file, logger, regex, excludeProviderNames, skipIdentities, seen, cancellationToken);
+                var loaded = await LoadDbDetailsAsync(file,
+                    logger,
+                    regex,
+                    excludeProviderNames,
+                    skipIdentities,
+                    seen,
+                    cancellationToken);
 
                 foreach (var details in loaded) { yield return details; }
             }
@@ -454,7 +493,13 @@ internal static class ProviderSource
             {
                 var hint = canUsePreDiscovered ? preDiscoveredProviderNames : null;
 
-                foreach (var details in MtaProviderSource.LoadProviders(file, logger, regex, excludeProviderNames, skipIdentities, seen, hint))
+                foreach (var details in MtaProviderSource.LoadProviders(file,
+                    logger.Trace,
+                    regex,
+                    excludeProviderNames,
+                    skipIdentities,
+                    seen,
+                    hint))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
@@ -463,7 +508,8 @@ internal static class ProviderSource
             }
             else
             {
-                logger.Warning($"Skipping unsupported source file: {file}");
+                logger.User(LogLevel.Warning,
+                    new LocalizableText(DatabaseToolsLogKeys.ProviderSourceSkippingUnsupportedFile, [file]));
             }
         }
     }

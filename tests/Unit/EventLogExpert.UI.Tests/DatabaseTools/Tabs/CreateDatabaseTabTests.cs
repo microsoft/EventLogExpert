@@ -262,6 +262,49 @@ public sealed class CreateDatabaseTabTests : BunitContext
     }
 
     [Fact]
+    public void LoadEditionsReturnsDiagnosticFailure_RendersGenericFailure()
+    {
+        Services.GetRequiredService<IElevatedDatabaseToolsRunner>()
+            .ListImageEditionsAsync(default!, default!, Arg.Any<CancellationToken>())
+            .ReturnsForAnyArgs(Task.FromResult(new OfflineImageEditionsResult(
+                DatabaseToolsOutcome.Failed,
+                Editions: null,
+                new LocalizableText("DatabaseTools_Op_EditionsDiagnostic", []))
+            {
+                SummaryIsDiagnostic = true,
+                DiagnosticDetail = "System.InvalidOperationException: Diagnostic detail"
+            }));
+
+        var component = Render<CreateDatabaseTab>();
+        component.Find("#create-source-path").Input(@"C:\images\install.wim");
+        component.FindAll("button").Single(button => button.TextContent.Contains("[[Db_Create_LoadEditions]]")).Click();
+
+        component.WaitForAssertion(() =>
+        {
+            Assert.Contains("[[Db_Create_Editions_Failed]]", component.Markup);
+            Assert.DoesNotContain("Diagnostic detail", component.Markup);
+        });
+    }
+
+    [Fact]
+    public void LoadEditionsReturnsNonDiagnosticFailure_RendersLocalizedSummary()
+    {
+        Services.GetRequiredService<IElevatedDatabaseToolsRunner>()
+            .ListImageEditionsAsync(default!, default!, Arg.Any<CancellationToken>())
+            .ReturnsForAnyArgs(Task.FromResult(new OfflineImageEditionsResult(
+                DatabaseToolsOutcome.Failed,
+                Editions: null,
+                new LocalizableText("DatabaseTools_Op_EditionsTestFailure", ["install.wim"]))));
+
+        var component = Render<CreateDatabaseTab>();
+        component.Find("#create-source-path").Input(@"C:\images\install.wim");
+        component.FindAll("button").Single(button => button.TextContent.Contains("[[Db_Create_LoadEditions]]")).Click();
+
+        component.WaitForAssertion(() =>
+            Assert.Contains("[[DatabaseTools_Op_EditionsTestFailure(install.wim)]]", component.Markup));
+    }
+
+    [Fact]
     public void LoadEditions_FillsTheEmptyIndexBoxWithTheFirstEdition()
     {
         ConfigureEditionsListed(
@@ -453,7 +496,10 @@ public sealed class CreateDatabaseTabTests : BunitContext
         Services.GetRequiredService<IDatabaseToolsService>()
             .CreateAsync(default!, default!, default, default)
             .ReturnsForAnyArgs(Task.FromResult(
-                new DatabaseToolsResult(outcome, outcome == DatabaseToolsOutcome.Failed ? "probe blocked" : null, TimeSpan.Zero)));
+                new DatabaseToolsResult(
+                    outcome,
+                    outcome == DatabaseToolsOutcome.Failed ? new LocalizableText("DatabaseTools_Op_TestFailure", []) : null,
+                    TimeSpan.Zero)));
 
     // Writes during dispatch so File.Exists passes auto-import without pre-triggering overwrite confirmation.
     private List<string> ConfigureCreateSucceededWritingDatabaseFile()
@@ -477,7 +523,7 @@ public sealed class CreateDatabaseTabTests : BunitContext
             .ReturnsForAnyArgs(Task.FromResult(new OfflineImageEditionsResult(
                 DatabaseToolsOutcome.Succeeded,
                 new WimImageList(WimImageListStatus.Ok, editions),
-                FailureSummary: null)));
+                null)));
 
     private IElevatedDatabaseToolsRunner ConfigureElevatedCreateSucceeded()
     {

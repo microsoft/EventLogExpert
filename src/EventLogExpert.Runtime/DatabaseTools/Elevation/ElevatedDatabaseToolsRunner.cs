@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Ipc;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
@@ -10,8 +11,10 @@ using EventLogExpert.DatabaseTools.ShowProviders;
 using EventLogExpert.DatabaseTools.UpgradeDatabase;
 using EventLogExpert.Eventing.OfflineImaging.Wim;
 using EventLogExpert.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
@@ -31,28 +34,52 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
     private readonly TimeSpan _exitGrace;
     private readonly TimeSpan _helloTimeout;
     private readonly IElevatedHelperProcessHost _host;
+    private readonly INeutralTextResolver _neutralTextResolver;
     private readonly ITraceLogger _traceLogger;
 
     public ElevatedDatabaseToolsRunner(IElevatedHelperProcessHost host, ITraceLogger traceLogger)
-        : this(host, traceLogger, s_defaultHelloTimeout, s_defaultCancellationGrace, s_defaultExitGrace) { }
+        : this(host, traceLogger, new KeyNeutralTextResolver()) { }
+
+    public ElevatedDatabaseToolsRunner(
+        IElevatedHelperProcessHost host,
+        ITraceLogger traceLogger,
+        INeutralTextResolver neutralTextResolver)
+        : this(host,
+            traceLogger,
+            neutralTextResolver,
+            s_defaultHelloTimeout,
+            s_defaultCancellationGrace,
+            s_defaultExitGrace) { }
 
     internal ElevatedDatabaseToolsRunner(
         IElevatedHelperProcessHost host,
         ITraceLogger traceLogger,
+        INeutralTextResolver neutralTextResolver,
         TimeSpan helloTimeout,
         TimeSpan cancellationGrace,
         TimeSpan exitGrace)
     {
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(traceLogger);
+        ArgumentNullException.ThrowIfNull(neutralTextResolver);
 
-        if (helloTimeout <= TimeSpan.Zero) { throw new ArgumentOutOfRangeException(nameof(helloTimeout), helloTimeout, "Must be positive."); }
+        if (helloTimeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(helloTimeout), helloTimeout, "Must be positive.");
+        }
 
-        if (cancellationGrace <= TimeSpan.Zero) { throw new ArgumentOutOfRangeException(nameof(cancellationGrace), cancellationGrace, "Must be positive."); }
+        if (cancellationGrace <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(cancellationGrace), cancellationGrace, "Must be positive.");
+        }
 
-        if (exitGrace <= TimeSpan.Zero) { throw new ArgumentOutOfRangeException(nameof(exitGrace), exitGrace, "Must be positive."); }
+        if (exitGrace <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(exitGrace), exitGrace, "Must be positive.");
+        }
 
         _host = host;
+        _neutralTextResolver = neutralTextResolver;
         _traceLogger = traceLogger;
         _helloTimeout = helloTimeout;
         _cancellationGrace = cancellationGrace;
@@ -104,7 +131,11 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
         if (result.Outcome != DatabaseToolsOutcome.Succeeded)
         {
-            return new OfflineImageEditionsResult(result.Outcome, null, result.FailureSummary);
+            return new OfflineImageEditionsResult(result.Outcome, null, result.Summary)
+            {
+                SummaryIsDiagnostic = result.SummaryIsDiagnostic,
+                DiagnosticDetail = result.DiagnosticDetail
+            };
         }
 
         if (editions is null)
@@ -112,7 +143,11 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             return new OfflineImageEditionsResult(
                 DatabaseToolsOutcome.Failed,
                 null,
-                "The elevation helper reported success but did not return the image editions.");
+                new LocalizableText(DatabaseToolsLogKeys.GenericDiagnosticFailure, []))
+            {
+                SummaryIsDiagnostic = true,
+                DiagnosticDetail = "The elevation helper reported success but did not return the image editions."
+            };
         }
 
         return new OfflineImageEditionsResult(
@@ -145,9 +180,26 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         bool verbose = false) =>
         RunAsync(new UpgradeDatabaseIpcRequest(request, verbose), logProgress, progress, cancellationToken);
 
-    private static async Task DrainPipeAsync(Stream pipe, ChannelWriter<DatabaseToolsIpcMessage> writer, CancellationToken cancellationToken)
+    private static DatabaseToolsResult DiagnosticFailure(string summary, TimeSpan elapsed, Exception? detail = null) =>
+        new(
+            DatabaseToolsOutcome.Failed,
+            new LocalizableText(DatabaseToolsLogKeys.GenericDiagnosticFailure, []),
+            elapsed)
+        {
+            SummaryIsDiagnostic = true,
+            DiagnosticDetail = detail is null ? summary : $"{summary}{Environment.NewLine}{detail}"
+        };
+
+    private static async Task DrainPipeAsync(
+        Stream pipe,
+        ChannelWriter<DatabaseToolsIpcMessage> writer,
+        CancellationToken cancellationToken)
     {
-        using var reader = new StreamReader(pipe, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
+        using var reader = new StreamReader(pipe,
+            s_utf8NoBom,
+            detectEncodingFromByteOrderMarks: false,
+            bufferSize: 4096,
+            leaveOpen: true);
 
         try
         {
@@ -180,8 +232,9 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
                 try
                 {
-                    message = JsonSerializer.Deserialize<DatabaseToolsIpcMessage>(line, DatabaseToolsIpcSerializer.Options)
-                        ?? throw new JsonException("Deserialized message was null.");
+                    message =
+                        JsonSerializer.Deserialize<DatabaseToolsIpcMessage>(line, DatabaseToolsIpcSerializer.Options) ??
+                        throw new JsonException("Deserialized message was null.");
                 }
                 catch (Exception ex)
                 {
@@ -211,10 +264,13 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         }
     }
 
-    private static string Truncate(string s, int max) =>
-        s.Length <= max ? s : s[..max] + "...";
+    private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max] + "...";
 
-    private static async Task WriteJsonLineAsync(Stream pipe, SemaphoreSlim writeLock, string json, CancellationToken cancellationToken)
+    private static async Task WriteJsonLineAsync(
+        Stream pipe,
+        SemaphoreSlim writeLock,
+        string json,
+        CancellationToken cancellationToken)
     {
         var payload = s_utf8NoBom.GetBytes(json + "\n");
 
@@ -231,33 +287,38 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         }
     }
 
-    private static async Task WriteMessageAsync(Stream pipe, SemaphoreSlim writeLock, DatabaseToolsIpcMessage message, CancellationToken cancellationToken)
+    private static async Task WriteMessageAsync(
+        Stream pipe,
+        SemaphoreSlim writeLock,
+        DatabaseToolsIpcMessage message,
+        CancellationToken cancellationToken)
     {
         var json = JsonSerializer.Serialize(message, DatabaseToolsIpcSerializer.Options);
 
         await WriteJsonLineAsync(pipe, writeLock, json, cancellationToken);
     }
 
-    private static async Task WriteRequestAsync(Stream pipe, SemaphoreSlim writeLock, DatabaseToolsIpcRequest request, CancellationToken cancellationToken)
+    private static async Task WriteRequestAsync(
+        Stream pipe,
+        SemaphoreSlim writeLock,
+        DatabaseToolsIpcRequest request,
+        CancellationToken cancellationToken)
     {
         var json = JsonSerializer.Serialize(request, DatabaseToolsIpcSerializer.Options);
 
         await WriteJsonLineAsync(pipe, writeLock, json, cancellationToken);
     }
 
-    private DatabaseToolsResult DiagnosticFailure(string summary, TimeSpan elapsed, Exception? detail = null)
-    {
-        string logMessage = detail is null ? summary : $"{summary}{Environment.NewLine}{detail}";
-        _traceLogger.Error($"{logMessage}");
-
-        return new DatabaseToolsResult(DatabaseToolsOutcome.Failed, summary, elapsed) { SummaryIsDiagnostic = true };
-    }
-
-    private void HandleCallerCancellation(Stream pipeStream, SemaphoreSlim writeLock, IElevatedHelperProcess process, KillState killState)
+    private void HandleCallerCancellation(
+        Stream pipeStream,
+        SemaphoreSlim writeLock,
+        IElevatedHelperProcess process,
+        KillState killState)
     {
         if (!killState.MarkCancelRequested()) { return; }
 
-        _traceLogger.Information($"Caller cancellation requested; sending CancelMessage to helper and starting {_cancellationGrace.TotalSeconds:N0}s grace window.");
+        _traceLogger.Information(
+            $"Caller cancellation requested; sending CancelMessage to helper and starting {_cancellationGrace.TotalSeconds:N0}s grace window.");
 
         _ = Task.Run(async () =>
         {
@@ -267,7 +328,8 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             }
             catch (Exception ex)
             {
-                _traceLogger.Trace($"CancelMessage write threw {ex.GetType().Name}: {ex.Message} (likely helper already exited)");
+                _traceLogger.Trace(
+                    $"CancelMessage write threw {ex.GetType().Name}: {ex.Message} (likely helper already exited)");
             }
         });
 
@@ -280,7 +342,8 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             {
                 await Task.Delay(_cancellationGrace, graceCts.Token);
 
-                _traceLogger.Warning($"Helper did not respond with a Result message within {_cancellationGrace.TotalSeconds:N0}s of CancelMessage - force-killing.");
+                _traceLogger.Warning(
+                    $"Helper did not respond with a Result message within {_cancellationGrace.TotalSeconds:N0}s of CancelMessage - force-killing.");
 
                 if (process.Kill())
                 {
@@ -290,7 +353,8 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 {
                     killState.MarkKillFailed();
 
-                    _traceLogger.Error($"Kill returned false; helper may continue running as orphan. Disposing pipe to unblock drain loop.");
+                    _traceLogger.Error(
+                        $"Kill returned false; helper may continue running as orphan. Disposing pipe to unblock drain loop.");
 
                     try { await ((IAsyncDisposable)process.Pipe).DisposeAsync(); }
                     catch { /* best effort */ }
@@ -319,11 +383,11 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 break;
 
             case ResultMessage { Outcome: DatabaseToolsOutcome.Cancelled } r:
-                _traceLogger.Information($"Helper result: Cancelled ({r.DurationMs} ms). {r.FailureSummary}");
+                _traceLogger.Information($"Helper result: Cancelled ({r.DurationMs} ms). {ResolveSummary(r)}");
                 break;
 
             case ResultMessage r:
-                _traceLogger.Error($"Helper result: Failed ({r.DurationMs} ms). {r.FailureSummary}");
+                _traceLogger.Error($"Helper result: Failed ({r.DurationMs} ms). {ResolveSummary(r)}");
                 break;
 
             case FatalMessage f:
@@ -337,11 +401,15 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 break;
 
             case ProbeMessage p:
-                _traceLogger.Warning($"(unexpected) Probe message received during operation path: processPath={p.ProcessPath}, integrity={p.IntegrityLevel}, packageIdentityOk={p.PackageIdentityOk}");
+                _traceLogger.Warning(
+                    $"(unexpected) Probe message received during operation path: processPath={p.ProcessPath}, integrity={p.IntegrityLevel}, packageIdentityOk={p.PackageIdentityOk}");
+
                 break;
 
             case CancelMessage:
-                _traceLogger.Warning($"(unexpected) CancelMessage received from helper. CancelMessage is a runner-to-helper control message; helpers must not emit it.");
+                _traceLogger.Warning(
+                    $"(unexpected) CancelMessage received from helper. CancelMessage is a runner-to-helper control message; helpers must not emit it.");
+
                 break;
 
             case ImageEditionsMessage e:
@@ -349,6 +417,42 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 break;
         }
     }
+
+    // A force-stopped or orphaned helper never ran its own destructive-recovery cleanup, so surface the localized
+    // recovery guidance as an operation-log line (the Cancelled outcome summary itself is not shown). Skip it when the
+    // helper delivered a terminal message: it responded to cancel, so the "did not respond" wording would be wrong.
+    private void ReportCancellationGuidance(
+        IProgress<LogRecord> logProgress,
+        DatabaseToolsOutcome outcome,
+        KillDisposition killDisposition,
+        bool helperDeliveredTerminalMessage)
+    {
+        if (outcome != DatabaseToolsOutcome.Cancelled || helperDeliveredTerminalMessage) { return; }
+
+        string? guidanceKey = killDisposition switch
+        {
+            KillDisposition.Failed => DatabaseToolsLogKeys.CancelHelperOrphaned,
+            KillDisposition.Succeeded => DatabaseToolsLogKeys.CancelHelperForceStopped,
+            _ => null
+        };
+
+        if (guidanceKey is null) { return; }
+
+        SafeReport(logProgress,
+            new LogRecord(
+                DateTime.UtcNow,
+                LogLevel.Warning,
+                string.Empty,
+                Category: string.Empty,
+                ProcessOrigin: ProcessOrigin.ElevatedHelper,
+                MessageKey: guidanceKey,
+                MessageArgs: []));
+    }
+
+    private string ResolveSummary(ResultMessage result) =>
+        result.SummaryKey is { Length: > 0 } summaryKey ?
+            _neutralTextResolver.Resolve(summaryKey, result.SummaryArgs ?? []) :
+            string.Empty;
 
     private async Task<DatabaseToolsResult> RunAsync(
         DatabaseToolsIpcRequest request,
@@ -381,13 +485,13 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             {
                 _traceLogger.Information($"User declined the UAC prompt.");
 
-                return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, "User declined the UAC prompt.", stopwatch.Elapsed);
+                return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, null, stopwatch.Elapsed);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 _traceLogger.Information($"Caller cancelled before helper spawn completed.");
 
-                return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, "Cancelled before helper spawn completed.", stopwatch.Elapsed);
+                return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, null, stopwatch.Elapsed);
             }
             catch (FileNotFoundException fnf)
             {
@@ -409,6 +513,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             readerStopCts = new CancellationTokenSource();
 
             var pipeStream = process.Pipe;
+
             pipeReaderTask = Task.Run(
                 () => DrainPipeAsync(pipeStream, channel.Writer, readerStopCts.Token),
                 readerStopCts.Token);
@@ -425,15 +530,19 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 {
                     if (hello.HelperProcessId != process.ProcessId)
                     {
-                        _traceLogger.Warning($"Hello.HelperProcessId={hello.HelperProcessId} does not match spawned PID={process.ProcessId}; continuing (PID was already verified at pipe-accept time).");
+                        _traceLogger.Warning(
+                            $"Hello.HelperProcessId={hello.HelperProcessId} does not match spawned PID={process.ProcessId}; continuing (PID was already verified at pipe-accept time).");
                     }
 
                     if (hello.ProtocolVersion != HelloMessage.CurrentProtocolVersion)
                     {
-                        // Kept English and not marked diagnostic: this is actionable user guidance (reinstall the MSIX), not internal detail.
                         return new DatabaseToolsResult(
                             DatabaseToolsOutcome.Failed,
-                            $"Helper IPC protocol version mismatch: helper sent {hello.ProtocolVersion}, runner expected {HelloMessage.CurrentProtocolVersion}. The helper EXE may be from a different app version - reinstall the MSIX so the main app and helper ship together.",
+                            new LocalizableText(DatabaseToolsLogKeys.RunnerProtocolMismatch,
+                            [
+                                hello.ProtocolVersion.ToString(CultureInfo.InvariantCulture),
+                                HelloMessage.CurrentProtocolVersion.ToString(CultureInfo.InvariantCulture)
+                            ]),
                             stopwatch.Elapsed);
                     }
                 }
@@ -446,7 +555,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, "Cancelled before helper handshake.", stopwatch.Elapsed);
+                return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, null, stopwatch.Elapsed);
             }
             catch (OperationCanceledException)
             {
@@ -467,12 +576,13 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             }
             catch (OperationCanceledException)
             {
-                return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, "Cancelled while sending request to helper.", stopwatch.Elapsed);
+                return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, null, stopwatch.Elapsed);
             }
 
             if (cancellationToken.CanBeCanceled)
             {
-                cancelRegistration = cancellationToken.Register(() => HandleCallerCancellation(pipeStream, writeLock, process, killState));
+                cancelRegistration = cancellationToken.Register(() =>
+                    HandleCallerCancellation(pipeStream, writeLock, process, killState));
             }
 
             ResultMessage? result = null;
@@ -489,11 +599,23 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                     switch (message)
                     {
                         case LogMessage log:
-                            SafeReport(logProgress, new LogRecord(log.TimestampUtc, log.Level, log.Message, log.Category, log.ProcessOrigin));
+                            SafeReport(logProgress,
+                                new LogRecord(
+                                    log.TimestampUtc,
+                                    log.Level,
+                                    log.Message,
+                                    log.Category,
+                                    log.ProcessOrigin,
+                                    log.MessageKey,
+                                    log.MessageArgs ?? [],
+                                    log.DebugDetail));
+
                             break;
 
                         case ProgressMessage prog when progress is not null:
-                            SafeReport(progress, new DatabaseToolsProgress(prog.Processed, prog.Total, prog.CurrentItem));
+                            SafeReport(progress,
+                                new DatabaseToolsProgress(prog.Processed, prog.Total, prog.CurrentItem));
+
                             break;
 
                         case ImageEditionsMessage edition when onDataMessage is not null:
@@ -527,10 +649,12 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             try { await killState.KillTaskOrCompleted.WaitAsync(_exitGrace); }
             catch (TimeoutException)
             {
-                _traceLogger.Warning($"kill-timer did not settle within {_exitGrace.TotalSeconds:N0}s; proceeding with current disposition.");
+                _traceLogger.Warning(
+                    $"kill-timer did not settle within {_exitGrace.TotalSeconds:N0}s; proceeding with current disposition.");
             }
 
             int exitCode;
+
             try
             {
                 using var exitCts = new CancellationTokenSource(_exitGrace);
@@ -541,7 +665,8 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             {
                 if (killState.Disposition != KillDisposition.Failed)
                 {
-                    _traceLogger.Warning($"Helper did not exit within {_exitGrace.TotalSeconds:N0}s after IPC drained - force-killing.");
+                    _traceLogger.Warning(
+                        $"Helper did not exit within {_exitGrace.TotalSeconds:N0}s after IPC drained - force-killing.");
 
                     if (process.Kill())
                     {
@@ -551,7 +676,8 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                     {
                         killState.MarkKillFailed();
 
-                        _traceLogger.Error($"Kill returned false; helper may continue running as orphan. Disposing pipe.");
+                        _traceLogger.Error(
+                            $"Kill returned false; helper may continue running as orphan. Disposing pipe.");
 
                         try { await ((IAsyncDisposable)process.Pipe).DisposeAsync(); }
                         catch { /* best effort */ }
@@ -577,17 +703,28 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             readerStopCts.Cancel();
 
             try { await pipeReaderTask; }
-            catch (OperationCanceledException) { /* normal */ }
+            catch (OperationCanceledException)
+            { /* normal */
+            }
             catch (Exception ex)
             {
                 _traceLogger.Warning($"Pipe reader task ended with {ex.GetType().Name}: {ex.Message}");
             }
 
-            _traceLogger.Trace($"Helper process exited; exit code = {exitCode}{(killState.HelperKilled ? " (force-killed)" : string.Empty)}.");
+            _traceLogger.Trace(
+                $"Helper process exited; exit code = {exitCode}{(killState.HelperKilled ? " (force-killed)" : string.Empty)}.");
 
             exitHandled = true;
 
-            return TranslateOutcome(result, fatal, exitCode, killState.Disposition, cancellationToken, stopwatch.Elapsed);
+            DatabaseToolsResult finalResult =
+                TranslateOutcome(result, fatal, exitCode, cancellationToken, stopwatch.Elapsed);
+
+            ReportCancellationGuidance(logProgress,
+                finalResult.Outcome,
+                killState.Disposition,
+                helperDeliveredTerminalMessage: result is not null || fatal is not null);
+
+            return finalResult;
         }
         catch (Exception ex)
         {
@@ -600,7 +737,9 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             if (!exitHandled && process is not null)
             {
                 try { readerStopCts?.Cancel(); }
-                catch (ObjectDisposedException) { /* already disposed */ }
+                catch (ObjectDisposedException)
+                { /* already disposed */
+                }
 
                 if (pipeReaderTask is not null)
                 {
@@ -666,7 +805,6 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         ResultMessage? result,
         FatalMessage? fatal,
         int exitCode,
-        KillDisposition killDisposition,
         CancellationToken cancellationToken,
         TimeSpan elapsed)
     {
@@ -674,27 +812,22 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
         {
             var helperDuration = TimeSpan.FromMilliseconds(result.DurationMs);
 
-            if (result is { Outcome: DatabaseToolsOutcome.Failed, SummaryIsDiagnostic: true })
-            {
-                // Mark only, no re-log: MirrorMessageToDebugLog already logged this on receipt.
-                return new DatabaseToolsResult(
-                    DatabaseToolsOutcome.Failed,
-                    result.FailureSummary ?? "Helper reported a failure with no summary.",
-                    helperDuration)
-                {
-                    SummaryIsDiagnostic = true
-                };
-            }
+            LocalizableText? resultSummary = result.SummaryKey is { Length: > 0 } summaryKey ?
+                new LocalizableText(summaryKey, result.SummaryArgs ?? []) :
+                null;
 
-            return new DatabaseToolsResult(result.Outcome, result.FailureSummary, helperDuration);
+            return new DatabaseToolsResult(result.Outcome, resultSummary, helperDuration)
+            {
+                SummaryIsDiagnostic = result.SummaryIsDiagnostic,
+                DiagnosticDetail = result.DiagnosticDetail
+            };
         }
 
         if (fatal is not null)
         {
-            // Mark only, no re-log: MirrorMessageToDebugLog already logged this on receipt.
             return new DatabaseToolsResult(
                 DatabaseToolsOutcome.Failed,
-                $"Helper threw {fatal.ExceptionType}: {fatal.Message}",
+                new LocalizableText(DatabaseToolsLogKeys.GenericDiagnosticFailure, []),
                 elapsed)
             {
                 SummaryIsDiagnostic = true
@@ -708,18 +841,12 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                 elapsed);
         }
 
-        string summary = killDisposition switch
-        {
-            KillDisposition.Failed =>
-                "Cancelled (helper did not respond to cancel and could not be terminated; it may continue running as an orphan process). " +
-                "If you ran an Upgrade, a .bak of the original target may remain next to it - rename it to recover.",
-            KillDisposition.Succeeded =>
-                "Cancelled (helper did not respond to CancelMessage within grace window; force-killed). " +
-                "If you ran an Upgrade, a .bak of the original target may remain next to it - rename it to recover.",
-            _ => "Cancelled."
-        };
+        return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, null, elapsed);
+    }
 
-        return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, summary, elapsed);
+    private sealed class KeyNeutralTextResolver : INeutralTextResolver
+    {
+        public string Resolve(string key, IReadOnlyList<string> args) => key;
     }
 
     private sealed class KillState
@@ -749,10 +876,11 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
         public bool MarkCancelRequested() => Interlocked.Exchange(ref _cancelRequested, 1) == 0;
 
-        public void MarkKillFailed() => Interlocked.CompareExchange(
-            ref _disposition,
-            (int)KillDisposition.Failed,
-            (int)KillDisposition.NotAttempted);
+        public void MarkKillFailed() =>
+            Interlocked.CompareExchange(
+                ref _disposition,
+                (int)KillDisposition.Failed,
+                (int)KillDisposition.NotAttempted);
 
         public void MarkKillSucceeded() => Interlocked.Exchange(ref _disposition, (int)KillDisposition.Succeeded);
 

@@ -1,12 +1,14 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.Provider.Schema;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Data.Common;
 
 namespace EventLogExpert.DatabaseTools.MergeDatabase;
@@ -16,7 +18,7 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
     private const int BatchSize = 100;
 
     public async Task<DatabaseToolsOutcome> ExecuteAsync(
-        ITraceLogger logger,
+        IOperationLog logger,
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken)
     {
@@ -28,18 +30,21 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
 
         if (!File.Exists(request.TargetDatabasePath))
         {
-            logger.Error($"File not found: {request.TargetDatabasePath}");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.MergeTargetFileNotFound, [request.TargetDatabasePath]));
 
             return DatabaseToolsOutcome.Failed;
         }
 
         var sourceIdentities = (await ProviderSource.LoadProviderIdentitiesAsync(
-            request.SourcePath, logger, cancellationToken: cancellationToken)).ToHashSet();
+            request.SourcePath,
+            logger,
+            cancellationToken: cancellationToken)).ToHashSet();
 
         if (sourceIdentities.Count == 0)
         {
-            logger.Warning($"No providers were discovered in the source.");
-            SetFailureSummary("No providers were discovered in the source, so the database was not modified.");
+            logger.User(LogLevel.Warning, new LocalizableText(DatabaseToolsLogKeys.MergeNoProvidersDiscovered, []));
+            SetFailureSummary(new LocalizableText(DatabaseToolsLogKeys.MergeFailureNoProvidersDiscovered, []));
 
             return DatabaseToolsOutcome.Failed;
         }
@@ -53,39 +58,51 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
 
         try
         {
-            await using var probe = new ProviderDbContext(request.TargetDatabasePath, false, false, logger);
+            await using var probe = new ProviderDbContext(request.TargetDatabasePath, false, false, logger.Trace);
             targetState = probe.IsUpgradeNeeded();
         }
         catch (DbException ex)
         {
-            logger.Error($"Failed to merge into database '{request.TargetDatabasePath}': {ex.Message}");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.MergeOpenTargetFailed, [request.TargetDatabasePath]),
+                ex);
 
             return DatabaseToolsOutcome.Failed;
         }
         catch (SchemaLockTimeoutException ex)
         {
-            logger.Error($"Cannot merge into '{request.TargetDatabasePath}': {ex.Message}");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.MergeCannotOpenTarget, [request.TargetDatabasePath]),
+                ex);
 
             return DatabaseToolsOutcome.Failed;
         }
 
         if (targetState.CurrentVersion == DatabaseSchemaVersion.Unknown)
         {
-            logger.Error($"{SchemaStateMessages.UnrecognizedSchema(SchemaStateMessages.TargetLabel, request.TargetDatabasePath)}");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.SchemaUnrecognizedTarget, [request.TargetDatabasePath]));
 
             return DatabaseToolsOutcome.Failed;
         }
 
         if (targetState.NeedsUpgrade)
         {
-            logger.Error($"Target database '{request.TargetDatabasePath}' is at schema v{targetState.CurrentVersion} but v{DatabaseSchemaVersion.Current} is required. Run the 'upgrade' command first.");
+            logger.User(LogLevel.Error,
+                new LocalizableText(DatabaseToolsLogKeys.MergeTargetNeedsUpgrade,
+                [
+                    request.TargetDatabasePath,
+                    targetState.CurrentVersion.ToString(),
+                    DatabaseSchemaVersion.Current.ToString()
+                ]));
 
             return DatabaseToolsOutcome.Failed;
         }
 
         try
         {
-            await using var targetContext = new ProviderDbContext(request.TargetDatabasePath, false, false, logger);
+            await using var targetContext =
+                new ProviderDbContext(request.TargetDatabasePath, false, false, logger.Trace);
 
             // SQLite cannot translate composite IN, so query by name and narrow exact identities in memory.
             var identitiesAlreadyInTarget = new HashSet<ProviderIdentity>();
@@ -118,44 +135,51 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
 
             if (identitiesAlreadyInTarget.Count > 0)
             {
-                logger.Information($"The target database already contains {identitiesAlreadyInTarget.Count} of the source's provider version(s).");
+                logger.User(LogLevel.Information,
+                    new LocalizableText(DatabaseToolsLogKeys.MergeTargetContainsVersions,
+                        [identitiesAlreadyInTarget.Count.ToString()]));
 
                 if (request.Overwrite)
                 {
-                    logger.Information($"Removing these provider version(s) from the target database...");
+                    logger.User(LogLevel.Information,
+                        new LocalizableText(DatabaseToolsLogKeys.MergeRemovingVersions, []));
 
                     // Delete only colliding identities so unrelated versions of the same provider survive.
                     foreach (var identity in identitiesAlreadyInTarget)
                     {
-                        targetContext.Entry(new ProviderDetails { ProviderName = identity.ProviderName, VersionKey = identity.VersionKey })
+                        targetContext.Entry(new ProviderDetails
+                                { ProviderName = identity.ProviderName, VersionKey = identity.VersionKey })
                             .State = EntityState.Deleted;
                     }
 
                     await targetContext.SaveChangesAsync(cancellationToken);
                     targetContext.ChangeTracker.Clear();
 
-                    logger.Information($"Removal of {identitiesAlreadyInTarget.Count} provider version(s) completed.");
+                    logger.User(LogLevel.Information,
+                        new LocalizableText(DatabaseToolsLogKeys.MergeRemovalCompleted,
+                            [identitiesAlreadyInTarget.Count.ToString()]));
                 }
                 else
                 {
-                    logger.Information($"These provider version(s) will not be copied from the source.");
+                    logger.User(LogLevel.Information,
+                        new LocalizableText(DatabaseToolsLogKeys.MergeVersionsSkipped, []));
                 }
             }
 
-            logger.Information($"Copying provider versions from the source...");
+            logger.User(LogLevel.Information, new LocalizableText(DatabaseToolsLogKeys.MergeCopyingVersions, []));
 
             var skipForLoad = request.Overwrite ? null : identitiesAlreadyInTarget;
 
-            var expectedCopiedIdentities = skipForLoad is null
-                ? sourceIdentities
-                : sourceIdentities.Where(identity => !skipForLoad.Contains(identity)).ToHashSet();
+            var expectedCopiedIdentities = skipForLoad is null ?
+                sourceIdentities :
+                [.. sourceIdentities.Where(identity => !skipForLoad.Contains(identity))];
 
             var expectedCopiedNames = expectedCopiedIdentities
                 .Select(identity => identity.ProviderName)
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
 
-            logger.Information($"");
+            logger.Data(LogLevel.Information, string.Empty);
             LogProviderDetailHeader(logger, expectedCopiedNames);
 
             var copiedCount = 0;
@@ -174,7 +198,9 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
                 targetContext.ProviderDetails.Add(provider);
                 pendingBatch.Add(provider);
 
-                progress?.Report(new DatabaseToolsProgress(copiedCount + pendingBatch.Count, expectedCopiedIdentities.Count, provider.ProviderName));
+                progress?.Report(new DatabaseToolsProgress(copiedCount + pendingBatch.Count,
+                    expectedCopiedIdentities.Count,
+                    provider.ProviderName));
 
                 if (pendingBatch.Count < BatchSize) { continue; }
 
@@ -188,8 +214,10 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
 
             await transaction.CommitAsync(cancellationToken);
 
-            logger.Information($"");
-            logger.Information($"Copied {copiedCount} provider version(s).");
+            logger.Data(LogLevel.Information, string.Empty);
+
+            logger.User(LogLevel.Information,
+                new LocalizableText(DatabaseToolsLogKeys.MergeCopiedVersions, [copiedCount.ToString()]));
 
             return DatabaseToolsOutcome.Succeeded;
         }
@@ -200,7 +228,7 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
     }
 
     private async Task<int> FlushBatchAsync(
-        ITraceLogger logger,
+        IOperationLog logger,
         ProviderDbContext context,
         List<ProviderDetails> batch,
         CancellationToken cancellationToken)

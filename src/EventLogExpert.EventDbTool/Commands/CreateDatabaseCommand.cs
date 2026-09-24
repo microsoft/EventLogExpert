@@ -6,6 +6,7 @@ using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
 using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.CommandLine;
 
 namespace EventLogExpert.EventDbTool.Commands;
@@ -95,13 +96,15 @@ public sealed class CreateDatabaseCommand
         createDatabaseCommand.SetAction(async (result, cancellationToken) =>
         {
             await using var sp = Program.BuildServiceProvider(result.GetValue(verboseOption));
-            var logger = sp.GetRequiredService<ITraceLogger>();
+            var logger = sp.GetRequiredService<IOperationLog>();
 
             var filterValue = result.GetValue(filterOption);
 
             if (!FilterRegexFactory.TryCreate(filterValue, out var regex, out var error))
             {
-                logger.Error($"Invalid --filter regex '{filterValue}': {error}");
+                logger.User(LogLevel.Error,
+                    new LocalizableText(DatabaseToolsLogKeys.CliInvalidFilterRegex,
+                        [filterValue ?? string.Empty, error ?? string.Empty]));
 
                 return 1;
             }
@@ -114,7 +117,8 @@ public sealed class CreateDatabaseCommand
                 if (!Enum.TryParse(imageKindValue, ignoreCase: true, out OfflineImageKind parsed) ||
                     !Enum.IsDefined(parsed))
                 {
-                    logger.Error($"Invalid --image-kind '{imageKindValue}'. Valid values: directory, wim, iso, vhdx.");
+                    logger.User(LogLevel.Error,
+                        new LocalizableText(DatabaseToolsLogKeys.CliInvalidImageKind, [imageKindValue]));
 
                     return 1;
                 }

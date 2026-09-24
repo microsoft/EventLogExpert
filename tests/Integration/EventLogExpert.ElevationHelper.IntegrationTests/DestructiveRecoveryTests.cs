@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
 using EventLogExpert.DatabaseTools.DiffDatabase;
@@ -176,7 +177,7 @@ public sealed class DestructiveRecoveryTests
             Assert.Equal(OriginalContents, restored);
             Assert.False(File.Exists(bakPath),
                 $"Backup at {bakPath} must be deleted after destructive recovery restored from it.");
-            Assert.Contains(logProgress.Entries, e => e.Message.Contains("restored from backup"));
+            Assert.Contains(logProgress.Entries, e => e.MessageKey == DatabaseToolsLogKeys.RecoveryOriginalRestored);
         }
         finally
         {
@@ -242,8 +243,7 @@ public sealed class DestructiveRecoveryTests
                 new UpgradeDatabaseRequest(dbPath), logProgress, progress: null, ct);
 
             Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
-            Assert.NotNull(result.FailureSummary);
-            Assert.Contains("recovery backup", result.FailureSummary, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(DatabaseToolsLogKeys.RecoveryBackupAlreadyPresent, result.Summary?.Key);
             Assert.Equal(TargetContents, await File.ReadAllTextAsync(dbPath, ct));
             Assert.Equal(BakContents, await File.ReadAllTextAsync(bakPath, ct));
         }

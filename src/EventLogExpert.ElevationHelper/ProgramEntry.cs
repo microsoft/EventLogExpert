@@ -1,12 +1,15 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.DatabaseTools.Common.Ipc;
 using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.ElevationHelper.Diagnostics;
 using EventLogExpert.ElevationHelper.Ipc;
 using EventLogExpert.ElevationHelper.Operations;
 using EventLogExpert.Eventing.OfflineImaging.Workspace;
+using EventLogExpert.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text;
@@ -51,9 +54,12 @@ internal static class ProgramEntry
 
     // Extracted (not inlined) so a unit test can guard the SummaryIsDiagnostic copy: dropping it would silently leak helper-side thrown-exception detail into the localized operation log.
     internal static ResultMessage BuildResultMessage(DatabaseToolsResult result) =>
-        new(result.Outcome, result.FailureSummary, (long)result.Duration.TotalMilliseconds)
+        new(result.Outcome, (long)result.Duration.TotalMilliseconds)
         {
-            SummaryIsDiagnostic = result.SummaryIsDiagnostic
+            SummaryIsDiagnostic = result.SummaryIsDiagnostic,
+            SummaryKey = result.Summary?.Key,
+            SummaryArgs = result.Summary?.Args,
+            DiagnosticDetail = result.DiagnosticDetail
         };
 
     private static async Task<int> RunOperationModeAsync(IpcMessageReader reader, IpcMessageWriter writer)
@@ -198,7 +204,7 @@ internal static class ProgramEntry
         {
             var probeMessage = ProbeMode.Capture();
             await writer.WriteAsync(probeMessage, CancellationToken.None);
-            await writer.WriteAsync(new ResultMessage(DatabaseToolsOutcome.Succeeded, FailureSummary: null, DurationMs: 0), CancellationToken.None);
+            await writer.WriteAsync(new ResultMessage(DatabaseToolsOutcome.Succeeded, DurationMs: 0), CancellationToken.None);
 
             return 0;
         }
@@ -216,9 +222,17 @@ internal static class ProgramEntry
     {
         try
         {
+            await TryWriteTerminalAsync(writer, new LogMessage(
+                DateTime.UtcNow,
+                LogLevel.Warning,
+                string.Empty,
+                Category: string.Empty,
+                ProcessOrigin: ProcessOrigin.ElevatedHelper,
+                MessageKey: DatabaseToolsLogKeys.CancelHelperSelfTerminated,
+                MessageArgs: [])).WaitAsync(s_selfTerminateWriteTimeout);
+
             await TryWriteTerminalAsync(writer, new ResultMessage(
                 DatabaseToolsOutcome.Cancelled,
-                "Cancelled; the elevated helper self-terminated after a native operation ignored cancellation.",
                 elapsedMs)).WaitAsync(s_selfTerminateWriteTimeout);
         }
         catch { /* Pipe EOF on exit is the guaranteed host signal. */ }

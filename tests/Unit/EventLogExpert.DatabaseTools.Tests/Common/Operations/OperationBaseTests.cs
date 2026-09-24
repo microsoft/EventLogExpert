@@ -18,11 +18,24 @@ public sealed class OperationBaseTests
         string walPath = workspace.CreateFile("partial.db-wal");
         string shmPath = workspace.CreateFile("partial.db-shm");
 
-        await OperationBaseHarness.CleanupAsync(new NullTraceLogger(), databasePath);
+        await OperationBaseHarness.CleanupAsync(new NullOperationLog(), databasePath);
 
         Assert.False(File.Exists(databasePath));
         Assert.False(File.Exists(walPath));
         Assert.False(File.Exists(shmPath));
+    }
+
+    private sealed class NullOperationLog : IOperationLog
+    {
+        public ITraceLogger Trace { get; } = new NullTraceLogger();
+
+        public void Data(LogLevel level, string text) { }
+
+        public IOperationLog ForCategory(string category) => this;
+
+        public void User(LogLevel level, LocalizableText message) { }
+
+        public void User(LogLevel level, LocalizableText message, Exception diagnostic) { }
     }
 
     private sealed class NullTraceLogger : ITraceLogger
@@ -44,7 +57,7 @@ public sealed class OperationBaseTests
 
     private sealed class OperationBaseHarness : OperationBase
     {
-        public static Task CleanupAsync(ITraceLogger logger, string targetPath) =>
+        public static Task CleanupAsync(IOperationLog logger, string targetPath) =>
             CleanupPartialDatabaseAsync(logger, dbContext: null, targetPath);
     }
 

@@ -10,4 +10,7 @@ public sealed record LogRecord(
     LogLevel Level,
     string Message,
     string Category = "",
-    ProcessOrigin ProcessOrigin = ProcessOrigin.InProcess);
+    ProcessOrigin ProcessOrigin = ProcessOrigin.InProcess,
+    string? MessageKey = null,
+    IReadOnlyList<string>? MessageArgs = null,
+    string? DebugDetail = null);

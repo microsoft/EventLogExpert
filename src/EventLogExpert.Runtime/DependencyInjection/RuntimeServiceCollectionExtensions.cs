@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.DependencyInjection;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
@@ -97,6 +96,11 @@ public static class RuntimeServiceCollectionExtensions
     private static ITraceLogger CategoryLogger(IServiceProvider serviceProvider, string category) =>
         serviceProvider.GetRequiredService<ILogSourceFactory>().ForCategory(category);
 
+    private sealed class KeyNeutralTextResolver : INeutralTextResolver
+    {
+        public string Resolve(string key, IReadOnlyList<string> args) => key;
+    }
+
     extension(IServiceCollection services)
     {
         public IServiceCollection AddDatabaseToolsRuntime()
@@ -104,10 +108,8 @@ public static class RuntimeServiceCollectionExtensions
             ArgumentNullException.ThrowIfNull(services);
 
             services.AddDatabaseToolsServices();
-            // Explicit factory: the built-in ServiceProvider ignores defaulted ctor params, so the optional logger is supplied here; the helper root has no ILogSourceFactory and passes null.
-            services.TryAddSingleton<IDatabaseToolsService>(static sp => new DatabaseToolsService(
-                sp.GetRequiredService<IDatabaseToolsOperationFactory>(),
-                sp.GetService<ILogSourceFactory>()?.ForCategory(LogCategories.DatabaseTools)));
+            services.TryAddSingleton<INeutralTextResolver, KeyNeutralTextResolver>();
+            services.TryAddSingleton<IDatabaseToolsService, DatabaseToolsService>();
 
             return services;
         }
@@ -116,10 +118,12 @@ public static class RuntimeServiceCollectionExtensions
         {
             ArgumentNullException.ThrowIfNull(services);
 
+            services.TryAddSingleton<INeutralTextResolver, KeyNeutralTextResolver>();
             services.AddSingleton<IElevatedDatabaseToolsRunner>(static sp =>
                 new ElevatedDatabaseToolsRunner(
                     sp.GetRequiredService<IElevatedHelperProcessHost>(),
-                    sp.GetRequiredService<ILogSourceFactory>().ForCategory(LogCategories.ElevationIpc)));
+                    sp.GetRequiredService<ILogSourceFactory>().ForCategory(LogCategories.ElevationIpc),
+                    sp.GetRequiredService<INeutralTextResolver>()));
 
             return services;
         }
@@ -224,6 +228,7 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IAnnouncementService, AnnouncementService>();
 
             // Logging
+            services.TryAddSingleton<INeutralTextResolver, KeyNeutralTextResolver>();
             services.Configure<LoggingOptions>(LoggingOptions.ApplyShippedDefaults);
             services.AddSingleton(static sp =>
             {
@@ -273,10 +278,7 @@ public static class RuntimeServiceCollectionExtensions
 
             // Database tools
             services.AddDatabaseToolsServices();
-            // Explicit factory: the built-in ServiceProvider ignores defaulted ctor params, so the optional logger is supplied here; the helper root has no ILogSourceFactory and passes null.
-            services.TryAddSingleton<IDatabaseToolsService>(static sp => new DatabaseToolsService(
-                sp.GetRequiredService<IDatabaseToolsOperationFactory>(),
-                sp.GetService<ILogSourceFactory>()?.ForCategory(LogCategories.DatabaseTools)));
+            services.TryAddSingleton<IDatabaseToolsService, DatabaseToolsService>();
 
             // Scenarios and channels
             services.AddSingleton<IScenarioSource, BuiltInScenarioSource>();
@@ -297,5 +299,6 @@ public static class RuntimeServiceCollectionExtensions
 
             return services;
         }
+
     }
 }

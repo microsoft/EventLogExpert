@@ -2,12 +2,14 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.DatabaseTools.Common;
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Localization;
+using EventLogExpert.Provider.Schema;
 using EventLogExpert.Runtime.ActivityCorrelation;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Display;
@@ -48,6 +50,91 @@ namespace EventLogExpert.UI.Tests.Localization;
 [Collection(CultureSensitiveCollection.Name)]
 public sealed class LocalizationInfraTests
 {
+    [Fact]
+    public void DatabaseToolsLocalizableTextArgCounts_MatchResxPlaceholderArity()
+    {
+        var constants = DatabaseToolsKeyConstants();
+        var neutralValues = ResxValues();
+        var checkedSites = 0;
+
+        foreach (string source in LocalizationSourceScan.EnumerateProductionSource().Select(File.ReadAllText))
+        {
+            foreach (string call in ExtractMethodCalls(source, "LocalizableText"))
+            {
+                var parts = SplitArguments(call);
+
+                if (parts.Count != 2) { continue; }
+                if (!TryResolveDatabaseToolsKey(parts[0], constants, out string? key)) { continue; }
+
+                var argumentCount = CountLocalizableTextArguments(parts[1]);
+                if (argumentCount < 0) { continue; }
+
+                Assert.True(neutralValues.TryGetValue(key!, out string? value), $"Key {key} is missing from the neutral resx.");
+                Assert.Equal(PlaceholderArity(value!), argumentCount);
+                checkedSites++;
+            }
+        }
+
+        Assert.True(checkedSites >= 50, $"Arg-arity guard only checked {checkedSites} LocalizableText sites.");
+    }
+
+    [Fact]
+    public void DatabaseToolsLocalizableTextKeyUsages_HasExpectedFloor()
+    {
+        var examined = 0;
+
+        foreach (string source in LocalizationSourceScan.EnumerateProductionSource().Select(File.ReadAllText))
+        {
+            examined += Regex.Matches(source, @"new\s+LocalizableText\s*\(\s*DatabaseToolsLogKeys\.").Count;
+        }
+
+        Assert.True(examined >= 60, $"DatabaseTools localizable key usage guard examined only {examined} sites.");
+    }
+
+    [Fact]
+    public void DatabaseToolsLogKeys_MatchNeutralResxAndAvoidCultureFormatSpecifiers()
+    {
+        var keyValues = typeof(DatabaseToolsLogKeys)
+            .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+            .Where(field => field is { IsLiteral: true, IsInitOnly: false } && field.FieldType == typeof(string))
+            .Select(field => (string)field.GetRawConstantValue()!)
+            .OrderBy(key => key, StringComparer.Ordinal)
+            .ToList();
+
+        var resxValues = ResxValues()
+            .Where(entry => entry.Key.StartsWith("DatabaseTools_Op_", StringComparison.Ordinal))
+            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(keyValues, resxValues.Select(entry => entry.Key));
+
+        var cultureFormatValues = resxValues
+            .Where(entry => Regex.IsMatch(entry.Value, @"\{\d+:[^}]+\}"))
+            .Select(entry => entry.Key)
+            .ToList();
+
+        Assert.Empty(cultureFormatValues);
+    }
+
+    [Fact]
+    public void DatabaseToolsSchemaMessageValues_MirrorSchemaStateMessages()
+    {
+        var neutralValues = ResxValues();
+
+        Assert.Equal(
+            SchemaStateMessages.UnrecognizedSchema(SchemaStateMessages.DefaultLabel, "{0}"),
+            neutralValues[DatabaseToolsLogKeys.SchemaUnrecognizedDefault]);
+        Assert.Equal(
+            SchemaStateMessages.UnrecognizedSchema(SchemaStateMessages.SourceLabel, "{0}"),
+            neutralValues[DatabaseToolsLogKeys.SchemaUnrecognizedSource]);
+        Assert.Equal(
+            SchemaStateMessages.UnrecognizedSchema(SchemaStateMessages.TargetLabel, "{0}"),
+            neutralValues[DatabaseToolsLogKeys.SchemaUnrecognizedTarget]);
+        Assert.Equal(
+            "Database '{0}' is at schema v{1}; this version is no longer supported. Upgrade through an older EventLogExpert release that supports v3 first, or delete the file.",
+            neutralValues[DatabaseToolsLogKeys.UpgradeUnsupportedV1OrV2Schema]);
+    }
+
     [Fact]
     public void EnumMappedKeyFamilies_MatchEnumMembersExactly()
     {
@@ -746,6 +833,18 @@ public sealed class LocalizationInfraTests
     }
 
     [Fact]
+    public void SharedResourceNeutralResolver_ResolvesKnownKeyWithArguments()
+    {
+        var resolver = new SharedResourceNeutralResolver();
+
+        string resolved = resolver.Resolve(DatabaseToolsLogKeys.RunnerProtocolMismatch, ["3", "4"]);
+
+        Assert.Equal(
+            "Helper IPC protocol version mismatch: helper sent 3, runner expected 4. The helper EXE may be from a different app version - reinstall the MSIX so the main app and helper ship together.",
+            resolved);
+    }
+
+    [Fact]
     public void StatusBarMemorySizes_UseCurrentCultureDecimalSeparator()
     {
         CultureInfo priorCulture = CultureInfo.CurrentCulture;
@@ -827,6 +926,73 @@ public sealed class LocalizationInfraTests
             .BuildServiceProvider()
             .GetRequiredService<IStringLocalizer<SharedResource>>();
 
+    private static int CountLocalizableTextArguments(string argumentsExpression)
+    {
+        argumentsExpression = argumentsExpression.Trim();
+
+        if (argumentsExpression == "[]" || string.IsNullOrEmpty(argumentsExpression)) { return 0; }
+
+        if (argumentsExpression.StartsWith('[') && argumentsExpression.EndsWith(']'))
+        {
+            return SplitArguments(argumentsExpression[1..^1]).Count(argument => !string.IsNullOrWhiteSpace(argument));
+        }
+
+        return -1;
+    }
+
+    private static IReadOnlyDictionary<string, string> DatabaseToolsKeyConstants() =>
+        typeof(DatabaseToolsLogKeys)
+            .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+            .Where(field => field is { IsLiteral: true, IsInitOnly: false } && field.FieldType == typeof(string))
+            .ToDictionary(field => field.Name, field => (string)field.GetRawConstantValue()!, StringComparer.Ordinal);
+
+    private static IReadOnlyList<string> ExtractMethodCalls(string source, string methodName)
+    {
+        var calls = new List<string>();
+        string token = methodName + "(";
+        var index = 0;
+
+        while ((index = source.IndexOf(token, index, StringComparison.Ordinal)) >= 0)
+        {
+            var start = index + token.Length;
+            var depth = 1;
+            var inString = false;
+            var escaped = false;
+
+            for (var position = start; position < source.Length; position++)
+            {
+                char current = source[position];
+
+                if (inString)
+                {
+                    if (escaped) { escaped = false; }
+                    else if (current == '\\') { escaped = true; }
+                    else if (current == '"') { inString = false; }
+
+                    continue;
+                }
+
+                if (current == '"')
+                {
+                    inString = true;
+                    continue;
+                }
+
+                if (current == '(') { depth++; }
+                else if (current == ')' && --depth == 0)
+                {
+                    calls.Add(source[start..position]);
+                    index = position + 1;
+                    break;
+                }
+            }
+
+            index++;
+        }
+
+        return calls;
+    }
+
     private static int PlaceholderArity(string value)
     {
         var indexes = Regex.Matches(value, @"\{(\d+)(?::[^}]*)?\}")
@@ -852,6 +1018,64 @@ public sealed class LocalizationInfraTests
                 data => (string)data.Attribute("name")!,
                 data => data.Element("value")?.Value ?? string.Empty,
                 StringComparer.Ordinal);
+
+    private static IReadOnlyList<string> SplitArguments(string callArguments)
+    {
+        var arguments = new List<string>();
+        var start = 0;
+        var depth = 0;
+        var inString = false;
+        var escaped = false;
+
+        for (var index = 0; index < callArguments.Length; index++)
+        {
+            char current = callArguments[index];
+
+            if (inString)
+            {
+                if (escaped) { escaped = false; }
+                else if (current == '\\') { escaped = true; }
+                else if (current == '"') { inString = false; }
+
+                continue;
+            }
+
+            if (current == '"')
+            {
+                inString = true;
+                continue;
+            }
+
+            if (current is '(' or '[' or '{') { depth++; }
+            else if (current is ')' or ']' or '}') { depth--; }
+            else if (current == ',' && depth == 0)
+            {
+                arguments.Add(callArguments[start..index].Trim());
+                start = index + 1;
+            }
+        }
+
+        arguments.Add(callArguments[start..].Trim());
+        return arguments;
+    }
+
+    private static bool TryResolveDatabaseToolsKey(
+        string expression,
+        IReadOnlyDictionary<string, string> constants,
+        out string? key)
+    {
+        const string prefix = "DatabaseToolsLogKeys.";
+        expression = expression.Trim();
+
+        if (!expression.StartsWith(prefix, StringComparison.Ordinal) ||
+            !constants.TryGetValue(expression[prefix.Length..], out key))
+        {
+            key = null;
+            return false;
+        }
+
+        return true;
+    }
 
     private sealed class StatusBarRenderContext : BunitContext
     {
