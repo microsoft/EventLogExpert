@@ -13,7 +13,7 @@ public enum OfflineWriteProbeStatus
 public readonly record struct OfflineWriteProbeResult(
     OfflineWriteProbeStatus Status,
     string Directory,
-    string? IoDetail)
+    IOException? IoException)
 {
     public bool IsWritable => Status == OfflineWriteProbeStatus.Writable;
 }
@@ -46,17 +46,17 @@ public static class OfflineScratch
 
             probe.WriteByte(0);
 
-            return new OfflineWriteProbeResult(OfflineWriteProbeStatus.Writable, directory, IoDetail: null);
+            return new OfflineWriteProbeResult(OfflineWriteProbeStatus.Writable, directory, IoException: null);
         }
         catch (UnauthorizedAccessException)
         {
             return new OfflineWriteProbeResult(OfflineWriteProbeStatus.ControlledFolderAccessBlocked,
                 directory,
-                IoDetail: null);
+                IoException: null);
         }
         catch (IOException ex)
         {
-            return new OfflineWriteProbeResult(OfflineWriteProbeStatus.IoError, directory, ex.Message);
+            return new OfflineWriteProbeResult(OfflineWriteProbeStatus.IoError, directory, ex);
         }
     }
 }
