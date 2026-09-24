@@ -25,18 +25,20 @@ public sealed class OfflineScratchTests
     }
 
     [Fact]
-    public void ProbeWritable_WhenPathIsAFile_ReturnsMessage()
+    public void ProbeWritable_WhenPathIsAFile_ReturnsIoFailure()
     {
         string filePath = Path.Combine(Path.GetTempPath(), "ELX_PROBE_" + Guid.NewGuid().ToString("N") + ".tmp");
         File.WriteAllText(filePath, "x");
 
         try
         {
-            // CreateDirectory over an existing file collides; the probe must surface a message, not throw.
-            string? message = OfflineScratch.ProbeWritable(filePath);
+            // CreateDirectory over an existing file collides; the probe must surface a structured failure, not throw.
+            OfflineWriteProbeResult probe = OfflineScratch.ProbeWritable(filePath);
 
-            Assert.NotNull(message);
-            Assert.Contains(filePath, message);
+            Assert.False(probe.IsWritable);
+            Assert.Equal(OfflineWriteProbeStatus.IoError, probe.Status);
+            Assert.Equal(filePath, probe.Directory);
+            Assert.NotNull(probe.IoDetail);
         }
         finally
         {
@@ -45,13 +47,13 @@ public sealed class OfflineScratchTests
     }
 
     [Fact]
-    public void ProbeWritable_WritableDirectory_ReturnsNull()
+    public void ProbeWritable_WritableDirectory_ReturnsWritable()
     {
         string directory = Path.Combine(Path.GetTempPath(), "ELX_PROBE_" + Guid.NewGuid().ToString("N"));
 
         try
         {
-            Assert.Null(OfflineScratch.ProbeWritable(directory));
+            Assert.True(OfflineScratch.ProbeWritable(directory).IsWritable);
         }
         finally
         {

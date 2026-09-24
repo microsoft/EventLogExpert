@@ -570,14 +570,19 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                     stopwatch.Elapsed);
             }
 
-            try
-            {
-                await WriteRequestAsync(pipeStream, writeLock, request, cancellationToken);
-            }
-            catch (OperationCanceledException)
+            // If the caller cancelled before we send anything, the helper never receives the request or starts the
+            // operation - return a clean cancellation (no destructive work, so no recovery guidance is needed).
+            if (cancellationToken.IsCancellationRequested)
             {
                 return new DatabaseToolsResult(DatabaseToolsOutcome.Cancelled, null, stopwatch.Elapsed);
             }
+
+            // Deliver the request with a non-cancelable token so a cancel racing the write cannot leave a partial
+            // frame - or let a CancelMessage overtake the request - which the helper would misread as a malformed
+            // request (reporting Fatal/Failed instead of Cancelled). Register caller cancellation only AFTER the
+            // request is fully on the wire: a forced stop then still reports recovery guidance, and the callback can
+            // never run before the request nor leak against a pre-registration write failure.
+            await WriteRequestAsync(pipeStream, writeLock, request, CancellationToken.None);
 
             if (cancellationToken.CanBeCanceled)
             {
