@@ -69,12 +69,12 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         }
 
         string targetDirectory = Path.GetDirectoryName(Path.GetFullPath(request.TargetPath)) ?? request.TargetPath;
-        string? targetBlocked = OfflineScratch.ProbeWritable(targetDirectory);
+        OfflineWriteProbeResult targetBlocked = OfflineScratch.ProbeWritable(targetDirectory);
 
-        if (targetBlocked is not null)
+        if (!targetBlocked.IsWritable)
         {
             var summary = MapWritableProbeFailure(targetBlocked);
-            LogWritableProbeFailure(logger, summary, targetBlocked);
+            LogWritableProbeFailure(logger, targetBlocked, summary);
             SetFailureSummary(summary);
 
             return DatabaseToolsOutcome.Failed;
@@ -140,12 +140,12 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
                 if (kind is OfflineImageKind.Wim or OfflineImageKind.Iso)
                 {
-                    string? scratchBlocked = OfflineScratch.ProbeWritable(OfflineScratch.Root);
+                    OfflineWriteProbeResult scratchBlocked = OfflineScratch.ProbeWritable(OfflineScratch.Root);
 
-                    if (scratchBlocked is not null)
+                    if (!scratchBlocked.IsWritable)
                     {
                         var summary = MapWritableProbeFailure(scratchBlocked);
-                        LogWritableProbeFailure(logger.ForCategory(LogCategories.OfflineWim), summary, scratchBlocked);
+                        LogWritableProbeFailure(logger.ForCategory(LogCategories.OfflineWim), scratchBlocked, summary);
                         SetFailureSummary(summary);
 
                         return DatabaseToolsOutcome.Failed;
@@ -704,44 +704,29 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
         }
     }
 
-    private static void LogWritableProbeFailure(IOperationLog logger, LocalizableText summary, string rawMessage)
+    private static void LogWritableProbeFailure(IOperationLog logger, OfflineWriteProbeResult probe, LocalizableText summary)
     {
-        if (summary.Key == DatabaseToolsLogKeys.CreateCannotWriteIo)
+        if (probe.Status == OfflineWriteProbeStatus.IoError)
         {
-            var detail = rawMessage[(rawMessage.IndexOf(": ", StringComparison.Ordinal) + 2)..];
-            logger.User(LogLevel.Error, new LocalizableText(summary.Key, summary.Args), new IOException(detail));
+            logger.User(LogLevel.Error, summary, new IOException(probe.IoDetail ?? string.Empty));
 
             return;
         }
 
-        logger.User(LogLevel.Error, new LocalizableText(summary.Key, summary.Args));
+        logger.User(LogLevel.Error, summary);
     }
 
-    private static LocalizableText MapWritableProbeFailure(string message)
+    private static LocalizableText MapWritableProbeFailure(OfflineWriteProbeResult probe)
     {
-        const string prefix = "Cannot write to '";
-        string directory = string.Empty;
-
-        if (message.StartsWith(prefix, StringComparison.Ordinal))
-        {
-            var end = message.IndexOf('\'', prefix.Length);
-            if (end > prefix.Length) { directory = message[prefix.Length..end]; }
-        }
-
-        if (message.Contains(": ", StringComparison.Ordinal))
-        {
-            return new LocalizableText(DatabaseToolsLogKeys.CreateCannotWriteIo, [directory]);
-        }
-
-        if (message.Contains("Controlled Folder Access", StringComparison.Ordinal))
+        if (probe.Status == OfflineWriteProbeStatus.ControlledFolderAccessBlocked)
         {
             var executable = Path.GetFileName(Environment.ProcessPath ?? "EventLogExpert");
 
             return new LocalizableText(DatabaseToolsLogKeys.CreateCannotWriteControlledFolderAccess,
-                [directory, executable]);
+                [probe.Directory, executable]);
         }
 
-        return new LocalizableText(DatabaseToolsLogKeys.CreateCannotWritePermissions, [directory]);
+        return new LocalizableText(DatabaseToolsLogKeys.CreateCannotWriteIo, [probe.Directory]);
     }
 
     private void DeleteOverwriteBackups(IOperationLog logger)

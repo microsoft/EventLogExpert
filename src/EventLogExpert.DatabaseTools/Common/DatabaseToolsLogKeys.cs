@@ -12,7 +12,6 @@ public static class DatabaseToolsLogKeys
     public const string CliInvalidImageKind = "DatabaseTools_Op_CliInvalidImageKind";
     public const string CreateCannotWriteControlledFolderAccess = "DatabaseTools_Op_CreateCannotWriteControlledFolderAccess";
     public const string CreateCannotWriteIo = "DatabaseTools_Op_CreateCannotWriteIo";
-    public const string CreateCannotWritePermissions = "DatabaseTools_Op_CreateCannotWritePermissions";
     public const string CreateCouldNotDetermineOfflineImageKind = "DatabaseTools_Op_CreateCouldNotDetermineOfflineImageKind";
     public const string CreateCouldNotExtractWim = "DatabaseTools_Op_CreateCouldNotExtractWim";
     public const string CreateCouldNotMountIso = "DatabaseTools_Op_CreateCouldNotMountIso";

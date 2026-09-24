@@ -4338,9 +4338,6 @@
   <data name="DatabaseTools_Op_CreateCannotWriteIo" xml:space="preserve">
     <value>Cannot write to '{0}'. See the debug log for details.</value>
   </data>
-  <data name="DatabaseTools_Op_CreateCannotWritePermissions" xml:space="preserve">
-    <value>Cannot write to '{0}'. Choose a different destination or adjust its permissions.</value>
-  </data>
   <data name="DatabaseTools_Op_CreateCouldNotDetermineOfflineImageKind" xml:space="preserve">
     <value>Could not determine the offline image kind for '{0}'. Pass --image-kind directory or wim (.wim/.esd) or iso (.iso) or vhdx (.vhdx/.vhd), or point at a mounted volume / extracted image folder.</value>
   </data>
