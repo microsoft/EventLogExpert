@@ -2,66 +2,36 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.Common.Versioning;
-using System.Text;
 
 namespace EventLogExpert.Runtime.Common.AppTitle;
 
 internal sealed class AppTitleService(
     ICurrentVersionProvider versionProvider,
-    ITitleProvider titleProvider) : IAppTitleService
+    IAppTitleTextComposer composer) : IAppTitleService
 {
     private bool _isPrereleaseBuild;
     private string? _logName;
-    private string? _progressString;
+    private AppTitleProgress? _progress;
 
     public void SetIsPrerelease(bool isPrerelease) => _isPrereleaseBuild = isPrerelease;
 
     public void SetLogName(string? logName)
     {
         _logName = logName;
-        SetTitle();
+        Compose();
     }
 
-    public void SetProgressString(string? progressString)
+    public void SetProgress(AppTitleProgress? progress)
     {
-        _progressString = progressString;
-        SetTitle();
+        _progress = progress;
+        Compose();
     }
 
-    private void SetTitle()
-    {
-        StringBuilder title = new();
-
-        if (_progressString is not null)
-        {
-            title.Append($"{_progressString} - ");
-        }
-
-        title.Append("EventLogExpert");
-
-        if (versionProvider.IsDevBuild)
-        {
-            title.Append(" (Development)");
-        }
-        else if (_isPrereleaseBuild)
-        {
-            title.Append($" (Preview) {versionProvider.CurrentVersion}");
-        }
-        else
-        {
-            title.Append($" {versionProvider.CurrentVersion}");
-        }
-
-        if (versionProvider.IsAdmin)
-        {
-            title.Append(" (Admin)");
-        }
-
-        if (_logName is not null)
-        {
-            title.Append($" - {_logName}");
-        }
-
-        titleProvider.SetTitle(title.ToString());
-    }
+    private void Compose() => composer.Compose(new AppTitleState(
+        _progress,
+        versionProvider.IsDevBuild,
+        _isPrereleaseBuild,
+        versionProvider.IsAdmin,
+        versionProvider.CurrentVersion.ToString(),
+        _logName));
 }

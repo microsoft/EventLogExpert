@@ -59,7 +59,7 @@ internal sealed class DeploymentService(
     {
         deployment.Progress = (result, progress) =>
         {
-            _mainThreadService.InvokeOnMainThread(() => _appTitleService.SetProgressString($"Installing: {progress.percentage}%"));
+            _mainThreadService.InvokeOnMainThread(() => _appTitleService.SetProgress(new AppTitleProgress.Installing((int)progress.percentage)));
         };
 
         deployment.Completed = (result, progress) =>
@@ -71,20 +71,21 @@ internal sealed class DeploymentService(
                     case AsyncStatus.Error:
                         if (userInitiated)
                         {
-                            await _alertDialogService.ShowAlert("Update Failure",
-                                $"Update failed to install:\r\n{result.ErrorCode}",
-                                "Ok");
+                            await _alertDialogService.ShowAlert(
+                                new LocalizableText("Update_Alert_Failure_Title"),
+                                new LocalizableText("Update_Alert_InstallFailed_Message", [$"{result.ErrorCode}"]),
+                                new LocalizableText("Modal_Accept"));
                         }
 
-                        _appTitleService.SetProgressString(null);
+                        _appTitleService.SetProgress(null);
                         break;
                     case AsyncStatus.Completed:
-                        _appTitleService.SetProgressString("Relaunch to Apply Update");
+                        _appTitleService.SetProgress(new AppTitleProgress.RelaunchToApply());
                         break;
                     case AsyncStatus.Canceled:
                     case AsyncStatus.Started:
                     default:
-                        _appTitleService.SetProgressString(null);
+                        _appTitleService.SetProgress(null);
                         break;
                 }
             });

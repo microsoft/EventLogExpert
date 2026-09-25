@@ -38,7 +38,7 @@ public sealed class UpdateServiceTests
         await updateService.CheckForUpdates(usePreRelease: false);
 
         // Assert
-        mockAppTitleService.Received(1).SetProgressString(null);
+        mockAppTitleService.Received(1).SetProgress(null);
     }
 
     [Fact]
@@ -65,42 +65,6 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
-    public async Task CheckForUpdates_DeploymentThrowsException_ShouldShowAlert()
-    {
-        // Arrange
-        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
-        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
-        mockCurrentVersionProvider.IsDevBuild.Returns(false);
-
-        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
-
-        mockAlertDialogService
-            .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
-            .Returns(Task.FromResult(true));
-
-        var mockDeploymentService = Substitute.For<IDeploymentService>();
-
-        mockDeploymentService.When(x => x.RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>()))
-            .Do(_ => throw new InvalidOperationException("Deployment failed"));
-
-        var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
-
-        var updateService = CreateUpdateService(
-            mockCurrentVersionProvider,
-            gitHubService: mockGitHubService,
-            deploymentService: mockDeploymentService,
-            alertDialogService: mockAlertDialogService);
-
-        // Act
-        await updateService.CheckForUpdates(usePreRelease: false, userInitiated: true);
-
-        // Assert
-        await mockAlertDialogService.Received(1)
-            .ShowAlert("Update Failure", Arg.Is<string>(s => s != null && s.Contains("Deployment failed")), "OK");
-    }
-
-    [Fact]
     public async Task CheckForUpdates_DeploymentThrowsExceptionAutoScan_ShouldNotShowAlert()
     {
         // Arrange
@@ -112,7 +76,7 @@ public sealed class UpdateServiceTests
 
         // User declines the "Update Available" prompt -> UpdateOnNextRestart is called
         mockAlertDialogService
-            .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
+            .ShowAlert(Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>())
             .Returns(Task.FromResult(false));
 
         var mockDeploymentService = Substitute.For<IDeploymentService>();
@@ -134,7 +98,52 @@ public sealed class UpdateServiceTests
 
         // Assert
         await mockAlertDialogService.DidNotReceive()
-            .ShowAlert("Update Failure", Arg.Any<string>(), "OK");
+            .ShowAlert(
+                KeyIs("Update_Alert_Failure_Title"),
+                Arg.Any<LocalizableText>(),
+                KeyIs("Modal_Accept"));
+    }
+
+    [Fact]
+    public async Task CheckForUpdates_DeploymentThrowsException_ShouldShowAlert()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
+
+        mockAlertDialogService
+            .ShowAlert(Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>())
+            .Returns(Task.FromResult(true));
+
+        var mockDeploymentService = Substitute.For<IDeploymentService>();
+
+        mockDeploymentService.When(x => x.RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>()))
+            .Do(_ => throw new InvalidOperationException("Deployment failed"));
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            gitHubService: mockGitHubService,
+            deploymentService: mockDeploymentService,
+            alertDialogService: mockAlertDialogService);
+
+        // Act
+        await updateService.CheckForUpdates(usePreRelease: false, userInitiated: true);
+
+        // Assert
+        await mockAlertDialogService.Received(1)
+            .ShowAlert(
+                KeyIs("Update_Alert_Failure_Title"),
+                Arg.Is<LocalizableText>(text =>
+                    text.Key == "Update_Alert_InstallFailed_Message" &&
+                    text.Args.Count == 1 &&
+                    text.Args[0].Contains("Deployment failed")),
+                KeyIs("Modal_Accept"));
     }
 
     [Fact]
@@ -161,7 +170,7 @@ public sealed class UpdateServiceTests
         await mockGitHubService.DidNotReceive().GetReleases();
         mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
         mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
-        await mockAlertDialogService.DidNotReceive().ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+        await mockAlertDialogService.DidNotReceive().ShowAlert(Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>());
     }
 
     [Fact]
@@ -185,42 +194,9 @@ public sealed class UpdateServiceTests
         // Assert
         await mockGitHubService.DidNotReceive().GetReleases();
         await mockAlertDialogService.Received(1).ShowAlert(
-            "Update Check Unavailable",
-            "Update checks are disabled for development builds.",
-            "OK");
-    }
-
-    [Fact]
-    public async Task CheckForUpdates_GetReleasesThrowsException_ShouldShowAlert()
-    {
-        // Arrange
-        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
-        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
-        mockCurrentVersionProvider.IsDevBuild.Returns(false);
-
-        var mockGitHubService = Substitute.For<IGitHubService>();
-
-        mockGitHubService.GetReleases().Returns<IEnumerable<GitHubRelease>>(_ =>
-            throw new HttpRequestException("Network error"));
-
-        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
-        var mockDeploymentService = Substitute.For<IDeploymentService>();
-
-        var updateService = CreateUpdateService(
-            mockCurrentVersionProvider,
-            gitHubService: mockGitHubService,
-            deploymentService: mockDeploymentService,
-            alertDialogService: mockAlertDialogService);
-
-        // Act
-        await updateService.CheckForUpdates(usePreRelease: false, userInitiated: true);
-
-        // Assert
-        await mockAlertDialogService.Received(1)
-            .ShowAlert("Update Failure", Arg.Is<string>(s => s != null && s.Contains("Network error")), "OK");
-
-        mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
-        mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
+            KeyIs("Update_Alert_CheckUnavailable_Title"),
+            KeyIs("Update_Alert_CheckUnavailable_Message"),
+            KeyIs("Modal_Accept"));
     }
 
     [Fact]
@@ -250,7 +226,46 @@ public sealed class UpdateServiceTests
 
         // Assert
         await mockAlertDialogService.DidNotReceive()
-            .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+            .ShowAlert(Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>());
+
+        mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
+        mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
+    }
+
+    [Fact]
+    public async Task CheckForUpdates_GetReleasesThrowsException_ShouldShowAlert()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+
+        mockGitHubService.GetReleases().Returns<IEnumerable<GitHubRelease>>(_ =>
+            throw new HttpRequestException("Network error"));
+
+        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
+        var mockDeploymentService = Substitute.For<IDeploymentService>();
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            gitHubService: mockGitHubService,
+            deploymentService: mockDeploymentService,
+            alertDialogService: mockAlertDialogService);
+
+        // Act
+        await updateService.CheckForUpdates(usePreRelease: false, userInitiated: true);
+
+        // Assert
+        await mockAlertDialogService.Received(1)
+            .ShowAlert(
+                KeyIs("Update_Alert_Failure_Title"),
+                Arg.Is<LocalizableText>(text =>
+                    text.Key == "Update_Alert_RetrieveFailed_Message" &&
+                    text.Args.Count == 1 &&
+                    text.Args[0].Contains("Network error")),
+                KeyIs("Modal_Accept"));
 
         mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
         mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
@@ -292,7 +307,7 @@ public sealed class UpdateServiceTests
         var mockAlertDialogService = Substitute.For<IAlertDialogService>();
 
         mockAlertDialogService
-            .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
+            .ShowAlert(Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>())
             .Returns(Task.FromResult(true));
 
         var mockGitHubService = Substitute.For<IGitHubService>();
@@ -311,6 +326,11 @@ public sealed class UpdateServiceTests
 
         // Assert
         mockDeploymentService.Received(1).RestartNowAndUpdate(Constants.GitHubLatestUri, userInitiated: true);
+        await mockAlertDialogService.Received(1).ShowAlert(
+            KeyIs("Update_Alert_Available_Title"),
+            KeyIs("Update_Alert_Available_Message"),
+            KeyIs("Modal_Yes"),
+            KeyIs("Modal_No"));
     }
 
     [Fact]
@@ -385,7 +405,7 @@ public sealed class UpdateServiceTests
         await updateService.CheckForUpdates(usePreRelease: false, userInitiated: false);
 
         // Assert
-        await mockAlertDialogService.DidNotReceive().ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+        await mockAlertDialogService.DidNotReceive().ShowAlert(Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>());
         mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
         mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
     }
@@ -414,40 +434,12 @@ public sealed class UpdateServiceTests
         await updateService.CheckForUpdates(usePreRelease: false, userInitiated: true);
 
         // Assert
-        await mockAlertDialogService.Received(1).ShowAlert("Update Unavailable", Arg.Any<string>(), "OK");
+        await mockAlertDialogService.Received(1).ShowAlert(
+            KeyIs("Update_Alert_Unavailable_Title"),
+            KeyIs("Update_Alert_Unavailable_Message"),
+            KeyIs("Modal_Accept"));
         mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
         mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
-    }
-
-    [Fact]
-    public async Task CheckForUpdates_NoReleases_ShouldShowAlert()
-    {
-        // Arrange
-        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
-        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
-        mockCurrentVersionProvider.IsDevBuild.Returns(false);
-
-        var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns([]);
-
-        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
-        var mockDeploymentService = Substitute.For<IDeploymentService>();
-
-        var updateService = CreateUpdateService(
-            mockCurrentVersionProvider,
-            gitHubService: mockGitHubService,
-            deploymentService: mockDeploymentService,
-            alertDialogService: mockAlertDialogService);
-
-        // Act
-        await updateService.CheckForUpdates(usePreRelease: false, userInitiated: true);
-
-        // Assert
-        mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
-        mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
-
-        await mockAlertDialogService.Received(1)
-            .ShowAlert("Update Failure", Arg.Is<string>(s => s != null && s.Contains("No releases available")), "OK");
     }
 
     [Fact]
@@ -478,7 +470,44 @@ public sealed class UpdateServiceTests
         mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
 
         await mockAlertDialogService.DidNotReceive()
-            .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+            .ShowAlert(Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>());
+    }
+
+    [Fact]
+    public async Task CheckForUpdates_NoReleases_ShouldShowAlert()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+        mockGitHubService.GetReleases().Returns([]);
+
+        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
+        var mockDeploymentService = Substitute.For<IDeploymentService>();
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            gitHubService: mockGitHubService,
+            deploymentService: mockDeploymentService,
+            alertDialogService: mockAlertDialogService);
+
+        // Act
+        await updateService.CheckForUpdates(usePreRelease: false, userInitiated: true);
+
+        // Assert
+        mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
+        mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
+
+        await mockAlertDialogService.Received(1)
+            .ShowAlert(
+                KeyIs("Update_Alert_Failure_Title"),
+                Arg.Is<LocalizableText>(text =>
+                    text.Key == "Update_Alert_RetrieveFailed_Message" &&
+                    text.Args.Count == 1 &&
+                    text.Args[0].Contains("No releases available")),
+                KeyIs("Modal_Accept"));
     }
 
     [Fact]
@@ -507,7 +536,10 @@ public sealed class UpdateServiceTests
         // Assert
         mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
         mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
-        await mockAlertDialogService.Received(1).ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+        await mockAlertDialogService.Received(1).ShowAlert(
+            KeyIs("Update_Alert_NoUpdates_Title"),
+            KeyIs("Update_Alert_NoUpdates_Message"),
+            KeyIs("Modal_Accept"));
     }
 
     [Fact]
@@ -541,38 +573,6 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
-    public async Task CheckForUpdates_Prerelease_ShouldUpdateImmediately()
-    {
-        // Arrange
-        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
-        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
-        mockCurrentVersionProvider.IsDevBuild.Returns(false);
-
-        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
-
-        mockAlertDialogService
-            .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
-            .Returns(Task.FromResult(true));
-
-        var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
-
-        var mockDeploymentService = Substitute.For<IDeploymentService>();
-
-        var updateService = CreateUpdateService(
-            mockCurrentVersionProvider,
-            gitHubService: mockGitHubService,
-            deploymentService: mockDeploymentService,
-            alertDialogService: mockAlertDialogService);
-
-        // Act
-        await updateService.CheckForUpdates(usePreRelease: true);
-
-        // Assert
-        mockDeploymentService.Received(1).RestartNowAndUpdate(Constants.GitHubPrereleaseUri, userInitiated: true);
-    }
-
-    [Fact]
     public async Task CheckForUpdates_PreRelease_ShouldUpdateOnNextRestart()
     {
         // Arrange
@@ -598,6 +598,70 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
+    public async Task CheckForUpdates_Prerelease_ShouldUpdateImmediately()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
+
+        mockAlertDialogService
+            .ShowAlert(Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>())
+            .Returns(Task.FromResult(true));
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
+
+        var mockDeploymentService = Substitute.For<IDeploymentService>();
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            gitHubService: mockGitHubService,
+            deploymentService: mockDeploymentService,
+            alertDialogService: mockAlertDialogService);
+
+        // Act
+        await updateService.CheckForUpdates(usePreRelease: true);
+
+        // Assert
+        mockDeploymentService.Received(1).RestartNowAndUpdate(Constants.GitHubPrereleaseUri, userInitiated: true);
+    }
+
+    [Fact]
+    public async Task CheckForUpdates_UserDeclinesUpdateManualScan_ShouldPropagateUserInitiated()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
+
+        mockAlertDialogService
+            .ShowAlert(Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>())
+            .Returns(Task.FromResult(false)); // User clicks "No"
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
+
+        var mockDeploymentService = Substitute.For<IDeploymentService>();
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            gitHubService: mockGitHubService,
+            deploymentService: mockDeploymentService,
+            alertDialogService: mockAlertDialogService);
+
+        // Act
+        await updateService.CheckForUpdates(usePreRelease: false, userInitiated: true);
+
+        // Assert
+        mockDeploymentService.Received(1).UpdateOnNextRestart(Constants.GitHubLatestUri, userInitiated: true);
+    }
+
+    [Fact]
     public async Task CheckForUpdates_UserDeclinesUpdate_ShouldUpdateOnNextRestart()
     {
         // Arrange
@@ -608,7 +672,7 @@ public sealed class UpdateServiceTests
         var mockAlertDialogService = Substitute.For<IAlertDialogService>();
 
         mockAlertDialogService
-            .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
+            .ShowAlert(Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>())
             .Returns(Task.FromResult(false)); // User clicks "No"
 
         var mockGitHubService = Substitute.For<IGitHubService>();
@@ -628,38 +692,6 @@ public sealed class UpdateServiceTests
         // Assert
         mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
         mockDeploymentService.Received(1).UpdateOnNextRestart(Constants.GitHubLatestUri);
-    }
-
-    [Fact]
-    public async Task CheckForUpdates_UserDeclinesUpdateManualScan_ShouldPropagateUserInitiated()
-    {
-        // Arrange
-        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
-        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
-        mockCurrentVersionProvider.IsDevBuild.Returns(false);
-
-        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
-
-        mockAlertDialogService
-            .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
-            .Returns(Task.FromResult(false)); // User clicks "No"
-
-        var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
-
-        var mockDeploymentService = Substitute.For<IDeploymentService>();
-
-        var updateService = CreateUpdateService(
-            mockCurrentVersionProvider,
-            gitHubService: mockGitHubService,
-            deploymentService: mockDeploymentService,
-            alertDialogService: mockAlertDialogService);
-
-        // Act
-        await updateService.CheckForUpdates(usePreRelease: false, userInitiated: true);
-
-        // Assert
-        mockDeploymentService.Received(1).UpdateOnNextRestart(Constants.GitHubLatestUri, userInitiated: true);
     }
 
     [Fact]
@@ -753,7 +785,11 @@ public sealed class UpdateServiceTests
         mockSettings.Received(1).IsPreReleaseEnabled = true;
 
         await mockAlertDialogService.DidNotReceive()
-            .ShowAlert("Update Available", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+            .ShowAlert(
+                KeyIs("Update_Alert_Available_Title"),
+                Arg.Any<LocalizableText>(),
+                Arg.Any<LocalizableText>(),
+                Arg.Any<LocalizableText>());
 
         mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>(), Arg.Any<bool>());
         mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>(), Arg.Any<bool>());
@@ -807,7 +843,10 @@ public sealed class UpdateServiceTests
 
         // Assert
         await mockAlertDialogService.Received(1)
-            .ShowAlert(Arg.Is<string>(s => s != null && s.Contains("Release Notes")), Arg.Is<string>(s => s != null && s.Contains("Failed to get release notes")), "OK");
+            .ShowAlert(
+                KeyIs("Update_Alert_ReleaseNotesFailed_Title"),
+                KeyIs("Update_Alert_ReleaseNotesFailed_Message"),
+                KeyIs("Modal_Accept"));
         Assert.Null(result);
     }
 
@@ -857,7 +896,7 @@ public sealed class UpdateServiceTests
 
         var mockAlertDialogService = Substitute.For<IAlertDialogService>();
         mockAlertDialogService
-            .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
+            .ShowAlert(Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>())
             .Returns(Task.FromResult(false));
 
         var updateService = CreateUpdateService(
@@ -871,12 +910,15 @@ public sealed class UpdateServiceTests
 
         // Assert
         Assert.NotNull(result);
-        Assert.Contains(Constants.AppInstalledVersion, result.Value.Title);
+        Assert.Equal(Constants.AppInstalledVersion, result.Value.Version);
         Assert.Contains("Bug fix for current version", result.Value.Markdown);
         Assert.DoesNotContain("Feature A for newer version", result.Value.Markdown);
 
         await mockAlertDialogService.DidNotReceive()
-            .ShowAlert("Release Notes Failure", Arg.Any<string>(), "OK");
+            .ShowAlert(
+                KeyIs("Update_Alert_ReleaseNotesFailed_Title"),
+                Arg.Any<LocalizableText>(),
+                KeyIs("Modal_Accept"));
     }
 
     [Fact]
@@ -903,13 +945,12 @@ public sealed class UpdateServiceTests
 
         // Assert
         Assert.NotNull(result);
-        Assert.Contains("Release notes", result.Value.Title);
-        Assert.Contains(Constants.GitHubLatestVersion[1..], result.Value.Title);
+        Assert.Equal(Constants.GitHubLatestVersion[1..], result.Value.Version);
         Assert.Contains("Updated Azure yml to .NET 8", result.Value.Markdown);
         Assert.DoesNotContain("66b7d6883807a5c518ffcd59f92e07e528a5636a", result.Value.Markdown);
 
         await mockAlertDialogService.DidNotReceive()
-            .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+            .ShowAlert(Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>());
     }
 
     // A release newer than the installed version whose only asset is the WindowsAppRuntime dependency (no
@@ -957,4 +998,6 @@ public sealed class UpdateServiceTests
             alertDialogService ?? Substitute.For<IAlertDialogService>(),
             settings);
     }
+
+    private static LocalizableText KeyIs(string key) => Arg.Is<LocalizableText>(text => text.Key == key);
 }

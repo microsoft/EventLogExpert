@@ -942,6 +942,67 @@ public sealed class LocalizationInfraTests
             "ONLY after the RTL prerequisite bundle lands.");
     }
 
+    [Fact]
+    public void UpdatesAndTitleNeutralValues_HaveExpectedArityAndByteExactEnglish()
+    {
+        var neutralValues = ResxValues();
+        (string Key, int Arity, string Value)[] expected =
+        [
+            ("Modal_Yes", 0, "Yes"),
+            ("Modal_No", 0, "No"),
+            ("Update_Alert_CheckUnavailable_Title", 0, "Update Check Unavailable"),
+            ("Update_Alert_CheckUnavailable_Message", 0, "Update checks are disabled for development builds."),
+            ("Update_Alert_NoUpdates_Title", 0, "No Updates Available"),
+            ("Update_Alert_NoUpdates_Message", 0, "You are currently running the latest version."),
+            ("Update_Alert_Failure_Title", 0, "Update Failure"),
+            ("Update_Alert_RetrieveFailed_Message", 1, "Failed to retrieve latest releases:\r\n{0}"),
+            ("Update_Alert_InstallFailed_Message", 1, "Update failed to install:\r\n{0}"),
+            ("Update_Alert_Unavailable_Title", 0, "Update Unavailable"),
+            ("Update_Alert_Unavailable_Message", 0, "No compatible update package was found."),
+            ("Update_Alert_Available_Title", 0, "Update Available"),
+            ("Update_Alert_Available_Message", 0,
+                "A new version has been detected, would you like to install and reload the application?"),
+            ("Update_Alert_ReleaseNotesFailed_Title", 0, "Release Notes Failure"),
+            ("Update_Alert_ReleaseNotesFailed_Message", 0, "Failed to get release notes for the current version"),
+            ("AppTitle_Qualifier_Development", 0, " (Development)"),
+            ("AppTitle_Qualifier_Preview", 0, " (Preview)"),
+            ("AppTitle_Qualifier_Admin", 0, " (Admin)"),
+            ("AppTitle_Progress_Installing", 1, "Installing: {0}%"),
+            ("AppTitle_Progress_Relaunch", 0, "Relaunch to Apply Update"),
+            ("ReleaseNotes_TitleWithVersion", 1, "Release notes for v{0}"),
+            ("ReleaseNotes_AriaLabel", 0, "Release Notes")
+        ];
+
+        foreach (var (key, arity, value) in expected)
+        {
+            Assert.True(neutralValues.TryGetValue(key, out var neutral), $"Missing neutral RESX value for {key}.");
+            Assert.Equal(value, neutral);
+            Assert.Equal(arity, PlaceholderArity(neutral));
+        }
+    }
+
+    [Fact]
+    public void UpdatesAndTitleWhitespaceSensitiveValues_ResolveByteExactThroughResourceManager()
+    {
+        // The XML-parse guard above cannot catch a dropped xml:space="preserve" (XDocument preserves leaf
+        // whitespace unconditionally); resolving through the compiled ResourceManager does, protecting the
+        // window-title byte-identity that depends on the leading-space qualifiers.
+        var localizer = BuildLocalizer();
+        (string Key, string Value)[] expected =
+        [
+            ("AppTitle_Qualifier_Development", " (Development)"),
+            ("AppTitle_Qualifier_Preview", " (Preview)"),
+            ("AppTitle_Qualifier_Admin", " (Admin)"),
+            ("Update_Alert_RetrieveFailed_Message", "Failed to retrieve latest releases:\r\n{0}"),
+            ("Update_Alert_InstallFailed_Message", "Update failed to install:\r\n{0}")
+        ];
+
+        foreach (var (key, value) in expected)
+        {
+            Assert.Equal(value, localizer[key].Value);
+        }
+    }
+
     // Resolves the localizer from a bare container: the production extension plus the ILoggerFactory it needs (as the host supplies in production).
     private static IStringLocalizer<SharedResource> BuildLocalizer() =>
         new ServiceCollection()

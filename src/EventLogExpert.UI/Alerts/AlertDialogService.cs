@@ -1,11 +1,14 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Modal;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.Alerts;
 
@@ -13,12 +16,14 @@ public sealed class AlertDialogService(
     IModalCoordinator modalCoordinator,
     IMainThreadService mainThreadService,
     IErrorBannerService errorBannerService,
+    IStringLocalizer<SharedResource> localizer,
     Func<IReadOnlyDictionary<string, object?>, Task<bool>> openStandaloneAlert,
     Func<IReadOnlyDictionary<string, object?>, Task<string>> openStandalonePrompt,
     Func<IReadOnlyDictionary<string, object?>, Task<PromptOutcome>>? openStandalonePromptWithSecondary = null)
     : IAlertDialogService
 {
     private readonly IErrorBannerService _errorBannerService = errorBannerService;
+    private readonly IStringLocalizer<SharedResource> _localizer = localizer;
     private readonly IMainThreadService _mainThreadService = mainThreadService;
     private readonly IModalCoordinator _modalCoordinator = modalCoordinator;
     private readonly Func<IReadOnlyDictionary<string, object?>, Task<bool>> _openStandaloneAlert = openStandaloneAlert;
@@ -63,6 +68,16 @@ public sealed class AlertDialogService(
     {
         return ShowAlertCore(title, message, accept, cancel, presentation);
     }
+
+    public Task ShowAlert(LocalizableText title, LocalizableText message, LocalizableText cancel) =>
+        ShowAlert(Localize(title), Localize(message), Localize(cancel));
+
+    public Task<bool> ShowAlert(
+        LocalizableText title,
+        LocalizableText message,
+        LocalizableText accept,
+        LocalizableText cancel) =>
+        ShowAlert(Localize(title), Localize(message), Localize(accept), Localize(cancel));
 
     public Task ShowErrorAlert(string title, string message, string? actionLabel = null, Func<Task>? action = null)
     {
@@ -159,6 +174,8 @@ public sealed class AlertDialogService(
 
         return result;
     }
+
+    private string Localize(LocalizableText text) => _localizer[text.Key, [.. text.Args]];
 
     private Task<bool> ShowAlertCore(
         string title,

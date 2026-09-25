@@ -231,7 +231,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<ISettingsPreferencesProvider>());
         services.AddSingleton(Substitute.For<IDatabasePreferencesProvider>());
         services.AddSingleton(Substitute.For<IProviderDatabaseMaintenance>());
-        services.AddSingleton(Substitute.For<ITitleProvider>());
+        services.AddSingleton(Substitute.For<IAppTitleTextComposer>());
         services.AddSingleton(Substitute.For<IMainThreadService>());
         services.AddSingleton(Substitute.For<IWindowsIdentityProvider>());
         services.AddSingleton(Substitute.For<IFilePickerService>());
@@ -382,7 +382,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(preferences ?? Substitute.For<ISettingsPreferencesProvider>());
         services.AddSingleton(Substitute.For<IDatabasePreferencesProvider>());
         services.AddSingleton(Substitute.For<IProviderDatabaseMaintenance>());
-        services.AddSingleton(Substitute.For<ITitleProvider>());
+        services.AddSingleton(Substitute.For<IAppTitleTextComposer>());
         services.AddSingleton(Substitute.For<IMainThreadService>());
         services.AddSingleton(Substitute.For<IWindowsIdentityProvider>());
         services.AddSingleton(Substitute.For<IFilePickerService>());

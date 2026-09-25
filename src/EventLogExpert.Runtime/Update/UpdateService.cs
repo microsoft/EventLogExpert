@@ -42,9 +42,10 @@ internal sealed class UpdateService(
 
             if (userInitiated)
             {
-                await alertDialogService.ShowAlert("Update Check Unavailable",
-                    "Update checks are disabled for development builds.",
-                    "OK");
+                await alertDialogService.ShowAlert(
+                    new LocalizableText("Update_Alert_CheckUnavailable_Title"),
+                    new LocalizableText("Update_Alert_CheckUnavailable_Message"),
+                    new LocalizableText("Modal_Accept"));
             }
 
             return;
@@ -123,9 +124,10 @@ internal sealed class UpdateService(
                 {
                     if (userInitiated)
                     {
-                        await alertDialogService.ShowAlert("No Updates Available",
-                            "You are currently running the latest version.",
-                            "OK");
+                        await alertDialogService.ShowAlert(
+                            new LocalizableText("Update_Alert_NoUpdates_Title"),
+                            new LocalizableText("Update_Alert_NoUpdates_Message"),
+                            new LocalizableText("Modal_Accept"));
                     }
 
                     return;
@@ -145,9 +147,10 @@ internal sealed class UpdateService(
 
             if (userInitiated)
             {
-                await alertDialogService.ShowAlert("Update Failure",
-                    $"Failed to retrieve latest releases:\r\n{ex.Message}",
-                    "OK");
+                await alertDialogService.ShowAlert(
+                    new LocalizableText("Update_Alert_Failure_Title"),
+                    new LocalizableText("Update_Alert_RetrieveFailed_Message", [ex.Message]),
+                    new LocalizableText("Modal_Accept"));
             }
 
             return;
@@ -163,27 +166,29 @@ internal sealed class UpdateService(
 
             if (string.IsNullOrEmpty(downloadPath))
             {
-                string availableAssets = latest.Value.Assets is null or { Count: 0 }
-                    ? "(none)"
-                    : string.Join(", ", latest.Value.Assets.Select(asset => string.IsNullOrEmpty(asset.Name) ? "(unnamed)" : asset.Name));
+                string availableAssets = latest.Value.Assets is null or { Count: 0 } ?
+                    "(none)" :
+                    string.Join(", ", latest.Value.Assets.Select(asset => string.IsNullOrEmpty(asset.Name) ? "(unnamed)" : asset.Name));
 
                 traceLogger.Warning($"{nameof(CheckForUpdates)} No update bundle (.msixbundle) was found in the " +
                     $"latest release. OS architecture: {RuntimeInformation.OSArchitecture}. Available assets: {availableAssets}");
 
                 if (userInitiated)
                 {
-                    await alertDialogService.ShowAlert("Update Unavailable",
-                        "No compatible update package was found.",
-                        "OK");
+                    await alertDialogService.ShowAlert(
+                        new LocalizableText("Update_Alert_Unavailable_Title"),
+                        new LocalizableText("Update_Alert_Unavailable_Message"),
+                        new LocalizableText("Modal_Accept"));
                 }
 
                 return;
             }
 
             shouldReboot = await alertDialogService.ShowAlert(
-                "Update Available",
-                "A new version has been detected, would you like to install and reload the application?",
-                "Yes", "No");
+                new LocalizableText("Update_Alert_Available_Title"),
+                new LocalizableText("Update_Alert_Available_Message"),
+                new LocalizableText("Modal_Yes"),
+                new LocalizableText("Modal_No"));
 
             traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(shouldReboot)} is {shouldReboot} after dialog.");
 
@@ -202,14 +207,15 @@ internal sealed class UpdateService(
 
             if (userInitiated || shouldReboot)
             {
-                await alertDialogService.ShowAlert("Update Failure",
-                    $"Update failed to install:\r\n{ex.Message}",
-                    "OK");
+                await alertDialogService.ShowAlert(
+                    new LocalizableText("Update_Alert_Failure_Title"),
+                    new LocalizableText("Update_Alert_InstallFailed_Message", [ex.Message]),
+                    new LocalizableText("Modal_Accept"));
             }
         }
         finally
         {
-            appTitleService.SetProgressString(null);
+            appTitleService.SetProgress(null);
         }
     }
 
@@ -217,17 +223,17 @@ internal sealed class UpdateService(
     {
         if (string.IsNullOrWhiteSpace(_currentRawChanges))
         {
-            await alertDialogService.ShowAlert("Release Notes Failure",
-                "Failed to get release notes for the current version",
-                "OK");
+            await alertDialogService.ShowAlert(
+                new LocalizableText("Update_Alert_ReleaseNotesFailed_Title"),
+                new LocalizableText("Update_Alert_ReleaseNotesFailed_Message"),
+                new LocalizableText("Modal_Accept"));
 
             return null;
         }
 
         var markdown = GitHubReleaseNormalizer.Normalize(_currentRawChanges);
-        var title = $"Release notes for v{versionProvider.CurrentVersion}";
 
-        return new ReleaseNotesContent(title, markdown);
+        return new ReleaseNotesContent(versionProvider.CurrentVersion.ToString(), markdown);
     }
 
     /// <summary>
