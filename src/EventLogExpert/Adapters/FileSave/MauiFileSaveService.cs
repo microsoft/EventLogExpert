@@ -1,13 +1,18 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Common.Files;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.Adapters.FileSave;
 
-public sealed class MauiFileSaveService(IFilePickerService filePickerService) : IFileSaveService
+public sealed class MauiFileSaveService(
+    IFilePickerService filePickerService,
+    IStringLocalizer<SharedResource> localizer) : IFileSaveService
 {
     private readonly IFilePickerService _filePickerService = filePickerService;
+    private readonly IStringLocalizer<SharedResource> _localizer = localizer;
 
     public async Task<string?> SaveStreamingAsync(
         string suggestedFileName,
@@ -22,7 +27,8 @@ public sealed class MauiFileSaveService(IFilePickerService filePickerService) : 
         cancellationToken.ThrowIfCancellationRequested();
 
         var extensions = FlattenExtensions(fileTypes);
-        var destinationPath = await _filePickerService.PickSaveAsync("Save As", extensions, suggestedFileName);
+        var destinationPath = await _filePickerService.PickSaveAsync(
+            _localizer["FilePicker_Title_SaveAs"], extensions, suggestedFileName);
 
         if (destinationPath is null) { return null; }
 
@@ -31,12 +37,12 @@ public sealed class MauiFileSaveService(IFilePickerService filePickerService) : 
         return destinationPath;
     }
 
-    private static IReadOnlyList<string> FlattenExtensions(
+    private IReadOnlyList<string> FlattenExtensions(
         IReadOnlyDictionary<string, IReadOnlyList<string>> fileTypes)
     {
         if (fileTypes.Count == 0)
         {
-            throw new ArgumentException("At least one file-type choice must be supplied.", nameof(fileTypes));
+            throw new ArgumentException(_localizer["FilePicker_Error_NoFileTypeChoice"], nameof(fileTypes));
         }
 
         var extensions = fileTypes.Values
@@ -45,6 +51,6 @@ public sealed class MauiFileSaveService(IFilePickerService filePickerService) : 
             .ToList();
 
         return extensions.Count == 0 ?
-            throw new ArgumentException("At least one extension must be supplied.", nameof(fileTypes)) : extensions;
+            throw new ArgumentException(_localizer["FilePicker_Error_NoExtensions"], nameof(fileTypes)) : extensions;
     }
 }

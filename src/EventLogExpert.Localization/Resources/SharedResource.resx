@@ -59,6 +59,30 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="FilePicker_Error_FirstExtensionBlank" xml:space="preserve">
+    <value>The first extension cannot be null or whitespace.</value>
+  </data>
+  <data name="FilePicker_Error_NoExtensions" xml:space="preserve">
+    <value>At least one extension must be supplied.</value>
+  </data>
+  <data name="FilePicker_Error_NoFileTypeChoice" xml:space="preserve">
+    <value>At least one file-type choice must be supplied.</value>
+  </data>
+  <data name="FilePicker_Filter_AllFiles" xml:space="preserve">
+    <value>All files</value>
+  </data>
+  <data name="FilePicker_Filter_SupportedTypes" xml:space="preserve">
+    <value>Supported types ({0})</value>
+  </data>
+  <data name="FilePicker_Title_OpenEventLogs" xml:space="preserve">
+    <value>Open Event Logs</value>
+  </data>
+  <data name="FilePicker_Title_SaveAs" xml:space="preserve">
+    <value>Save As</value>
+  </data>
+  <data name="FilePicker_Title_SelectFolder" xml:space="preserve">
+    <value>Select Folder</value>
+  </data>
   <data name="FindBar_Close" xml:space="preserve">
     <value>Close find</value>
   </data>

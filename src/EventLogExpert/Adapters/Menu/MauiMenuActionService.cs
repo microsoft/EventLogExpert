@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
@@ -26,6 +27,7 @@ using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.WindowsPlatform.Activation;
 using Fluxor;
+using Microsoft.Extensions.Localization;
 using System.Collections.Immutable;
 using Application = Microsoft.Maui.Controls.Application;
 using IDispatcher = Fluxor.IDispatcher;
@@ -50,6 +52,7 @@ public sealed class MauiMenuActionService(
     IFilePickerService filePickerService,
     IFolderPickerService folderPickerService,
     IState<EventLogState> eventLogState,
+    IStringLocalizer<SharedResource> localizer,
     EventExportCoordinator exportCoordinator) : IMenuActionService, IDisposable
 {
     private readonly IClipboardService _clipboardService = clipboardService;
@@ -65,6 +68,7 @@ public sealed class MauiMenuActionService(
     private readonly IFolderPickerService _folderPickerService = folderPickerService;
     private readonly IHistogramCommands _histogramCommands = histogramCommands;
     private readonly IInfoBannerService _infoBannerService = infoBannerService;
+    private readonly IStringLocalizer<SharedResource> _localizer = localizer;
     private readonly ILogTableCommands _logTableCommands = logTableCommands;
     private readonly IModalCoordinator _modalCoordinator = modalCoordinator;
     private readonly ISettingsService _settings = settings;
@@ -140,7 +144,7 @@ public sealed class MauiMenuActionService(
 
         try
         {
-            paths = await _filePickerService.PickMultipleAsync("Open Event Logs", [".evtx"]);
+            paths = await _filePickerService.PickMultipleAsync(_localizer["FilePicker_Title_OpenEventLogs"], [".evtx"]);
         }
         catch (InvalidOperationException ex)
         {

@@ -1,9 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using System.Globalization;
 using System.Runtime.InteropServices;
 
-namespace EventLogExpert.Platforms.Windows;
+namespace EventLogExpert.WindowsPlatform.Dialogs;
 
 /// <summary>
 ///     Win32 file-open dialog via the procedural <c>comdlg32!GetOpenFileNameW</c> API. We deliberately do NOT use WinUI's
@@ -23,11 +24,18 @@ namespace EventLogExpert.Platforms.Windows;
 ///     unpackaged elevated apps, and standard user mode. Buffers are stack-allocated to match the codebase's
 ///     <c>stackalloc</c>-based P/Invoke style (see <c>NativeMethods.FormatMessageW</c> in EventLogExpert.Eventing).
 /// </summary>
-internal static partial class Win32FileDialog
+/// <remarks>
+///     Lives in EventLogExpert.WindowsPlatform (not the MAUI head) so the pure filter-buffer construction (
+///     <see cref="BuildFilter" />) is unit-testable from EventLogExpert.Windows.Tests. The MAUI head's
+///     <c>Win32FileDialogService</c> owns the window handle and STA pump and calls into the public <c>Pick*</c> entries.
+/// </remarks>
+public static partial class Win32FileDialog
 {
+    // Bounds the stack-allocated filter buffer against pseudo-localized label growth, mirroring the MaxTitleChars guard.
+    internal const int MaxFilterLabelChars = 256;
+
     // 32K char = 64 KB stack: fits typical multi-select (dir + filenames), well under 1 MB stack.
     private const int FileBufferChars = 32 * 1024;
-
     // 256 chars bounds stack alloc against pathologically long external title input.
     private const int MaxTitleChars = 256;
     private const int OFN_ALLOWMULTISELECT = 0x00000200;
@@ -40,10 +48,51 @@ internal static partial class Win32FileDialog
     private const int OFN_OVERWRITEPROMPT = 0x00000002;
     private const int OFN_PATHMUSTEXIST = 0x00000800;
 
+    /// <summary>
+    ///     Composes the localized <see cref="FilterChrome" /> from already-resolved localized strings. Call this on the
+    ///     UI thread (where the localizer resolved the strings) so the "Supported types" label is formatted with the caller's
+    ///     culture BEFORE it crosses into the native P/Invoke layer. The extension pattern is snapshotted ONCE and stored on
+    ///     the result, so the display label and native token never drift and the buffer passes stay identical. A malformed
+    ///     translation format (unbalanced brace, bad index) or a blank/whitespace translation falls back to the English label
+    ///     so the picker still opens with usable filter rows; both labels are clamped to <see cref="MaxFilterLabelChars" /> so
+    ///     the stack-allocated filter buffer stays bounded against pseudo-loc growth.
+    /// </summary>
+    public static FilterChrome CreateFilterChrome(
+        string supportedTypesFormat,
+        string allFilesLabel,
+        IReadOnlyList<string> extensions)
+    {
+        ArgumentNullException.ThrowIfNull(supportedTypesFormat);
+        ArgumentNullException.ThrowIfNull(allFilesLabel);
+        ArgumentNullException.ThrowIfNull(extensions);
+
+        var pattern = BuildExtensionPattern(extensions);
+
+        string label;
+
+        try
+        {
+            label = string.Format(CultureInfo.CurrentCulture, supportedTypesFormat, pattern);
+        }
+        catch (FormatException)
+        {
+            label = $"Supported types ({pattern})";
+        }
+
+        // A blank translation would collapse to a leading "\0" and make GetOpenFileNameW drop the filter row, so fall
+        // back to English for empty/whitespace labels as well.
+        if (string.IsNullOrWhiteSpace(label)) { label = $"Supported types ({pattern})"; }
+
+        var allFiles = string.IsNullOrWhiteSpace(allFilesLabel) ? "All files" : allFilesLabel;
+
+        return new FilterChrome(Clamp(label), Clamp(allFiles), pattern);
+    }
+
     /// <summary>Returns the picked paths (empty if the user cancelled).</summary>
     public static unsafe IReadOnlyList<string> PickMultipleFiles(
         IntPtr hwndOwner,
         IReadOnlyList<string> extensions,
+        FilterChrome chrome,
         string? title = null,
         string? initialDirectory = null)
     {
@@ -52,8 +101,8 @@ internal static partial class Win32FileDialog
         Span<char> fileBuffer = stackalloc char[FileBufferChars];
         fileBuffer.Clear();
 
-        Span<char> filter = stackalloc char[BuildFilter(default, extensions)];
-        BuildFilter(filter, extensions);
+        Span<char> filter = stackalloc char[BuildFilter(default, chrome)];
+        BuildFilter(filter, chrome);
 
         Span<char> titleBuffer = stackalloc char[CopyNullableTitle(default, title)];
         CopyNullableTitle(titleBuffer, title);
@@ -95,21 +144,12 @@ internal static partial class Win32FileDialog
     public static unsafe string? PickSaveFile(
         IntPtr hwndOwner,
         IReadOnlyList<string> extensions,
+        FilterChrome chrome,
         string? suggestedFileName = null,
         string? title = null,
         string? initialDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(extensions);
-
-        if (extensions.Count == 0)
-        {
-            throw new ArgumentException("At least one extension is required.", nameof(extensions));
-        }
-
-        if (string.IsNullOrWhiteSpace(extensions[0]))
-        {
-            throw new ArgumentException("The first extension cannot be null or whitespace.", nameof(extensions));
-        }
 
         Span<char> fileBuffer = stackalloc char[FileBufferChars];
         fileBuffer.Clear();
@@ -120,11 +160,12 @@ internal static partial class Win32FileDialog
             suggestedFileName.AsSpan(0, copyLen).CopyTo(fileBuffer);
         }
 
-        Span<char> filter = stackalloc char[BuildFilter(default, extensions)];
-        BuildFilter(filter, extensions);
+        Span<char> filter = stackalloc char[BuildFilter(default, chrome)];
+        BuildFilter(filter, chrome);
 
-        // lpstrDefExt is auto-appended on no-extension input; strip leading dot per Win32 contract.
-        var defaultExt = extensions[0].TrimStart('.');
+        // lpstrDefExt is auto-appended on no-extension input; strip leading dot per Win32 contract. This public entry
+        // stays crash-safe for a direct caller that passes an empty list (the MAUI adapter validates non-empty first).
+        var defaultExt = extensions.Count > 0 ? extensions[0].TrimStart('.') : string.Empty;
         Span<char> defaultExtBuffer = stackalloc char[defaultExt.Length + 1];
         defaultExt.AsSpan().CopyTo(defaultExtBuffer);
         defaultExtBuffer[defaultExt.Length] = '\0';
@@ -186,6 +227,7 @@ internal static partial class Win32FileDialog
     public static unsafe string? PickSingleFile(
         IntPtr hwndOwner,
         IReadOnlyList<string> extensions,
+        FilterChrome chrome,
         string? title = null,
         string? initialDirectory = null)
     {
@@ -194,8 +236,8 @@ internal static partial class Win32FileDialog
         Span<char> fileBuffer = stackalloc char[FileBufferChars];
         fileBuffer.Clear();
 
-        Span<char> filter = stackalloc char[BuildFilter(default, extensions)];
-        BuildFilter(filter, extensions);
+        Span<char> filter = stackalloc char[BuildFilter(default, chrome)];
+        BuildFilter(filter, chrome);
 
         Span<char> titleBuffer = stackalloc char[CopyNullableTitle(default, title)];
         CopyNullableTitle(titleBuffer, title);
@@ -236,24 +278,39 @@ internal static partial class Win32FileDialog
     }
 
     /// <summary>
+    ///     Builds the <c>"*.ext;*.ext2"</c> pattern token from the extension list. Called once per picker operation (by
+    ///     <see cref="CreateFilterChrome" />) so the display label and the native filter token share one snapshot.
+    /// </summary>
+    internal static string BuildExtensionPattern(IReadOnlyList<string> extensions)
+    {
+        ArgumentNullException.ThrowIfNull(extensions);
+
+        return string.Join(";", extensions.Select(extension => "*" + extension));
+    }
+
+    /// <summary>
     ///     Builds (or measures, when <paramref name="destination" /> is empty) the OPENFILENAME filter buffer in the
     ///     <c>"label\0pattern\0...\0\0"</c> null-separated null-terminated format. Returns the total number of chars written
-    ///     or needed.
+    ///     or needed. Every segment comes pre-resolved from the immutable <paramref name="chrome" /> (labels formatted and
+    ///     clamped, pattern captured once), so this method does NO culture-sensitive or list-dependent work: the measure and
+    ///     write passes are pure measure/copy over the same strings and therefore always agree on size (a mismatch would
+    ///     overrun the caller's stack-allocated span inside its <c>fixed</c> block).
     /// </summary>
-    private static int BuildFilter(Span<char> destination, IReadOnlyList<string> extensions)
+    internal static int BuildFilter(Span<char> destination, FilterChrome chrome)
     {
-        var pattern = string.Join(";", extensions.Select(e => "*" + e));
-        var label = $"Supported types ({pattern})";
+        var label = chrome.SupportedTypesLabel;
+        var pattern = chrome.Pattern;
+        var allFiles = chrome.AllFilesLabel;
 
-        // label\0pattern\0All files\0*.*\0\0
-        var needed = label.Length + 1 + pattern.Length + 1 + "All files".Length + 1 + "*.*".Length + 1 + 1;
+        // label\0pattern\0allFiles\0*.*\0\0
+        var needed = label.Length + 1 + pattern.Length + 1 + allFiles.Length + 1 + "*.*".Length + 1 + 1;
 
         if (destination.IsEmpty) { return needed; }
 
         var position = 0;
         position += CopyWithNullTerminator(label, destination[position..]);
         position += CopyWithNullTerminator(pattern, destination[position..]);
-        position += CopyWithNullTerminator("All files", destination[position..]);
+        position += CopyWithNullTerminator(allFiles, destination[position..]);
         position += CopyWithNullTerminator("*.*", destination[position..]);
         destination[position] = '\0'; // double-null terminator
 
@@ -285,6 +342,9 @@ internal static partial class Win32FileDialog
                 OFN_DONTADDTORECENT |
                 (multiSelect ? OFN_ALLOWMULTISELECT : 0)
         };
+
+    private static string Clamp(string value) =>
+        value.Length <= MaxFilterLabelChars ? value : value[..MaxFilterLabelChars];
 
     [LibraryImport("Comdlg32.dll", EntryPoint = "CommDlgExtendedError")]
     private static partial int CommDlgExtendedError();
