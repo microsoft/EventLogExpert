@@ -28,30 +28,7 @@ public sealed class DeploymentServiceTests
     }
 
     [Fact]
-    public void RestartNowAndUpdate_WhenApplicationRestartFails_ShouldNotCallPackageDeployment()
-    {
-        // Arrange
-        var mockPackageDeploymentService = Substitute.For<IPackageDeploymentService>();
-        var mockApplicationRestartService = Substitute.For<IApplicationRestartService>();
-        mockApplicationRestartService.RegisterApplicationRestart().Returns(false);
-
-        var deploymentService = CreateDeploymentService(
-            applicationRestartService: mockApplicationRestartService,
-            packageDeploymentService: mockPackageDeploymentService);
-
-        // Act
-        deploymentService.RestartNowAndUpdate(Constants.DownloadPath, true);
-
-        // Assert
-        mockApplicationRestartService.Received(1).RegisterApplicationRestart();
-
-        // NSubstitute's Received() doesn't reliably return configured values for IAsyncOperationWithProgress
-        _ = mockPackageDeploymentService.DidNotReceive()
-            .AddPackageAsync(Arg.Any<Uri>(), Arg.Any<PackageDeploymentOptions>());
-    }
-
-    [Fact]
-    public void RestartNowAndUpdate_WhenApplicationRestartSucceeds_ShouldCallPackageDeployment()
+    public void RestartNowAndUpdate_WhenCalled_ShouldStageUpdateWithDeferredRegistration()
     {
         // Arrange
         var mockDeploymentOperation = new DeploymentUtils.MockDeploymentOperation();
@@ -61,31 +38,25 @@ public sealed class DeploymentServiceTests
             .AddPackageAsync(Arg.Any<Uri>(), Arg.Any<PackageDeploymentOptions>())
             .Returns(mockDeploymentOperation);
 
-        var mockApplicationRestartService = Substitute.For<IApplicationRestartService>();
-        mockApplicationRestartService.RegisterApplicationRestart().Returns(true);
-
-        var deploymentService = CreateDeploymentService(
-            applicationRestartService: mockApplicationRestartService,
-            packageDeploymentService: mockPackageDeploymentService);
+        var deploymentService = CreateDeploymentService(packageDeploymentService: mockPackageDeploymentService);
 
         // Act
         deploymentService.RestartNowAndUpdate(Constants.DownloadPath, true);
 
         // Assert
-        mockApplicationRestartService.Received(1).RegisterApplicationRestart();
-
+        // Force shutdown must stay disabled: it makes the OS quiesce/kill the running app and log an AppHang.
         // NSubstitute's Received() doesn't reliably return configured values for IAsyncOperationWithProgress
         _ = mockPackageDeploymentService.Received(1)
             .AddPackageAsync(
                 Arg.Is<Uri>(uri => uri != null && uri.LocalPath == Constants.DownloadPath),
                 Arg.Is<PackageDeploymentOptions>(opt => opt != null &&
                     opt.ForceUpdateFromAnyVersion == true &&
-                    opt.ForceTargetAppShutdown == true &&
-                    opt.DeferRegistrationWhenPackagesAreInUse == false));
+                    opt.ForceTargetAppShutdown == false &&
+                    opt.DeferRegistrationWhenPackagesAreInUse == true));
     }
 
     [Fact]
-    public void RestartNowAndUpdate_WhenCalled_ShouldTraceMessages()
+    public void RestartNowAndUpdate_WhenCalled_ShouldTraceMessage()
     {
         // Arrange
         var mockDeploymentOperation = new DeploymentUtils.MockDeploymentOperation();
@@ -95,21 +66,17 @@ public sealed class DeploymentServiceTests
             .AddPackageAsync(Arg.Any<Uri>(), Arg.Any<PackageDeploymentOptions>())
             .Returns(mockDeploymentOperation);
 
-        var mockApplicationRestartService = Substitute.For<IApplicationRestartService>();
-        mockApplicationRestartService.RegisterApplicationRestart().Returns(true);
-
         var mockTraceLogger = Substitute.For<ITraceLogger>();
 
         var deploymentService = CreateDeploymentService(
             mockTraceLogger,
-            applicationRestartService: mockApplicationRestartService,
             packageDeploymentService: mockPackageDeploymentService);
 
         // Act
         deploymentService.RestartNowAndUpdate(Constants.DownloadPath, true);
 
         // Assert
-        mockTraceLogger.Received(2).Debug(Arg.Any<DebugLogHandler>());
+        mockTraceLogger.Received(1).Debug(Arg.Any<DebugLogHandler>());
     }
 
     [Theory]
@@ -126,7 +93,6 @@ public sealed class DeploymentServiceTests
             .Returns(mockDeploymentOperation);
 
         var mockApplicationRestartService = Substitute.For<IApplicationRestartService>();
-        mockApplicationRestartService.RegisterApplicationRestart().Returns(true);
 
         var mockAppTitleService = Substitute.For<IAppTitleService>();
         var mockMainThreadService = Substitute.For<IMainThreadService>();
@@ -155,7 +121,7 @@ public sealed class DeploymentServiceTests
     }
 
     [Fact]
-    public async Task RestartNowAndUpdate_WhenDeploymentCompleted_ShouldSetRelaunchMessage()
+    public async Task RestartNowAndUpdate_WhenDeploymentCompleted_ShouldRequestGracefulRestart()
     {
         // Arrange
         var mockDeploymentOperation = new DeploymentUtils.MockDeploymentOperation();
@@ -166,7 +132,7 @@ public sealed class DeploymentServiceTests
             .Returns(mockDeploymentOperation);
 
         var mockApplicationRestartService = Substitute.For<IApplicationRestartService>();
-        mockApplicationRestartService.RegisterApplicationRestart().Returns(true);
+        mockApplicationRestartService.TryRestartAsync(Arg.Any<string>()).Returns(true);
 
         var mockAppTitleService = Substitute.For<IAppTitleService>();
         var mockMainThreadService = Substitute.For<IMainThreadService>();
@@ -190,8 +156,7 @@ public sealed class DeploymentServiceTests
         mockDeploymentOperation.SimulateCompleted(AsyncStatus.Completed);
 
         // Assert
-        await mockMainThreadService.Received(1).InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
-        mockAppTitleService.Received(1).SetProgress(new AppTitleProgress.RelaunchToApply());
+        await mockApplicationRestartService.Received(1).TryRestartAsync(Arg.Any<string>());
     }
 
     [Fact]
@@ -207,7 +172,6 @@ public sealed class DeploymentServiceTests
             .Returns(mockDeploymentOperation);
 
         var mockApplicationRestartService = Substitute.For<IApplicationRestartService>();
-        mockApplicationRestartService.RegisterApplicationRestart().Returns(true);
 
         var mockAppTitleService = Substitute.For<IAppTitleService>();
         var mockAlertDialogService = Substitute.For<IAlertDialogService>();
@@ -254,7 +218,6 @@ public sealed class DeploymentServiceTests
             .Returns(mockDeploymentOperation);
 
         var mockApplicationRestartService = Substitute.For<IApplicationRestartService>();
-        mockApplicationRestartService.RegisterApplicationRestart().Returns(true);
 
         var mockAppTitleService = Substitute.For<IAppTitleService>();
         var mockAlertDialogService = Substitute.For<IAlertDialogService>();
@@ -304,7 +267,6 @@ public sealed class DeploymentServiceTests
             .Returns(mockDeploymentOperation);
 
         var mockApplicationRestartService = Substitute.For<IApplicationRestartService>();
-        mockApplicationRestartService.RegisterApplicationRestart().Returns(true);
 
         var mockAppTitleService = Substitute.For<IAppTitleService>();
         var mockMainThreadService = Substitute.For<IMainThreadService>();
@@ -330,6 +292,46 @@ public sealed class DeploymentServiceTests
         // Assert
         await mockMainThreadService.Received(1).InvokeOnMainThread(Arg.Any<Action>());
         mockAppTitleService.Received(1).SetProgress(new AppTitleProgress.Installing(50));
+    }
+
+    [Fact]
+    public async Task RestartNowAndUpdate_WhenRestartDenied_ShouldSurfaceRelaunchPrompt()
+    {
+        // Arrange
+        var mockDeploymentOperation = new DeploymentUtils.MockDeploymentOperation();
+        var mockPackageDeploymentService = Substitute.For<IPackageDeploymentService>();
+
+        mockPackageDeploymentService
+            .AddPackageAsync(Arg.Any<Uri>(), Arg.Any<PackageDeploymentOptions>())
+            .Returns(mockDeploymentOperation);
+
+        var mockApplicationRestartService = Substitute.For<IApplicationRestartService>();
+        mockApplicationRestartService.TryRestartAsync(Arg.Any<string>()).Returns(false);
+
+        var mockAppTitleService = Substitute.For<IAppTitleService>();
+        var mockMainThreadService = Substitute.For<IMainThreadService>();
+
+        mockMainThreadService.InvokeOnMainThread(Arg.Any<Action>()).Returns(callInfo =>
+        {
+            callInfo.ArgAt<Action>(0).Invoke();
+            return Task.CompletedTask;
+        });
+
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.ArgAt<Func<Task>>(0)());
+
+        var deploymentService = CreateDeploymentService(
+            appTitleService: mockAppTitleService,
+            mainThreadService: mockMainThreadService,
+            applicationRestartService: mockApplicationRestartService,
+            packageDeploymentService: mockPackageDeploymentService);
+
+        // Act
+        deploymentService.RestartNowAndUpdate(Constants.DownloadPath, true);
+        mockDeploymentOperation.SimulateCompleted(AsyncStatus.Completed);
+
+        // Assert
+        await mockApplicationRestartService.Received(1).TryRestartAsync(Arg.Any<string>());
+        mockAppTitleService.Received(1).SetProgress(new AppTitleProgress.RelaunchToApply());
     }
 
     [Fact]
@@ -380,7 +382,7 @@ public sealed class DeploymentServiceTests
         deploymentService.UpdateOnNextRestart(Constants.DownloadPath, true);
 
         // Assert
-        mockApplicationRestartService.DidNotReceive().RegisterApplicationRestart();
+        _ = mockApplicationRestartService.DidNotReceive().TryRestartAsync(Arg.Any<string>());
     }
 
     [Fact]

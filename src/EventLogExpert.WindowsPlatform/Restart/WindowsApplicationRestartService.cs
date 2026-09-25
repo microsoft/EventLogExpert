@@ -11,13 +11,6 @@ internal sealed class WindowsApplicationRestartService(ITraceLogger traceLogger)
 {
     private readonly ITraceLogger _traceLogger = traceLogger;
 
-    public bool RegisterApplicationRestart()
-    {
-        uint result = NativeMethods.RegisterApplicationRestart(null, RestartFlags.NONE);
-
-        return result == 0;
-    }
-
     public async Task<bool> TryRestartAsync(string launchArguments = "")
     {
         try
@@ -28,6 +21,7 @@ internal sealed class WindowsApplicationRestartService(ITraceLogger traceLogger)
             if (reason == AppRestartFailureReason.RestartPending)
             {
                 _traceLogger.Information($"{nameof(WindowsApplicationRestartService)}.{nameof(TryRestartAsync)}: restart already pending");
+
                 return true;
             }
 
