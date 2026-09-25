@@ -256,6 +256,30 @@ public sealed class LocalizationInfraTests
     }
 
     [Fact]
+    public void FilePickerNeutralValues_HaveExpectedArityAndByteExactEnglish()
+    {
+        var neutralValues = ResxValues();
+        (string Key, int Arity, string Value)[] expected =
+        [
+            ("FilePicker_Error_FirstExtensionBlank", 0, "The first extension cannot be null or whitespace."),
+            ("FilePicker_Error_NoExtensions", 0, "At least one extension must be supplied."),
+            ("FilePicker_Error_NoFileTypeChoice", 0, "At least one file-type choice must be supplied."),
+            ("FilePicker_Filter_AllFiles", 0, "All files"),
+            ("FilePicker_Filter_SupportedTypes", 1, "Supported types ({0})"),
+            ("FilePicker_Title_OpenEventLogs", 0, "Open Event Logs"),
+            ("FilePicker_Title_SaveAs", 0, "Save As"),
+            ("FilePicker_Title_SelectFolder", 0, "Select Folder")
+        ];
+
+        foreach (var (key, arity, value) in expected)
+        {
+            Assert.True(neutralValues.TryGetValue(key, out var neutral), $"Missing neutral RESX value for {key}.");
+            Assert.Equal(value, neutral);
+            Assert.Equal(arity, PlaceholderArity(neutral));
+        }
+    }
+
+    [Fact]
     public void Localizer_KnownKey_Resolves()
     {
         var key = "FindBar_NoResults";

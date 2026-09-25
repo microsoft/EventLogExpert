@@ -1,17 +1,24 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.WindowsPlatform.Dialogs;
+
 namespace EventLogExpert.Platforms.Windows;
 
 internal static class Win32FileDialogService
 {
-    public static Task<string?> PickAsync(IReadOnlyList<string> extensions, string? title = null, string? initialDirectory = null)
+    public static Task<string?> PickAsync(
+        IReadOnlyList<string> extensions,
+        FilterChrome chrome,
+        string? title = null,
+        string? initialDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(extensions);
 
         var hwnd = PickerHostWindow.GetHandle();
 
-        return RunOnStaThreadAsync(() => Win32FileDialog.PickSingleFile(hwnd, extensions, title, initialDirectory));
+        return RunOnStaThreadAsync(() =>
+            Win32FileDialog.PickSingleFile(hwnd, extensions, chrome, title, initialDirectory));
     }
 
     public static Task<string?> PickFolderAsync(string? title = null)
@@ -21,17 +28,23 @@ internal static class Win32FileDialogService
         return RunOnStaThreadAsync(() => Win32FolderDialog.PickFolder(hwnd, title));
     }
 
-    public static Task<IReadOnlyList<string>> PickMultipleAsync(IReadOnlyList<string> extensions, string? title = null, string? initialDirectory = null)
+    public static Task<IReadOnlyList<string>> PickMultipleAsync(
+        IReadOnlyList<string> extensions,
+        FilterChrome chrome,
+        string? title = null,
+        string? initialDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(extensions);
 
         var hwnd = PickerHostWindow.GetHandle();
 
-        return RunOnStaThreadAsync(() => Win32FileDialog.PickMultipleFiles(hwnd, extensions, title, initialDirectory));
+        return RunOnStaThreadAsync(() =>
+            Win32FileDialog.PickMultipleFiles(hwnd, extensions, chrome, title, initialDirectory));
     }
 
     public static Task<string?> PickSaveAsync(
         IReadOnlyList<string> extensions,
+        FilterChrome chrome,
         string? suggestedFileName = null,
         string? title = null,
         string? initialDirectory = null)
@@ -40,7 +53,8 @@ internal static class Win32FileDialogService
 
         var hwnd = PickerHostWindow.GetHandle();
 
-        return RunOnStaThreadAsync(() => Win32FileDialog.PickSaveFile(hwnd, extensions, suggestedFileName, title, initialDirectory));
+        return RunOnStaThreadAsync(() =>
+            Win32FileDialog.PickSaveFile(hwnd, extensions, chrome, suggestedFileName, title, initialDirectory));
     }
 
     private static Task<T> RunOnStaThreadAsync<T>(Func<T> func)
@@ -63,5 +77,3 @@ internal static class Win32FileDialogService
         return tcs.Task;
     }
 }
-
-

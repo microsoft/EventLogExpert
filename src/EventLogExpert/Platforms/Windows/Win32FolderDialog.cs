@@ -51,12 +51,6 @@ internal static partial class Win32FolderDialog
         }
     }
 
-    /// <summary>
-    ///     Builds (or measures, when <paramref name="destination" /> is empty) the null-terminated title buffer. Returns
-    ///     0 when <paramref name="title" /> is null or empty (the dialog uses no caption prompt in that case -- pass
-    ///     IntPtr.Zero for <c>lpszTitle</c>). Titles longer than <see cref="MaxTitleChars" /> are silently truncated to bound
-    ///     the stack allocation against external input (mirror of the helper in <see cref="Win32FileDialog" />).
-    /// </summary>
     private static int CopyNullableTitle(Span<char> destination, string? title)
     {
         if (string.IsNullOrEmpty(title)) { return 0; }
