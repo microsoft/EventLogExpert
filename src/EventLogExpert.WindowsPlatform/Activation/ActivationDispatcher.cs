@@ -88,10 +88,11 @@ public sealed class ActivationDispatcher : IActivationDispatcher
         }
     }
 
-    private static (List<(string Path, LogPathType Type)> Paths, List<(string Title, string Message)> Alerts) ExpandToOpenList(ActivationArgs args)
+    private static (List<(string Path, LogPathType Type)> Paths, List<(LocalizableText Title, LocalizableText Message)> Alerts)
+        ExpandToOpenList(ActivationArgs args)
     {
         var paths = new List<(string, LogPathType)>(args.FilePaths.Count + (args.FolderPaths.Count * 4));
-        var alerts = new List<(string, string)>();
+        var alerts = new List<(LocalizableText, LocalizableText)>();
 
         foreach (var file in args.FilePaths)
         {
@@ -133,7 +134,7 @@ public sealed class ActivationDispatcher : IActivationDispatcher
         {
             cancellationToken.ThrowIfCancellationRequested();
             await _mainThread.InvokeOnMainThreadAsync(() =>
-                _dialogService.ShowAlert(title, message, "Ok"));
+                _dialogService.ShowAlert(title, message, new LocalizableText("Modal_Accept")));
         }
 
         if (paths.Count == 0) { return; }

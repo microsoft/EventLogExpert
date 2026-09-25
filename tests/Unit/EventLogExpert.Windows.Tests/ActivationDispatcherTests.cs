@@ -64,12 +64,15 @@ public sealed class ActivationDispatcherTests
         var alertOrderedBeforeOpen = false;
         var alertSeen = false;
         var openCalled = false;
+        LocalizableText? capturedTitle = null;
 
         dialogService
-            .When(d => d.ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()))
-            .Do(_ =>
+            .When(d => d.ShowAlert(Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>(), Arg.Any<LocalizableText>()))
+            .Do(call =>
             {
+                capturedTitle = call.ArgAt<LocalizableText>(0);
                 alertSeen = true;
+
                 if (!openCalled) { alertOrderedBeforeOpen = true; }
             });
 
@@ -85,6 +88,7 @@ public sealed class ActivationDispatcherTests
         await consumerTask;
 
         Assert.True(alertSeen);
+        Assert.Equal("Menu_Alert_OpenFolderFailed_Title", capturedTitle?.Key);
         Assert.False(openCalled, "openBatch must not be called when no .evtx files were enumerated");
         Assert.True(alertOrderedBeforeOpen);
     }

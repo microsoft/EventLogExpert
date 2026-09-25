@@ -96,6 +96,8 @@ public sealed class AlertDialogService(
                     ["Title"] = title,
                     ["Message"] = message,
                     ["InitialValue"] = initialValue ?? string.Empty,
+                    ["PrimaryLabel"] = _localizer["Modal_Accept"].Value,
+                    ["CancelLabel"] = _localizer["Modal_Cancel"].Value,
                     ["Validate"] = validate,
                 });
             }
@@ -103,7 +105,7 @@ public sealed class AlertDialogService(
             try
             {
                 InlineAlertResult result = await host.ShowInlineAlertAsync(
-                    new InlineAlertRequest(title, message, "OK", "Cancel", true, initialValue)
+                    new InlineAlertRequest(title, message, _localizer["Modal_Accept"].Value, _localizer["Modal_Cancel"].Value, true, initialValue)
                     {
                         Validate = validate,
                     },

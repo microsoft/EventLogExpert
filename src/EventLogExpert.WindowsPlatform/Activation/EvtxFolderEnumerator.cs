@@ -1,12 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Logging.Abstractions;
+
 namespace EventLogExpert.WindowsPlatform.Activation;
 
 public static class EvtxFolderEnumerator
 {
     private const string EvtxSearchPattern = "*.evtx";
-    private const string OpenFolderFailedTitle = "Open Folder Failed";
 
     public static EvtxEnumerationResult EnumerateEvtx(string folderPath, bool includeSubfolders, CancellationToken cancellationToken = default)
     {
@@ -68,10 +69,12 @@ public static class EvtxFolderEnumerator
     ///     Alert copy for failure variants; <c>null</c> for <see cref="EvtxEnumerationResult.Success" /> and
     ///     <see cref="EvtxEnumerationResult.Empty" />.
     /// </returns>
-    public static (string Title, string Message)? ToAlertCopy(EvtxEnumerationResult result) => result switch
+    public static (LocalizableText Title, LocalizableText Message)? ToAlertCopy(EvtxEnumerationResult result) => result switch
     {
-        EvtxEnumerationResult.AccessDenied a => (OpenFolderFailedTitle, a.Message),
-        EvtxEnumerationResult.IoError i => (OpenFolderFailedTitle, i.Message),
+        EvtxEnumerationResult.AccessDenied a =>
+            (new LocalizableText("Menu_Alert_OpenFolderFailed_Title"), new LocalizableText("Menu_Alert_OpenFolderFailed_Message", [a.Message])),
+        EvtxEnumerationResult.IoError i =>
+            (new LocalizableText("Menu_Alert_OpenFolderFailed_Title"), new LocalizableText("Menu_Alert_OpenFolderFailed_Message", [i.Message])),
         _ => null,
     };
 
