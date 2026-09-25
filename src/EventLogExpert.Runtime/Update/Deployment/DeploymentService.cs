@@ -29,19 +29,13 @@ internal sealed class DeploymentService(
 
     public void RestartNowAndUpdate(string downloadPath, bool userInitiated = false)
     {
-        _traceLogger.Debug($"{MethodBase.GetCurrentMethod()} Calling {nameof(_applicationRestartService.RegisterApplicationRestart)}.");
-
-        bool registrationSuccessful = _applicationRestartService.RegisterApplicationRestart();
-
-        if (!registrationSuccessful) { return; }
-
         _traceLogger.Debug($"{MethodBase.GetCurrentMethod()} Calling {nameof(_packageDeploymentService.AddPackageAsync)}.");
 
         var deployment = _packageDeploymentService.AddPackageAsync(
             new Uri(downloadPath),
-            new PackageDeploymentOptions(ForceUpdateFromAnyVersion: true, ForceTargetAppShutdown: true));
+            new PackageDeploymentOptions(ForceUpdateFromAnyVersion: true, DeferRegistrationWhenPackagesAreInUse: true));
 
-        SetCallbacks(deployment, userInitiated);
+        SetCallbacks(deployment, userInitiated, restartWhenComplete: true);
     }
 
     public void UpdateOnNextRestart(string downloadPath, bool userInitiated = false)
@@ -52,10 +46,27 @@ internal sealed class DeploymentService(
             new Uri(downloadPath),
             new PackageDeploymentOptions(ForceUpdateFromAnyVersion: true, DeferRegistrationWhenPackagesAreInUse: true));
 
-        SetCallbacks(deployment, userInitiated);
+        SetCallbacks(deployment, userInitiated, restartWhenComplete: false);
     }
 
-    private void SetCallbacks(IAsyncOperationWithProgress<DeploymentResult, DeploymentProgress> deployment, bool userInitiated)
+    private async Task CompleteStagedUpdateAsync(bool restartWhenComplete)
+    {
+        _appTitleService.SetProgress(new AppTitleProgress.RelaunchToApply());
+
+        if (!restartWhenComplete) { return; }
+
+        bool restartRequested = await _applicationRestartService.TryRestartAsync();
+
+        if (!restartRequested)
+        {
+            _traceLogger.Warning($"{nameof(DeploymentService)} graceful restart was not honored; the staged update will apply the next time the app is launched.");
+        }
+    }
+
+    private void SetCallbacks(
+        IAsyncOperationWithProgress<DeploymentResult, DeploymentProgress> deployment,
+        bool userInitiated,
+        bool restartWhenComplete)
     {
         deployment.Progress = (result, progress) =>
         {
@@ -80,7 +91,7 @@ internal sealed class DeploymentService(
                         _appTitleService.SetProgress(null);
                         break;
                     case AsyncStatus.Completed:
-                        _appTitleService.SetProgress(new AppTitleProgress.RelaunchToApply());
+                        await CompleteStagedUpdateAsync(restartWhenComplete);
                         break;
                     case AsyncStatus.Canceled:
                     case AsyncStatus.Started:
