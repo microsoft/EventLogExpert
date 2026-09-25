@@ -148,7 +148,7 @@ public sealed class MauiMenuActionService(
         }
         catch (InvalidOperationException ex)
         {
-            await _dialogService.ShowAlert("Open File Failed", ex.Message, "Ok");
+            await _dialogService.ShowAlert(_localizer["Menu_Alert_OpenFileFailed_Title"], ex.Message, _localizer["Modal_Accept"]);
 
             return;
         }
@@ -180,7 +180,7 @@ public sealed class MauiMenuActionService(
             }
             catch (InvalidOperationException ex)
             {
-                await _dialogService.ShowAlert("Open Folder Failed", ex.Message, "Ok");
+                await _dialogService.ShowAlert(_localizer["Menu_Alert_OpenFolderFailed_Title"], ex.Message, _localizer["Modal_Accept"]);
 
                 return;
             }
@@ -205,7 +205,7 @@ public sealed class MauiMenuActionService(
 
             if (EvtxFolderEnumerator.ToAlertCopy(result) is { } copy)
             {
-                await _dialogService.ShowAlert(copy.Title, copy.Message, "Ok");
+                await _dialogService.ShowAlert(copy.Title, copy.Message, new LocalizableText("Modal_Accept"));
 
                 return;
             }
@@ -275,9 +275,9 @@ public sealed class MauiMenuActionService(
     public async Task SaveFiltersAsFilterSetAsync()
     {
         var filterSetName = await _dialogService.DisplayPrompt(
-            "Filter Set Name",
-            "What would you like to name this filter set?",
-            "New Filter Set");
+            _localizer["FilterLibrary_Entry_NewFilterSetPromptTitle"],
+            _localizer["FilterLibrary_Entry_NewFilterSetPromptMessage"],
+            _localizer["FilterLibrary_Entry_NewFilterSetPromptInitialValue"]);
 
         if (string.IsNullOrWhiteSpace(filterSetName)) { return; }
 
@@ -336,7 +336,7 @@ public sealed class MauiMenuActionService(
         }
         catch (Exception ex)
         {
-            await _dialogService.ShowAlert("Failed to launch browser", ex.Message, "Ok");
+            await _dialogService.ShowAlert(_localizer["Menu_Alert_LaunchBrowserFailed_Title"], ex.Message, _localizer["Modal_Accept"]);
         }
     }
 
@@ -363,9 +363,9 @@ public sealed class MauiMenuActionService(
             if (showInlineAlerts)
             {
                 await _dialogService.ShowAlert(
-                    "Log requires elevation",
-                    "Please relaunch with \"Run as Administrator\" to open this log",
-                    "Ok");
+                    _localizer["Menu_Alert_LogElevationRequired_Title"],
+                    _localizer["Menu_Alert_LogElevationRequired_Message"],
+                    _localizer["Modal_Accept"]);
             }
 
             return new ChannelOutcome(logPath, ChannelLaunchOutcome.AccessDenied);
@@ -375,9 +375,9 @@ public sealed class MauiMenuActionService(
             if (showInlineAlerts)
             {
                 await _dialogService.ShowAlert(
-                    "Failed to open Log",
-                    $"The log {logPath} was not found.",
-                    "Ok");
+                    _localizer["Menu_Alert_OpenLogFailed_Title"],
+                    _localizer["Menu_Alert_LogNotFound_Message", logPath],
+                    _localizer["Modal_Accept"]);
             }
 
             return new ChannelOutcome(logPath, ChannelLaunchOutcome.NotPresent);
@@ -386,7 +386,7 @@ public sealed class MauiMenuActionService(
         {
             if (showInlineAlerts)
             {
-                await _dialogService.ShowAlert("Failed to open Log", $"Exception: {ex.Message}", "Ok");
+                await _dialogService.ShowAlert(_localizer["Menu_Alert_OpenLogFailed_Title"], _localizer["Menu_Alert_OpenLogError_Message", ex.Message], _localizer["Modal_Accept"]);
             }
 
             return new ChannelOutcome(logPath, ChannelLaunchOutcome.Failed);

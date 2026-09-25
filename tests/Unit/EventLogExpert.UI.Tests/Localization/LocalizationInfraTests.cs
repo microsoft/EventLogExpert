@@ -299,6 +299,34 @@ public sealed class LocalizationInfraTests
     }
 
     [Fact]
+    public void MenuAlertValues_HaveExpectedPlaceholderArity()
+    {
+        var neutralValues = ResxValues();
+        (string Key, int Arity)[] expected =
+        [
+            ("Menu_Alert_OpenFileFailed_Title", 0),
+            ("Menu_Alert_OpenFolderFailed_Title", 0),
+            ("Menu_Alert_OpenFolderFailed_Message", 1),
+            ("Menu_Alert_LaunchBrowserFailed_Title", 0),
+            ("Menu_Alert_LogElevationRequired_Title", 0),
+            ("Menu_Alert_LogElevationRequired_Message", 0),
+            ("Menu_Alert_OpenLogFailed_Title", 0),
+            ("Menu_Alert_LogNotFound_Message", 1),
+            ("Menu_Alert_OpenLogError_Message", 1)
+        ];
+
+        foreach ((string key, int arity) in expected)
+        {
+            Assert.True(neutralValues.TryGetValue(key, out string? value), $"Missing neutral RESX value for {key}.");
+            Assert.Equal(arity, PlaceholderArity(value));
+        }
+
+        Assert.Equal(
+            expected.Select(entry => entry.Key).OrderBy(key => key, StringComparer.Ordinal),
+            neutralValues.Keys.Where(key => key.StartsWith("Menu_Alert_", StringComparison.Ordinal)).OrderBy(key => key, StringComparer.Ordinal));
+    }
+
+    [Fact]
     public void NeutralBannerValues_HaveExpectedPlaceholderArity()
     {
         var neutralValues = ResxValues();

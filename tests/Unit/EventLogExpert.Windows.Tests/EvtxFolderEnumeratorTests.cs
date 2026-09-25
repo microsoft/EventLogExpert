@@ -131,6 +131,21 @@ public sealed class EvtxFolderEnumeratorTests : IDisposable
     }
 
     [Fact]
+    public void ToAlertCopy_OnIoError_ReturnsKeyedFolderFailedCopyWithRawErrorArg()
+    {
+        var nonexistent = Path.Combine(_tempRoot, "does-not-exist");
+        var result = EvtxFolderEnumerator.EnumerateEvtx(nonexistent, includeSubfolders: false, TestContext.Current.CancellationToken);
+        var ioError = Assert.IsType<EvtxEnumerationResult.IoError>(result);
+
+        var copy = EvtxFolderEnumerator.ToAlertCopy(result);
+
+        Assert.NotNull(copy);
+        Assert.Equal("Menu_Alert_OpenFolderFailed_Title", copy.Value.Title.Key);
+        Assert.Equal("Menu_Alert_OpenFolderFailed_Message", copy.Value.Message.Key);
+        Assert.Equal(new[] { ioError.Message }, copy.Value.Message.Args);
+    }
+
+    [Fact]
     public void ToAlertCopy_OnSuccess_ReturnsNull()
     {
         EvtxFolderFixtures.WriteEmptyFile(_tempRoot, "a.evtx");

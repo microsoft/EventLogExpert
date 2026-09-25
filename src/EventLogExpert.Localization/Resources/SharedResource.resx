@@ -5233,4 +5233,40 @@
     <value>Release Notes</value>
     <comment>Release notes modal accessible label.</comment>
   </data>
+  <data name="Menu_Alert_OpenFileFailed_Title" xml:space="preserve">
+    <value>Open File Failed</value>
+    <comment>Title of the alert shown when opening an event log file fails.</comment>
+  </data>
+  <data name="Menu_Alert_OpenFolderFailed_Title" xml:space="preserve">
+    <value>Open Folder Failed</value>
+    <comment>Title of the alert shown when opening or enumerating a folder of event logs fails (menu + activation paths).</comment>
+  </data>
+  <data name="Menu_Alert_OpenFolderFailed_Message" xml:space="preserve">
+    <value>{0}</value>
+    <comment>Message for the open-folder-failed alert. {0} is the raw error text, passed through untranslated.</comment>
+  </data>
+  <data name="Menu_Alert_LaunchBrowserFailed_Title" xml:space="preserve">
+    <value>Failed to launch browser</value>
+    <comment>Title of the alert shown when launching the default browser fails.</comment>
+  </data>
+  <data name="Menu_Alert_LogElevationRequired_Title" xml:space="preserve">
+    <value>Log requires elevation</value>
+    <comment>Title of the alert shown when a log needs administrator rights to open.</comment>
+  </data>
+  <data name="Menu_Alert_LogElevationRequired_Message" xml:space="preserve">
+    <value>Please relaunch with "Run as Administrator" to open this log</value>
+    <comment>Message asking the user to relaunch elevated. "Run as Administrator" is the Windows shell command label.</comment>
+  </data>
+  <data name="Menu_Alert_OpenLogFailed_Title" xml:space="preserve">
+    <value>Failed to open Log</value>
+    <comment>Title of the alert shown when opening a specific log fails.</comment>
+  </data>
+  <data name="Menu_Alert_LogNotFound_Message" xml:space="preserve">
+    <value>The log {0} was not found.</value>
+    <comment>Open-log-failed message when the log is missing. {0} is the log path.</comment>
+  </data>
+  <data name="Menu_Alert_OpenLogError_Message" xml:space="preserve">
+    <value>Exception: {0}</value>
+    <comment>Open-log-failed message for an unexpected error. {0} is the raw error text.</comment>
+  </data>
 </root>

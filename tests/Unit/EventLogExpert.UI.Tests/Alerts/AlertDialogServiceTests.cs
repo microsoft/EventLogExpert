@@ -195,7 +195,7 @@ public sealed class ModalAlertDialogServiceTests
 
         Assert.Equal("typed-value", result);
         await host.Received(1).ShowInlineAlertAsync(
-            Arg.Is<InlineAlertRequest>(r => r != null && r.IsPrompt && r.Title == "Rename" && r.Message == "Enter new name"),
+            Arg.Is<InlineAlertRequest>(r => r != null && r.IsPrompt && r.Title == "Rename" && r.Message == "Enter new name" && r.AcceptLabel == "[[Modal_Accept]]" && r.CancelLabel == "[[Modal_Cancel]]"),
             Arg.Any<CancellationToken>());
     }
 
@@ -248,6 +248,8 @@ public sealed class ModalAlertDialogServiceTests
         Assert.Equal("Rename", capturedPrompt!["Title"]);
         Assert.Equal("Enter new name", capturedPrompt["Message"]);
         Assert.Equal("old-value", capturedPrompt["InitialValue"]);
+        Assert.Equal("[[Modal_Accept]]", capturedPrompt["PrimaryLabel"]);
+        Assert.Equal("[[Modal_Cancel]]", capturedPrompt["CancelLabel"]);
     }
 
     [Fact]
