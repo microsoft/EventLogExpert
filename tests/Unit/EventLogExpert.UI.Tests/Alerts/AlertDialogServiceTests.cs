@@ -1,12 +1,14 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Modal;
+using EventLogExpert.UI.Tests.TestUtils;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Alerts;
@@ -32,6 +34,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -77,6 +80,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -109,6 +113,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -135,6 +140,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty),
             parameters =>
@@ -181,6 +187,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -210,6 +217,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -229,6 +237,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             _ => Task.FromResult(false),
             parameters => { capturedPrompt = parameters; return Task.FromResult("user-typed"); });
 
@@ -254,6 +263,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             _ => Task.FromResult(false),
             parameters => { capturedPrompt = parameters; return Task.FromResult("user-typed"); });
 
@@ -273,6 +283,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -299,6 +310,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             _ => { standaloneCalled = true; return Task.FromResult(false); },
             _ => Task.FromResult(string.Empty));
 
@@ -324,6 +336,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             parameters => { capturedAlert = parameters; return Task.FromResult(true); },
             _ => Task.FromResult(string.Empty));
 
@@ -345,6 +358,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             parameters => { capturedAlert = parameters; return Task.FromResult(true); },
             _ => Task.FromResult(string.Empty));
 
@@ -358,6 +372,33 @@ public sealed class ModalAlertDialogServiceTests
     }
 
     [Fact]
+    public async Task ShowAlertOneButton_WithLocalizableText_ShouldResolveKeysThroughLocalizer()
+    {
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(false);
+
+        IReadOnlyDictionary<string, object?>? capturedAlert = null;
+        var sut = new AlertDialogService(
+            coordinator,
+            PassthroughMainThread(),
+            Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
+            parameters => { capturedAlert = parameters; return Task.FromResult(true); },
+            _ => Task.FromResult(string.Empty));
+
+        await sut.ShowAlert(
+            new LocalizableText("Update_Alert_Failure_Title", []),
+            new LocalizableText("Update_Alert_RetrieveFailed_Message", ["boom"]),
+            new LocalizableText("Modal_Accept", []));
+
+        Assert.NotNull(capturedAlert);
+        Assert.Equal("[[Update_Alert_Failure_Title]]", capturedAlert!["Title"]);
+        Assert.Equal("[[Update_Alert_RetrieveFailed_Message(boom)]]", capturedAlert["Message"]);
+        Assert.Null(capturedAlert["AcceptLabel"]);
+        Assert.Equal("[[Modal_Accept]]", capturedAlert["CancelLabel"]);
+    }
+
+    [Fact]
     public async Task ShowAlertTwoButton_InlineOnlyNoHost_ThrowsInvalidOperationException()
     {
         var coordinator = Substitute.For<IModalCoordinator>();
@@ -367,6 +408,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -390,6 +432,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             parameters => { capturedAlert = parameters; return Task.FromResult(true); },
             _ => Task.FromResult(string.Empty));
 
@@ -421,6 +464,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             _ => { standaloneCalled = true; return Task.FromResult(false); },
             _ => Task.FromResult(string.Empty));
 
@@ -457,12 +501,42 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
         var result = await sut.ShowAlert("Confirm", "Sure?", "Yes", "No");
 
         Assert.False(result);
+    }
+
+    [Fact]
+    public async Task ShowAlertTwoButton_WithLocalizableText_ShouldResolveKeysThroughLocalizer()
+    {
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(false);
+
+        IReadOnlyDictionary<string, object?>? capturedAlert = null;
+        var sut = new AlertDialogService(
+            coordinator,
+            PassthroughMainThread(),
+            Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
+            parameters => { capturedAlert = parameters; return Task.FromResult(true); },
+            _ => Task.FromResult(string.Empty));
+
+        var result = await sut.ShowAlert(
+            new LocalizableText("Update_Alert_Available_Title", []),
+            new LocalizableText("Update_Alert_Available_Message", []),
+            new LocalizableText("Modal_Yes", []),
+            new LocalizableText("Modal_No", []));
+
+        Assert.True(result);
+        Assert.NotNull(capturedAlert);
+        Assert.Equal("[[Update_Alert_Available_Title]]", capturedAlert!["Title"]);
+        Assert.Equal("[[Update_Alert_Available_Message]]", capturedAlert["Message"]);
+        Assert.Equal("[[Modal_Yes]]", capturedAlert["AcceptLabel"]);
+        Assert.Equal("[[Modal_No]]", capturedAlert["CancelLabel"]);
     }
 
     [Fact]
@@ -479,6 +553,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             mainThread,
             Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(),
             _ => Task.FromResult(true),
             _ => Task.FromResult(string.Empty));
 
@@ -497,6 +572,7 @@ public sealed class ModalAlertDialogServiceTests
             Substitute.For<IModalCoordinator>(),
             mainThread,
             errorBannerService,
+            new MarkerLocalizer(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -518,6 +594,7 @@ public sealed class ModalAlertDialogServiceTests
             coordinator,
             PassthroughMainThread(),
             errorBannerService,
+            new MarkerLocalizer(),
             _ => { standaloneCalled = true; return Task.FromResult(false); },
             _ => Task.FromResult(string.Empty));
 
@@ -539,6 +616,7 @@ public sealed class ModalAlertDialogServiceTests
             Substitute.For<IModalCoordinator>(),
             PassthroughMainThread(),
             errorBannerService,
+            new MarkerLocalizer(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 

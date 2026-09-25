@@ -8,6 +8,7 @@ using EventLogExpert.Adapters.Menu;
 using EventLogExpert.Adapters.Settings;
 using EventLogExpert.Adapters.Threading;
 using EventLogExpert.Adapters.Window;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Platforms.Windows.Activation;
 using EventLogExpert.Runtime.Alerts;
@@ -27,8 +28,10 @@ using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Stats;
 using EventLogExpert.UI.Alerts;
+using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.WindowsPlatform.Activation;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.DependencyInjection;
 
@@ -60,11 +63,13 @@ internal static class MauiProgramExtensions
                 var modalCoordinator = provider.GetRequiredService<IModalCoordinator>();
                 var mainThreadService = provider.GetRequiredService<IMainThreadService>();
                 var errorBannerService = provider.GetRequiredService<IErrorBannerService>();
+                var localizer = provider.GetRequiredService<IStringLocalizer<SharedResource>>();
 
                 return new AlertDialogService(
                     modalCoordinator,
                     mainThreadService,
                     errorBannerService,
+                    localizer,
                     async parameters =>
                     {
                         ModalOpenResult<bool> result = await modalCoordinator.PushAsync<AlertModal, bool>(
@@ -106,6 +111,7 @@ internal static class MauiProgramExtensions
         {
             services.AddSingleton<IMainThreadService, MauiMainThreadService>();
             services.AddSingleton<ITitleProvider, TitleProvider>();
+            services.AddSingleton<IAppTitleTextComposer, AppTitleTextComposer>();
             services.AddSingleton<IClipboardService, MauiClipboardService>();
             services.AddSingleton<IFileSaveService, MauiFileSaveService>();
             services.AddSingleton<IFilePickerService, MauiFilePickerService>();

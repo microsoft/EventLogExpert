@@ -9,5 +9,5 @@ public interface IAppTitleService
 
     void SetLogName(string? logName);
 
-    void SetProgressString(string? progressString);
+    void SetProgress(AppTitleProgress? progress);
 }

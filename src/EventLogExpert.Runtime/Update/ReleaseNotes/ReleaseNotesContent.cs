@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.Runtime.Update.ReleaseNotes;
 
-public readonly record struct ReleaseNotesContent(string Title, string Markdown);
+public readonly record struct ReleaseNotesContent(string Version, string Markdown);

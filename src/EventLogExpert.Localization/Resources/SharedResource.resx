@@ -1390,7 +1390,7 @@
   </data>
   <data name="Menu_Help_ReleaseNotes" xml:space="preserve">
     <value>Release Notes</value>
-    <comment>Also used as the Release Notes modal accessible name (ReleaseNotesModal); keep consistent if that surface is localized later.</comment>
+    <comment>Help menu item label. The Release Notes modal now supplies its own accessible name (ReleaseNotes_AriaLabel).</comment>
   </data>
   <data name="Menu_Help_ViewLogs" xml:space="preserve">
     <value>View Logs</value>
@@ -5144,5 +5144,93 @@
   <data name="Db_Manage_Selection_Many" xml:space="preserve">
     <value>{0} databases selected.</value>
     <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Modal_Yes" xml:space="preserve">
+    <value>Yes</value>
+    <comment>Shared dialog button.</comment>
+  </data>
+  <data name="Modal_No" xml:space="preserve">
+    <value>No</value>
+    <comment>Shared dialog button.</comment>
+  </data>
+  <data name="Update_Alert_CheckUnavailable_Title" xml:space="preserve">
+    <value>Update Check Unavailable</value>
+    <comment>Update check dialog title (development builds).</comment>
+  </data>
+  <data name="Update_Alert_CheckUnavailable_Message" xml:space="preserve">
+    <value>Update checks are disabled for development builds.</value>
+    <comment>Update check dialog message (development builds).</comment>
+  </data>
+  <data name="Update_Alert_NoUpdates_Title" xml:space="preserve">
+    <value>No Updates Available</value>
+    <comment>Update check dialog title when already on the latest version.</comment>
+  </data>
+  <data name="Update_Alert_NoUpdates_Message" xml:space="preserve">
+    <value>You are currently running the latest version.</value>
+    <comment>Update check dialog message when already on the latest version.</comment>
+  </data>
+  <data name="Update_Alert_Failure_Title" xml:space="preserve">
+    <value>Update Failure</value>
+    <comment>Shared update-failure dialog title.</comment>
+  </data>
+  <data name="Update_Alert_RetrieveFailed_Message" xml:space="preserve">
+    <value>Failed to retrieve latest releases:&#xD;&#xA;{0}</value>
+    <comment>Update-failure dialog message; {0} is the raw error detail (kept in English as diagnostic data).</comment>
+  </data>
+  <data name="Update_Alert_InstallFailed_Message" xml:space="preserve">
+    <value>Update failed to install:&#xD;&#xA;{0}</value>
+    <comment>Update-failure dialog message; {0} is the raw error detail (kept in English as diagnostic data).</comment>
+  </data>
+  <data name="Update_Alert_Unavailable_Title" xml:space="preserve">
+    <value>Update Unavailable</value>
+    <comment>Update dialog title when no compatible package was found.</comment>
+  </data>
+  <data name="Update_Alert_Unavailable_Message" xml:space="preserve">
+    <value>No compatible update package was found.</value>
+    <comment>Update dialog message when no compatible package was found.</comment>
+  </data>
+  <data name="Update_Alert_Available_Title" xml:space="preserve">
+    <value>Update Available</value>
+    <comment>Update-available confirmation dialog title.</comment>
+  </data>
+  <data name="Update_Alert_Available_Message" xml:space="preserve">
+    <value>A new version has been detected, would you like to install and reload the application?</value>
+    <comment>Update-available confirmation dialog message (Yes/No).</comment>
+  </data>
+  <data name="Update_Alert_ReleaseNotesFailed_Title" xml:space="preserve">
+    <value>Release Notes Failure</value>
+    <comment>Release-notes retrieval failure dialog title.</comment>
+  </data>
+  <data name="Update_Alert_ReleaseNotesFailed_Message" xml:space="preserve">
+    <value>Failed to get release notes for the current version</value>
+    <comment>Release-notes retrieval failure dialog message.</comment>
+  </data>
+  <data name="AppTitle_Qualifier_Development" xml:space="preserve">
+    <value> (Development)</value>
+    <comment>Window-title qualifier for development builds (leading space + parentheses preserved).</comment>
+  </data>
+  <data name="AppTitle_Qualifier_Preview" xml:space="preserve">
+    <value> (Preview)</value>
+    <comment>Window-title qualifier for preview builds (leading space + parentheses preserved).</comment>
+  </data>
+  <data name="AppTitle_Qualifier_Admin" xml:space="preserve">
+    <value> (Admin)</value>
+    <comment>Window-title qualifier when running elevated (leading space + parentheses preserved).</comment>
+  </data>
+  <data name="AppTitle_Progress_Installing" xml:space="preserve">
+    <value>Installing: {0}%</value>
+    <comment>Window-title progress while installing an update; {0} is the percentage.</comment>
+  </data>
+  <data name="AppTitle_Progress_Relaunch" xml:space="preserve">
+    <value>Relaunch to Apply Update</value>
+    <comment>Window-title progress after an update is staged.</comment>
+  </data>
+  <data name="ReleaseNotes_TitleWithVersion" xml:space="preserve">
+    <value>Release notes for v{0}</value>
+    <comment>Release notes modal heading; {0} is the version.</comment>
+  </data>
+  <data name="ReleaseNotes_AriaLabel" xml:space="preserve">
+    <value>Release Notes</value>
+    <comment>Release notes modal accessible label.</comment>
   </data>
 </root>
