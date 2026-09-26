@@ -2,20 +2,20 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Common.Filtering;
+using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.UI.DebugLog;
 
 public sealed partial class DebugLogFilterRow
 {
-    private const string UncategorizedLabel = "(Uncategorized)";
-
     private static readonly IReadOnlyList<string> s_levelValues =
     [
         nameof(LogLevel.Trace),
@@ -67,6 +67,8 @@ public sealed partial class DebugLogFilterRow
 
     private bool FieldSupportsText => Draft?.Field == DebugLogFilterField.Message;
 
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
+
     private string? SingleValue => Draft is { Values.Count: > 0 } draft ? draft.Values[0] : null;
 
     internal ValueTask FocusChipEditButtonAsync() =>
@@ -74,40 +76,6 @@ public sealed partial class DebugLogFilterRow
 
     internal ValueTask FocusEditorFirstControlAsync() =>
         _editorFirstControl is { } button ? ElementFocus.SafelyAsync(button.Element) : ValueTask.CompletedTask;
-
-    // Collapsed-chip label for the APPLIED filter, e.g. "Level in Warning, Error" or "Message contains foo"; the
-    // include/exclude and enabled state are conveyed by the toggle icons, not the text.
-    private static string FilterSummary(DebugLogFilter filter)
-    {
-        string operatorLabel = (filter.Operator, filter.MatchMode) switch
-        {
-            (ComparisonOperator.Equals, MatchMode.Many) => "in",
-            (ComparisonOperator.Equals, _) => "==",
-            (ComparisonOperator.Contains, _) => "contains",
-            (ComparisonOperator.NotEqual, _) => "!=",
-            (ComparisonOperator.NotContains, _) => "doesn't contain",
-            _ => "?"
-        };
-
-        string valueLabel = !filter.IsComplete
-            ? "?"
-            : string.Join(", ", filter.Values.Select(value => FormatValue(filter.Field, value)));
-
-        return $"{filter.Field} {operatorLabel} {valueLabel}";
-    }
-
-    private static string FormatValue(DebugLogFilterField field, string? value) => field switch
-    {
-        DebugLogFilterField.ProcessOrigin => value switch
-        {
-            nameof(ProcessOrigin.InProcess) => "In-process",
-            nameof(ProcessOrigin.ElevatedHelper) => "Elevated helper",
-            _ => value ?? string.Empty
-        },
-        // Null is "no selection" (blank header); the empty string is the real "(Uncategorized)" category value.
-        DebugLogFilterField.Category => value is null ? string.Empty : value.Length == 0 ? UncategorizedLabel : value,
-        _ => value ?? string.Empty
-    };
 
     private IReadOnlyList<string> CategoryOptions()
     {
@@ -117,6 +85,54 @@ public sealed partial class DebugLogFilterRow
 
         return [.. options];
     }
+
+    // Localized filter-property token for the summary chip + field dropdown; literal keys keep the orphan-key scan happy.
+    private string FieldLabel(DebugLogFilterField field) => field switch
+    {
+        DebugLogFilterField.Message => Localizer["DebugLog_Field_Message"].Value,
+        DebugLogFilterField.Level => Localizer["DebugLog_Field_Level"].Value,
+        DebugLogFilterField.Category => Localizer["DebugLog_Field_Category"].Value,
+        DebugLogFilterField.ProcessOrigin => Localizer["DebugLog_Field_ProcessOrigin"].Value,
+        _ => field.ToString()
+    };
+
+    // Collapsed-chip label for the APPLIED filter, e.g. "Level in Warning, Error" or "Message contains foo"; the
+    // include/exclude and enabled state are conveyed by the toggle icons, not the text. Reuses the shared filter
+    // predicate-summary template + compact operator labels so the localized chip stays terse and byte-identical.
+    private string FilterSummary(DebugLogFilter filter)
+    {
+        string operatorLabel = (filter.Operator, filter.MatchMode) switch
+        {
+            (ComparisonOperator.Equals, MatchMode.Many) => Localizer["FilterEditor_PredicateSummary_Operator_In"].Value,
+            (ComparisonOperator.Equals, _) => "==",
+            (ComparisonOperator.Contains, _) => Localizer["FilterEditor_PredicateSummary_Operator_Contains"].Value,
+            (ComparisonOperator.NotEqual, _) => "!=",
+            (ComparisonOperator.NotContains, _) => Localizer["FilterEditor_PredicateSummary_Operator_NotContains"].Value,
+            _ => "?"
+        };
+
+        string valueLabel = !filter.IsComplete
+            ? "?"
+            : string.Join(", ", filter.Values.Select(value => FormatValue(filter.Field, value)));
+
+        return Localizer["FilterEditor_PredicateSummary", FieldLabel(filter.Field), operatorLabel, valueLabel];
+    }
+
+    private string FormatValue(DebugLogFilterField field, string? value) => field switch
+    {
+        // Reuses Settings_LogLevel_* so the level display localizes; byte-identical in English. Empty/null render
+        // blank (no bogus "Settings_LogLevel_" key-echo), matching the prior default arm's value ?? string.Empty.
+        DebugLogFilterField.Level => string.IsNullOrEmpty(value) ? string.Empty : Localizer[$"Settings_LogLevel_{value}"].Value,
+        DebugLogFilterField.ProcessOrigin => value switch
+        {
+            nameof(ProcessOrigin.InProcess) => Localizer["DebugLog_ProcessOrigin_InProcess"].Value,
+            nameof(ProcessOrigin.ElevatedHelper) => Localizer["DebugLog_ProcessOrigin_ElevatedHelper"].Value,
+            _ => value ?? string.Empty
+        },
+        // Null is "no selection" (blank header); the empty string is the real "(Uncategorized)" category value.
+        DebugLogFilterField.Category => value is null ? string.Empty : value.Length == 0 ? Localizer["DebugLog_Category_Uncategorized"].Value : value,
+        _ => value ?? string.Empty
+    };
 
     private async Task OnEditorExcludeToggled()
     {

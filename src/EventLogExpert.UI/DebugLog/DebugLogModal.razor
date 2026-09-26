@@ -1,8 +1,8 @@
 @inherits ModalBase<bool>
 
-<ModalChrome AriaLabel="Debug Log"
+<ModalChrome AriaLabel="@Localizer["DebugLog_Aria_Title"]"
     BodyLayout="ModalBodyLayout.Flex"
-    CloseLabel="Exit"
+    CloseLabel="@Localizer["DebugLog_Close"]"
     Footer="FooterPreset.CloseOnly"
     Height="60%"
     InlineAlert="@CurrentInlineAlert"
@@ -13,7 +13,7 @@
     OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
     @ref="ChromeRef">
     <ChildContent>
-        <div aria-label="Filters" class="debug-log-filter-tray" role="group">
+        <div aria-label="@Localizer["DebugLog_Aria_Filters"]" class="debug-log-filter-tray" role="group">
             @foreach (var row in _rows)
             {
                 <DebugLogFilterRow Applied="row.Applied"
@@ -33,27 +33,27 @@
             <Button CssClass="debug-log-add-filter"
                 IconClass="bi bi-plus-circle"
                 OnClick="AddFilter"
-                aria-label="Add filter"
-                data-tooltip="Add filter"
+                aria-label="@Localizer["DebugLog_AddFilter_Aria"]"
+                data-tooltip="@Localizer["DebugLog_AddFilter_Aria"]"
                 @ref="_addButton">
-                Add Filter
+                @Localizer["DebugLog_AddFilter"]
             </Button>
 
             @if (_rows.Count == 0)
             {
-                <span class="visually-hidden" id="debug-clear-filters-hint">Add a filter to enable Clear Filters</span>
+                <span class="visually-hidden" id="debug-clear-filters-hint">@Localizer["DebugLog_ClearFilters_Hint"]</span>
             }
             <Button CssClass="debug-log-clear-filters"
                 Disabled="@(_rows.Count == 0)"
                 IconClass="bi bi-x-circle"
                 OnClick="ClearFilters"
                 aria-describedby="@(_rows.Count == 0 ? "debug-clear-filters-hint" : null)"
-                aria-label="Clear all filters"
-                data-tooltip="@(_rows.Count == 0 ? "Add a filter to enable Clear Filters" : "Clear all filters")">
-                Clear Filters
+                aria-label="@Localizer["DebugLog_ClearFilters_Aria"]"
+                data-tooltip="@(_rows.Count == 0 ? Localizer["DebugLog_ClearFilters_Hint"].Value : Localizer["DebugLog_ClearFilters_Aria"].Value)">
+                @Localizer["DebugLog_ClearFilters"]
             </Button>
         </div>
-        <div aria-busy="@(_hasLoaded ? "false" : "true")" aria-label="Debug log entries" class="debug-log-viewport" role="region" tabindex="0">
+        <div aria-busy="@(_hasLoaded ? "false" : "true")" aria-label="@Localizer["DebugLog_Aria_Entries"]" class="debug-log-viewport" role="region" tabindex="0">
             <Virtualize Context="line" ItemSize="@RowHeightPx" Items="_displayed" OverscanCount="20">
                 <ItemContent>
                     <div class="debug-log-row" data-tooltip="@line" data-tooltip-overflow>@line</div>
@@ -61,7 +61,7 @@
                 <EmptyContent>
                     @if (_hasLoaded)
                     {
-                        <span>@(_entries.Count == 0 ? "Log is Empty..." : "No entries match filters.")</span>
+                        <span>@(_entries.Count == 0 ? Localizer["DebugLog_Empty"].Value : Localizer["DebugLog_NoMatches"].Value)</span>
                     }
                 </EmptyContent>
             </Virtualize>
@@ -78,7 +78,7 @@
                     OnClick="HandleExportAsync"
                     aria-describedby="@(DebugExportDisabledReason is null ? null : "debug-export-hint")"
                     data-tooltip="@DebugExportDisabledReason">
-                    Export
+                    @Localizer["DebugLog_Export"]
                 </Button>
                 @if (DebugCopyDisabledReason is not null)
                 {
@@ -88,15 +88,15 @@
                     OnClick="HandleCopyAsync"
                     aria-describedby="@(DebugCopyDisabledReason is null ? null : "debug-copy-hint")"
                     data-tooltip="@DebugCopyDisabledReason">
-                    Copy
+                    @Localizer["DebugLog_Copy"]
                 </Button>
             </div>
             <span aria-atomic="true" aria-live="polite" class="debug-log-footer-counter vcenter-text" role="status">
-                @($"{_filteredEntryCount:N0} of {_entries.Count:N0} {(_entries.Count == 1 ? "entry" : "entries")}")
+                @FooterCounterText
             </span>
             <div class="debug-log-footer-actions debug-log-footer-right">
-                <Button OnClick="Refresh">Refresh</Button>
-                <Button OnClick="ClearDebugLogFileAsync">Clear Log</Button>
+                <Button OnClick="Refresh">@Localizer["DebugLog_Refresh"]</Button>
+                <Button OnClick="ClearDebugLogFileAsync">@Localizer["DebugLog_ClearLog"]</Button>
             </div>
         </div>
     </ExtraFooterContent>
