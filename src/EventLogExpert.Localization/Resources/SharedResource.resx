@@ -5269,4 +5269,199 @@
     <value>Exception: {0}</value>
     <comment>Open-log-failed message for an unexpected error. {0} is the raw error text.</comment>
   </data>
+  <!-- Debug Log modal chrome. The log CONTENT (rendered lines, exported file, raw exception messages) stays English by design; only the surrounding chrome + filter UI is localized. -->
+  <data name="DebugLog_Aria_Title" xml:space="preserve">
+    <value>Debug Log</value>
+    <comment>Accessible name of the Debug Log modal dialog.</comment>
+  </data>
+  <data name="DebugLog_Close" xml:space="preserve">
+    <value>Exit</value>
+    <comment>Label of the Debug Log modal's close control.</comment>
+  </data>
+  <data name="DebugLog_Aria_Filters" xml:space="preserve">
+    <value>Filters</value>
+    <comment>Accessible group name for the Debug Log filter tray.</comment>
+  </data>
+  <data name="DebugLog_Aria_Entries" xml:space="preserve">
+    <value>Debug log entries</value>
+    <comment>Accessible region name for the scrolling list of debug log lines.</comment>
+  </data>
+  <data name="DebugLog_AddFilter" xml:space="preserve">
+    <value>Add Filter</value>
+  </data>
+  <data name="DebugLog_AddFilter_Aria" xml:space="preserve">
+    <value>Add filter</value>
+    <comment>Accessible name/tooltip for the Add Filter button.</comment>
+  </data>
+  <data name="DebugLog_ClearFilters" xml:space="preserve">
+    <value>Clear Filters</value>
+  </data>
+  <data name="DebugLog_ClearFilters_Aria" xml:space="preserve">
+    <value>Clear all filters</value>
+    <comment>Accessible name/tooltip for the Clear Filters button when it is enabled.</comment>
+  </data>
+  <data name="DebugLog_ClearFilters_Hint" xml:space="preserve">
+    <value>Add a filter to enable Clear Filters</value>
+    <comment>Hint shown when Clear Filters is disabled because no filters exist.</comment>
+  </data>
+  <data name="DebugLog_Export" xml:space="preserve">
+    <value>Export</value>
+  </data>
+  <data name="DebugLog_Copy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="DebugLog_Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="DebugLog_ClearLog" xml:space="preserve">
+    <value>Clear Log</value>
+  </data>
+  <data name="DebugLog_Empty" xml:space="preserve">
+    <value>Log is Empty...</value>
+    <comment>Shown when the debug log file contains no entries.</comment>
+  </data>
+  <data name="DebugLog_NoMatches" xml:space="preserve">
+    <value>No entries match filters.</value>
+    <comment>Shown when entries exist but none match the active filters.</comment>
+  </data>
+  <data name="DebugLog_Footer_Counter_One" xml:space="preserve">
+    <value>{0:N0} of {1:N0} entry</value>
+    <comment>Footer count when the total is exactly one entry. {0} is the filtered count, {1} is the total count (culture-aware N0).</comment>
+  </data>
+  <data name="DebugLog_Footer_Counter_Many" xml:space="preserve">
+    <value>{0:N0} of {1:N0} entries</value>
+    <comment>Footer count when the total is zero or more than one. {0} is the filtered count, {1} is the total count (culture-aware N0).</comment>
+  </data>
+  <data name="DebugLog_ExportDisabled_Loading" xml:space="preserve">
+    <value>Wait for the log to finish loading</value>
+    <comment>Reason the Export button is disabled while the log is still loading.</comment>
+  </data>
+  <data name="DebugLog_ExportDisabled_NoEntries" xml:space="preserve">
+    <value>No entries to export</value>
+    <comment>Reason the Export button is disabled when there are no entries to export.</comment>
+  </data>
+  <data name="DebugLog_CopyDisabled_Loading" xml:space="preserve">
+    <value>Wait for the log to finish loading</value>
+    <comment>Reason the Copy button is disabled while the log is still loading.</comment>
+  </data>
+  <data name="DebugLog_CopyDisabled_NoEntries" xml:space="preserve">
+    <value>No entries to copy</value>
+    <comment>Reason the Copy button is disabled when there are no entries to copy.</comment>
+  </data>
+  <data name="DebugLog_Alert_ClearFailed" xml:space="preserve">
+    <value>Clear Log Failed</value>
+    <comment>Alert title when clearing the debug log file fails. The alert message is the raw exception text (English).</comment>
+  </data>
+  <data name="DebugLog_Alert_ExportFailed" xml:space="preserve">
+    <value>Export Failed</value>
+    <comment>Alert title when exporting the debug log fails. The alert message is the raw exception text (English).</comment>
+  </data>
+  <data name="DebugLog_Alert_RefreshFailed" xml:space="preserve">
+    <value>Refresh Failed</value>
+    <comment>Alert title when reloading the debug log fails. The alert message is the raw exception text (English).</comment>
+  </data>
+  <data name="DebugLog_Filter_ExcludeAria_Excluded" xml:space="preserve">
+    <value>Filter is excluded; activate to include</value>
+    <comment>Accessible name for the include/exclude toggle when the filter is currently excluded.</comment>
+  </data>
+  <data name="DebugLog_Filter_ExcludeAria_Included" xml:space="preserve">
+    <value>Filter is included; activate to exclude</value>
+    <comment>Accessible name for the include/exclude toggle when the filter is currently included.</comment>
+  </data>
+  <data name="DebugLog_Filter_ExcludeTip_Excluded" xml:space="preserve">
+    <value>Excluded - click to include</value>
+    <comment>Tooltip for the include/exclude toggle when the filter is currently excluded.</comment>
+  </data>
+  <data name="DebugLog_Filter_ExcludeTip_Included" xml:space="preserve">
+    <value>Included - click to exclude</value>
+    <comment>Tooltip for the include/exclude toggle when the filter is currently included.</comment>
+  </data>
+  <data name="DebugLog_Filter_EnableAria_Enabled" xml:space="preserve">
+    <value>Filter is enabled; activate to disable</value>
+    <comment>Accessible name for the enable/disable toggle when the filter is currently enabled.</comment>
+  </data>
+  <data name="DebugLog_Filter_EnableAria_Disabled" xml:space="preserve">
+    <value>Filter is disabled; activate to enable</value>
+    <comment>Accessible name for the enable/disable toggle when the filter is currently disabled.</comment>
+  </data>
+  <data name="DebugLog_Filter_EnableTip_Enabled" xml:space="preserve">
+    <value>Enabled - click to disable</value>
+    <comment>Tooltip for the enable/disable toggle when the filter is currently enabled.</comment>
+  </data>
+  <data name="DebugLog_Filter_EnableTip_Disabled" xml:space="preserve">
+    <value>Disabled - click to enable</value>
+    <comment>Tooltip for the enable/disable toggle when the filter is currently disabled.</comment>
+  </data>
+  <data name="DebugLog_Filter_FieldAria" xml:space="preserve">
+    <value>Filter field</value>
+    <comment>Accessible name for the filter field (property) dropdown.</comment>
+  </data>
+  <data name="DebugLog_Filter_OperatorAria" xml:space="preserve">
+    <value>Filter operator</value>
+    <comment>Accessible name for the filter comparison-operator dropdown.</comment>
+  </data>
+  <data name="DebugLog_Filter_ValueAria" xml:space="preserve">
+    <value>Filter value</value>
+    <comment>Accessible name for the filter value input/dropdown.</comment>
+  </data>
+  <data name="DebugLog_Filter_AnyValue" xml:space="preserve">
+    <value>Any</value>
+    <comment>Placeholder/clear option meaning no value is selected for the filter.</comment>
+  </data>
+  <data name="DebugLog_Filter_SaveHint" xml:space="preserve">
+    <value>Add a value to finish this filter</value>
+    <comment>Hint shown while the draft filter is incomplete (Save disabled).</comment>
+  </data>
+  <data name="DebugLog_Filter_SaveAria" xml:space="preserve">
+    <value>Save filter</value>
+    <comment>Accessible name/tooltip for the Save button on a draft filter.</comment>
+  </data>
+  <data name="DebugLog_Filter_CancelAria" xml:space="preserve">
+    <value>Cancel edit</value>
+    <comment>Accessible name/tooltip for the Cancel button on a draft filter.</comment>
+  </data>
+  <data name="DebugLog_Filter_RemoveAria" xml:space="preserve">
+    <value>Remove filter</value>
+    <comment>Accessible name/tooltip for the static Remove button in the filter editor.</comment>
+  </data>
+  <data name="DebugLog_Filter_EditTip" xml:space="preserve">
+    <value>Edit filter</value>
+    <comment>Tooltip for the collapsed filter chip's edit affordance.</comment>
+  </data>
+  <data name="DebugLog_Filter_EditAria" xml:space="preserve">
+    <value>Edit filter: {0}</value>
+    <comment>Accessible name for the collapsed filter chip's edit button. {0} is the filter summary text.</comment>
+  </data>
+  <data name="DebugLog_Filter_RemoveRowAria" xml:space="preserve">
+    <value>Remove filter: {0}</value>
+    <comment>Accessible name for the collapsed filter chip's remove button. {0} is the filter summary text.</comment>
+  </data>
+  <data name="DebugLog_Field_Message" xml:space="preserve">
+    <value>Message</value>
+    <comment>DebugLogFilterField.Message label (filter property token in the summary chip and field dropdown).</comment>
+  </data>
+  <data name="DebugLog_Field_Level" xml:space="preserve">
+    <value>Level</value>
+    <comment>DebugLogFilterField.Level label (filter property token in the summary chip and field dropdown).</comment>
+  </data>
+  <data name="DebugLog_Field_Category" xml:space="preserve">
+    <value>Category</value>
+    <comment>DebugLogFilterField.Category label (filter property token in the summary chip and field dropdown).</comment>
+  </data>
+  <data name="DebugLog_Field_ProcessOrigin" xml:space="preserve">
+    <value>ProcessOrigin</value>
+    <comment>DebugLogFilterField.ProcessOrigin label (filter property token in the summary chip and field dropdown).</comment>
+  </data>
+  <data name="DebugLog_ProcessOrigin_InProcess" xml:space="preserve">
+    <value>In-process</value>
+    <comment>Display label for the ProcessOrigin.InProcess filter value.</comment>
+  </data>
+  <data name="DebugLog_ProcessOrigin_ElevatedHelper" xml:space="preserve">
+    <value>Elevated helper</value>
+    <comment>Display label for the ProcessOrigin.ElevatedHelper filter value.</comment>
+  </data>
+  <data name="DebugLog_Category_Uncategorized" xml:space="preserve">
+    <value>(Uncategorized)</value>
+    <comment>Display label for the empty-string category value (entries with no category).</comment>
+  </data>
 </root>

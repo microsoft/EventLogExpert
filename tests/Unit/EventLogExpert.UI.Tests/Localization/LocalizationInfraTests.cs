@@ -136,6 +136,34 @@ public sealed class LocalizationInfraTests
     }
 
     [Fact]
+    public void DebugLogPlaceholderValues_HaveExpectedPlaceholderArity()
+    {
+        var neutralValues = ResxValues();
+        (string Key, int Arity)[] expected =
+        [
+            ("DebugLog_Footer_Counter_One", 2),
+            ("DebugLog_Footer_Counter_Many", 2),
+            ("DebugLog_Filter_EditAria", 1),
+            ("DebugLog_Filter_RemoveRowAria", 1)
+        ];
+
+        foreach ((string key, int arity) in expected)
+        {
+            Assert.True(neutralValues.TryGetValue(key, out string? value), $"Missing neutral RESX value for {key}.");
+            Assert.Equal(arity, PlaceholderArity(value));
+        }
+
+        // Completeness: these are the ONLY DebugLog_* keys that carry placeholders. A new placeholder-bearing DebugLog
+        // key must extend this list (so its arity stays guarded); arity-0 keys and value edits do not touch this.
+        Assert.Equal(
+            expected.Select(entry => entry.Key).OrderBy(key => key, StringComparer.Ordinal),
+            neutralValues
+                .Where(pair => pair.Key.StartsWith("DebugLog_", StringComparison.Ordinal) && PlaceholderArity(pair.Value) > 0)
+                .Select(pair => pair.Key)
+                .OrderBy(key => key, StringComparer.Ordinal));
+    }
+
+    [Fact]
     public void EnumMappedKeyFamilies_MatchEnumMembersExactly()
     {
         // Bidirectional per family: an authored key with no enum member is an orphan/typo; an enum member with no

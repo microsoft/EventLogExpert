@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
@@ -9,6 +10,7 @@ using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.DebugLog;
 
@@ -40,16 +42,25 @@ public sealed partial class DebugLogModal : ModalBase<bool>
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
     private string? DebugCopyDisabledReason =>
-        !_hasLoaded ? "Wait for the log to finish loading" : (_filteredEntryCount == 0 ? "No entries to copy" : null);
+        !_hasLoaded ? Localizer["DebugLog_CopyDisabled_Loading"].Value :
+        _filteredEntryCount == 0 ? Localizer["DebugLog_CopyDisabled_NoEntries"].Value : null;
 
-    // Plain-English (DebugLog is un-localized dev tooling): why the footer Export/Copy buttons are disabled, or
-    // null when enabled. Non-null exactly when Disabled="@(!_hasLoaded || _filteredEntryCount == 0)" is true.
+    // Why the footer Export/Copy buttons are disabled, or null when enabled. Non-null exactly when
+    // Disabled="@(!_hasLoaded || _filteredEntryCount == 0)" is true. The chrome is localized; the log content stays English.
     private string? DebugExportDisabledReason =>
-        !_hasLoaded ? "Wait for the log to finish loading" : (_filteredEntryCount == 0 ? "No entries to export" : null);
+        !_hasLoaded ? Localizer["DebugLog_ExportDisabled_Loading"].Value :
+        _filteredEntryCount == 0 ? Localizer["DebugLog_ExportDisabled_NoEntries"].Value : null;
 
     [Inject] private IDebugLogReader DebugLogReader { get; init; } = null!;
 
     [Inject] private IFileSaveService FileSaveService { get; init; } = null!;
+
+    // Footer summary "{filtered:N0} of {total:N0} entry|entries"; the singular form is used only when the TOTAL is
+    // exactly one (matches the pre-localization pivot on _entries.Count). N0 grouping stays culture-aware.
+    private string FooterCounterText =>
+        Localizer[_entries.Count == 1 ? "DebugLog_Footer_Counter_One" : "DebugLog_Footer_Counter_Many", _filteredEntryCount, _entries.Count];
+
+    [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
     protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
@@ -167,7 +178,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         }
         catch (Exception ex)
         {
-            await AlertDialogService.ShowAlert("Clear Log Failed", ex.Message, "OK");
+            await AlertDialogService.ShowAlert(Localizer["DebugLog_Alert_ClearFailed"].Value, ex.Message, Localizer["Modal_Accept"].Value);
 
             return;
         }
@@ -222,7 +233,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         }
         catch (Exception ex)
         {
-            await AlertDialogService.ShowAlert("Export Failed", ex.Message, "OK");
+            await AlertDialogService.ShowAlert(Localizer["DebugLog_Alert_ExportFailed"].Value, ex.Message, Localizer["Modal_Accept"].Value);
         }
     }
 
@@ -324,7 +335,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 
         if (loadException is not null && generation == _loadGeneration)
         {
-            await AlertDialogService.ShowAlert("Refresh Failed", loadException.Message, "OK");
+            await AlertDialogService.ShowAlert(Localizer["DebugLog_Alert_RefreshFailed"].Value, loadException.Message, Localizer["Modal_Accept"].Value);
         }
     }
 

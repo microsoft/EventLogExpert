@@ -6,16 +6,16 @@
             IconClass="@(draft.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"
             IconOnly
             OnClick="OnEditorExcludeToggled"
-            aria-label="@(draft.IsExcluded ? "Filter is excluded; activate to include" : "Filter is included; activate to exclude")"
+            aria-label="@(draft.IsExcluded ? Localizer["DebugLog_Filter_ExcludeAria_Excluded"].Value : Localizer["DebugLog_Filter_ExcludeAria_Included"].Value)"
             aria-pressed="@(draft.IsExcluded ? "true" : "false")"
             data-excluded="@(draft.IsExcluded ? "true" : "false")"
-            data-tooltip="@(draft.IsExcluded ? "Excluded - click to include" : "Included - click to exclude")"
+            data-tooltip="@(draft.IsExcluded ? Localizer["DebugLog_Filter_ExcludeTip_Excluded"].Value : Localizer["DebugLog_Filter_ExcludeTip_Included"].Value)"
             @ref="_editorFirstControl" />
 
-        <ValueSelect AriaLabel="Filter field"
+        <ValueSelect AriaLabel="@Localizer["DebugLog_Filter_FieldAria"]"
             CssClass="input filter-dropdown"
             T="DebugLogFilterField"
-            ToStringFunc="@(field => field.ToString())"
+            ToStringFunc="@FieldLabel"
             Value="draft.Field"
             ValueChanged="OnFieldChanged">
             @foreach (var field in Enum.GetValues<DebugLogFilterField>())
@@ -24,7 +24,7 @@
             }
         </ValueSelect>
 
-        <ComparisonOperatorSelect AriaLabel="Filter operator"
+        <ComparisonOperatorSelect AriaLabel="@Localizer["DebugLog_Filter_OperatorAria"]"
             CssClass="input filter-dropdown"
             MatchMode="draft.MatchMode"
             OnChanged="OnOperatorChanged"
@@ -34,22 +34,22 @@
 
         @if (draft.Field == DebugLogFilterField.Message)
         {
-            <TextInput AriaLabel="Filter value"
+            <TextInput AriaLabel="@Localizer["DebugLog_Filter_ValueAria"]"
                 CssClass="input filter-description"
                 Value="@SingleValue"
                 ValueChanged="OnSingleValueChanged" />
         }
         else if (draft.MatchMode == MatchMode.Many)
         {
-            <ValueSelect AriaLabel="Filter value"
+            <ValueSelect AriaLabel="@Localizer["DebugLog_Filter_ValueAria"]"
                 CssClass="input filter-multiselect-dropdown"
-                EmptyText="Any"
+                EmptyText="@Localizer["DebugLog_Filter_AnyValue"]"
                 IsMultiSelect
                 T="string"
                 ToStringFunc="@ValueLabel"
                 Values="draft.Values"
                 ValuesChanged="OnValuesChanged">
-                <ValueSelectItem ClearItem T="string">Any</ValueSelectItem>
+                <ValueSelectItem ClearItem T="string">@Localizer["DebugLog_Filter_AnyValue"]</ValueSelectItem>
                 @foreach (var option in ValueOptions())
                 {
                     <ValueSelectItem T="string" Value="option" />
@@ -58,13 +58,13 @@
         }
         else
         {
-            <ValueSelect AriaLabel="Filter value"
+            <ValueSelect AriaLabel="@Localizer["DebugLog_Filter_ValueAria"]"
                 CssClass="input filter-value-dropdown"
                 T="string"
                 ToStringFunc="@ValueLabel"
                 Value="@SingleValue"
                 ValueChanged="OnSingleValueChanged">
-                <ValueSelectItem ClearItem T="string">Any</ValueSelectItem>
+                <ValueSelectItem ClearItem T="string">@Localizer["DebugLog_Filter_AnyValue"]</ValueSelectItem>
                 @foreach (var option in ValueOptions())
                 {
                     <ValueSelectItem T="string" Value="option" />
@@ -74,29 +74,29 @@
 
         @if (!draft.IsComplete)
         {
-            <span class="visually-hidden" id="@_saveHintId">Add a value to finish this filter</span>
+            <span class="visually-hidden" id="@_saveHintId">@Localizer["DebugLog_Filter_SaveHint"]</span>
         }
         <Button Disabled="@(!draft.IsComplete)"
             IconClass="bi bi-check-circle"
             IconOnly
             OnClick="OnSave"
             aria-describedby="@(!draft.IsComplete ? _saveHintId : null)"
-            aria-label="Save filter"
-            data-tooltip="@(draft.IsComplete ? "Save filter" : "Add a value to finish this filter")" />
+            aria-label="@Localizer["DebugLog_Filter_SaveAria"]"
+            data-tooltip="@(draft.IsComplete ? Localizer["DebugLog_Filter_SaveAria"].Value : Localizer["DebugLog_Filter_SaveHint"].Value)" />
 
         <Button IconClass="bi bi-x-circle"
             IconOnly
             OnClick="OnCancel"
-            aria-label="Cancel edit"
-            data-tooltip="Cancel edit" />
+            aria-label="@Localizer["DebugLog_Filter_CancelAria"]"
+            data-tooltip="@Localizer["DebugLog_Filter_CancelAria"]" />
 
         @if (Applied is not null)
         {
             <DangerButton IconClass="bi bi-dash-circle"
                 IconOnly
                 OnClick="OnRemove"
-                aria-label="Remove filter"
-                data-tooltip="Remove filter" />
+                aria-label="@Localizer["DebugLog_Filter_RemoveAria"]"
+                data-tooltip="@Localizer["DebugLog_Filter_RemoveAria"]" />
         }
     </div>
 }
@@ -109,24 +109,24 @@ else if (Applied is { } applied)
             IconClass="@(applied.IsExcluded ? "bi bi-slash-circle-fill" : "bi bi-slash-circle")"
             IconOnly
             OnClick="OnExcludeToggled"
-            aria-label="@(applied.IsExcluded ? "Filter is excluded; activate to include" : "Filter is included; activate to exclude")"
+            aria-label="@(applied.IsExcluded ? Localizer["DebugLog_Filter_ExcludeAria_Excluded"].Value : Localizer["DebugLog_Filter_ExcludeAria_Included"].Value)"
             aria-pressed="@(applied.IsExcluded ? "true" : "false")"
             data-excluded="@(applied.IsExcluded ? "true" : "false")"
-            data-tooltip="@(applied.IsExcluded ? "Excluded - click to include" : "Included - click to exclude")" />
+            data-tooltip="@(applied.IsExcluded ? Localizer["DebugLog_Filter_ExcludeTip_Excluded"].Value : Localizer["DebugLog_Filter_ExcludeTip_Included"].Value)" />
 
         <Button CssClass="debug-log-filter-enable-toggle"
             IconClass="@(applied.IsEnabled ? "bi bi-toggle-on" : "bi bi-toggle-off")"
             IconOnly
             OnClick="OnEnableToggled"
-            aria-label="@(applied.IsEnabled ? "Filter is enabled; activate to disable" : "Filter is disabled; activate to enable")"
+            aria-label="@(applied.IsEnabled ? Localizer["DebugLog_Filter_EnableAria_Enabled"].Value : Localizer["DebugLog_Filter_EnableAria_Disabled"].Value)"
             aria-pressed="@(applied.IsEnabled ? "true" : "false")"
             data-enabled="@(applied.IsEnabled ? "true" : "false")"
-            data-tooltip="@(applied.IsEnabled ? "Enabled - click to disable" : "Disabled - click to enable")" />
+            data-tooltip="@(applied.IsEnabled ? Localizer["DebugLog_Filter_EnableTip_Enabled"].Value : Localizer["DebugLog_Filter_EnableTip_Disabled"].Value)" />
 
         <ChromelessButton CssClass="debug-log-filter-chip-edit"
             OnClick="OnEdit"
-            aria-label="@($"Edit filter: {summary}")"
-            data-tooltip="Edit filter"
+            aria-label="@Localizer["DebugLog_Filter_EditAria", summary]"
+            data-tooltip="@Localizer["DebugLog_Filter_EditTip"]"
             @ref="_chipEditButton">
             <span class="debug-log-filter-summary" data-tooltip="@summary" data-tooltip-overflow>@summary</span>
         </ChromelessButton>
@@ -134,7 +134,7 @@ else if (Applied is { } applied)
         <ChromelessButton CssClass="debug-log-filter-chip-remove"
             IconClass="bi bi-x-circle"
             OnClick="OnRemove"
-            aria-label="@($"Remove filter: {summary}")"
-            data-tooltip="Remove filter" />
+            aria-label="@Localizer["DebugLog_Filter_RemoveRowAria", summary]"
+            data-tooltip="@Localizer["DebugLog_Filter_RemoveAria"]" />
     </div>
 }
