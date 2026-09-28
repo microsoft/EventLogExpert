@@ -136,18 +136,28 @@ public sealed class LogTableLocalizerWiringTests
     }
 
     [Fact]
-    public void EventTableExportText_ColumnHeader_LocalizesPlainAndDateWithZoneHeaders()
+    public void ExportText_ColumnHeader_RoutesColumnsAndDateHeaderThroughWholeStringTemplates()
     {
-        EventTableExportText text = new(_localizer);
+        var exportText = new EventTableExportText(_localizer);
+
+        // Non-date columns route through the single-label Column_* localizer.
+        Assert.Equal("[[Column_EventId]]", exportText.ColumnHeader(ColumnName.EventId, TimeZoneInfo.Utc));
+
+        // The Date and Time export header routes through the whole-string Table_ColumnHeader_DateAndTime[WithZone]
+        // template (matching the on-screen header) so a translation controls the label+zone word order and spacing.
+        Assert.Equal("[[Table_ColumnHeader_DateAndTime]]", exportText.ColumnHeader(ColumnName.DateAndTime, TimeZoneInfo.Local));
+
         TimeZoneInfo alternateZone = TimeZoneInfo.CreateCustomTimeZone(
-            "csv-marker-zone",
+            "l4-export-zone",
             TimeSpan.FromHours(3),
             "Marker Zone Standard Time",
             "Marker Zone Standard Time");
+        Assert.NotEqual(TimeZoneInfo.Local, alternateZone);
+        Assert.Equal(
+            $"[[Table_ColumnHeader_DateAndTimeWithZone({alternateZone.DisplayName.Split(' ')[0]})]]",
+            exportText.ColumnHeader(ColumnName.DateAndTime, alternateZone));
 
-        Assert.Equal("[[Column_EventId]]", text.ColumnHeader(ColumnName.EventId, TimeZoneInfo.Local));
-        Assert.Equal("[[Column_DateAndTime]] Marker", text.ColumnHeader(ColumnName.DateAndTime, alternateZone));
-        Assert.Equal("[[Copy_Markdown_DescriptionHeader]]", text.DescriptionHeader);
+        Assert.Equal("[[Copy_Markdown_DescriptionHeader]]", exportText.DescriptionHeader);
     }
 
     [Theory]
