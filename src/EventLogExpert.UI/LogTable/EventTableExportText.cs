@@ -13,8 +13,15 @@ internal sealed class EventTableExportText(IStringLocalizer<SharedResource> loca
 {
     public string DescriptionHeader => localizer["Copy_Markdown_DescriptionHeader"];
 
-    public string ColumnHeader(ColumnName column, TimeZoneInfo timeZone) =>
-        column == ColumnName.DateAndTime && !timeZone.Equals(TimeZoneInfo.Local) ?
-            $"{ColumnNameLocalizer.Label(localizer, column)} {timeZone.DisplayName.Split(' ').First()}" :
-            ColumnNameLocalizer.Label(localizer, column);
+    public string ColumnHeader(ColumnName column, TimeZoneInfo timeZone)
+    {
+        if (column != ColumnName.DateAndTime)
+        {
+            return ColumnNameLocalizer.Label(localizer, column);
+        }
+
+        return timeZone.Equals(TimeZoneInfo.Local) ?
+            localizer["Table_ColumnHeader_DateAndTime"].Value :
+            localizer["Table_ColumnHeader_DateAndTimeWithZone", timeZone.DisplayName.Split(' ').First()].Value;
+    }
 }
