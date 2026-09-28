@@ -27,7 +27,7 @@ public sealed class EventTableExporterTests
     {
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
-        EventTableExporter exporter = new(new TabularExportWriter());
+        EventTableExporter exporter = new(new TabularExportWriter(), ExportText());
         using MemoryStream stream = new();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => exporter.ExportAsync(
@@ -43,7 +43,7 @@ public sealed class EventTableExporterTests
 
         byte[] bytes = await ExportAsync(ExportFormat.Csv, events, s_columns, includeDescription: false);
 
-        Assert.Equal("Event ID,Source\r\n1,Alpha\r\n", ExportTestHelpers.DecodeWithoutBom(bytes));
+        Assert.Equal("[[Column_EventId]],[[Column_Source]]\r\n1,Alpha\r\n", ExportTestHelpers.DecodeWithoutBom(bytes));
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public sealed class EventTableExporterTests
         byte[] bytes = await ExportAsync(ExportFormat.Csv, events, s_columns, includeDescription: true);
 
         Assert.Equal(
-            "Event ID,Source,Description\r\n1,Alpha,First\r\n2,Beta,\r\n",
+            "[[Column_EventId]],[[Column_Source]],[[DescriptionHeader]]\r\n1,Alpha,First\r\n2,Beta,\r\n",
             ExportTestHelpers.DecodeWithoutBom(bytes));
     }
 
@@ -71,23 +71,23 @@ public sealed class EventTableExporterTests
         byte[] bytes = await ExportAsync(ExportFormat.Csv, events, [ColumnName.EventId], includeDescription: true);
 
         Assert.Equal(
-            $"Event ID,Description\r\n1,{largeDescription}\r\n",
+            $"[[Column_EventId]],[[DescriptionHeader]]\r\n1,{largeDescription}\r\n",
             ExportTestHelpers.DecodeWithoutBom(bytes));
     }
 
     [Theory]
-    [InlineData("plain", "Event ID,Description\r\n1,plain\r\n")]
-    [InlineData("=cmd", "Event ID,Description\r\n1,'=cmd\r\n")]
-    [InlineData("+cmd", "Event ID,Description\r\n1,'+cmd\r\n")]
-    [InlineData("-cmd", "Event ID,Description\r\n1,'-cmd\r\n")]
-    [InlineData("@cmd", "Event ID,Description\r\n1,'@cmd\r\n")]
-    [InlineData("\tcmd", "Event ID,Description\r\n1,'\tcmd\r\n")]
-    [InlineData("\rcmd", "Event ID,Description\r\n1,\"'\rcmd\"\r\n")]
-    [InlineData("a\"b", "Event ID,Description\r\n1,\"a\"\"b\"\r\n")]
-    [InlineData("a\nb", "Event ID,Description\r\n1,\"a\nb\"\r\n")]
-    [InlineData("a\rb", "Event ID,Description\r\n1,\"a\rb\"\r\n")]
-    [InlineData("a\r\nb", "Event ID,Description\r\n1,\"a\r\nb\"\r\n")]
-    [InlineData("=cmd\r\nx", "Event ID,Description\r\n1,\"'=cmd\r\nx\"\r\n")]
+    [InlineData("plain", "[[Column_EventId]],[[DescriptionHeader]]\r\n1,plain\r\n")]
+    [InlineData("=cmd", "[[Column_EventId]],[[DescriptionHeader]]\r\n1,'=cmd\r\n")]
+    [InlineData("+cmd", "[[Column_EventId]],[[DescriptionHeader]]\r\n1,'+cmd\r\n")]
+    [InlineData("-cmd", "[[Column_EventId]],[[DescriptionHeader]]\r\n1,'-cmd\r\n")]
+    [InlineData("@cmd", "[[Column_EventId]],[[DescriptionHeader]]\r\n1,'@cmd\r\n")]
+    [InlineData("\tcmd", "[[Column_EventId]],[[DescriptionHeader]]\r\n1,'\tcmd\r\n")]
+    [InlineData("\rcmd", "[[Column_EventId]],[[DescriptionHeader]]\r\n1,\"'\rcmd\"\r\n")]
+    [InlineData("a\"b", "[[Column_EventId]],[[DescriptionHeader]]\r\n1,\"a\"\"b\"\r\n")]
+    [InlineData("a\nb", "[[Column_EventId]],[[DescriptionHeader]]\r\n1,\"a\nb\"\r\n")]
+    [InlineData("a\rb", "[[Column_EventId]],[[DescriptionHeader]]\r\n1,\"a\rb\"\r\n")]
+    [InlineData("a\r\nb", "[[Column_EventId]],[[DescriptionHeader]]\r\n1,\"a\r\nb\"\r\n")]
+    [InlineData("=cmd\r\nx", "[[Column_EventId]],[[DescriptionHeader]]\r\n1,\"'=cmd\r\nx\"\r\n")]
     public async Task ExportAsync_Csv_IncludeDescription_NeutralizesAndQuotes(string description, string expectedCsv)
     {
         ResolvedEvent[] events = [new("Log", LogPathType.Channel) { Id = 1, Description = description }];
@@ -98,20 +98,20 @@ public sealed class EventTableExporterTests
     }
 
     [Theory]
-    [InlineData("=SUM(A1)", "Source\r\n'=SUM(A1)\r\n")]
-    [InlineData("+1+1", "Source\r\n'+1+1\r\n")]
-    [InlineData("-2-2", "Source\r\n'-2-2\r\n")]
-    [InlineData("@cmd", "Source\r\n'@cmd\r\n")]
-    [InlineData("\tTabLed", "Source\r\n'\tTabLed\r\n")]
-    [InlineData("\rCarriage", "Source\r\n\"'\rCarriage\"\r\n")]
-    [InlineData("Alpha", "Source\r\nAlpha\r\n")]
-    [InlineData("a=b", "Source\r\na=b\r\n")]
-    [InlineData(" =SUM(A1)", "Source\r\n' =SUM(A1)\r\n")]
-    [InlineData(" +1", "Source\r\n' +1\r\n")]
-    [InlineData("  -2", "Source\r\n'  -2\r\n")]
-    [InlineData(" @cmd", "Source\r\n' @cmd\r\n")]
-    [InlineData("  hello", "Source\r\n  hello\r\n")]
-    [InlineData("   ", "Source\r\n   \r\n")]
+    [InlineData("=SUM(A1)", "[[Column_Source]]\r\n'=SUM(A1)\r\n")]
+    [InlineData("+1+1", "[[Column_Source]]\r\n'+1+1\r\n")]
+    [InlineData("-2-2", "[[Column_Source]]\r\n'-2-2\r\n")]
+    [InlineData("@cmd", "[[Column_Source]]\r\n'@cmd\r\n")]
+    [InlineData("\tTabLed", "[[Column_Source]]\r\n'\tTabLed\r\n")]
+    [InlineData("\rCarriage", "[[Column_Source]]\r\n\"'\rCarriage\"\r\n")]
+    [InlineData("Alpha", "[[Column_Source]]\r\nAlpha\r\n")]
+    [InlineData("a=b", "[[Column_Source]]\r\na=b\r\n")]
+    [InlineData(" =SUM(A1)", "[[Column_Source]]\r\n' =SUM(A1)\r\n")]
+    [InlineData(" +1", "[[Column_Source]]\r\n' +1\r\n")]
+    [InlineData("  -2", "[[Column_Source]]\r\n'  -2\r\n")]
+    [InlineData(" @cmd", "[[Column_Source]]\r\n' @cmd\r\n")]
+    [InlineData("  hello", "[[Column_Source]]\r\n  hello\r\n")]
+    [InlineData("   ", "[[Column_Source]]\r\n   \r\n")]
     public async Task ExportAsync_Csv_NeutralizesLeadingFormulaTriggers(string sourceValue, string expectedCsv)
     {
         ResolvedEvent[] events = [new("Log", LogPathType.Channel) { Id = 1, Source = sourceValue }];
@@ -126,7 +126,7 @@ public sealed class EventTableExporterTests
     {
         byte[] bytes = await ExportAsync(ExportFormat.Csv, s_events, s_columns);
 
-        Assert.Equal("Event ID,Source\r\n1,Alpha\r\n2,Beta\r\n", ExportTestHelpers.DecodeWithoutBom(bytes));
+        Assert.Equal("[[Column_EventId]],[[Column_Source]]\r\n1,Alpha\r\n2,Beta\r\n", ExportTestHelpers.DecodeWithoutBom(bytes));
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public sealed class EventTableExporterTests
     {
         byte[] bytes = await ExportAsync(ExportFormat.Csv, [], s_columns);
 
-        Assert.Equal("Event ID,Source\r\n", ExportTestHelpers.DecodeWithoutBom(bytes));
+        Assert.Equal("[[Column_EventId]],[[Column_Source]]\r\n", ExportTestHelpers.DecodeWithoutBom(bytes));
     }
 
     private static IEventColumnView BuildView(IReadOnlyList<ResolvedEvent> events)
@@ -190,12 +190,21 @@ public sealed class EventTableExporterTests
         IReadOnlyList<ColumnName> columns,
         bool includeDescription = false)
     {
-        EventTableExporter exporter = new(new TabularExportWriter());
+        EventTableExporter exporter = new(new TabularExportWriter(), ExportText());
         using MemoryStream stream = new();
 
         await exporter.ExportAsync(
             stream, format, BuildView(events), columns, s_utc, includeDescription, TestContext.Current.CancellationToken);
 
         return stream.ToArray();
+    }
+
+    private static IEventTableExportText ExportText() => new MarkerEventTableExportText();
+
+    private sealed class MarkerEventTableExportText : IEventTableExportText
+    {
+        public string DescriptionHeader => "[[DescriptionHeader]]";
+
+        public string ColumnHeader(ColumnName column, TimeZoneInfo timeZone) => $"[[Column_{column}]]";
     }
 }

@@ -351,9 +351,9 @@ public sealed class FilterEditorLocalizerWiringTests : BunitContext
         var predicate = new FilterPredicateDraft { Comparison = { Value = "1" } };
         var component = RenderPredicate(predicate, isEditing: false);
 
-        Assert.Contains("[[FilterEditor_Predicate_EditAria([[FilterEditor_PredicateSummary(Id|==|1)]])]]", component.Markup);
+        Assert.Contains("[[FilterEditor_Predicate_EditAria([[FilterEditor_PredicateSummary([[FilterLens_Property_Id]]|==|1)]])]]", component.Markup);
         Assert.Contains("[[FilterEditor_Predicate_EditTitle]]", component.Markup);
-        Assert.Contains("[[FilterEditor_Predicate_RemoveAria([[FilterEditor_PredicateSummary(Id|==|1)]])]]", component.Markup);
+        Assert.Contains("[[FilterEditor_Predicate_RemoveAria([[FilterEditor_PredicateSummary([[FilterLens_Property_Id]]|==|1)]])]]", component.Markup);
         Assert.Contains("[[FilterEditor_Predicate_RemoveTitle]]", component.Markup);
     }
 
@@ -393,7 +393,7 @@ public sealed class FilterEditorLocalizerWiringTests : BunitContext
         Assert.Contains("[[FilterEditor_PredicateJoin_OrLabel]]", component.Markup);
         Assert.Contains("[[FilterEditor_Predicate_DoneAria]]", component.Markup);
         Assert.Contains("[[FilterEditor_Predicate_DoneDisabledTitle]]", component.Markup);
-        Assert.Contains("[[FilterEditor_Predicate_RemoveAria([[FilterEditor_PredicateSummary(Id|==|?)]])]]", component.Markup);
+        Assert.Contains("[[FilterEditor_Predicate_RemoveAria([[FilterEditor_PredicateSummary([[FilterLens_Property_Id]]|==|?)]])]]", component.Markup);
         Assert.Contains("[[FilterEditor_Predicate_RemoveTitle]]", component.Markup);
 
         var andPredicate = new FilterPredicateDraft { JoinWithAny = false };
@@ -446,6 +446,27 @@ public sealed class FilterEditorLocalizerWiringTests : BunitContext
         Assert.Equal("preserve", data.Attribute(XNamespace.Xml + "space")?.Value);
     }
 
+    [Fact]
+    public void PredicateSummary_LevelValue_RendersSeverityMarker()
+    {
+        var predicate = new FilterPredicateDraft
+        {
+            Comparison =
+            {
+                Property = EventProperty.Level,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "Information"
+            }
+        };
+
+        var component = RenderPredicate(predicate, isEditing: false);
+
+        Assert.Contains(
+            "[[FilterEditor_PredicateSummary([[FilterLens_Property_Level]]|==|[[Severity_Level_Information]])]]",
+            component.Markup);
+    }
+
     [Theory]
     [InlineData(0, "?")]
     [InlineData(1, "alpha")]
@@ -472,15 +493,15 @@ public sealed class FilterEditorLocalizerWiringTests : BunitContext
 
         var component = RenderPredicate(predicate, isEditing: false);
 
-        Assert.Contains($"[[FilterEditor_PredicateSummary(Id|[[FilterEditor_PredicateSummary_Operator_In]]|{expectedValueLabel})]]", component.Markup);
+        Assert.Contains($"[[FilterEditor_PredicateSummary([[FilterLens_Property_Id]]|[[FilterEditor_PredicateSummary_Operator_In]]|{expectedValueLabel})]]", component.Markup);
     }
 
     [Theory]
-    [InlineData(ComparisonOperator.Equals, MatchMode.Many, "a|b", "[[FilterEditor_PredicateSummary(TaskCategory|[[FilterEditor_PredicateSummary_Operator_In]]|[[FilterEditor_PredicateSummary_ValueCount_Many(2)]])]]")]
-    [InlineData(ComparisonOperator.Contains, MatchMode.Single, "abc", "[[FilterEditor_PredicateSummary(TaskCategory|[[FilterEditor_PredicateSummary_Operator_Contains]]|abc)]]")]
-    [InlineData(ComparisonOperator.NotContains, MatchMode.Single, "abc", "[[FilterEditor_PredicateSummary(TaskCategory|[[FilterEditor_PredicateSummary_Operator_NotContains]]|abc)]]")]
-    [InlineData(ComparisonOperator.Equals, MatchMode.Single, "abc", "[[FilterEditor_PredicateSummary(TaskCategory|==|abc)]]")]
-    [InlineData(ComparisonOperator.NotEqual, MatchMode.Single, "abc", "[[FilterEditor_PredicateSummary(TaskCategory|!=|abc)]]")]
+    [InlineData(ComparisonOperator.Equals, MatchMode.Many, "a|b", "[[FilterEditor_PredicateSummary([[FilterLens_Property_TaskCategory]]|[[FilterEditor_PredicateSummary_Operator_In]]|[[FilterEditor_PredicateSummary_ValueCount_Many(2)]])]]")]
+    [InlineData(ComparisonOperator.Contains, MatchMode.Single, "abc", "[[FilterEditor_PredicateSummary([[FilterLens_Property_TaskCategory]]|[[FilterEditor_PredicateSummary_Operator_Contains]]|abc)]]")]
+    [InlineData(ComparisonOperator.NotContains, MatchMode.Single, "abc", "[[FilterEditor_PredicateSummary([[FilterLens_Property_TaskCategory]]|[[FilterEditor_PredicateSummary_Operator_NotContains]]|abc)]]")]
+    [InlineData(ComparisonOperator.Equals, MatchMode.Single, "abc", "[[FilterEditor_PredicateSummary([[FilterLens_Property_TaskCategory]]|==|abc)]]")]
+    [InlineData(ComparisonOperator.NotEqual, MatchMode.Single, "abc", "[[FilterEditor_PredicateSummary([[FilterLens_Property_TaskCategory]]|!=|abc)]]")]
     public void PredicateSummary_RoutesLocalizedPartsAndKeepsExpressionTokens(
         ComparisonOperator comparisonOperator,
         MatchMode matchMode,
@@ -502,7 +523,7 @@ public sealed class FilterEditorLocalizerWiringTests : BunitContext
         var component = RenderPredicate(predicate, isEditing: false);
 
         Assert.Contains(expectedSummary, component.Markup);
-        Assert.DoesNotContain("[[FilterLens_Property_TaskCategory]]", component.Markup);
+        Assert.Contains("[[FilterLens_Property_TaskCategory]]", component.Markup);
     }
 
     [Fact]
@@ -521,7 +542,7 @@ public sealed class FilterEditorLocalizerWiringTests : BunitContext
 
         var component = RenderPredicate(predicate, isEditing: false);
 
-        Assert.Contains("[[FilterEditor_PredicateSummary(TaskCategory|?|abc)]]", component.Markup);
+        Assert.Contains("[[FilterEditor_PredicateSummary([[FilterLens_Property_TaskCategory]]|?|abc)]]", component.Markup);
         Assert.DoesNotContain("[[?]]", component.Markup);
     }
 

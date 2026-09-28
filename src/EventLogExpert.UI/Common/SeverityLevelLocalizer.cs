@@ -19,4 +19,7 @@ internal static class SeverityLevelLocalizer
         null => localizer["Severity_Unknown"],
         _ => throw new ArgumentOutOfRangeException(nameof(level), level, null)
     };
+
+    internal static string Label(IStringLocalizer<SharedResource> localizer, string? rawLevel) =>
+        LevelSeverity.FromLevelName(rawLevel) is { } level ? Label(localizer, level) : rawLevel ?? string.Empty;
 }

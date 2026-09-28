@@ -102,6 +102,27 @@ public sealed class EventFindMatcherTests
     }
 
     [Fact]
+    public void RowMatches_WhenCellTextProjectionSupplied_SearchesProjectedText()
+    {
+        Assert.True(EventFindMatcher.RowMatches(
+            s_event,
+            [ColumnName.Level],
+            TimeZoneInfo.Utc,
+            "Gegevens",
+            caseSensitive: false,
+            wholeWord: false,
+            static (_, column) => column == ColumnName.Level ? "Gegevens" : string.Empty));
+        Assert.False(EventFindMatcher.RowMatches(
+            s_event,
+            [ColumnName.Level],
+            TimeZoneInfo.Utc,
+            "Information",
+            caseSensitive: false,
+            wholeWord: false,
+            static (_, column) => column == ColumnName.Level ? "Gegevens" : string.Empty));
+    }
+
+    [Fact]
     public void RowMatches_WholeWord_MatchesBoundedEventIdAndHyphenSegment()
     {
         Assert.True(EventFindMatcher.RowMatches(s_event, s_allColumns, TimeZoneInfo.Utc, "4624", caseSensitive: false, wholeWord: true));

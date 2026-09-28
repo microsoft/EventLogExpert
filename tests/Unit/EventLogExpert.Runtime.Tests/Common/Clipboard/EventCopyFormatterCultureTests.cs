@@ -36,7 +36,7 @@ public sealed class EventCopyFormatterCultureTests
         string result = await FormatUnderContrastCultureAsync(EventCopyFormat.Markdown);
 
         Assert.StartsWith("|", result, StringComparison.Ordinal);
-        Assert.Contains("| Level | Source | Event ID | [[MarkdownDescriptionHeader]] |", result, StringComparison.Ordinal);
+        Assert.Contains("| [[Column_Level]] | [[Column_Source]] | [[Column_EventId]] | [[MarkdownDescriptionHeader]] |", result, StringComparison.Ordinal);
     }
 
     private static IEventCopyText CopyText() => new MarkerEventCopyText();
@@ -96,5 +96,7 @@ public sealed class EventCopyFormatterCultureTests
             EventCopyFullField.EventXmlHeader => "[[EventXmlHeader]]",
             _ => $"[[{field}({value})]]"
         };
+
+        public string MarkdownColumnHeader(ColumnName column) => $"[[Column_{column}]]";
     }
 }

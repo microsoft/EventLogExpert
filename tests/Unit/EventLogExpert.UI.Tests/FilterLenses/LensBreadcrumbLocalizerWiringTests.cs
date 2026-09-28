@@ -64,6 +64,21 @@ public sealed class LensBreadcrumbLocalizerWiringTests : BunitContext
     }
 
     [Fact]
+    public void LevelChip_RoutesValueThroughSeverityKey()
+    {
+        var summary = new FilterLensSummary(
+            FilterLensId.Create(),
+            new FilterLensLabel.PropertyComparison(EventProperty.Level, IsEqual: true, "Information"));
+        _source.Lenses.Returns(ImmutableList.Create(summary));
+
+        var cut = Render<LensBreadcrumb>();
+
+        Assert.Contains(
+            "[[FilterLens_Property_Level]] = [[Severity_Level_Information]]",
+            cut.Find(".lens-chip-label").TextContent);
+    }
+
+    [Fact]
     public void ResolutionStatusChip_RoutesClosedSetValueThroughItsOwnKey()
     {
         var summary = new FilterLensSummary(

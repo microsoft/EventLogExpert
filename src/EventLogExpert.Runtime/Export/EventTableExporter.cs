@@ -7,7 +7,7 @@ using System.Runtime.CompilerServices;
 
 namespace EventLogExpert.Runtime.Export;
 
-internal sealed class EventTableExporter(ITabularExportWriter writer) : IEventTableExporter
+internal sealed class EventTableExporter(ITabularExportWriter writer, IEventTableExportText exportText) : IEventTableExporter
 {
     private const string ExportDateTimeFormat = "yyyy-MM-dd HH:mm:ss";
 
@@ -29,12 +29,16 @@ internal sealed class EventTableExporter(ITabularExportWriter writer) : IEventTa
 
         for (int i = 0; i < columns.Count; i++)
         {
-            headers[i] = EventTableColumnFormatter.GetColumnHeader(columns[i], timeZone);
+            headers[i] = format == ExportFormat.Csv ?
+                exportText.ColumnHeader(columns[i], timeZone) :
+                EventTableColumnFormatter.GetColumnHeader(columns[i], timeZone);
         }
 
         if (includeDescription)
         {
-            headers[columns.Count] = EventTableColumnFormatter.DescriptionColumnHeader;
+            headers[columns.Count] = format == ExportFormat.Csv ?
+                exportText.DescriptionHeader :
+                EventTableColumnFormatter.DescriptionColumnHeader;
         }
 
         await writer.WriteAsync(

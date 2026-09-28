@@ -3,6 +3,8 @@
 
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.UI.Common;
 using Microsoft.Extensions.Localization;
 
 namespace EventLogExpert.UI.LogTable;
@@ -27,4 +29,6 @@ internal sealed class EventCopyText(IStringLocalizer<SharedResource> localizer) 
         EventCopyFullField.EventXmlHeader => localizer["Copy_Full_EventXmlHeader"],
         _ => throw new ArgumentOutOfRangeException(nameof(field), field, null)
     };
+
+    public string MarkdownColumnHeader(ColumnName column) => ColumnNameLocalizer.Label(localizer, column);
 }

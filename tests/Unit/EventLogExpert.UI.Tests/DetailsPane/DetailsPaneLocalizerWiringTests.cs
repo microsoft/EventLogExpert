@@ -63,6 +63,7 @@ public sealed class DetailsPaneLocalizerWiringTests : BunitContext
         Assert.Contains("[[Details_TabLabel]]", cut.Markup);
         Assert.Contains("[[Details_CopyEventButtonLabel]]", cut.Markup);
         Assert.Contains("[[Details_EventId(4624)]]", cut.Markup);
+        Assert.Contains("[[Severity_Level_Information]]", cut.Markup);
         Assert.Contains("[[Details_Property_Source]]", cut.Markup);
         Assert.Contains("[[Details_Placeholder_Empty]]", cut.Markup);
         Assert.Contains("[[Explain_LogonType]]", cut.Markup);

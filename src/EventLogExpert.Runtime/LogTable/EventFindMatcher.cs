@@ -38,7 +38,8 @@ public static class EventFindMatcher
         TimeZoneInfo timeZone,
         string query,
         bool caseSensitive,
-        bool wholeWord)
+        bool wholeWord,
+        Func<ResolvedEvent, ColumnName, string>? cellText = null)
     {
         if (string.IsNullOrEmpty(query)) { return false; }
 
@@ -46,7 +47,10 @@ public static class EventFindMatcher
 
         for (int i = 0; i < columns.Count; i++)
         {
-            if (IndexOfMatch(EventTableColumnFormatter.GetCellText(@event, columns[i], timeZone), query, 0, comparison, wholeWord) >= 0)
+            string text = cellText?.Invoke(@event, columns[i]) ??
+                EventTableColumnFormatter.GetCellText(@event, columns[i], timeZone);
+
+            if (IndexOfMatch(text, query, 0, comparison, wholeWord) >= 0)
             {
                 return true;
             }

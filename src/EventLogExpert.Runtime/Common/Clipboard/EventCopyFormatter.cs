@@ -187,7 +187,8 @@ internal sealed class EventCopyFormatter(
         StringBuilder builder = new();
 
         builder.Append("| ");
-        foreach (var column in columns) { builder.Append(EscapeMarkdownCell(column.ToFullString())).Append(" | "); }
+
+        foreach (var column in columns) { builder.Append(EscapeMarkdownCell(_copyText.MarkdownColumnHeader(column))).Append(" | "); }
 
         builder.Append(EscapeMarkdownCell(_copyText.MarkdownDescriptionHeader)).AppendLine(" |");
 

@@ -52,7 +52,7 @@
                         <span aria-hidden="true" class="level-icon @levelIcon"></span>
                     }
 
-                    @FindableCell((EventTableColumnFormatter.GetCellText(row.Lean, capturedColumn, _timeZoneSettings), isCurrentFindMatch))
+                    @FindableCell((CellDisplayText(row.Lean, capturedColumn), isCurrentFindMatch))
                 </td>
             }
 
@@ -106,7 +106,7 @@
                 @for (int columnIndex = 0; columnIndex < _enabledColumns.Length; columnIndex++)
                 {
                     var columnHeader = _enabledColumns[columnIndex];
-                    _headerName = columnHeader.ToFullString();
+                    _headerName = ColumnNameLocalizer.Label(Localizer, columnHeader);
                     var width = GetColumnWidth(columnHeader);
 
                     <th aria-colindex="@(columnIndex + 1)"

@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Export;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.LogTable;
@@ -79,6 +80,7 @@ public sealed class LogTableLocalizerWiringTests
         using var provider = services.BuildServiceProvider();
 
         Assert.IsType<EventCopyText>(provider.GetRequiredService<IEventCopyText>());
+        Assert.IsType<EventTableExportText>(provider.GetRequiredService<IEventTableExportText>());
         Assert.NotNull(provider.GetRequiredService<IEventCopyFormatter>());
     }
 
@@ -123,6 +125,29 @@ public sealed class LogTableLocalizerWiringTests
             Assert.DoesNotContain("{0}", value, StringComparison.Ordinal);
             Assert.Equal(value.TrimEnd(), value);
         }
+    }
+
+    [Fact]
+    public void EventCopyText_MarkdownColumnHeader_MapsColumnToLiteralKey()
+    {
+        EventCopyText text = new(_localizer);
+
+        Assert.Equal("[[Column_EventId]]", text.MarkdownColumnHeader(ColumnName.EventId));
+    }
+
+    [Fact]
+    public void EventTableExportText_ColumnHeader_LocalizesPlainAndDateWithZoneHeaders()
+    {
+        EventTableExportText text = new(_localizer);
+        TimeZoneInfo alternateZone = TimeZoneInfo.CreateCustomTimeZone(
+            "csv-marker-zone",
+            TimeSpan.FromHours(3),
+            "Marker Zone Standard Time",
+            "Marker Zone Standard Time");
+
+        Assert.Equal("[[Column_EventId]]", text.ColumnHeader(ColumnName.EventId, TimeZoneInfo.Local));
+        Assert.Equal("[[Column_DateAndTime]] Marker", text.ColumnHeader(ColumnName.DateAndTime, alternateZone));
+        Assert.Equal("[[Copy_Markdown_DescriptionHeader]]", text.DescriptionHeader);
     }
 
     [Theory]

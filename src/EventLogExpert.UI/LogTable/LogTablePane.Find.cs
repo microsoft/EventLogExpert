@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.LogTable.Find;
 using EventLogExpert.UI.LogTable.Grouping;
 using Microsoft.AspNetCore.Components;
@@ -86,6 +87,13 @@ public sealed partial class LogTablePane
         _findScanCts?.Dispose();
         _findScanCts = null;
         _findScanning = false;
+    }
+
+    private string CellDisplayText(ResolvedEvent @event, ColumnName column)
+    {
+        string text = EventTableColumnFormatter.GetCellText(@event, column, _timeZoneSettings);
+
+        return column == ColumnName.Level ? SeverityLevelLocalizer.Label(Localizer, text) : text;
     }
 
     private void ClearFindMatches()
@@ -428,7 +436,7 @@ public sealed partial class LogTablePane
 
                         foreach (DisplayRow row in slice)
                         {
-                            if (EventFindMatcher.RowMatches(row.Lean, columns, timeZone, query, caseSensitive, wholeWord))
+                            if (EventFindMatcher.RowMatches(row.Lean, columns, timeZone, query, caseSensitive, wholeWord, CellDisplayText))
                             {
                                 found.Add(row.Loc);
                                 foundTicks.Add(row.Lean.TimeCreated.Ticks);
