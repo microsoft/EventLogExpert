@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Export;
 using EventLogExpert.UI.Keyboard;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.LogTable.Find;
@@ -24,6 +25,7 @@ public static class UIServiceCollectionExtensions
             services.AddSingleton<IFindMarkerSource, FindMarkerSource>();
             services.AddSingleton<KeyboardShortcutService>();
             services.AddSingleton<IEventCopyText, EventCopyText>();
+            services.AddSingleton<IEventTableExportText, EventTableExportText>();
 
             services.TryAddSingleton<IMenuService, MenuService>();
             services.TryAddSingleton<IModalCoordinator, ModalCoordinator>();

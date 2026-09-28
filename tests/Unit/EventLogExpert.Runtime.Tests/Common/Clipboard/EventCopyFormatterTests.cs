@@ -179,6 +179,9 @@ public sealed class EventCopyFormatterTests
             TestContext.Current.CancellationToken);
 
         Assert.StartsWith("|", result);
+        Assert.Contains("[[Column_Level]]", result);
+        Assert.Contains("[[Column_Source]]", result);
+        Assert.Contains("[[Column_EventId]]", result);
         Assert.Contains("[[MarkdownDescriptionHeader]]", result);
         Assert.Contains("---", result);
         Assert.Contains("ProviderA", result);
@@ -292,5 +295,7 @@ public sealed class EventCopyFormatterTests
             EventCopyFullField.EventXmlHeader => "[[EventXmlHeader]]",
             _ => $"[[{field}({value})]]"
         };
+
+        public string MarkdownColumnHeader(ColumnName column) => $"[[Column_{column}]]";
     }
 }

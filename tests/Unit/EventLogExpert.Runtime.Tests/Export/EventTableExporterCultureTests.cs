@@ -83,7 +83,7 @@ public sealed class EventTableExporterCultureTests
             CultureInfo.CurrentCulture = culture;
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en"); // isolate the regional axis from the localization axis
 
-            EventTableExporter exporter = new(new TabularExportWriter());
+            EventTableExporter exporter = new(new TabularExportWriter(), new MarkerEventTableExportText());
             using MemoryStream stream = new();
 
             await exporter.ExportAsync(
@@ -96,5 +96,12 @@ public sealed class EventTableExporterCultureTests
             CultureInfo.CurrentCulture = priorCulture;
             CultureInfo.CurrentUICulture = priorUiCulture;
         }
+    }
+
+    private sealed class MarkerEventTableExportText : IEventTableExportText
+    {
+        public string DescriptionHeader => "[[DescriptionHeader]]";
+
+        public string ColumnHeader(ColumnName column, TimeZoneInfo timeZone) => $"[[Column_{column}]]";
     }
 }

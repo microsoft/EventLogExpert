@@ -118,6 +118,6 @@ public sealed class LocalizationMappingTests
             Assert.Equal($"[[Severity_Level_{level}]]", SeverityLevelLocalizer.Label(_localizer, level));
         }
 
-        Assert.Equal("[[Severity_Unknown]]", SeverityLevelLocalizer.Label(_localizer, null));
+        Assert.Equal("[[Severity_Unknown]]", SeverityLevelLocalizer.Label(_localizer, (SeverityLevel?)null));
     }
 }

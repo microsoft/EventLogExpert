@@ -40,6 +40,6 @@ public sealed class ResolutionCoverageLocalizerMappingTests
     [Fact]
     public void SeverityLevelLocalizer_RoutesNullLevelToUnknownKey()
     {
-        Assert.Equal("[[Severity_Unknown]]", SeverityLevelLocalizer.Label(_localizer, null));
+        Assert.Equal("[[Severity_Unknown]]", SeverityLevelLocalizer.Label(_localizer, (SeverityLevel?)null));
     }
 }

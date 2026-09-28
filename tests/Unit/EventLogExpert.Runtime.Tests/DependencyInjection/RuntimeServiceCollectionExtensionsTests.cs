@@ -23,6 +23,7 @@ using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DatabaseTools.Elevation;
 using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.Export;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
@@ -228,6 +229,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<IAlertDialogService>());
         services.AddSingleton(Substitute.For<IApplicationRestartService>());
         services.AddSingleton(Substitute.For<IEventCopyText>());
+        services.AddSingleton(Substitute.For<IEventTableExportText>());
         services.AddSingleton(Substitute.For<ISettingsPreferencesProvider>());
         services.AddSingleton(Substitute.For<IDatabasePreferencesProvider>());
         services.AddSingleton(Substitute.For<IProviderDatabaseMaintenance>());
@@ -379,6 +381,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<IAlertDialogService>());
         services.AddSingleton(Substitute.For<IApplicationRestartService>());
         services.AddSingleton(Substitute.For<IEventCopyText>());
+        services.AddSingleton(Substitute.For<IEventTableExportText>());
         services.AddSingleton(preferences ?? Substitute.For<ISettingsPreferencesProvider>());
         services.AddSingleton(Substitute.For<IDatabasePreferencesProvider>());
         services.AddSingleton(Substitute.For<IProviderDatabaseMaintenance>());

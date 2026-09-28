@@ -10,7 +10,6 @@ using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Clipboard;
-using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
@@ -487,11 +486,11 @@ public sealed partial class LogTablePane
 
         if (CellFilterBuilder.MapColumn(cellColumn) is not { } property) { return; }
 
-        string columnLabel = cellColumn.ToFullString();
+        string columnLabel = ColumnNameLocalizer.Label(Localizer, cellColumn);
 
         if (CellFilterBuilder.TryGetDisplayValue(@event, property, out var value))
         {
-            string shown = TruncateForMenu(value);
+            string shown = TruncateForMenu(property == EventProperty.Level ? SeverityLevelLocalizer.Label(Localizer, value) : value);
             bool isKeywords = property is EventProperty.Keywords;
 
             items.Add(MenuItem.Item(
@@ -670,7 +669,8 @@ public sealed partial class LogTablePane
             Localizer["Table_ColumnHeader_DateAndTimeWithZone", timeZone.DisplayName.Split(' ').First()].Value;
     }
 
-    private string GetGroupName() => Presentation.Ordering.GroupBy?.ToFullString() ?? string.Empty;
+    private string GetGroupName() =>
+        Presentation.Ordering.GroupBy is { } groupBy ? ColumnNameLocalizer.Label(Localizer, groupBy) : string.Empty;
 
     private string GetGroupValueText(EventGroup group)
     {
@@ -682,7 +682,9 @@ public sealed partial class LogTablePane
             ColumnDescriptors.GetGroupText(representative, groupBy, new ColumnFormatContext(_timeZoneSettings)) :
             string.Empty;
 
-        return string.IsNullOrEmpty(value) ? Localizer["LogTable_GroupValueNone"].Value : value;
+        if (string.IsNullOrEmpty(value)) { return Localizer["LogTable_GroupValueNone"].Value; }
+
+        return Presentation.Ordering.GroupBy == ColumnName.Level ? SeverityLevelLocalizer.Label(Localizer, value) : value;
     }
 
     private string? GetHighlight(DisplayRow row)
@@ -1399,7 +1401,7 @@ public sealed partial class LogTablePane
         {
             var capturedColumn = column;
             items.Add(MenuItem.Item(
-                column.ToFullString(),
+                ColumnNameLocalizer.Label(Localizer, column),
                 () => LogTableCommands.ToggleColumn(capturedColumn),
                 isChecked: isVisible));
         }
@@ -1411,7 +1413,7 @@ public sealed partial class LogTablePane
         {
             var capturedColumn = column;
             orderItems.Add(MenuItem.Item(
-                column.ToFullString(),
+                ColumnNameLocalizer.Label(Localizer, column),
                 () => LogTableCommands.SetOrderBy(capturedColumn),
                 isChecked: ordering.OrderBy.Equals(capturedColumn)));
         }
@@ -1430,7 +1432,7 @@ public sealed partial class LogTablePane
         {
             var capturedColumn = column;
             groupItems.Add(MenuItem.Item(
-                column.ToFullString(),
+                ColumnNameLocalizer.Label(Localizer, column),
                 () => { if (!ordering.GroupBy.Equals(capturedColumn)) { LogTableCommands.SetGroupBy(capturedColumn); } },
                 isChecked: ordering.GroupBy.Equals(capturedColumn)));
         }
@@ -1522,7 +1524,7 @@ public sealed partial class LogTablePane
             bool hasValue = CellFilterBuilder.TryGetDisplayValue(selectedEvent, property, out _);
 
             items.Add(MenuItem.Item(
-                property.ToFullString(),
+                FilterLensLabelFormatter.PropertyName(Localizer, property),
                 () => ApplySelectedFilter(selectedEvent, capturedProperty, exclude),
                 isEnabled: hasValue,
                 disabledReason: hasValue ? null : Localizer["LogTable_NoCellValue"].Value));

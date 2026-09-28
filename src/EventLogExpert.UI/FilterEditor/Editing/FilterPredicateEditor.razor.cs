@@ -72,16 +72,9 @@ public sealed partial class FilterPredicateEditor : ComponentBase
                 _ => "?"
             };
 
-            string valueLabel = cmp.MatchMode == MatchMode.Many ?
-                cmp.Values.Count switch
-                {
-                    0 => "?",
-                    1 => cmp.Values[0],
-                    var count => Localizer["FilterEditor_PredicateSummary_ValueCount_Many", count]
-                } :
-                string.IsNullOrEmpty(cmp.Value) ? "?" : cmp.Value;
+            string valueLabel = ValueLabel(cmp);
 
-            return Localizer["FilterEditor_PredicateSummary", cmp.Property.ToString(), opLabel, valueLabel];
+            return Localizer["FilterEditor_PredicateSummary", FilterLensLabelFormatter.PropertyName(Localizer, cmp.Property), opLabel, valueLabel];
         }
     }
 
@@ -116,4 +109,22 @@ public sealed partial class FilterPredicateEditor : ComponentBase
     private Task OnEditChip() => OnEdit.InvokeAsync();
 
     private Task OnRemoveChip() => OnRemove.InvokeAsync();
+
+    private string ValueLabel(FilterComparisonDraft comparison)
+    {
+        if (comparison.MatchMode == MatchMode.Many)
+        {
+            return comparison.Values.Count switch
+            {
+                0 => "?",
+                1 => ValueText(comparison, comparison.Values[0]),
+                var count => Localizer["FilterEditor_PredicateSummary_ValueCount_Many", count]
+            };
+        }
+
+        return string.IsNullOrEmpty(comparison.Value) ? "?" : ValueText(comparison, comparison.Value);
+    }
+
+    private string ValueText(FilterComparisonDraft comparison, string value) =>
+        comparison.Property == EventProperty.Level ? SeverityLevelLocalizer.Label(Localizer, value) : value;
 }

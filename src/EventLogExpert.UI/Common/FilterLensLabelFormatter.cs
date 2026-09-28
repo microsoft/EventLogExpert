@@ -49,8 +49,11 @@ internal static class FilterLensLabelFormatter
         _ => throw new ArgumentOutOfRangeException(nameof(property), property, null)
     };
 
-    // ResolutionStatus filter values are stored as frozen tokens; localize the closed set for display while leaving the
-    // token untouched. Any other property's value is raw user text and renders verbatim.
     private static string ValueText(IStringLocalizer<SharedResource> localizer, EventProperty property, string value) =>
-        property == EventProperty.ResolutionStatus ? ResolutionStatusLocalizer.DisplayToken(localizer, value) : value;
+        property switch
+        {
+            EventProperty.Level => SeverityLevelLocalizer.Label(localizer, value),
+            EventProperty.ResolutionStatus => ResolutionStatusLocalizer.DisplayToken(localizer, value),
+            _ => value
+        };
 }

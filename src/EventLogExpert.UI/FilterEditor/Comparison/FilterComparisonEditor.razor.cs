@@ -180,7 +180,11 @@ public sealed partial class FilterComparisonEditor : ComponentBase
     {
         if (string.IsNullOrEmpty(value)) { return Localizer["FilterEditor_EmptyValuePlaceholder"]; }
 
-        return Comparison.Property == EventProperty.ResolutionStatus ?
-            ResolutionStatusLocalizer.DisplayToken(Localizer, value) : value;
+        return Comparison.Property switch
+        {
+            EventProperty.Level => SeverityLevelLocalizer.Label(Localizer, value),
+            EventProperty.ResolutionStatus => ResolutionStatusLocalizer.DisplayToken(Localizer, value),
+            _ => value
+        };
     }
 }

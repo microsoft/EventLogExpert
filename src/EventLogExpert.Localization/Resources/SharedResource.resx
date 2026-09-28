@@ -5464,4 +5464,46 @@
     <value>(Uncategorized)</value>
     <comment>Display label for the empty-string category value (entries with no category).</comment>
   </data>
+  <data name="Column_RecordId" xml:space="preserve">
+    <value>Record ID</value>
+  </data>
+  <data name="Column_Level" xml:space="preserve">
+    <value>Level</value>
+  </data>
+  <data name="Column_DateAndTime" xml:space="preserve">
+    <value>Date and Time</value>
+  </data>
+  <data name="Column_ActivityId" xml:space="preserve">
+    <value>Activity ID</value>
+  </data>
+  <data name="Column_Log" xml:space="preserve">
+    <value>Log</value>
+  </data>
+  <data name="Column_ComputerName" xml:space="preserve">
+    <value>Computer Name</value>
+  </data>
+  <data name="Column_Source" xml:space="preserve">
+    <value>Source</value>
+  </data>
+  <data name="Column_EventId" xml:space="preserve">
+    <value>Event ID</value>
+  </data>
+  <data name="Column_TaskCategory" xml:space="preserve">
+    <value>Task Category</value>
+  </data>
+  <data name="Column_Keywords" xml:space="preserve">
+    <value>Keywords</value>
+  </data>
+  <data name="Column_ProcessId" xml:space="preserve">
+    <value>Process ID</value>
+  </data>
+  <data name="Column_ThreadId" xml:space="preserve">
+    <value>Thread ID</value>
+  </data>
+  <data name="Column_User" xml:space="preserve">
+    <value>User</value>
+  </data>
+  <data name="Column_Opcode" xml:space="preserve">
+    <value>Opcode</value>
+  </data>
 </root>

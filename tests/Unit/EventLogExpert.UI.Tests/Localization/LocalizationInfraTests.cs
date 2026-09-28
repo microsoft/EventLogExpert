@@ -51,6 +51,20 @@ namespace EventLogExpert.UI.Tests.Localization;
 public sealed class LocalizationInfraTests
 {
     [Fact]
+    public void ColumnDisplayValues_MirrorToFullString()
+    {
+        var neutralValues = ResxValues();
+
+        foreach (ColumnName column in Enum.GetValues<ColumnName>())
+        {
+            var key = $"Column_{column}";
+
+            Assert.True(neutralValues.TryGetValue(key, out var neutral), $"Missing neutral RESX value for {key}.");
+            Assert.Equal(column.ToFullString(), neutral);
+        }
+    }
+
+    [Fact]
     public void DatabaseToolsLocalizableTextArgCounts_MatchResxPlaceholderArity()
     {
         var constants = DatabaseToolsKeyConstants();
@@ -174,6 +188,7 @@ public sealed class LocalizationInfraTests
             ("Settings_Theme_", typeof(Theme)),
             ("Settings_CopyFormat_", typeof(EventCopyFormat)),
             ("Settings_LogLevel_", typeof(LogLevel)),
+            ("Column_", typeof(ColumnName)),
             ("Dashboard_Group_", typeof(ScenarioGroup)),
             ("Dashboard_Presence_", typeof(ChannelPresence)),
             ("Dashboard_Enablement_", typeof(ChannelEnablement)),
@@ -910,6 +925,16 @@ public sealed class LocalizationInfraTests
 
         Assert.Equal(expectedName, resolved.Name);
         Assert.Equal(expectedDir, ContentCulture.DirectionOf(resolved));
+    }
+
+    [Theory]
+    [InlineData("Information", "[[Severity_Level_Information]]")]
+    [InlineData("6", "6")]
+    [InlineData("", "")]
+    [InlineData(null, "")]
+    public void SeverityLevelLocalizer_RawLabel_LocalizesKnownLevelsAndPreservesUnknownRawValues(string? rawLevel, string expected)
+    {
+        Assert.Equal(expected, SeverityLevelLocalizer.Label(new MarkerLocalizer(), rawLevel));
     }
 
     [Fact]

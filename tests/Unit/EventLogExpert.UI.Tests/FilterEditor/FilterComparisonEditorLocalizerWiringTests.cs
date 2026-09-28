@@ -68,6 +68,26 @@ public sealed class FilterComparisonEditorLocalizerWiringTests : BunitContext
     }
 
     [Fact]
+    public void ManySelect_Level_LocalizesDisplay_ButKeepsStoredValuesAsTokens()
+    {
+        var draft = new FilterComparisonDraft
+        {
+            Property = EventProperty.Level,
+            Operator = ComparisonOperator.Equals,
+            MatchMode = MatchMode.Many,
+            Values = ["Information"]
+        };
+        _eventLogQueries.GetPropertyValues(EventProperty.Level)
+            .Returns(ImmutableArray.Create("Information", "6"));
+
+        var cut = RenderEditor(draft);
+
+        Assert.Contains("[[Severity_Level_Information]]", cut.Markup);
+        Assert.Contains("6", cut.Markup);
+        Assert.Equal(["Information"], draft.Values);
+    }
+
+    [Fact]
     public void ManySelect_LocalizesDisplay_ButKeepsStoredValuesAsTokens()
     {
         var draft = new FilterComparisonDraft
@@ -235,6 +255,27 @@ public sealed class FilterComparisonEditorLocalizerWiringTests : BunitContext
         var cut = RenderEditor(draft);
 
         Assert.Contains("[[FilterEditor_EmptyValuePlaceholder]]", cut.Markup);
+    }
+
+    [Fact]
+    public void SingleValueLevelEquality_StaysEditableRawText()
+    {
+        var draft = new FilterComparisonDraft
+        {
+            Property = EventProperty.Level,
+            Operator = ComparisonOperator.Equals,
+            MatchMode = MatchMode.Single,
+            Value = "6"
+        };
+        _eventLogQueries.GetPropertyValues(EventProperty.Level)
+            .Returns(ImmutableArray.Create("Information", "6"));
+
+        var cut = RenderEditor(draft);
+
+        var input = cut.Find("input.filter-value-dropdown");
+        Assert.False(input.HasAttribute("readonly"));
+        Assert.Equal("6", draft.Value);
+        Assert.DoesNotContain("[[Severity_Level_Information]]", cut.Markup);
     }
 
     private IRenderedComponent<FilterComparisonEditor> RenderEditor(FilterComparisonDraft draft) =>

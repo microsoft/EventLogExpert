@@ -12,6 +12,7 @@ using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.LogTable;
+using EventLogExpert.UI.LogTable.Find;
 using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
@@ -48,6 +49,7 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
         CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
         JSInterop.Mode = JSRuntimeMode.Loose;
         JSInterop.SetupModule("./_content/EventLogExpert.UI/LogTable/LogTablePane.razor.js");
+        JSInterop.SetupModule("./_content/EventLogExpert.UI/LogTable/Find/FindBar.razor.js");
 
         _columnDefaults.ColumnOrder.Returns(ImmutableList.Create(ColumnName.Source, ColumnName.DateAndTime));
         _selectedEvent.Current.Returns((SelectionEntry?)null);
@@ -85,6 +87,36 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
         Services.AddSingleton(_menuService);
         Services.AddSingleton(_viewSource);
         Services.AddFluxor(options => options.ScanAssemblies(typeof(LogTablePane).Assembly));
+    }
+
+    [Fact]
+    public void CellFilterMenu_RendersColumnAndLevelValueMarkers()
+    {
+        var @event = Event(1, "Alpha") with { Level = "Information" };
+        var cut = RenderTable(groupBy: null, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Level, [ColumnName.Level], @event);
+
+        OpenMenu(cut, "tbody tr.table-row td");
+
+        AssertMenuContains("[[CellFilter_IncludeWhereEquals([[Column_Level]]|[[Severity_Level_Information]])]]");
+        AssertMenuContains("[[CellFilter_ExcludeWhereEquals([[Column_Level]]|[[Severity_Level_Information]])]]");
+    }
+
+    [Fact]
+    public void ColumnDisplaySites_RenderColumnMarkers()
+    {
+        var cut = RenderTable(groupBy: null, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, [ColumnName.Source, ColumnName.Level], Event(1, "Alpha"));
+
+        Assert.Contains("[[Column_Source]]", cut.Find("th.source").TextContent);
+        Assert.Contains("[[Column_Level]]", cut.Find("th.level").TextContent);
+
+        OpenMenu(cut, "thead");
+
+        AssertMenuContains("[[Column_Source]]");
+        AssertMenuContains("[[Column_Level]]");
+        AssertMenuContains("[[Column_Source]]", ChildrenOf("[[LogTable_OrderBy]]"));
+        AssertMenuContains("[[Column_Level]]", ChildrenOf("[[LogTable_OrderBy]]"));
+        AssertMenuContains("[[Column_Source]]", ChildrenOf("[[LogTable_GroupBy]]"));
+        AssertMenuContains("[[Column_Level]]", ChildrenOf("[[LogTable_GroupBy]]"));
     }
 
     [Fact]
@@ -135,6 +167,43 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void EventFieldIncludeExcludeMenu_RendersPropertyMarkers()
+    {
+        var @event = Event(1, "Alpha");
+        var cut = RenderTable(groupBy: null, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, @event);
+        _selectedEvent.Current.Returns(Focus(@event, 0));
+
+        OpenMenu(cut, "tbody");
+
+        var moreFields = ChildrenOf("[[LogTable_MoreFields]]");
+        var include = moreFields.Single(item => item.Label == "[[LogTable_Include]]").Children!;
+        var exclude = moreFields.Single(item => item.Label == "[[LogTable_Exclude]]").Children!;
+
+        AssertMenuContains("[[FilterLens_Property_Level]]", include);
+        AssertMenuContains("[[FilterLens_Property_TaskCategory]]", include);
+        AssertMenuContains("[[FilterLens_Property_Level]]", exclude);
+        AssertMenuContains("[[FilterLens_Property_TaskCategory]]", exclude);
+    }
+
+    [Fact]
+    public void Find_MatchesAndHighlightsLocalizedLevelDisplayText()
+    {
+        var @event = Event(1, "Alpha") with { Level = "Information" };
+        var cut = RenderTable(groupBy: null, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Level, [ColumnName.Level], @event);
+
+        OpenFind(cut);
+        cut.Find(".find-input").Input("[[Severity_Level_Information]]");
+
+        cut.WaitForAssertion(() =>
+        {
+            var rows = cut.FindAll("tr[data-find]");
+            Assert.Single(rows);
+            Assert.Equal("current", rows[0].GetAttribute("data-find"));
+            Assert.Equal("[[Severity_Level_Information]]", cut.Find("mark.find-mark").TextContent);
+        }, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public void GroupContextMenu_RoutesEveryGroupActionThroughMarkerLocalizer()
     {
         var expanded = RenderTable(ColumnName.Source, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, Event(1, "Alpha"));
@@ -158,6 +227,27 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
         var cut = RenderTable(ColumnName.Source, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, Event(1, string.Empty));
 
         Assert.Contains("[[LogTable_GroupValueNone]]", cut.Find("tr.group-header-row").TextContent);
+    }
+
+    [Fact]
+    public void GroupHeader_WhenGroupedByLevel_RendersColumnAndSeverityMarkers()
+    {
+        var @event = Event(1, "Alpha") with { Level = "Information" };
+        var cut = RenderTable(ColumnName.Level, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Level, [ColumnName.Level], @event);
+
+        string header = cut.Find("tr.group-header-row").TextContent;
+
+        Assert.Contains("[[Column_Level]]", header);
+        Assert.Contains("[[Severity_Level_Information]]", header);
+    }
+
+    [Fact]
+    public void LevelCell_RendersSeverityMarker()
+    {
+        var @event = Event(1, "Alpha") with { Level = "Information" };
+        var cut = RenderTable(groupBy: null, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Level, [ColumnName.Level], @event);
+
+        Assert.Contains("[[Severity_Level_Information]]", cut.Find("tbody tr.table-row td").TextContent);
     }
 
     [Fact]
@@ -199,6 +289,13 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
         return new SelectionEntry(handle, handle, reloadKey);
     }
 
+    private void OpenFind(IRenderedComponent<LogTablePane> cut)
+    {
+        var coordinator = Services.GetRequiredService<IFindCoordinator>();
+        cut.InvokeAsync(() => coordinator.RequestOpen());
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".find-input")));
+    }
+
     private void OpenMenu(IRenderedComponent<LogTablePane> cut, string selector)
     {
         _capturedMenu = null;
@@ -210,8 +307,17 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
         ColumnName? groupBy,
         ImmutableHashSet<string> collapsed,
         ColumnName? orderBy,
+        params ResolvedEvent[] events) =>
+        RenderTable(groupBy, collapsed, orderBy, [ColumnName.Source, ColumnName.DateAndTime], events);
+
+    private IRenderedComponent<LogTablePane> RenderTable(
+        ColumnName? groupBy,
+        ImmutableHashSet<string> collapsed,
+        ColumnName? orderBy,
+        ImmutableList<ColumnName> columns,
         params ResolvedEvent[] events)
     {
+        _columnDefaults.ColumnOrder.Returns(columns);
         _presentation = DisplayViewTestFactory.Presentation(
             _logId,
             events,
@@ -225,10 +331,8 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
         {
             ActiveEventLogId = _logId,
             EventTables = ImmutableList.Create(new LogView(_logId) { LogName = LogName }),
-            Columns = ImmutableDictionary<ColumnName, bool>.Empty
-                .Add(ColumnName.Source, true)
-                .Add(ColumnName.DateAndTime, true),
-            ColumnOrder = ImmutableList.Create(ColumnName.Source, ColumnName.DateAndTime),
+            Columns = columns.ToImmutableDictionary(column => column, _ => true),
+            ColumnOrder = columns,
             OrderBy = orderBy,
             GroupBy = groupBy,
             GroupCollapseOverrides = collapsed
