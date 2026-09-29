@@ -13,7 +13,8 @@ public sealed class LocalizingLogProgress(INeutralTextResolver resolver, IProgre
 
         if (value.MessageKey is { Length: > 0 } key && string.IsNullOrEmpty(value.Message))
         {
-            inner.Report(value with { Message = resolver.Resolve(key, value.MessageArgs ?? []) });
+            inner.Report(value with { Message = resolver.Resolve(key, value.MessageArgs ?? [], value.MessagePluralCount) });
+
             return;
         }
 

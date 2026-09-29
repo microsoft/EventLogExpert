@@ -144,7 +144,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         {
             _pendingEntries.Add(entry with
             {
-                Message = LocalizableTextResolver.Resolve(Localizer, entry.MessageKey, entry.MessageArgs, entry.Message)
+                Message = LocalizableTextResolver.Resolve(Localizer, entry.MessageKey, entry.MessageArgs, entry.Message, entry.MessagePluralCount)
             });
             needsSchedule = !_flushScheduled;
 

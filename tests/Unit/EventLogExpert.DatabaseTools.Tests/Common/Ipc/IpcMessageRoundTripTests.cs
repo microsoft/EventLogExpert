@@ -37,6 +37,12 @@ public sealed class IpcMessageRoundTripTests
     }
 
     [Fact]
+    public void HelloMessage_CurrentProtocolVersion_IsPinnedToFive()
+    {
+        Assert.Equal(5, HelloMessage.CurrentProtocolVersion);
+    }
+
+    [Fact]
     public void HelloMessage_RoundTrips_PreservesPidAndProtocolVersion()
     {
         var original = new HelloMessage(HelperProcessId: 12345, ProtocolVersion: HelloMessage.CurrentProtocolVersion);
@@ -46,7 +52,7 @@ public sealed class IpcMessageRoundTripTests
         AssertDiscriminator(json, "hello");
         var hello = Assert.IsType<HelloMessage>(roundTripped);
         Assert.Equal(12345, hello.HelperProcessId);
-        Assert.Equal(4, hello.ProtocolVersion);
+        Assert.Equal(HelloMessage.CurrentProtocolVersion, hello.ProtocolVersion);
     }
 
     [Fact]
@@ -106,6 +112,28 @@ public sealed class IpcMessageRoundTripTests
         Assert.Equal("System.Exception: boom", log.DebugDetail);
         Assert.Equal(LogAudience.Diagnostic, log.Audience);
         Assert.DoesNotContain("ElevatedHelper", json);
+    }
+
+    [Fact]
+    public void LogMessage_RoundTrips_PreservesMessagePluralCount()
+    {
+        var original = new LogMessage(
+            DateTime.UtcNow,
+            LogLevel.Information,
+            string.Empty,
+            "db",
+            ProcessOrigin.ElevatedHelper,
+            "DatabaseTools_Op_CreateSkippedProviders",
+            ["provider.db"],
+            MessagePluralCount: 3);
+
+        var roundTripped = SerializeDeserialize(original, out var json);
+
+        AssertDiscriminator(json, "log");
+        var log = Assert.IsType<LogMessage>(roundTripped);
+        Assert.Equal(3L, log.MessagePluralCount);
+        Assert.Equal("DatabaseTools_Op_CreateSkippedProviders", log.MessageKey);
+        Assert.Equal(["provider.db"], log.MessageArgs);
     }
 
     [Fact]
@@ -213,6 +241,7 @@ public sealed class IpcMessageRoundTripTests
             SummaryIsDiagnostic = true,
             SummaryKey = "DatabaseTools_Op_TestSummary",
             SummaryArgs = ["alpha", "beta"],
+            SummaryPluralCount = 7,
             DiagnosticDetail = "System.Exception: boom"
         };
 
@@ -222,6 +251,7 @@ public sealed class IpcMessageRoundTripTests
         Assert.True(result.SummaryIsDiagnostic);
         Assert.Equal("DatabaseTools_Op_TestSummary", result.SummaryKey);
         Assert.Equal(["alpha", "beta"], result.SummaryArgs);
+        Assert.Equal(7L, result.SummaryPluralCount);
         Assert.Equal("System.Exception: boom", result.DiagnosticDetail);
     }
 

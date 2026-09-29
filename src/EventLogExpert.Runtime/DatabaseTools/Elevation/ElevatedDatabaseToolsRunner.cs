@@ -451,7 +451,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
 
     private string ResolveSummary(ResultMessage result) =>
         result.SummaryKey is { Length: > 0 } summaryKey ?
-            _neutralTextResolver.Resolve(summaryKey, result.SummaryArgs ?? []) :
+            _neutralTextResolver.Resolve(summaryKey, result.SummaryArgs ?? [], result.SummaryPluralCount) :
             string.Empty;
 
     private async Task<DatabaseToolsResult> RunAsync(
@@ -614,7 +614,8 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
                                     log.MessageKey,
                                     log.MessageArgs ?? [],
                                     log.DebugDetail,
-                                    log.Audience));
+                                    log.Audience,
+                                    log.MessagePluralCount));
 
                             break;
 
@@ -819,7 +820,7 @@ internal sealed class ElevatedDatabaseToolsRunner : IElevatedDatabaseToolsRunner
             var helperDuration = TimeSpan.FromMilliseconds(result.DurationMs);
 
             LocalizableText? resultSummary = result.SummaryKey is { Length: > 0 } summaryKey ?
-                new LocalizableText(summaryKey, result.SummaryArgs ?? []) :
+                new LocalizableText(summaryKey, result.SummaryArgs ?? [], result.SummaryPluralCount) :
                 null;
 
             return new DatabaseToolsResult(result.Outcome, resultSummary, helperDuration)
