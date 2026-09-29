@@ -166,11 +166,7 @@ public sealed class DatabaseRecoveryHost : IDisposable
         return _errorBannerService.ReportError(
             new Preformatted(
                 _localizer["Banner_Recovery_Needed_Title"],
-                LocalizedCount.OneOrManyRaw(
-                    _localizer,
-                    count,
-                    "Banner_Recovery_Needed_One",
-                    "Banner_Recovery_Needed_Many"),
+                PluralText.Format(_localizer, "Banner_Recovery_Needed", ("count", count)),
                 _localizer["Banner_Recovery_Resolve"]),
             OpenRecoveryDialogAsync);
     }

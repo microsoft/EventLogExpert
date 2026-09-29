@@ -140,16 +140,11 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         IStringLocalizer<SharedResource> localizer,
         int upgradeCount,
         int databaseCount) =>
-        LocalizedCount.OneOrManyRaw(
+        PluralText.Format(
             localizer,
-            upgradeCount,
-            databaseCount,
-            "Db_Manage_RemoveConfirm_Accept_OneOne",
-            "Db_Manage_RemoveConfirm_Accept_OneMany",
-            "Db_Manage_RemoveConfirm_Accept_ManyOne",
-            "Db_Manage_RemoveConfirm_Accept_ManyMany",
-            upgradeCount,
-            databaseCount);
+            "Db_Manage_RemoveConfirm_Accept",
+            ("upgradeCount", upgradeCount),
+            ("databaseCount", databaseCount));
 
     internal async Task<bool> ApplyPendingTogglesAsync()
     {
@@ -271,10 +266,11 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         if (result.Cancelled.Count > 0 && result.Failed.Count == 0)
         {
             AnnouncementService.Announce(
-                Localizer[
-                    result.Succeeded.Count == 1 ? "Db_Manage_Upgrade_Cancelled_One" : "Db_Manage_Upgrade_Cancelled_Many",
-                    result.Succeeded.Count,
-                    result.Cancelled.Count]);
+                PluralText.Format(
+                    Localizer,
+                    "Db_Manage_Upgrade_Cancelled",
+                    ("count", result.Succeeded.Count),
+                    ("cancelled", result.Cancelled.Count)));
 
             return;
         }
@@ -298,11 +294,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         }
 
         AnnouncementService.Announce(
-            LocalizedCount.OneOrManyRaw(
-                Localizer,
-                result.Succeeded.Count,
-                "Db_Manage_Upgrade_Success_One",
-                "Db_Manage_Upgrade_Success_Many"));
+            PluralText.Format(Localizer, "Db_Manage_Upgrade_Success", ("count", result.Succeeded.Count)));
     }
 
     private string AppendCloseReopenWarningIfNeeded(string baseMessage, IReadOnlyList<string> fileNames)
@@ -316,11 +308,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         if (!anyRemovalAffectsActiveLog) { return baseMessage; }
 
-        string warning = LocalizedCount.OneOrManyRaw(
-            Localizer,
-            fileNames.Count,
-            "Db_Manage_Remove_CloseReopenWarning_One",
-            "Db_Manage_Remove_CloseReopenWarning_Many");
+        string warning = PluralText.Format(Localizer, "Db_Manage_Remove_CloseReopenWarning", ("count", fileNames.Count));
 
         return $"{baseMessage} {warning}";
     }
@@ -350,7 +338,11 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     {
         string namesSummary = BuildNamesSummary(fileNames);
 
-        return Localizer["Db_Manage_Remove_BulkPlain", fileNames.Count, namesSummary];
+        return PluralText.Format(
+            Localizer,
+            "Db_Manage_Remove_BulkPlain",
+            ("count", fileNames.Count),
+            ("names", namesSummary));
     }
 
     private string BuildCancelThenRemoveMessage(IReadOnlyList<string> fileNames, IReadOnlyList<string> upgradingFiles)
@@ -359,13 +351,12 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         string fileNamesSummary = BuildNamesSummary(fileNames);
         int batchCount = CountUpgradeBatchesForPrompt(upgradingFiles);
 
-        string baseMessage = LocalizedCount.OneOrManyRaw(
+        string baseMessage = PluralText.Format(
             Localizer,
-            batchCount,
-            "Db_Manage_Remove_CancelThenRemove_One",
-            "Db_Manage_Remove_CancelThenRemove_Many",
-            upgradingNamesSummary,
-            fileNamesSummary);
+            "Db_Manage_Remove_CancelThenRemove",
+            ("batchCount", batchCount),
+            ("upgradingNames", upgradingNamesSummary),
+            ("fileNames", fileNamesSummary));
 
         return AppendCloseReopenWarningIfNeeded(baseMessage, fileNames);
     }
@@ -516,11 +507,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         bool requiresCancelFirst = IsAnyFileUpgrading(validFileNames, out var upgradingFiles);
 
-        string title = LocalizedCount.OneOrManyRaw(
-            Localizer,
-            validFileNames.Count,
-            "Db_Manage_Remove_Title_One",
-            "Db_Manage_Remove_Title_Many");
+        string title = PluralText.Format(Localizer, "Db_Manage_Remove_Title", ("count", validFileNames.Count));
 
         string acceptLabel = requiresCancelFirst ?
             SelectRemoveConfirmAcceptLabel(Localizer, upgradingFiles.Count, validFileNames.Count) :
@@ -947,13 +934,13 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         if (AlertSurface is null) { return true; }
 
         var sb = new StringBuilder();
-        sb.AppendLine(Localizer["Db_Manage_SubsetConfirm_Intro", eligible.Count, eligible.Count + skipped.Count]);
-        sb.AppendLine();
-        sb.Append(LocalizedCount.OneOrManyRaw(
+        sb.AppendLine(PluralText.Format(
             Localizer,
-            skipped.Count,
-            "Db_Manage_SubsetConfirm_SkipHeader_One",
-            "Db_Manage_SubsetConfirm_SkipHeader_Many"));
+            "Db_Manage_SubsetConfirm_Intro",
+            ("eligible", eligible.Count),
+            ("total", eligible.Count + skipped.Count)));
+        sb.AppendLine();
+        sb.Append(PluralText.Format(Localizer, "Db_Manage_SubsetConfirm_SkipHeader", ("count", skipped.Count)));
 
         foreach (var (fileName, reason) in skipped)
         {
@@ -1069,25 +1056,19 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         if (succeeded.Count > 0)
         {
             AnnouncementService.Announce(
-                LocalizedCount.OneOrManyRaw(
-                    Localizer,
-                    succeeded.Count,
-                    "Db_Manage_Announcement_Removed_One",
-                    "Db_Manage_Announcement_Removed_Many"));
+                PluralText.Format(Localizer, "Db_Manage_Announcement_Removed", ("count", succeeded.Count)));
         }
 
         if (failed.Count > 0)
         {
             var (firstFailedFile, firstFailedReason) = failed[0];
             AnnouncementService.Announce(
-                LocalizedCount.OneOrManyRaw(
+                PluralText.Format(
                     Localizer,
-                    failed.Count,
-                    "Db_Manage_Announcement_RemoveFailed_One",
-                    "Db_Manage_Announcement_RemoveFailed_Many",
-                    failed.Count,
-                    firstFailedFile,
-                    firstFailedReason));
+                    "Db_Manage_Announcement_RemoveFailed",
+                    ("count", failed.Count),
+                    ("fileName", firstFailedFile),
+                    ("reason", firstFailedReason)));
         }
 
         var remainingEntries = DatabaseService.Entries.ToList();
@@ -1225,11 +1206,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         int count = _selectedForBulk.Count;
         _selectionAnnouncement = count == 0 ?
             Localizer["Db_Manage_SelectionCleared"] :
-            LocalizedCount.OneOrManyRaw(
-                Localizer,
-                count,
-                "Db_Manage_Selection_One",
-                "Db_Manage_Selection_Many");
+            PluralText.Format(Localizer, "Db_Manage_Selection", ("count", count));
     }
 
     private async Task UpgradeEntry(string fileName)

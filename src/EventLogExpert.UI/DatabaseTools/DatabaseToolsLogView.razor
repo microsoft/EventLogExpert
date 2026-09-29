@@ -8,7 +8,7 @@
         }
 
         <span class="entry-count vcenter-text">
-            @LocalizedCount.OneOrManyRaw(Localizer, Entries.Count, "DatabaseTools_Log_EntryCount_One", "DatabaseTools_Log_EntryCount_Many")
+            @PluralText.Format(Localizer, "DatabaseTools_Log_EntryCount", ("count", Entries.Count))
         </span>
 
         <span aria-atomic="true" aria-live="@OutcomeChipAriaLive" role="@OutcomeChipRole">

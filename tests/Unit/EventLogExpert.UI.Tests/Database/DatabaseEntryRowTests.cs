@@ -188,7 +188,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         var component = RenderRow(entry);
 
-        Assert.Equal("[[Db_Entry_MixedOs_Count(9)]]", component.Find(".db-entry-osstamp").TextContent.Trim());
+        Assert.Equal("[[Db_Entry_MixedOs_Count]]", component.Find(".db-entry-osstamp").TextContent.Trim());
     }
 
     [Fact]
@@ -205,7 +205,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         var component = RenderRow(entry);
 
-        Assert.Equal("[[Db_Entry_MixedOs_Count(2)]]", component.Find(".db-entry-osstamp").TextContent.Trim());
+        Assert.Equal("[[Db_Entry_MixedOs_Count]]", component.Find(".db-entry-osstamp").TextContent.Trim());
     }
 
     [Fact]
@@ -636,7 +636,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var statusSpan = component.Find(".db-entry-upgrading-status");
         var liveText = statusSpan.QuerySelector(".visually-hidden");
         Assert.NotNull(liveText);
-        Assert.Equal("[[Banner_Upgrade_Preparing_Many(2)]]", liveText!.TextContent);
+        Assert.Equal("[[Banner_Upgrade_Preparing]]", liveText!.TextContent);
     }
 
     [Fact]
@@ -650,7 +650,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry, upgradeProgress: progress);
 
         var text = component.Find(".db-entry-upgrading-text");
-        Assert.Equal("[[Banner_Upgrade_Preparing_Many(3)]]", text.TextContent);
+        Assert.Equal("[[Banner_Upgrade_Preparing]]", text.TextContent);
     }
 
     [Fact]
@@ -662,7 +662,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry, upgradeProgress: progress);
 
         var text = component.Find(".db-entry-upgrading-text");
-        Assert.Equal("[[Banner_Upgrade_Preparing_One(1)]]", text.TextContent);
+        Assert.Equal("[[Banner_Upgrade_Preparing]]", text.TextContent);
         Assert.DoesNotContain("Many", text.TextContent);
     }
 

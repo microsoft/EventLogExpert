@@ -161,8 +161,8 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
 
         var cut = RenderActive();
 
-        cut.WaitForAssertion(() => Assert.Contains(Localized("Correlation_ErrorMany", 2), cut.Markup));
-        Assert.Contains(Localized("Correlation_WarningOne", 1), cut.Markup);
+        cut.WaitForAssertion(() => Assert.Contains("2 errors", cut.Markup));
+        Assert.Contains("1 warning", cut.Markup);
     }
 
     [Fact]

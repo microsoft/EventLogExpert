@@ -115,7 +115,7 @@
     {
         <div aria-label="@Localizer["Db_Manage_PendingChangesAria"]" class="manage-databases-save-strip" role="group">
             <span class="manage-databases-pending-count">
-                @LocalizedCount.OneOrManyRaw(Localizer, _pendingToggles.Count, "Db_Manage_PendingChange_One", "Db_Manage_PendingChange_Many")
+                @PluralText.Format(Localizer, "Db_Manage_PendingChange", ("count", _pendingToggles.Count))
             </span>
             <Button OnClick="DiscardPending">
                 @Localizer["Db_Manage_Discard"]

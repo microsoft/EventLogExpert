@@ -270,11 +270,14 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
             return Localizer["Dashboard_Launch_NoneOpened", scenario.Name];
         }
 
-        return result.Failed > 0 ?
-            Localizer["Dashboard_Launch_OpenedWithUnavailable",
-                scenario.Name,
-                LocalizedCount.OneOrMany(Localizer, result.Failed, "Dashboard_Channel_One", "Dashboard_Channel_Many")] :
-            Localizer["Dashboard_Launch_Opened", scenario.Name];
+        if (result.Failed > 0)
+        {
+            string unavailableChannels = PluralText.Format(Localizer, "Dashboard_Channel", ("count", result.Failed));
+
+            return Localizer["Dashboard_Launch_OpenedWithUnavailable", scenario.Name, unavailableChannels];
+        }
+
+        return Localizer["Dashboard_Launch_Opened", scenario.Name];
     }
 
     private string DescribeLaunchOutcome(ChannelOutcome outcome) => outcome.Outcome switch
@@ -322,9 +325,9 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
             .OrderBy(scenario => scenario.Priority)
             .ThenBy(scenario => scenario.Order);
 
-    private string FolderFilesWord(int count) => LocalizedCount.OneOrMany(Localizer, count, "Dashboard_File_One", "Dashboard_File_Many");
+    private string FolderFilesWord(int count) => PluralText.Format(Localizer, "Dashboard_File", ("count", count));
 
-    private string FolderLogsWord(int count) => LocalizedCount.OneOrMany(Localizer, count, "Dashboard_Log_One", "Dashboard_Log_Many");
+    private string FolderLogsWord(int count) => PluralText.Format(Localizer, "Dashboard_Log", ("count", count));
 
     private string FolderMissingNote(ImmutableArray<string> missing) =>
         missing.IsDefaultOrEmpty ? string.Empty : Localizer["Dashboard_MissingNote", string.Join(", ", missing)].Value;

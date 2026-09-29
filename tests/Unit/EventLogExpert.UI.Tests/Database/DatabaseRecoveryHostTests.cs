@@ -103,7 +103,7 @@ public sealed class DatabaseRecoveryHostTests
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         _errorBannerService.Received(1).ReportError(
-            Arg.Is<BannerMessage>(message => IsRecoveryContent(message, 2)),
+            Arg.Is<BannerMessage>(message => IsRecoveryContent(message)),
             Arg.Any<Func<Task>?>());
     }
 
@@ -117,7 +117,7 @@ public sealed class DatabaseRecoveryHostTests
 
         // Assert
         _errorBannerService.Received(1).ReportError(
-            Arg.Is<BannerMessage>(message => IsRecoveryContent(message, 1)),
+            Arg.Is<BannerMessage>(message => IsRecoveryContent(message)),
             Arg.Any<Func<Task>?>());
     }
 
@@ -278,8 +278,8 @@ public sealed class DatabaseRecoveryHostTests
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         _errorBannerService.Received(1).DismissError(initialId);
-        _errorBannerService.Received(1).ReportError(
-            Arg.Is<BannerMessage>(message => IsRecoveryContent(message, 2)),
+        _errorBannerService.Received(2).ReportError(
+            Arg.Is<BannerMessage>(message => IsRecoveryContent(message)),
             Arg.Any<Func<Task>?>());
     }
 
@@ -316,8 +316,8 @@ public sealed class DatabaseRecoveryHostTests
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         _errorBannerService.Received(1).DismissError(initialId);
-        _errorBannerService.Received(1).ReportError(
-            Arg.Is<BannerMessage>(message => IsRecoveryContent(message, 1)),
+        _errorBannerService.Received(2).ReportError(
+            Arg.Is<BannerMessage>(message => IsRecoveryContent(message)),
             Arg.Any<Func<Task>?>());
     }
 
@@ -330,7 +330,7 @@ public sealed class DatabaseRecoveryHostTests
         using var host = CreateHost();
 
         _errorBannerService.Received(1).ReportError(
-            Arg.Is<BannerMessage>(message => IsRecoveryContent(message, 2)),
+            Arg.Is<BannerMessage>(message => IsRecoveryContent(message)),
             Arg.Any<Func<Task>?>());
     }
 
@@ -342,7 +342,7 @@ public sealed class DatabaseRecoveryHostTests
         using var host = CreateHost();
 
         _errorBannerService.Received(1).ReportError(
-            Arg.Is<BannerMessage>(message => IsRecoveryContent(message, 1)),
+            Arg.Is<BannerMessage>(message => IsRecoveryContent(message)),
             Arg.Any<Func<Task>?>());
     }
 
@@ -417,12 +417,10 @@ public sealed class DatabaseRecoveryHostTests
             DatabaseStatus.UpgradeRequired,
             backupExists);
 
-    private static bool IsRecoveryContent(BannerMessage? message, int count) =>
+    private static bool IsRecoveryContent(BannerMessage? message) =>
         message is Preformatted preformatted &&
         preformatted.Title == "[[Banner_Recovery_Needed_Title]]" &&
-        preformatted.Message == (count == 1
-            ? "[[Banner_Recovery_Needed_One(1)]]"
-            : $"[[Banner_Recovery_Needed_Many({count})]]") &&
+        preformatted.Message == "[[Banner_Recovery_Needed]]" &&
         preformatted.ActionLabel == "[[Banner_Recovery_Resolve]]";
 
     private DatabaseRecoveryHost CreateHost() =>
@@ -435,4 +433,3 @@ public sealed class DatabaseRecoveryHostTests
             _mainThreadService,
             _localizer);
 }
-

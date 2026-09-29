@@ -54,10 +54,7 @@
                             (hasPosition ?
                                 Localizer["Db_Entry_PhaseProgress", verb, progress.CurrentBatchPosition, progress.CurrentBatchSize] :
                                 verb) :
-                            Localizer[progress.CurrentBatchSize == 1 ?
-                                    "Banner_Upgrade_Preparing_One" :
-                                    "Banner_Upgrade_Preparing_Many",
-                                progress.CurrentBatchSize];
+                            PluralText.Format(Localizer, "Banner_Upgrade_Preparing", ("count", progress.CurrentBatchSize));
 
                         var statusAriaLabel = hasFile ? Localizer["Db_Entry_ProgressAria", displayText, Entry.FileName] : displayText;
 

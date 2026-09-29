@@ -63,8 +63,8 @@ public sealed class DatabaseToolsLocalizerWiringTests : BunitContext
     }
 
     [Theory]
-    [InlineData(0, "[[DatabaseTools_Log_EntryCount_Many(0)]]")]
-    [InlineData(1, "[[DatabaseTools_Log_EntryCount_One(1)]]")]
+    [InlineData(0, "[[DatabaseTools_Log_EntryCount]]")]
+    [InlineData(1, "[[DatabaseTools_Log_EntryCount]]")]
     public void LogView_RoutesEntryCountActionsAndOutcomeThroughLocalizer(int entryCount, string expectedCount)
     {
         ImmutableList<LogRecord> entries = Enumerable.Range(0, entryCount)
@@ -82,10 +82,10 @@ public sealed class DatabaseToolsLocalizerWiringTests : BunitContext
     }
 
     [Theory]
-    [InlineData(1, 1, "[[Db_Manage_RemoveConfirm_Accept_OneOne(1|1)]]")]
-    [InlineData(1, 2, "[[Db_Manage_RemoveConfirm_Accept_OneMany(1|2)]]")]
-    [InlineData(2, 1, "[[Db_Manage_RemoveConfirm_Accept_ManyOne(2|1)]]")]
-    [InlineData(2, 2, "[[Db_Manage_RemoveConfirm_Accept_ManyMany(2|2)]]")]
+    [InlineData(1, 1, "[[Db_Manage_RemoveConfirm_Accept]]")]
+    [InlineData(1, 2, "[[Db_Manage_RemoveConfirm_Accept]]")]
+    [InlineData(2, 1, "[[Db_Manage_RemoveConfirm_Accept]]")]
+    [InlineData(2, 2, "[[Db_Manage_RemoveConfirm_Accept]]")]
     public void RemoveConfirmAcceptLabel_SelectsVariantForUpgradeAndDatabaseCounts(
         int upgradeCount,
         int databaseCount,

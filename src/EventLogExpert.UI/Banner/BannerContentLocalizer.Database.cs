@@ -4,6 +4,7 @@
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Database;
 using Microsoft.Extensions.Localization;
 
@@ -44,8 +45,7 @@ internal static partial class BannerContentLocalizer
             return new BannerContentText(
                 localizer["Banner_Db_Import_Success_Title"],
                 content.Imported == 0 ? localizer["Banner_Db_Import_None"] :
-                content.Imported == 1 ? localizer["Banner_Db_Import_Success_One"] :
-                localizer["Banner_Db_Import_Success_Many", content.Imported]);
+                PluralText.Format(localizer, "Banner_Db_Import_Success", ("count", content.Imported)));
         }
 
         string failureSummary = FormatDatabaseFailureSummary(localizer, content.Failures, content.UpgradeFailures);
@@ -57,9 +57,7 @@ internal static partial class BannerContentLocalizer
                 localizer["Banner_Db_Import_Failed_Message", failureSummary]);
         }
 
-        string partialMessage = content.Imported == 1
-            ? localizer["Banner_Db_Import_Partial_One"]
-            : localizer["Banner_Db_Import_Partial_Many", content.Imported];
+        string partialMessage = PluralText.Format(localizer, "Banner_Db_Import_Partial", ("count", content.Imported));
 
         return new BannerContentText(
             localizer["Banner_Db_Import_Partial_Title"],
@@ -96,12 +94,10 @@ internal static partial class BannerContentLocalizer
             DatabaseOperation.UpgradeSingle upgradeSingle => localizer[
                 "Banner_Db_OperationNoun_UpgradeSingle",
                 upgradeSingle.FileName],
-            DatabaseOperation.UpgradeBatch { Count: 1 } upgradeBatch => localizer[
-                "Banner_Db_OperationNoun_UpgradeBatch_One",
-                upgradeBatch.Count],
-            DatabaseOperation.UpgradeBatch upgradeBatch => localizer[
-                "Banner_Db_OperationNoun_UpgradeBatch_Many",
-                upgradeBatch.Count],
+            DatabaseOperation.UpgradeBatch upgradeBatch => PluralText.Format(
+                localizer,
+                "Banner_Db_OperationNoun_UpgradeBatch",
+                ("count", upgradeBatch.Count)),
             _ => throw new ArgumentOutOfRangeException(nameof(operation), operation.GetType(), "Unknown database operation.")
         };
 }

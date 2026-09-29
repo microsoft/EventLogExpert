@@ -630,9 +630,7 @@ public sealed partial class FilterPane
             _pendingDrafts.Count +
             (IsDateFilterVisible ? 1 : 0);
 
-        string message = count == 1 ?
-            Localizer["FilterPane_ClearConfirm_Message_One"] :
-            Localizer["FilterPane_ClearConfirm_Message_Many", count];
+        string message = PluralText.Format(Localizer, "FilterPane_ClearConfirm_Message", ("count", count));
 
         bool confirmed = await AlertDialogService.ShowAlert(
             Localizer["FilterPane_ClearConfirm_Title"],
@@ -688,9 +686,7 @@ public sealed partial class FilterPane
     private string FormatFilterSetDetail(LibraryEntryFilterSet set)
     {
         int count = set.Filters.Count;
-        string detail = Localizer[
-            count == 1 ? "FilterPane_FilterSetFilterCount_One" : "FilterPane_FilterSetFilterCount_Many",
-            count];
+        string detail = PluralText.Format(Localizer, "FilterPane_FilterSetFilterCount", ("count", count));
 
         return set.Tags.Count > 0 ?
             Localizer["FilterPane_FilterSetDetail_WithTags", detail, string.Join(", ", set.Tags)] :

@@ -132,7 +132,7 @@ public sealed class AttentionBannerTests : BunitContext
         var component = RenderAttentionBanner(2);
 
         var banner = component.Find("aside.banner-attention");
-        Assert.Contains("[[Banner_Attention_Many(2)]]", banner.TextContent);
+        Assert.Contains("[[Banner_Attention]]", banner.TextContent);
         Assert.Equal("[[Banner_Attention_OpenDatabases]]", component.Find("aside.banner-attention button.banner-action").TextContent.Trim());
         Assert.Single(component.FindAll("aside.banner-attention button.banner-dismiss"));
     }
@@ -143,8 +143,8 @@ public sealed class AttentionBannerTests : BunitContext
         var component = RenderAttentionBanner(1);
 
         var banner = component.Find("aside.banner-attention");
-        Assert.Contains("[[Banner_Attention_One(1)]]", banner.TextContent);
-        Assert.DoesNotContain("[[Banner_Attention_Many", banner.TextContent);
+        Assert.Contains("[[Banner_Attention]]", banner.TextContent);
+        Assert.DoesNotContain("[[Banner_Attention(", banner.TextContent);
     }
 
     private static bool IsPreformatted(BannerMessage? message, string title, string text, string? actionLabel = null) =>

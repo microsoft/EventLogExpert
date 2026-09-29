@@ -155,8 +155,6 @@ public sealed class LocalizationInfraTests
         var neutralValues = ResxValues();
         (string Key, int Arity)[] expected =
         [
-            ("DebugLog_Footer_Counter_One", 2),
-            ("DebugLog_Footer_Counter_Many", 2),
             ("DebugLog_Filter_EditAria", 1),
             ("DebugLog_Filter_RemoveRowAria", 1)
         ];
@@ -377,8 +375,7 @@ public sealed class LocalizationInfraTests
         [
             ("Banner_Attention_DismissAria", 0),
             ("Banner_Attention_ErrorTitle", 0),
-            ("Banner_Attention_Many", 1),
-            ("Banner_Attention_One", 1),
+            ("Banner_Attention", 0),
             ("Banner_Attention_OpenDatabases", 0),
             ("Banner_Attention_OpenFailed", 0),
             ("Banner_Attention_OpenFailedDetail", 1),
@@ -394,27 +391,23 @@ public sealed class LocalizationInfraTests
             ("Banner_Db_Import_FailurePart", 2),
             ("Banner_Db_Import_FailureSummary", 1),
             ("Banner_Db_Import_None", 0),
-            ("Banner_Db_Import_Partial_Many", 1),
+            ("Banner_Db_Import_Partial", 0),
             ("Banner_Db_Import_Partial_Message", 2),
-            ("Banner_Db_Import_Partial_One", 0),
             ("Banner_Db_Import_Partial_Title", 0),
-            ("Banner_Db_Import_Success_Many", 1),
-            ("Banner_Db_Import_Success_One", 0),
+            ("Banner_Db_Import_Success", 0),
             ("Banner_Db_Import_Success_Title", 0),
             ("Banner_Db_Import_UpgradeFailurePart", 2),
             ("Banner_Db_OperationFailed_Message", 2),
             ("Banner_Db_OperationNoun_Import", 0),
             ("Banner_Db_OperationNoun_Toggle", 1),
-            ("Banner_Db_OperationNoun_UpgradeBatch_Many", 1),
-            ("Banner_Db_OperationNoun_UpgradeBatch_One", 1),
+            ("Banner_Db_OperationNoun_UpgradeBatch", 0),
             ("Banner_Db_OperationNoun_UpgradeSingle", 1),
             ("Banner_Db_RemoveFailed_Message", 2),
             ("Banner_Db_RemoveFailed_Title", 0),
             ("Banner_Db_UpdateFailed_Title", 0),
             ("Banner_Db_UpgradeFailed_Message", 2),
             ("Banner_Db_UpgradeFailed_Title", 0),
-            ("Banner_EmptyLog_Many", 2),
-            ("Banner_EmptyLog_One", 1),
+            ("Banner_EmptyLog", 0),
             ("Banner_EmptyLog_Title", 0),
             ("Banner_Error_DismissAria", 0),
             ("Banner_Export_Blocked_Faulted", 0),
@@ -424,8 +417,7 @@ public sealed class LocalizationInfraTests
             ("Banner_Export_Blocked_Updating", 0),
             ("Banner_Export_Canceled_Message", 0),
             ("Banner_Export_Canceled_Title", 0),
-            ("Banner_Export_Complete_Many", 2),
-            ("Banner_Export_Complete_One", 2),
+            ("Banner_Export_Complete", 0),
             ("Banner_Export_Complete_Title", 0),
             ("Banner_Export_Failed_Title", 0),
             ("Banner_Export_Progress", 0),
@@ -446,8 +438,7 @@ public sealed class LocalizationInfraTests
             ("Banner_Filter_FavoriteFailed_Title", 0),
             ("Banner_Filter_ImportFailed_Message", 0),
             ("Banner_Filter_ImportFailed_Title", 0),
-            ("Banner_Filter_NotLoaded_Message_Many", 1),
-            ("Banner_Filter_NotLoaded_Message_One", 0),
+            ("Banner_Filter_NotLoaded_Message", 0),
             ("Banner_Filter_NotLoaded_Title", 0),
             ("Banner_Filter_PromoteFailed_Message", 0),
             ("Banner_Filter_PromoteFailed_Title", 0),
@@ -467,15 +458,12 @@ public sealed class LocalizationInfraTests
             ("Banner_Recovery_Failed_Delete", 1),
             ("Banner_Recovery_Failed_Restore", 1),
             ("Banner_Recovery_Failed_Title", 0),
-            ("Banner_Recovery_Needed_Many", 1),
-            ("Banner_Recovery_Needed_One", 0),
+            ("Banner_Recovery_Needed", 0),
             ("Banner_Recovery_Needed_Title", 0),
             ("Banner_Recovery_Resolve", 0),
             ("Banner_Upgrade_InProgress", 4),
-            ("Banner_Upgrade_Preparing_Many", 1),
-            ("Banner_Upgrade_Preparing_One", 1),
-            ("Banner_Upgrade_QueuedBatches_Many", 1),
-            ("Banner_Upgrade_QueuedBatches_One", 1)
+            ("Banner_Upgrade_Preparing", 0),
+            ("Banner_Upgrade_QueuedBatches", 0)
         ];
 
         foreach ((string key, int arity) in expected)
@@ -675,7 +663,7 @@ public sealed class LocalizationInfraTests
             ("Db_Entry_Aria_Select", 1),
             ("Db_Entry_Aria_Upgrade", 1),
             ("Db_Entry_MixedOs_Capped", 0),
-            ("Db_Entry_MixedOs_Count", 1),
+            ("Db_Entry_MixedOs_Count", 0),
             ("Db_Entry_PendingToggle", 0),
             ("Db_Entry_PhaseProgress", 3),
             ("Db_Entry_ProgressAria", 2),
@@ -699,17 +687,14 @@ public sealed class LocalizationInfraTests
             ("Db_Fail_UpgradeCleanupFailed", 0),
             ("Db_Fail_UpgradeVerificationFailed", 0),
             ("Db_Fail_VerificationOrCleanupRollbackFailed", 1),
-            ("Db_Manage_Upgrade_Cancelled_Many", 2),
-            ("Db_Manage_Upgrade_Cancelled_One", 2),
+            ("Db_Manage_Upgrade_Cancelled", 0),
             ("Db_Manage_Upgrade_MultipleFailure", 5),
             ("Db_Manage_Upgrade_SingleFailure", 2),
-            ("Db_Manage_Upgrade_Success_Many", 1),
-            ("Db_Manage_Upgrade_Success_One", 1),
+            ("Db_Manage_Upgrade_Success", 0),
             ("Db_Picker_ImportPrompt", 0),
             ("DatabaseRecoveryModal_Delete", 0),
             ("DatabaseRecoveryModal_DeleteAll", 0),
-            ("DatabaseRecoveryModal_Description_Many", 0),
-            ("DatabaseRecoveryModal_Description_One", 0),
+            ("DatabaseRecoveryModal_Description", 0),
             ("DatabaseRecoveryModal_Explanation", 0),
             ("DatabaseRecoveryModal_Restore", 0),
             ("DatabaseRecoveryModal_RestoreAll", 0),
@@ -726,7 +711,7 @@ public sealed class LocalizationInfraTests
         Assert.Equal(3, neutralValues.Keys.Count(key => key.StartsWith("Db_UpgradePhase_", StringComparison.Ordinal)));
         Assert.Equal(12, neutralValues.Keys.Count(key => key.StartsWith("Db_Fail_", StringComparison.Ordinal)));
         Assert.Equal(7, neutralValues.Keys.Count(key => key.StartsWith("Db_StatusToken_", StringComparison.Ordinal)));
-        Assert.Equal(6, neutralValues.Keys.Count(key => key.StartsWith("Db_Manage_Upgrade_", StringComparison.Ordinal)));
+        Assert.Equal(4, neutralValues.Keys.Count(key => key.StartsWith("Db_Manage_Upgrade_", StringComparison.Ordinal)));
     }
 
     [Fact]
