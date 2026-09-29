@@ -253,7 +253,33 @@ public sealed class ElevatedDatabaseToolsRunnerTests
 
         Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
         Assert.Equal(DatabaseToolsLogKeys.RunnerProtocolMismatch, result.Summary?.Key);
-        Assert.Equal(["3", "4"], result.Summary?.Args);
+        Assert.Equal(["3", HelloMessage.CurrentProtocolVersion.ToString()], result.Summary?.Args);
+    }
+
+    [Fact]
+    public async Task HelloMessageWithV4ProtocolVersion_RunnerRejectsHelper()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
+        var fakeProcess = new FakeElevatedHelperProcess(server, processId: 9494);
+        var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
+        var logger = new LoggerUtils.RecordingTraceLogger();
+        var runner = CreateRunner(host, logger);
+        var logProgress = new ListProgress<LogRecord>();
+
+        await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
+
+        var runTask = runner.ShowAsync(
+            new ShowProvidersRequest(null, null), logProgress, progress: null, ct);
+
+        await WriteMessageAsync(clientWriter, new HelloMessage(9494, ProtocolVersion: 4), ct);
+        fakeProcess.SignalExited(0);
+
+        var result = await runTask;
+
+        Assert.Equal(DatabaseToolsOutcome.Failed, result.Outcome);
+        Assert.Equal(DatabaseToolsLogKeys.RunnerProtocolMismatch, result.Summary?.Key);
+        Assert.Equal(["4", HelloMessage.CurrentProtocolVersion.ToString()], result.Summary?.Args);
     }
 
     [Fact]
@@ -398,6 +424,49 @@ public sealed class ElevatedDatabaseToolsRunnerTests
         Assert.Contains("eventlogexpert-elevated.exe", result.DiagnosticDetail);
         Assert.True(result.SummaryIsDiagnostic);
         Assert.Empty(logger.ErrorMessages);
+    }
+
+    [Fact]
+    public async Task HelperPluralLogAndResultMessages_PreserveCountThroughReconstruction()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var pipes = await HelperPipePair.CreateAsync(ct); var server = pipes.Server; var client = pipes.Client;
+        var fakeProcess = new FakeElevatedHelperProcess(server, processId: 9999);
+        var host = new FakeElevatedHelperProcessHost((_, _) => Task.FromResult<IElevatedHelperProcess>(fakeProcess));
+        var logger = new LoggerUtils.RecordingTraceLogger();
+        var runner = CreateRunner(host, logger);
+
+        var logProgress = new ListProgress<LogRecord>();
+
+        await using var clientWriter = new StreamWriter(client, s_utf8NoBom, bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
+        using var clientReader = new StreamReader(client, s_utf8NoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
+
+        var runTask = runner.ShowAsync(
+            new ShowProvidersRequest(null, null), logProgress, progress: null, ct);
+
+        await WriteMessageAsync(clientWriter, new HelloMessage(9999, HelloMessage.CurrentProtocolVersion), ct);
+        await ReadRequestAsync(clientReader, ct);
+
+        var ts = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        await WriteMessageAsync(clientWriter,
+            new LogMessage(ts, LogLevel.Information, string.Empty, "Import", MessageKey: "DatabaseTools_Imported", MessageArgs: ["5"], MessagePluralCount: 5), ct);
+        await WriteMessageAsync(clientWriter,
+            new ResultMessage(DatabaseToolsOutcome.Succeeded, 250)
+            {
+                SummaryKey = "DatabaseTools_ImportSummary",
+                SummaryArgs = ["7"],
+                SummaryPluralCount = 7
+            }, ct);
+        fakeProcess.SignalExited(0);
+
+        var result = await runTask;
+
+        Assert.Equal(DatabaseToolsOutcome.Succeeded, result.Outcome);
+        var entry = Assert.Single(logProgress.Entries);
+        Assert.Equal("DatabaseTools_Imported", entry.MessageKey);
+        Assert.Equal(5L, entry.MessagePluralCount);
+        Assert.Equal("DatabaseTools_ImportSummary", result.Summary?.Key);
+        Assert.Equal(7L, result.Summary?.PluralCount);
     }
 
     [Fact]

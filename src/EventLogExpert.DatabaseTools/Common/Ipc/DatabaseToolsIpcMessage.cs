@@ -22,7 +22,7 @@ public abstract record DatabaseToolsIpcMessage;
 
 public sealed record HelloMessage(int HelperProcessId, int ProtocolVersion) : DatabaseToolsIpcMessage
 {
-    public const int CurrentProtocolVersion = 4;
+    public const int CurrentProtocolVersion = 5;
 }
 
 public sealed record ProbeMessage(
@@ -43,7 +43,8 @@ public sealed record LogMessage(
     string? MessageKey = null,
     IReadOnlyList<string>? MessageArgs = null,
     string? DebugDetail = null,
-    LogAudience Audience = LogAudience.User) : DatabaseToolsIpcMessage;
+    LogAudience Audience = LogAudience.User,
+    long? MessagePluralCount = null) : DatabaseToolsIpcMessage;
 
 public sealed record ProgressMessage(int Processed, int? Total, string? CurrentItem) : DatabaseToolsIpcMessage;
 
@@ -55,6 +56,8 @@ public sealed record ResultMessage(DatabaseToolsOutcome Outcome, long DurationMs
     public string? SummaryKey { get; init; }
 
     public IReadOnlyList<string>? SummaryArgs { get; init; }
+
+    public long? SummaryPluralCount { get; init; }
 
     public string? DiagnosticDetail { get; init; }
 }

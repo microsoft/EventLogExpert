@@ -14,4 +14,5 @@ public sealed record LogRecord(
     string? MessageKey = null,
     IReadOnlyList<string>? MessageArgs = null,
     string? DebugDetail = null,
-    LogAudience Audience = LogAudience.User);
+    LogAudience Audience = LogAudience.User,
+    long? MessagePluralCount = null);

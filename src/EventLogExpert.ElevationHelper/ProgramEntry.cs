@@ -59,6 +59,7 @@ internal static class ProgramEntry
             SummaryIsDiagnostic = result.SummaryIsDiagnostic,
             SummaryKey = result.Summary?.Key,
             SummaryArgs = result.Summary?.Args,
+            SummaryPluralCount = result.Summary?.PluralCount,
             DiagnosticDetail = result.DiagnosticDetail
         };
 

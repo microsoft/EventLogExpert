@@ -5,7 +5,6 @@ using EventLogExpert.Localization;
 using EventLogExpert.Localization.Plural;
 using EventLogExpert.UI.Globalization;
 using Microsoft.Extensions.Localization;
-using System.Collections.Concurrent;
 using System.Globalization;
 
 namespace EventLogExpert.UI.Common;
@@ -21,7 +20,6 @@ internal static class PluralText
 {
     private static readonly CultureInfo s_englishCulture = CultureInfo.GetCultureInfo("en");
     private static readonly IcuMessageFormatter s_formatter = new();
-    private static readonly ConcurrentDictionary<(int Generation, string Key, string Culture), byte> s_reported = new();
 
     internal static string Format(
         IStringLocalizer<SharedResource> localizer,
@@ -45,14 +43,11 @@ internal static class PluralText
         {
             // Never throw into the UI: report (best-effort), render the neutral English pattern, then fall back to the key.
             PluralServices.Snapshot services = PluralServices.Current;
-            ReportOnce(services, key, uiCulture, pattern, exception);
+            MalformedPatternReporter.ReportOnce(services, key, uiCulture.Name, pattern, exception.Message);
 
             return FormatNeutralFallback(services, key, arguments, numberCulture) ?? key;
         }
     }
-
-    /// <summary>Test seam: clears the report-once dedup so a freshly configured diagnostics sink is notified again.</summary>
-    internal static void Reset() => s_reported.Clear();
 
     private static Dictionary<string, object?> BuildArguments((string Name, object? Value)[] args)
     {
@@ -96,29 +91,6 @@ internal static class PluralText
         catch (IcuMessageException)
         {
             return null;
-        }
-    }
-
-    private static void ReportOnce(
-        PluralServices.Snapshot services,
-        string key,
-        CultureInfo culture,
-        string pattern,
-        IcuMessageException exception)
-    {
-        if (!s_reported.TryAdd((services.Generation, key, culture.Name), 0))
-        {
-            return;
-        }
-
-        try
-        {
-            services.Diagnostics.ReportMalformedPattern(key, culture.Name, pattern, exception.Message);
-        }
-        catch (Exception reportException) when (reportException is not OutOfMemoryException
-            and not StackOverflowException)
-        {
-            // A throwing diagnostics sink must not escape the facade.
         }
     }
 }

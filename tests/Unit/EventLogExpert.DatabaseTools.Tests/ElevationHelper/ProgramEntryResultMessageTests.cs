@@ -33,6 +33,21 @@ public sealed class ProgramEntryResultMessageTests
     }
 
     [Fact]
+    public void BuildResultMessage_CarriesSummaryPluralCount_FromLocalizableText()
+    {
+        var result = new DatabaseToolsResult(
+            DatabaseToolsOutcome.Succeeded,
+            new LocalizableText("DatabaseTools_Op_CreateSkippedProviders", ["provider.db"], PluralCount: 4),
+            TimeSpan.FromMilliseconds(10));
+
+        var message = ProgramEntry.BuildResultMessage(result);
+
+        Assert.Equal("DatabaseTools_Op_CreateSkippedProviders", message.SummaryKey);
+        Assert.Equal(["provider.db"], message.SummaryArgs);
+        Assert.Equal(4L, message.SummaryPluralCount);
+    }
+
+    [Fact]
     public void BuildResultMessage_LeavesActionableSummaryUnmarked_WhenResultIsNotDiagnostic()
     {
         var result = new DatabaseToolsResult(

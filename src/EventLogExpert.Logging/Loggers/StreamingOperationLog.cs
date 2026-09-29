@@ -29,7 +29,7 @@ public sealed class StreamingOperationLog(
     {
         ArgumentNullException.ThrowIfNull(message);
 
-        Emit(level, message: string.Empty, message.Key, message.Args, debugDetail: null);
+        Emit(level, message: string.Empty, message.Key, message.Args, debugDetail: null, message.PluralCount);
     }
 
     public void User(LogLevel level, LocalizableText message, Exception diagnostic)
@@ -37,7 +37,7 @@ public sealed class StreamingOperationLog(
         ArgumentNullException.ThrowIfNull(message);
         ArgumentNullException.ThrowIfNull(diagnostic);
 
-        Emit(level, message: string.Empty, message.Key, message.Args, diagnostic.ToString());
+        Emit(level, message: string.Empty, message.Key, message.Args, diagnostic.ToString(), message.PluralCount);
     }
 
     private void Emit(
@@ -45,7 +45,8 @@ public sealed class StreamingOperationLog(
         string message,
         string? messageKey,
         IReadOnlyList<string>? messageArgs,
-        string? debugDetail)
+        string? debugDetail,
+        long? messagePluralCount = null)
     {
         if (level < minimumLevel) { return; }
 
@@ -57,6 +58,7 @@ public sealed class StreamingOperationLog(
             category,
             MessageKey: messageKey,
             MessageArgs: messageArgs,
-            DebugDetail: debugDetail));
+            DebugDetail: debugDetail,
+            MessagePluralCount: messagePluralCount));
     }
 }

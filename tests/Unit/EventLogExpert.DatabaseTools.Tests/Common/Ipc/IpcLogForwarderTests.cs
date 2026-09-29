@@ -39,6 +39,35 @@ public sealed class IpcLogForwarderTests
     }
 
     [Fact]
+    public async Task Report_PreservesMessageKeyArgsAndPluralCount()
+    {
+        using var stream = new MemoryStream();
+
+        await using (var writer = new IpcMessageWriter(stream))
+        {
+            IProgress<LogRecord> forwarder = new IpcLogForwarder(writer);
+            forwarder.Report(new LogRecord(
+                new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc),
+                LogLevel.Information,
+                string.Empty,
+                LogCategories.EventLog,
+                MessageKey: "DatabaseTools_Imported",
+                MessageArgs: ["5"],
+                MessagePluralCount: 5));
+        }
+
+        stream.Position = 0;
+        using var reader = new StreamReader(stream);
+        string line = (await reader.ReadToEndAsync(TestContext.Current.CancellationToken)).Trim();
+        var message = JsonSerializer.Deserialize<DatabaseToolsIpcMessage>(line, DatabaseToolsIpcSerializer.Options);
+
+        var log = Assert.IsType<LogMessage>(message);
+        Assert.Equal("DatabaseTools_Imported", log.MessageKey);
+        Assert.Equal(["5"], log.MessageArgs);
+        Assert.Equal(5L, log.MessagePluralCount);
+    }
+
+    [Fact]
     public void Report_WhenTheUnderlyingStreamIsClosed_SwallowsTheExceptionSoLoggingNeverBreaksTheOperation()
     {
         var stream = new MemoryStream();

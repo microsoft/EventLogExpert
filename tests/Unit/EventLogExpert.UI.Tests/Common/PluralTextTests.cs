@@ -113,7 +113,7 @@ public sealed class PluralTextTests : IDisposable
     private static void ResetServices()
     {
         PluralServices.Reset();
-        PluralText.Reset();
+        MalformedPatternReporter.Reset();
     }
 
     private sealed class RecordingDiagnostics : IPluralDiagnostics
