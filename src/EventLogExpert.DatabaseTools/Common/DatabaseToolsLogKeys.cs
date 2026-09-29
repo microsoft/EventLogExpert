@@ -36,8 +36,7 @@ public static class DatabaseToolsLogKeys
     public const string CreateRegexTimedOut = "DatabaseTools_Op_CreateRegexTimedOut";
     public const string CreateRestoreOriginalDatabaseFailed = "DatabaseTools_Op_CreateRestoreOriginalDatabaseFailed";
     public const string CreateSavingDatabase = "DatabaseTools_Op_CreateSavingDatabase";
-    public const string CreateSkippedProvidersMany = "DatabaseTools_Op_CreateSkippedProvidersMany";
-    public const string CreateSkippedProvidersOne = "DatabaseTools_Op_CreateSkippedProvidersOne";
+    public const string CreateSkippedProviders = "DatabaseTools_Op_CreateSkippedProviders";
     public const string CreateSourceHiveNotCleanlyFlushed = "DatabaseTools_Op_CreateSourceHiveNotCleanlyFlushed";
     public const string CreateSourceOrOfflineImage = "DatabaseTools_Op_CreateSourceOrOfflineImage";
     public const string CreateTargetAlreadyExists = "DatabaseTools_Op_CreateTargetAlreadyExists";

@@ -54,7 +54,8 @@ internal sealed class DiffDatabaseOperation(DiffDatabaseRequest request) : Opera
 
         logger.User(LogLevel.Information,
             new LocalizableText(DatabaseToolsLogKeys.DiffSkippingSecondSourceDuplicates,
-                [firstIdentities.Count.ToString()]));
+                [],
+                PluralCount: firstIdentities.Count));
 
         ProviderDbContext? newDbContext = null;
 

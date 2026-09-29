@@ -4080,11 +4080,8 @@
   <data name="DatabaseTools_Op_CreateSavingDatabase" xml:space="preserve">
     <value>Saving database. Please wait...</value>
   </data>
-  <data name="DatabaseTools_Op_CreateSkippedProvidersMany" xml:space="preserve">
-    <value>Found {0} providers in {1}. These will not be included in the new database.</value>
-  </data>
-  <data name="DatabaseTools_Op_CreateSkippedProvidersOne" xml:space="preserve">
-    <value>Found {0} provider in {1}. It will not be included in the new database.</value>
+  <data name="DatabaseTools_Op_CreateSkippedProviders" xml:space="preserve">
+    <value>{count, plural, one {Found {count} provider in {0}. It will not be included in the new database.} other {Found {count} providers in {0}. These will not be included in the new database.}}</value>
   </data>
   <data name="DatabaseTools_Op_CreateSourceHiveNotCleanlyFlushed" xml:space="preserve">
     <value>The offline image's registry hive was not cleanly flushed; some providers may be missing from the database.</value>
@@ -4159,7 +4156,7 @@
     <value>Providers copied to new database:</value>
   </data>
   <data name="DatabaseTools_Op_DiffSkippingSecondSourceDuplicates" xml:space="preserve">
-    <value>Skipping up to {0} provider version(s) from the second source that also appear in the first source.</value>
+    <value>{count, plural, one {Skipping up to {count} provider version from the second source that also appears in the first source.} other {Skipping up to {count} provider versions from the second source that also appear in the first source.}}</value>
   </data>
   <data name="DatabaseTools_Op_DiffUnexpectedError" xml:space="preserve">
     <value>Unexpected error diffing databases.</value>
@@ -4201,7 +4198,7 @@
     <value>Cannot merge into '{0}'.</value>
   </data>
   <data name="DatabaseTools_Op_MergeCopiedVersions" xml:space="preserve">
-    <value>Copied {0} provider version(s).</value>
+    <value>{count, plural, one {Copied {count} provider version.} other {Copied {count} provider versions.}}</value>
   </data>
   <data name="DatabaseTools_Op_MergeCopyingVersions" xml:space="preserve">
     <value>Copying provider versions from the source...</value>
@@ -4216,13 +4213,13 @@
     <value>Failed to merge into database '{0}'.</value>
   </data>
   <data name="DatabaseTools_Op_MergeRemovalCompleted" xml:space="preserve">
-    <value>Removal of {0} provider version(s) completed.</value>
+    <value>{count, plural, one {Removal of {count} provider version completed.} other {Removal of {count} provider versions completed.}}</value>
   </data>
   <data name="DatabaseTools_Op_MergeRemovingVersions" xml:space="preserve">
-    <value>Removing these provider version(s) from the target database...</value>
+    <value>{count, plural, =1 {Removing this provider version from the target database...} other {Removing these provider versions from the target database...}}</value>
   </data>
   <data name="DatabaseTools_Op_MergeTargetContainsVersions" xml:space="preserve">
-    <value>The target database already contains {0} of the source's provider version(s).</value>
+    <value>{count, plural, other {The target database already contains {count} of the source's provider versions.}}</value>
   </data>
   <data name="DatabaseTools_Op_MergeTargetFileNotFound" xml:space="preserve">
     <value>File not found: {0}</value>
@@ -4231,7 +4228,7 @@
     <value>Target database '{0}' is at schema v{1} but v{2} is required. Run the 'upgrade' command first.</value>
   </data>
   <data name="DatabaseTools_Op_MergeVersionsSkipped" xml:space="preserve">
-    <value>These provider version(s) will not be copied from the source.</value>
+    <value>{count, plural, =1 {This provider version will not be copied from the source.} other {These provider versions will not be copied from the source.}}</value>
   </data>
   <data name="DatabaseTools_Op_OperationDeletePartialFailed" xml:space="preserve">
     <value>Could not delete partial database at {0}. Delete manually before next run.</value>

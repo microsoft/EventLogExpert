@@ -239,16 +239,11 @@ public sealed class LocalizationInfraTests
         // including keys selected by a conditional such as Localizer[count == 1 ? "..._One" : "..._Many", count] and
         // composite keys such as Localizer["...", arg] - so a key referenced only through a ternary cannot silently drift
         // out of the RESX. Format arguments are variables or punctuation separators (", ", " "), never identifier-like
-        // literals, so scanning the whole call span never misreads an argument as a key. LocalizedCount.OneOrMany picks
-        // its key by count at runtime, so its singular/plural pair never lands inside a Localizer[...] indexer; a second
-        // pattern anchored on the trailing quoted pair recovers both keys (a parenthesis in the count arg cannot truncate it).
+        // literals, so scanning the whole call span never misreads an argument as a key.
         var localizerCallPattern = new Regex(
             @"[Ll]ocalizer\[([^\]]*)\]|\.GetString\(([^)]*)\)",
             RegexOptions.Compiled);
         var keyLiteralPattern = new Regex(@"""([A-Za-z0-9_]+)""", RegexOptions.Compiled);
-        var oneOrManyPattern = new Regex(
-            @"OneOrMany(?:Raw)?\([^;{}]*?""([A-Za-z0-9_]+)""\s*,\s*""([A-Za-z0-9_]+)""(?:\s*,\s*""([A-Za-z0-9_]+)""\s*,\s*""([A-Za-z0-9_]+)"")?",
-            RegexOptions.Compiled);
 
         var sources = LocalizationSourceScan.EnumerateProductionSource()
             .Select(File.ReadAllText)
@@ -258,11 +253,6 @@ public sealed class LocalizationInfraTests
             .SelectMany(source => localizerCallPattern.Matches(source))
             .SelectMany(call => keyLiteralPattern.Matches(call.Groups[1].Value + call.Groups[2].Value))
             .Select(match => match.Groups[1].Value)
-            .Concat(sources
-                .SelectMany(source => oneOrManyPattern.Matches(source))
-                .SelectMany(call => Enumerable.Range(1, 4)
-                    .Select(index => call.Groups[index].Value)
-                    .Where(value => value.Length > 0)))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(key => key, StringComparer.Ordinal)
             .ToList();

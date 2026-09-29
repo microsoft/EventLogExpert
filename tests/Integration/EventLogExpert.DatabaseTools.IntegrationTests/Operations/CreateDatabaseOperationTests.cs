@@ -332,6 +332,12 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         Assert.Equal(new[] { Constants.FirstProviderName, Constants.SecondProviderName }, names);
         Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
         Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Warning);
+
+        // The skip-providers message routes through the ICU PluralCount transport: one excluded provider selects the
+        // singular branch and renders formatted text (not the raw ICU pattern).
+        var skipped = Assert.Single(logger.Entries, entry => entry.Key == "DatabaseTools_Op_CreateSkippedProviders");
+        Assert.Equal(1L, skipped.PluralCount);
+        Assert.Equal($"Found 1 provider in {skipSource}. It will not be included in the new database.", skipped.Message);
     }
 
     [Fact]

@@ -9,13 +9,6 @@ using System.Globalization;
 
 namespace EventLogExpert.UI.Common;
 
-/// <summary>
-///     The UI-side plural facade (replaces <c>LocalizedCount</c>). Called only at known plural sites, so it always
-///     routes the resolved <see cref="SharedResource" /> pattern through the in-house ICU formatter, selecting the plural
-///     category on the RESOLVED content culture and formatting numbers on the current culture. A malformed pattern never
-///     throws into the UI: it is reported once per (key, culture), then rendered from the neutral English pattern (with
-///     English plural rules), and finally falls back to the key - never raw ICU syntax.
-/// </summary>
 internal static class PluralText
 {
     private static readonly CultureInfo s_englishCulture = CultureInfo.GetCultureInfo("en");
