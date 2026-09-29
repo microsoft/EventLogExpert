@@ -202,10 +202,10 @@ public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
     }
 
     private string FormatErrorCount(int count) =>
-        Localizer[count == 1 ? "Correlation_ErrorOne" : "Correlation_ErrorMany", count].Value;
+        PluralText.Format(Localizer, "Correlation_Error", ("count", count));
 
     private string FormatEventCount(int count) =>
-        Localizer[count == 1 ? "Correlation_EventOne" : "Correlation_EventMany", count].Value;
+        PluralText.Format(Localizer, "Correlation_Event", ("count", count));
 
     private string FormatSpan(ActivityNode node)
     {
@@ -219,7 +219,7 @@ public sealed partial class ActivityCorrelationPanel : AppStateComponentBase
             .ToString("g", CultureInfo.CurrentCulture);
 
     private string FormatWarningCount(int count) =>
-        Localizer[count == 1 ? "Correlation_WarningOne" : "Correlation_WarningMany", count].Value;
+        PluralText.Format(Localizer, "Correlation_Warning", ("count", count));
 
     private bool IsExpanded(ActivityNode node) => _expanded.Contains(node.ActivityId);
 

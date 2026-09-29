@@ -69,13 +69,13 @@ public sealed class BannerContentLocalizerTests
         AssertResolved(
             new DatabaseImportSummary(1, [], []),
             "[[Banner_Db_Import_Success_Title]]",
-            "[[Banner_Db_Import_Success_One]]",
+            "[[Banner_Db_Import_Success]]",
             "Import Successful",
             "1 database has successfully been imported");
         AssertResolved(
             new DatabaseImportSummary(3, [], []),
             "[[Banner_Db_Import_Success_Title]]",
-            "[[Banner_Db_Import_Success_Many(3)]]",
+            "[[Banner_Db_Import_Success]]",
             "Import Successful",
             "3 databases have successfully been imported");
         AssertResolved(
@@ -87,13 +87,13 @@ public sealed class BannerContentLocalizerTests
         AssertResolved(
             new DatabaseImportSummary(1, [new ImportFailure("A.db", new DatabaseFailureReason.NativeDetail("bad"))], []),
             "[[Banner_Db_Import_Partial_Title]]",
-            "[[Banner_Db_Import_Partial_Message([[Banner_Db_Import_Partial_One]]|[[Banner_Db_Import_FailureSummary([[Banner_Db_Import_FailurePart(A.db|bad)]])]])]]",
+            "[[Banner_Db_Import_Partial_Message([[Banner_Db_Import_Partial]]|[[Banner_Db_Import_FailureSummary([[Banner_Db_Import_FailurePart(A.db|bad)]])]])]]",
             "Import Completed with Errors",
             "1 database imported; failed: A.db (bad)");
         AssertResolved(
             new DatabaseImportSummary(2, [], [new ImportFailure("B.db", new DatabaseFailureReason.NativeDetail("schema"))]),
             "[[Banner_Db_Import_Partial_Title]]",
-            "[[Banner_Db_Import_Partial_Message([[Banner_Db_Import_Partial_Many(2)]]|[[Banner_Db_Import_FailureSummary([[Banner_Db_Import_UpgradeFailurePart(B.db|schema)]])]])]]",
+            "[[Banner_Db_Import_Partial_Message([[Banner_Db_Import_Partial]]|[[Banner_Db_Import_FailureSummary([[Banner_Db_Import_UpgradeFailurePart(B.db|schema)]])]])]]",
             "Import Completed with Errors",
             "2 databases imported; failed: B.db upgrade (schema)");
     }
@@ -107,7 +107,7 @@ public sealed class BannerContentLocalizerTests
                 [new ImportFailure("A.db", new DatabaseFailureReason.NativeDetail("bad")), new ImportFailure("C.db", new DatabaseFailureReason.NativeDetail("io"))],
                 [new ImportFailure("B.db", new DatabaseFailureReason.NativeDetail("schema"))]),
             "[[Banner_Db_Import_Partial_Title]]",
-            "[[Banner_Db_Import_Partial_Message([[Banner_Db_Import_Partial_Many(2)]]|[[Banner_Db_Import_FailureSummary([[Banner_Db_Import_FailurePart(A.db|bad)]][[Banner_List_Separator]][[Banner_Db_Import_FailurePart(C.db|io)]][[Banner_List_Separator]][[Banner_Db_Import_UpgradeFailurePart(B.db|schema)]])]])]]",
+            "[[Banner_Db_Import_Partial_Message([[Banner_Db_Import_Partial]]|[[Banner_Db_Import_FailureSummary([[Banner_Db_Import_FailurePart(A.db|bad)]][[Banner_List_Separator]][[Banner_Db_Import_FailurePart(C.db|io)]][[Banner_List_Separator]][[Banner_Db_Import_UpgradeFailurePart(B.db|schema)]])]])]]",
             "Import Completed with Errors",
             "2 databases imported; failed: A.db (bad), C.db (io), B.db upgrade (schema)");
     }
@@ -165,13 +165,13 @@ public sealed class BannerContentLocalizerTests
         AssertResolved(
             new DatabaseOperationFailed(new DatabaseOperation.UpgradeBatch(1), "locked"),
             "[[Banner_Db_UpgradeFailed_Title]]",
-            "[[Banner_Db_OperationFailed_Message([[Banner_Db_OperationNoun_UpgradeBatch_One(1)]]|locked)]]",
+            "[[Banner_Db_OperationFailed_Message([[Banner_Db_OperationNoun_UpgradeBatch]]|locked)]]",
             "Database Upgrade Failed",
             "An exception occurred while upgrading 1 database: locked");
         AssertResolved(
             new DatabaseOperationFailed(new DatabaseOperation.UpgradeBatch(2), "locked"),
             "[[Banner_Db_UpgradeFailed_Title]]",
-            "[[Banner_Db_OperationFailed_Message([[Banner_Db_OperationNoun_UpgradeBatch_Many(2)]]|locked)]]",
+            "[[Banner_Db_OperationFailed_Message([[Banner_Db_OperationNoun_UpgradeBatch]]|locked)]]",
             "Database Upgrade Failed",
             "An exception occurred while upgrading 2 databases: locked");
     }
@@ -267,8 +267,8 @@ public sealed class BannerContentLocalizerTests
         BannerContentText oneMarker = ResolveWithMarker(new ExportComplete(1, @"C:\events.csv"));
         BannerContentText manyMarker = ResolveWithMarker(new ExportComplete(1000, @"C:\events.csv"));
 
-        Assert.Equal("[[Banner_Export_Complete_One(1|C:\\events.csv)]]", oneMarker.Message);
-        Assert.Equal("[[Banner_Export_Complete_Many(1000|C:\\events.csv)]]", manyMarker.Message);
+        Assert.Equal("[[Banner_Export_Complete]]", oneMarker.Message);
+        Assert.Equal("[[Banner_Export_Complete]]", manyMarker.Message);
 
         BannerContentText one = ResolveWithEnUs(new ExportComplete(1, @"C:\events.csv"));
         BannerContentText many = ResolveWithEnUs(new ExportComplete(1000, @"C:\events.csv"));
@@ -285,13 +285,13 @@ public sealed class BannerContentLocalizerTests
         AssertResolved(
             new FilterLibraryNotFullyLoaded(1),
             "[[Banner_Filter_NotLoaded_Title]]",
-            "[[Banner_Filter_NotLoaded_Message_One]]",
+            "[[Banner_Filter_NotLoaded_Message]]",
             "Filter library not fully loaded",
             "1 library entry couldn't be read and was left in place to avoid data loss. This usually means the library was written by a newer version of the app.");
         AssertResolved(
             new FilterLibraryNotFullyLoaded(3),
             "[[Banner_Filter_NotLoaded_Title]]",
-            "[[Banner_Filter_NotLoaded_Message_Many(3)]]",
+            "[[Banner_Filter_NotLoaded_Message]]",
             "Filter library not fully loaded",
             "3 library entries couldn't be read and were left in place to avoid data loss. This usually means the library was written by a newer version of the app.");
         AssertResolved(
@@ -375,13 +375,13 @@ public sealed class BannerContentLocalizerTests
         AssertResolved(
             new EmptyLogs(["Application.evtx"]),
             "[[Banner_EmptyLog_Title]]",
-            "[[Banner_EmptyLog_One(Application.evtx)]]",
+            "[[Banner_EmptyLog]]",
             "Empty log",
             "Log contains no events: Application.evtx");
         AssertResolved(
             new EmptyLogs(["A.evtx", "B.evtx"]),
             "[[Banner_EmptyLog_Title]]",
-            "[[Banner_EmptyLog_Many(2|A.evtx[[Banner_List_Separator]]B.evtx)]]",
+            "[[Banner_EmptyLog]]",
             "Empty log",
             "2 logs contained no events: A.evtx, B.evtx");
     }

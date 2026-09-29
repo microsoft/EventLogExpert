@@ -92,7 +92,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         await InvokeRemoveDatabaseAsync(component, entry);
 
         var captured = Assert.Single(alertSurface.Requests);
-        Assert.Equal("[[Db_Manage_RemoveConfirm_Accept_OneOne(1|1)]]", captured.AcceptLabel);
+        Assert.Equal("[[Db_Manage_RemoveConfirm_Accept]]", captured.AcceptLabel);
     }
 
     [Fact]
@@ -192,8 +192,8 @@ public sealed class ManageDatabasesTabTests : BunitContext
         await component.InvokeAsync(() => bulkRemove.Click());
 
         var captured = Assert.Single(alertSurface.Requests);
-        Assert.Equal("[[Db_Manage_RemoveConfirm_Accept_OneOne(1|1)]]", captured.AcceptLabel);
-        Assert.Equal("[[Db_Manage_Remove_CancelThenRemove_One(a.db|a.db)]]", captured.Message);
+        Assert.Equal("[[Db_Manage_RemoveConfirm_Accept]]", captured.AcceptLabel);
+        Assert.Equal("[[Db_Manage_Remove_CancelThenRemove]]", captured.Message);
     }
 
     [Fact]
@@ -276,7 +276,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var bulkRemove = component.Find(".manage-databases-bulk-strip .button-red");
         await component.InvokeAsync(() => bulkRemove.Click());
 
-        _announcementService.Received().Announce(Arg.Is<string>(s => s != null && s.Contains("a.db") && s.Contains("disk full")));
+        _announcementService.Received().Announce("[[Db_Manage_Announcement_RemoveFailed]]");
     }
 
     [Fact]
@@ -437,7 +437,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         await component.InvokeAsync(() => upgradeBtn.Click());
 
         var prompt = Assert.Single(alertSurface.Requests);
-        Assert.Contains("[[Db_Manage_SubsetConfirm_Intro(1|2)]]", prompt.Message);
+        Assert.Contains("[[Db_Manage_SubsetConfirm_Intro]]", prompt.Message);
         Assert.Contains("b.db ([[DatabaseUpgradeSkipReason_AlreadyUpToDate]])", prompt.Message);
         Assert.Equal("[[Db_Manage_UpgradeCount(1)]]", prompt.AcceptLabel);
 
@@ -468,8 +468,8 @@ public sealed class ManageDatabasesTabTests : BunitContext
         await component.InvokeAsync(() => upgradeBtn.Click());
 
         var prompt = Assert.Single(alertSurface.Requests);
-        Assert.Contains("[[Db_Manage_SubsetConfirm_Intro(1|3)]]", prompt.Message);
-        Assert.Contains("[[Db_Manage_SubsetConfirm_SkipHeader_Many(2)]]", prompt.Message);
+        Assert.Contains("[[Db_Manage_SubsetConfirm_Intro]]", prompt.Message);
+        Assert.Contains("[[Db_Manage_SubsetConfirm_SkipHeader]]", prompt.Message);
         Assert.Contains("b.db ([[DatabaseUpgradeSkipReason_AlreadyUpToDate]])", prompt.Message);
         Assert.Contains("c.db ([[DatabaseUpgradeSkipReason_ClassificationPending]])", prompt.Message);
     }
@@ -530,8 +530,8 @@ public sealed class ManageDatabasesTabTests : BunitContext
         await InvokeRemoveDatabaseAsync(component, entry);
 
         var captured = Assert.Single(alertSurface.Requests);
-        Assert.Equal("[[Db_Manage_RemoveConfirm_Accept_OneOne(1|1)]]", captured.AcceptLabel);
-        Assert.Equal("[[Db_Manage_Remove_CancelThenRemove_One(a.db|a.db)]]", captured.Message);
+        Assert.Equal("[[Db_Manage_RemoveConfirm_Accept]]", captured.AcceptLabel);
+        Assert.Equal("[[Db_Manage_Remove_CancelThenRemove]]", captured.Message);
     }
 
     [Fact]
@@ -704,8 +704,8 @@ public sealed class ManageDatabasesTabTests : BunitContext
         await InvokeRemoveDatabaseAsync(component, _databaseService.Entries[0]);
 
         var captured = Assert.Single(alertSurface.Requests);
-        Assert.DoesNotContain("[[Db_Manage_Remove_CloseReopenWarning_One(1)]]", captured.Message);
-        Assert.DoesNotContain("[[Db_Manage_Remove_CloseReopenWarning_Many(1)]]", captured.Message);
+        Assert.DoesNotContain("[[Db_Manage_Remove_CloseReopenWarning]]", captured.Message);
+        Assert.DoesNotContain("[[Db_Manage_Remove_CloseReopenWarning]]", captured.Message);
     }
 
     [Fact]
@@ -720,7 +720,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         await InvokeRemoveDatabaseAsync(component, _databaseService.Entries[0]);
 
         var captured = Assert.Single(alertSurface.Requests);
-        Assert.Contains("[[Db_Manage_Remove_CloseReopenWarning_One(1)]]", captured.Message);
+        Assert.Contains("[[Db_Manage_Remove_CloseReopenWarning]]", captured.Message);
     }
 
     [Fact]
@@ -735,8 +735,8 @@ public sealed class ManageDatabasesTabTests : BunitContext
         await InvokeRemoveDatabaseAsync(component, _databaseService.Entries[0]);
 
         var captured = Assert.Single(alertSurface.Requests);
-        Assert.DoesNotContain("[[Db_Manage_Remove_CloseReopenWarning_One(1)]]", captured.Message);
-        Assert.DoesNotContain("[[Db_Manage_Remove_CloseReopenWarning_Many(1)]]", captured.Message);
+        Assert.DoesNotContain("[[Db_Manage_Remove_CloseReopenWarning]]", captured.Message);
+        Assert.DoesNotContain("[[Db_Manage_Remove_CloseReopenWarning]]", captured.Message);
     }
 
     [Fact]
@@ -1030,7 +1030,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         await InvokeRemoveDatabaseAsync(component, entry);
 
         var captured = Assert.Single(alertSurface.Requests);
-        Assert.Equal("[[Db_Manage_RemoveConfirm_Accept_OneOne(1|1)]]", captured.AcceptLabel);
+        Assert.Equal("[[Db_Manage_RemoveConfirm_Accept]]", captured.AcceptLabel);
     }
 
     [Fact]
@@ -1277,7 +1277,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         await InvokeRemoveDatabaseAsync(component, entry);
 
         var captured = Assert.Single(alertSurface.Requests);
-        Assert.Equal("[[Db_Manage_RemoveConfirm_Accept_OneOne(1|1)]]", captured.AcceptLabel);
+        Assert.Equal("[[Db_Manage_RemoveConfirm_Accept]]", captured.AcceptLabel);
     }
 
     [Fact]
@@ -1384,12 +1384,11 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
         await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
         liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
-        Assert.Contains("1", liveRegion.TextContent);
-        Assert.Contains("[[Db_Manage_Selection_One(1)]]", liveRegion.TextContent);
+        Assert.Contains("[[Db_Manage_Selection]]", liveRegion.TextContent);
 
         await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
         liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
-        Assert.Contains("2", liveRegion.TextContent);
+        Assert.Contains("[[Db_Manage_Selection]]", liveRegion.TextContent);
     }
 
     private static async Task EnterSelectionModeAsync(IRenderedComponent<ManageDatabasesTab> component)

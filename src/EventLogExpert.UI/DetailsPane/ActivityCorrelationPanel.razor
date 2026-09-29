@@ -40,11 +40,11 @@
                  <p class="correlation-truncated details-muted">
                      @if (node.IsSharedOversized)
                      {
-                         @Localizer["Correlation_SharedTruncated", node.Events.Count, node.EventCount]
+                         @PluralText.Format(Localizer, "Correlation_SharedTruncated", ("shown", node.Events.Count), ("total", node.EventCount))
                      }
                      else
                      {
-                         @Localizer["Correlation_Truncated", node.Events.Count, node.EventCount]
+                         @PluralText.Format(Localizer, "Correlation_Truncated", ("shown", node.Events.Count), ("total", node.EventCount))
                      }
                  </p>
              }

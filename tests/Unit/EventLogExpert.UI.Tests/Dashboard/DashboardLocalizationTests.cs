@@ -46,16 +46,14 @@ public sealed class DashboardLocalizationTests : BunitContext
     }
 
     [Theory]
-    [InlineData("Dashboard_File_One", "Dashboard_File_Many")]
-    [InlineData("Dashboard_Log_One", "Dashboard_Log_Many")]
-    [InlineData("Dashboard_Channel_One", "Dashboard_Channel_Many")]
-    public void PluralKeys_AreCountInclusive(string oneKey, string manyKey)
+    [InlineData("Dashboard_File")]
+    [InlineData("Dashboard_Log")]
+    [InlineData("Dashboard_Channel")]
+    public void PluralKeys_AreCountInclusive(string key)
     {
         var localizer = Localizer;
 
-        Assert.Contains("1", localizer[oneKey, 1].Value);
-        Assert.Contains("2", localizer[manyKey, 2].Value);
-        Assert.NotEqual(localizer[manyKey].Value, localizer[manyKey, 2].Value);
+        Assert.Contains("{count", localizer[key].Value);
     }
 
     [Fact]

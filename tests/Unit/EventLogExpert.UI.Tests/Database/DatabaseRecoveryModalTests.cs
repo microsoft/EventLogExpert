@@ -302,8 +302,8 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
     }
 
     [Theory]
-    [InlineData(1, "[[DatabaseRecoveryModal_Description_One]] [[DatabaseRecoveryModal_Explanation]]")]
-    [InlineData(2, "[[DatabaseRecoveryModal_Description_Many]] [[DatabaseRecoveryModal_Explanation]]")]
+    [InlineData(1, "[[DatabaseRecoveryModal_Description]] [[DatabaseRecoveryModal_Explanation]]")]
+    [InlineData(2, "[[DatabaseRecoveryModal_Description]] [[DatabaseRecoveryModal_Explanation]]")]
     public void DatabaseRecoveryModal_Description_RendersSentencesSeparatedBySingleSpace(int entryCount, string expected)
     {
         var entries = new DatabaseEntry[entryCount];

@@ -155,7 +155,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
             0 => string.Empty,
             1 => FormatStamp(_meaningfulOsStamps[0]),
             > OsStampDisplayCap => Localizer["Db_Entry_MixedOs_Capped"],
-            _ => Localizer["Db_Entry_MixedOs_Count", _meaningfulOsStamps.Count]
+            _ => PluralText.Format(Localizer, "Db_Entry_MixedOs_Count", ("count", _meaningfulOsStamps.Count))
         };
     }
 

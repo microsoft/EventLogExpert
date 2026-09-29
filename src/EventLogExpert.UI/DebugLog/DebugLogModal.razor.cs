@@ -6,6 +6,7 @@ using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.DebugLog;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.Modal;
@@ -55,10 +56,12 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 
     [Inject] private IFileSaveService FileSaveService { get; init; } = null!;
 
-    // Footer summary "{filtered:N0} of {total:N0} entry|entries"; the singular form is used only when the TOTAL is
-    // exactly one (matches the pre-localization pivot on _entries.Count). N0 grouping stays culture-aware.
     private string FooterCounterText =>
-        Localizer[_entries.Count == 1 ? "DebugLog_Footer_Counter_One" : "DebugLog_Footer_Counter_Many", _filteredEntryCount, _entries.Count];
+        PluralText.Format(
+            Localizer,
+            "DebugLog_Footer_Counter",
+            ("filtered", _filteredEntryCount),
+            ("total", _entries.Count));
 
     [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 

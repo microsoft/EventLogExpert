@@ -75,8 +75,8 @@ public sealed class BannerLocalizationTests : BunitContext
         var one = Render<AttentionBanner>(parameters => parameters.Add(component => component.AttentionCount, 1));
         var many = Render<AttentionBanner>(parameters => parameters.Add(component => component.AttentionCount, 2));
 
-        Assert.Equal("[[Banner_Attention_One(1)]]", one.Find(".banner-message").TextContent.Trim());
-        Assert.Equal("[[Banner_Attention_Many(2)]]", many.Find(".banner-message").TextContent.Trim());
+        Assert.Equal("[[Banner_Attention]]", one.Find(".banner-message").TextContent.Trim());
+        Assert.Equal("[[Banner_Attention]]", many.Find(".banner-message").TextContent.Trim());
         Assert.Equal("[[Banner_Attention_OpenDatabases]]", many.Find("button.banner-action").TextContent.Trim());
         Assert.Equal("[[Banner_Attention_DismissAria]]", many.Find("button.banner-dismiss").GetAttribute("aria-label"));
     }
@@ -288,10 +288,12 @@ public sealed class BannerLocalizationTests : BunitContext
         {
             Assert.Equal("Exporting events...", localizer["Banner_Export_Progress"].Value);
             Assert.Equal("Database upgrade recovery", localizer["Banner_Recovery_Needed_Title"].Value);
-            Assert.Equal("1 database needs recovery from interrupted upgrade.", localizer["Banner_Recovery_Needed_One"].Value);
+            Assert.Equal(
+                "1 database needs recovery from interrupted upgrade.",
+                PluralText.Format(localizer, "Banner_Recovery_Needed", ("count", 1)));
             Assert.Equal(
                 "3 databases need recovery from interrupted upgrade.",
-                localizer["Banner_Recovery_Needed_Many", 3].Value);
+                PluralText.Format(localizer, "Banner_Recovery_Needed", ("count", 3)));
             Assert.Equal("Resolve", localizer["Banner_Recovery_Resolve"].Value);
             Assert.Equal("Database recovery failed", localizer["Banner_Recovery_Failed_Title"].Value);
             Assert.Equal("Failed to restore 'x' from backup.", localizer["Banner_Recovery_Failed_Restore", "x"].Value);
@@ -305,14 +307,14 @@ public sealed class BannerLocalizationTests : BunitContext
         var localizer = new MarkerLocalizer();
 
         Assert.Equal(
-            "[[Banner_Attention_Many(1000)]]",
-            LocalizedCount.OneOrManyRaw(localizer, 1000, "Banner_Attention_One", "Banner_Attention_Many"));
+            "[[Banner_Attention]]",
+            PluralText.Format(localizer, "Banner_Attention", ("count", 1000)));
         Assert.Equal(
-            "[[Banner_Attention_Many(1000)]]",
+            "[[Banner_Attention]]",
             Render<AttentionBanner>(parameters => parameters.Add(banner => banner.AttentionCount, 1000))
                 .Find(".banner-message").TextContent.Trim());
         Assert.Equal(
-            "[[Banner_Upgrade_Preparing_Many(1000)]]",
+            "[[Banner_Upgrade_Preparing]]",
             Render<UpgradeProgressBanner>(parameters => parameters.Add(
                     banner => banner.Progress,
                     CreateUpgradeProgress(position: 0, size: 1000, entryName: string.Empty, queuedBatches: 0)))
@@ -324,7 +326,7 @@ public sealed class BannerLocalizationTests : BunitContext
                     CreateUpgradeProgress(position: 1000, size: 1001, entryName: "db.evtx", queuedBatches: 0)))
                 .Find(".banner-message").TextContent.Trim());
         Assert.Equal(
-            "[[Banner_Upgrade_QueuedBatches_Many(1000)]]",
+            "[[Banner_Upgrade_QueuedBatches]]",
             Render<UpgradeProgressBanner>(parameters => parameters.Add(
                     banner => banner.Progress,
                     CreateUpgradeProgress(position: 1, size: 1, entryName: "db.evtx", queuedBatches: 1000)))
@@ -358,12 +360,12 @@ public sealed class BannerLocalizationTests : BunitContext
             banner => banner.Progress,
             CreateUpgradeProgress(position: 2, size: 5, entryName: "db.evtx", queuedBatches: 2)));
 
-        Assert.Equal("[[Banner_Upgrade_Preparing_One(1)]]", preparingOne.Find(".banner-message").TextContent.Trim());
+        Assert.Equal("[[Banner_Upgrade_Preparing]]", preparingOne.Find(".banner-message").TextContent.Trim());
         Assert.Empty(preparingOne.FindAll(".banner-subtitle"));
-        Assert.Equal("[[Banner_Upgrade_Preparing_Many(2)]]", preparingMany.Find(".banner-message").TextContent.Trim());
+        Assert.Equal("[[Banner_Upgrade_Preparing]]", preparingMany.Find(".banner-message").TextContent.Trim());
         Assert.Equal("[[Banner_Upgrade_InProgress(2|5|db.evtx|BackingUp)]]", inProgress.Find(".banner-message").TextContent.Trim());
-        Assert.Equal("[[Banner_Upgrade_QueuedBatches_One(1)]]", inProgress.Find(".banner-subtitle").TextContent.Trim());
-        Assert.Equal("[[Banner_Upgrade_QueuedBatches_Many(2)]]", queuedMany.Find(".banner-subtitle").TextContent.Trim());
+        Assert.Equal("[[Banner_Upgrade_QueuedBatches]]", inProgress.Find(".banner-subtitle").TextContent.Trim());
+        Assert.Equal("[[Banner_Upgrade_QueuedBatches]]", queuedMany.Find(".banner-subtitle").TextContent.Trim());
         Assert.Equal("[[Modal_Cancel]]", inProgress.Find("button.banner-action").TextContent.Trim());
     }
 

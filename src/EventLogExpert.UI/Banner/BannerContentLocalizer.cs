@@ -3,6 +3,7 @@
 
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Banner;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Database;
 using Microsoft.Extensions.Localization;
 
@@ -22,10 +23,11 @@ internal static partial class BannerContentLocalizer
                 exportFailed.Detail),
             ExportComplete exportComplete => new BannerContentText(
                 localizer["Banner_Export_Complete_Title"],
-                localizer[
-                    exportComplete.Count == 1 ? "Banner_Export_Complete_One" : "Banner_Export_Complete_Many",
-                    exportComplete.Count,
-                    exportComplete.Path]),
+                PluralText.Format(
+                    localizer,
+                    "Banner_Export_Complete",
+                    ("count", exportComplete.Count),
+                    ("path", exportComplete.Path))),
             DatabaseRemoveFailed databaseRemoveFailed => new BannerContentText(
                 localizer["Banner_Db_RemoveFailed_Title"],
                 localizer["Banner_Db_RemoveFailed_Message", databaseRemoveFailed.FileName, databaseRemoveFailed.Detail]),
@@ -41,9 +43,10 @@ internal static partial class BannerContentLocalizer
             DatabaseImportSummary databaseImportSummary => ResolveDatabaseImportSummary(localizer, databaseImportSummary),
             FilterLibraryNotFullyLoaded filterLibraryNotFullyLoaded => new BannerContentText(
                 localizer["Banner_Filter_NotLoaded_Title"],
-                filterLibraryNotFullyLoaded.Count == 1 ?
-                    localizer["Banner_Filter_NotLoaded_Message_One"] :
-                    localizer["Banner_Filter_NotLoaded_Message_Many", filterLibraryNotFullyLoaded.Count]),
+                PluralText.Format(
+                    localizer,
+                    "Banner_Filter_NotLoaded_Message",
+                    ("count", filterLibraryNotFullyLoaded.Count))),
             FilterLibraryImportFailed => new BannerContentText(
                 localizer["Banner_Filter_ImportFailed_Title"],
                 localizer["Banner_Filter_ImportFailed_Message"]),
@@ -85,9 +88,12 @@ internal static partial class BannerContentLocalizer
                 localizer["Banner_Filter_TagBulkFailed_Message"]),
             EmptyLogs emptyLogs => new BannerContentText(
                 localizer["Banner_EmptyLog_Title"],
-                emptyLogs.DisplayNames.Count == 1
-                    ? localizer["Banner_EmptyLog_One", emptyLogs.DisplayNames[0]]
-                    : localizer["Banner_EmptyLog_Many", emptyLogs.DisplayNames.Count, JoinLocalizedList(localizer, emptyLogs.DisplayNames)]),
+                PluralText.Format(
+                    localizer,
+                    "Banner_EmptyLog",
+                    ("logCount", emptyLogs.DisplayNames.Count),
+                    ("name", emptyLogs.DisplayNames.Count == 1 ? emptyLogs.DisplayNames[0] : string.Empty),
+                    ("names", JoinLocalizedList(localizer, emptyLogs.DisplayNames)))),
             Preformatted preformatted => new BannerContentText(
                 preformatted.Title,
                 preformatted.Message,

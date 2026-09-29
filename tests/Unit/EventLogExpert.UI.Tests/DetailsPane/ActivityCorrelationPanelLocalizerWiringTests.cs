@@ -80,12 +80,12 @@ public sealed class ActivityCorrelationPanelLocalizerWiringTests : BunitContext
             .Returns(Task.FromResult<ActivityCorrelationView?>(ViewWithRelatedActivity()));
 
         var cut = RenderActive();
-        cut.WaitForAssertion(() => Assert.Contains("[[Correlation_EventOne(1)]]", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("[[Correlation_Event]]", cut.Markup));
         cut.Find(".correlation-chip-head").Click();
 
         Assert.Contains("[[Correlation_NoMessage]]", cut.Markup);
-        Assert.Contains("[[Correlation_ErrorMany(2)]]", cut.Markup);
-        Assert.Contains("[[Correlation_WarningOne(1)]]", cut.Markup);
+        Assert.Contains("[[Correlation_Error]]", cut.Markup);
+        Assert.Contains("[[Correlation_Warning]]", cut.Markup);
         Assert.Contains("[[Correlation_FilterButton]]", cut.Markup);
         Assert.Contains("[[Correlation_Role_Child]]", cut.Markup);
         Assert.Contains("[[Correlation_CycleBadge]]", cut.Markup);

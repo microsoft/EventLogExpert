@@ -261,14 +261,7 @@
     <value>Databases</value>
     <comment>Title used when the attention banner posts a fallback database error.</comment>
   </data>
-  <data name="Banner_Attention_Many" xml:space="preserve">
-    <value>{0} databases need attention. Open Databases to enable or remove them.</value>
-    <comment>Attention banner message for multiple databases. {0} is a raw database count.</comment>
-  </data>
-  <data name="Banner_Attention_One" xml:space="preserve">
-    <value>{0} database needs attention. Open Databases to enable or remove them.</value>
-    <comment>Attention banner message for one database. {0} is the raw database count.</comment>
-  </data>
+  <data name="Banner_Attention" xml:space="preserve"><value>{count, plural, one {{count} database needs attention. Open Databases to enable or remove them.} other {{count} databases need attention. Open Databases to enable or remove them.}}</value></data>
   <data name="Banner_Attention_OpenDatabases" xml:space="preserve">
     <value>Open Databases</value>
     <comment>Button text that opens the database tools from the attention banner.</comment>
@@ -333,22 +326,8 @@
     <value>Upgrading database {0} of {1}: {2} - {3}</value>
     <comment>Upgrade progress banner message. {0} is current batch position; {1} is batch size; {2} is database name; {3} is the raw upgrade phase.</comment>
   </data>
-  <data name="Banner_Upgrade_Preparing_Many" xml:space="preserve">
-    <value>Preparing upgrade of {0} databases…</value>
-    <comment>Upgrade progress preparing message for multiple databases. {0} is the raw database count.</comment>
-  </data>
-  <data name="Banner_Upgrade_Preparing_One" xml:space="preserve">
-    <value>Preparing upgrade of {0} database…</value>
-    <comment>Upgrade progress preparing message for one database. {0} is the raw database count.</comment>
-  </data>
-  <data name="Banner_Upgrade_QueuedBatches_Many" xml:space="preserve">
-    <value>(+{0} batches queued)</value>
-    <comment>Upgrade progress subtitle for multiple queued batches. {0} is the raw queued-batch count.</comment>
-  </data>
-  <data name="Banner_Upgrade_QueuedBatches_One" xml:space="preserve">
-    <value>(+{0} batch queued)</value>
-    <comment>Upgrade progress subtitle for one queued batch. {0} is the raw queued-batch count.</comment>
-  </data>
+  <data name="Banner_Upgrade_Preparing" xml:space="preserve"><value>{count, plural, one {Preparing upgrade of {count} database…} other {Preparing upgrade of {count} databases…}}</value></data>
+  <data name="Banner_Upgrade_QueuedBatches" xml:space="preserve"><value>{count, plural, one {(+{count} batch queued)} other {(+{count} batches queued)}}</value></data>
   <!-- Export banner messages. -->
   <data name="Banner_Export_Title" xml:space="preserve">
     <value>Export events</value>
@@ -390,14 +369,7 @@
     <value>Export complete</value>
     <comment>Title for the export-complete banner.</comment>
   </data>
-  <data name="Banner_Export_Complete_One" xml:space="preserve">
-    <value>Exported {0:N0} event to {1}.</value>
-    <comment>Export-complete message for one event. {0} is the exported event count; {1} is the destination path.</comment>
-  </data>
-  <data name="Banner_Export_Complete_Many" xml:space="preserve">
-    <value>Exported {0:N0} events to {1}.</value>
-    <comment>Export-complete message for multiple events. {0} is the exported event count; {1} is the destination path.</comment>
-  </data>
+  <data name="Banner_Export_Complete" xml:space="preserve"><value>{count, plural, one {Exported {count:N0} event to {path}.} other {Exported {count:N0} events to {path}.}}</value></data>
   <data name="Banner_Export_Progress" xml:space="preserve">
     <value>Exporting events...</value>
     <comment>Indeterminate export progress banner text.</comment>
@@ -439,14 +411,7 @@
     <value>upgrading '{0}'</value>
     <comment>Operation noun phrase for upgrading one named database. {0} is the file name.</comment>
   </data>
-  <data name="Banner_Db_OperationNoun_UpgradeBatch_One" xml:space="preserve">
-    <value>upgrading {0} database</value>
-    <comment>Operation noun phrase for upgrading one database. {0} is the raw database count.</comment>
-  </data>
-  <data name="Banner_Db_OperationNoun_UpgradeBatch_Many" xml:space="preserve">
-    <value>upgrading {0} databases</value>
-    <comment>Operation noun phrase for upgrading multiple databases. {0} is the raw database count.</comment>
-  </data>
+  <data name="Banner_Db_OperationNoun_UpgradeBatch" xml:space="preserve"><value>{count, plural, one {upgrading {count} database} other {upgrading {count} databases}}</value></data>
   <data name="Banner_Db_Import_Success_Title" xml:space="preserve">
     <value>Import Successful</value>
     <comment>Title for successful provider database imports.</comment>
@@ -455,14 +420,7 @@
     <value>No databases were imported.</value>
     <comment>Import result when no database was selected or imported.</comment>
   </data>
-  <data name="Banner_Db_Import_Success_One" xml:space="preserve">
-    <value>1 database has successfully been imported</value>
-    <comment>Import success message for one database.</comment>
-  </data>
-  <data name="Banner_Db_Import_Success_Many" xml:space="preserve">
-    <value>{0} databases have successfully been imported</value>
-    <comment>Import success message for multiple databases. {0} is the raw imported count.</comment>
-  </data>
+  <data name="Banner_Db_Import_Success" xml:space="preserve"><value>{count, plural, one {{count} database has successfully been imported} other {{count} databases have successfully been imported}}</value></data>
   <data name="Banner_Db_Import_Failed_Title" xml:space="preserve">
     <value>Import Failed</value>
     <comment>Title for failed provider database imports.</comment>
@@ -475,14 +433,7 @@
     <value>Import Completed with Errors</value>
     <comment>Title for provider database imports that partially succeed.</comment>
   </data>
-  <data name="Banner_Db_Import_Partial_One" xml:space="preserve">
-    <value>1 database imported</value>
-    <comment>Partial import message prefix for one imported database.</comment>
-  </data>
-  <data name="Banner_Db_Import_Partial_Many" xml:space="preserve">
-    <value>{0} databases imported</value>
-    <comment>Partial import message prefix for multiple imported databases. {0} is the raw imported count.</comment>
-  </data>
+  <data name="Banner_Db_Import_Partial" xml:space="preserve"><value>{count, plural, one {{count} database imported} other {{count} databases imported}}</value></data>
   <data name="Banner_Db_Import_Partial_Message" xml:space="preserve">
     <value>{0}; {1}</value>
     <comment>Partial import message. {0} is the imported-count phrase; {1} is the composed failure summary.</comment>
@@ -556,14 +507,7 @@
     <value>ClassificationFailed</value>
     <comment>Database status token shown inside a provider-database failure message.</comment>
   </data>
-  <data name="Db_Manage_Upgrade_Cancelled_One" xml:space="preserve">
-    <value>Upgraded {0} database; {1} cancelled.</value>
-    <comment>Upgrade announcement when some upgrades were cancelled (one upgraded). {0} upgraded count; {1} cancelled count.</comment>
-  </data>
-  <data name="Db_Manage_Upgrade_Cancelled_Many" xml:space="preserve">
-    <value>Upgraded {0} databases; {1} cancelled.</value>
-    <comment>Upgrade announcement when some upgrades were cancelled (multiple upgraded). {0} upgraded count; {1} cancelled count.</comment>
-  </data>
+  <data name="Db_Manage_Upgrade_Cancelled" xml:space="preserve"><value>{count, plural, one {Upgraded {count} database; {cancelled} cancelled.} other {Upgraded {count} databases; {cancelled} cancelled.}}</value></data>
   <data name="Db_Manage_Upgrade_SingleFailure" xml:space="preserve">
     <value>Upgrade of '{0}' failed: {1}</value>
     <comment>Upgrade announcement for a single failure. {0} is the file name; {1} is the failure reason.</comment>
@@ -572,14 +516,7 @@
     <value>Upgraded {0} of {1} databases; {2} failed. First failure: '{3}' — {4}</value>
     <comment>Upgrade announcement for multiple failures. {0} succeeded; {1} attempted; {2} failed; {3} first failed file name; {4} first failure reason.</comment>
   </data>
-  <data name="Db_Manage_Upgrade_Success_One" xml:space="preserve">
-    <value>Upgraded {0} database.</value>
-    <comment>Upgrade announcement when all upgrades succeeded (one). {0} is the upgraded count.</comment>
-  </data>
-  <data name="Db_Manage_Upgrade_Success_Many" xml:space="preserve">
-    <value>Upgraded {0} databases.</value>
-    <comment>Upgrade announcement when all upgrades succeeded (multiple). {0} is the upgraded count.</comment>
-  </data>
+  <data name="Db_Manage_Upgrade_Success" xml:space="preserve"><value>{count, plural, one {Upgraded {count} database.} other {Upgraded {count} databases.}}</value></data>
   <data name="Db_Badge_RecoveryRequired" xml:space="preserve">
     <value>Recovery required</value>
     <comment>Provider database row badge shown when an upgrade backup exists.</comment>
@@ -665,21 +602,14 @@
     <comment>Provider database OS stamp fallback.</comment>
   </data>
   <data name="Db_Entry_MixedOs_Count" xml:space="preserve">
-    <value>Mixed ({0} OS versions)</value>
+    <value>{count, plural, other {Mixed ({count} OS versions)}}</value>
     <comment>Provider database OS stamp summary for multiple versions. {0} is the raw count from 2 through 9.</comment>
   </data>
   <data name="Db_Entry_MixedOs_Capped" xml:space="preserve">
     <value>Mixed (9+ OS versions)</value>
     <comment>Provider database OS stamp summary when more than 9 OS versions are present.</comment>
   </data>
-  <data name="DatabaseRecoveryModal_Description_One" xml:space="preserve">
-    <value>The following database had its upgrade interrupted.</value>
-    <comment>Recovery modal description for one provider database.</comment>
-  </data>
-  <data name="DatabaseRecoveryModal_Description_Many" xml:space="preserve">
-    <value>The following databases had their upgrade interrupted.</value>
-    <comment>Recovery modal description for multiple provider databases.</comment>
-  </data>
+  <data name="DatabaseRecoveryModal_Description" xml:space="preserve"><value>{count, plural, one {The following database had its upgrade interrupted.} other {The following databases had their upgrade interrupted.}}</value></data>
   <data name="DatabaseRecoveryModal_Explanation" xml:space="preserve">
     <value>Restore from backup keeps the V3 data; Delete removes both the partial entry and its backup.</value>
     <comment>Recovery modal explanation. V3 is a provider database schema name; keep V3 literal.</comment>
@@ -757,14 +687,7 @@
     <value>Filter library not fully loaded</value>
     <comment>Title for a filter library load warning.</comment>
   </data>
-  <data name="Banner_Filter_NotLoaded_Message_One" xml:space="preserve">
-    <value>1 library entry couldn't be read and was left in place to avoid data loss. This usually means the library was written by a newer version of the app.</value>
-    <comment>Filter library load warning for a single unreadable entry.</comment>
-  </data>
-  <data name="Banner_Filter_NotLoaded_Message_Many" xml:space="preserve">
-    <value>{0} library entries couldn't be read and were left in place to avoid data loss. This usually means the library was written by a newer version of the app.</value>
-    <comment>Filter library load warning for multiple unreadable entries. {0} is the raw count of unreadable entries.</comment>
-  </data>
+  <data name="Banner_Filter_NotLoaded_Message" xml:space="preserve"><value>{count, plural, one {{count} library entry couldn't be read and was left in place to avoid data loss. This usually means the library was written by a newer version of the app.} other {{count} library entries couldn't be read and were left in place to avoid data loss. This usually means the library was written by a newer version of the app.}}</value></data>
   <data name="Banner_Filter_CreateFailed_Title" xml:space="preserve">
     <value>Couldn't create filter set</value>
     <comment>Title shown when creating a filter set in the filter library fails.</comment>
@@ -873,14 +796,7 @@
     <value>Empty log</value>
     <comment>Title for empty-log open warnings.</comment>
   </data>
-  <data name="Banner_EmptyLog_One" xml:space="preserve">
-    <value>Log contains no events: {0}</value>
-    <comment>Message for one empty log. {0} is the display name.</comment>
-  </data>
-  <data name="Banner_EmptyLog_Many" xml:space="preserve">
-    <value>{0} logs contained no events: {1}</value>
-    <comment>Message for multiple empty logs. {0} is the raw log count; {1} is the display-name list joined with Banner_List_Separator.</comment>
-  </data>
+  <data name="Banner_EmptyLog" xml:space="preserve"><value>{logCount, plural, =1 {Log contains no events: {name}} other {{logCount} logs contained no events: {names}}}</value></data>
   <data name="Banner_List_Separator" xml:space="preserve">
     <value>, </value>
     <comment>Separator inserted between items when a banner joins a list (e.g. multiple empty-log names or import failure details). Include any trailing space the locale needs.</comment>
@@ -890,14 +806,7 @@
     <value>Database upgrade recovery</value>
     <comment>Title for the database recovery banner.</comment>
   </data>
-  <data name="Banner_Recovery_Needed_One" xml:space="preserve">
-    <value>1 database needs recovery from interrupted upgrade.</value>
-    <comment>Recovery-needed message for one database.</comment>
-  </data>
-  <data name="Banner_Recovery_Needed_Many" xml:space="preserve">
-    <value>{0} databases need recovery from interrupted upgrade.</value>
-    <comment>Recovery-needed message for multiple databases. {0} is the raw database count.</comment>
-  </data>
+  <data name="Banner_Recovery_Needed" xml:space="preserve"><value>{count, plural, one {{count} database needs recovery from interrupted upgrade.} other {{count} databases need recovery from interrupted upgrade.}}</value></data>
   <data name="Banner_Recovery_Resolve" xml:space="preserve">
     <value>Resolve</value>
     <comment>Action label that opens the database recovery dialog.</comment>
@@ -1118,27 +1027,9 @@
     <comment>{0} is the channel name (data); {1} is a raw enum outcome identifier (diagnostic, not translated).</comment>
   </data>
   <!-- Dashboard: 2-form plural phrases (English count-picks-singular; see design "Known localization limitations"). -->
-  <data name="Dashboard_File_One" xml:space="preserve">
-    <value>1 file</value>
-  </data>
-  <data name="Dashboard_File_Many" xml:space="preserve">
-    <value>{0} files</value>
-    <comment>{0} is the count (2 or more).</comment>
-  </data>
-  <data name="Dashboard_Log_One" xml:space="preserve">
-    <value>1 log</value>
-  </data>
-  <data name="Dashboard_Log_Many" xml:space="preserve">
-    <value>{0} logs</value>
-    <comment>{0} is the count (2 or more).</comment>
-  </data>
-  <data name="Dashboard_Channel_One" xml:space="preserve">
-    <value>1 channel</value>
-  </data>
-  <data name="Dashboard_Channel_Many" xml:space="preserve">
-    <value>{0} channels</value>
-    <comment>{0} is the count (2 or more).</comment>
-  </data>
+  <data name="Dashboard_File" xml:space="preserve"><value>{count, plural, one {{count:N0} file} other {{count:N0} files}}</value></data>
+  <data name="Dashboard_Log" xml:space="preserve"><value>{count, plural, one {{count:N0} log} other {{count:N0} logs}}</value></data>
+  <data name="Dashboard_Channel" xml:space="preserve"><value>{count, plural, one {{count:N0} channel} other {{count:N0} channels}}</value></data>
   <!-- Dashboard: folder-scan chip status + cancel accessible names. -->
   <data name="Dashboard_ScanCancel_Labeled" xml:space="preserve">
     <value>Cancel folder scan for {0}</value>
@@ -1659,30 +1550,9 @@
   <data name="Correlation_Role_Child" xml:space="preserve">
     <value>Child</value>
   </data>
-  <data name="Correlation_EventOne" xml:space="preserve">
-    <value>{0} event</value>
-    <comment>{0} is a formatted count.</comment>
-  </data>
-  <data name="Correlation_EventMany" xml:space="preserve">
-    <value>{0} events</value>
-    <comment>{0} is a formatted count.</comment>
-  </data>
-  <data name="Correlation_ErrorOne" xml:space="preserve">
-    <value>{0} error</value>
-    <comment>{0} is a formatted count.</comment>
-  </data>
-  <data name="Correlation_ErrorMany" xml:space="preserve">
-    <value>{0} errors</value>
-    <comment>{0} is a formatted count.</comment>
-  </data>
-  <data name="Correlation_WarningOne" xml:space="preserve">
-    <value>{0} warning</value>
-    <comment>{0} is a formatted count.</comment>
-  </data>
-  <data name="Correlation_WarningMany" xml:space="preserve">
-    <value>{0} warnings</value>
-    <comment>{0} is a formatted count.</comment>
-  </data>
+  <data name="Correlation_Event" xml:space="preserve"><value>{count, plural, one {{count} event} other {{count} events}}</value></data>
+  <data name="Correlation_Error" xml:space="preserve"><value>{count, plural, one {{count} error} other {{count} errors}}</value></data>
+  <data name="Correlation_Warning" xml:space="preserve"><value>{count, plural, one {{count} warning} other {{count} warnings}}</value></data>
   <data name="Correlation_NoMessage" xml:space="preserve">
     <value>No message</value>
   </data>
@@ -1756,11 +1626,11 @@
     <comment>{0} is the localized start time; {1} is the localized end time.</comment>
   </data>
   <data name="Correlation_SharedTruncated" xml:space="preserve">
-    <value>Shared Activity ID: showing {0} of {1} events (the selected event and the most recent errors/events).</value>
+    <value>{total, plural, other {Shared Activity ID: showing {shown} of {total} events (the selected event and the most recent errors/events).}}</value>
     <comment>{0} is the number of rendered events; {1} is the total event count. Activity ID is a Windows Event Log identifier name.</comment>
   </data>
   <data name="Correlation_Truncated" xml:space="preserve">
-    <value>Showing the newest {0} of {1} events (plus the selected event).</value>
+    <value>{total, plural, other {Showing the newest {shown} of {total} events (plus the selected event).}}</value>
     <comment>{0} is the number of rendered events; {1} is the total event count.</comment>
   </data>
   <!-- Resolution coverage modal (step 2 localization). -->
@@ -3174,14 +3044,7 @@
   <data name="FilterPane_FilterSet_SelectAria" xml:space="preserve">
     <value>Filter Set</value>
   </data>
-  <data name="FilterPane_FilterSetFilterCount_One" xml:space="preserve">
-    <value>{0} filter</value>
-    <comment>{0} is the raw, ungrouped filter count.</comment>
-  </data>
-  <data name="FilterPane_FilterSetFilterCount_Many" xml:space="preserve">
-    <value>{0} filters</value>
-    <comment>{0} is the raw, ungrouped filter count.</comment>
-  </data>
+  <data name="FilterPane_FilterSetFilterCount" xml:space="preserve"><value>{count, plural, one {{count} filter} other {{count} filters}}</value></data>
   <data name="FilterPane_FilterSetDetail_WithTags" xml:space="preserve">
     <value>{0} · {1}</value>
     <comment>{0} is the localized filter count; {1} is the comma-joined tag list data.</comment>
@@ -3257,13 +3120,7 @@
   <data name="FilterPane_Announcement_SelectedScenarioMissing" xml:space="preserve">
     <value>Selected scenario no longer matches the loaded logs.</value>
   </data>
-  <data name="FilterPane_ClearConfirm_Message_One" xml:space="preserve">
-    <value>Clear 1 filter? This cannot be undone.</value>
-  </data>
-  <data name="FilterPane_ClearConfirm_Message_Many" xml:space="preserve">
-    <value>Clear {0} filters? This cannot be undone.</value>
-    <comment>{0} is the raw, ungrouped filter count.</comment>
-  </data>
+  <data name="FilterPane_ClearConfirm_Message" xml:space="preserve"><value>{count, plural, one {Clear {count} filter? This cannot be undone.} other {Clear {count} filters? This cannot be undone.}}</value></data>
   <data name="FilterPane_ClearConfirm_Title" xml:space="preserve">
     <value>Clear All Filters</value>
   </data>
@@ -4101,14 +3958,7 @@
     <comment>Database tools UI text.</comment>
   </data>
   <!-- Database Tools log view. -->
-  <data name="DatabaseTools_Log_EntryCount_One" xml:space="preserve">
-    <value>{0} entry</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="DatabaseTools_Log_EntryCount_Many" xml:space="preserve">
-    <value>{0} entries</value>
-    <comment>Database tools UI text.</comment>
-  </data>
+  <data name="DatabaseTools_Log_EntryCount" xml:space="preserve"><value>{count, plural, one {{count} entry} other {{count} entries}}</value></data>
   <data name="DatabaseTools_Log_Copy" xml:space="preserve">
     <value>Copy</value>
     <comment>Database tools UI text.</comment>
@@ -4781,14 +4631,7 @@
     <value>Pending database changes</value>
     <comment>Database tools UI text.</comment>
   </data>
-  <data name="Db_Manage_PendingChange_One" xml:space="preserve">
-    <value>{0} pending change</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="Db_Manage_PendingChange_Many" xml:space="preserve">
-    <value>{0} pending changes</value>
-    <comment>Database tools UI text.</comment>
-  </data>
+  <data name="Db_Manage_PendingChange" xml:space="preserve"><value>{count, plural, one {{count} pending change} other {{count} pending changes}}</value></data>
   <data name="Db_Manage_Discard" xml:space="preserve">
     <value>Discard</value>
     <comment>Database tools UI text.</comment>
@@ -4822,7 +4665,7 @@
     <comment>Database tools UI text.</comment>
   </data>
   <data name="Db_Manage_Remove_BulkPlain" xml:space="preserve">
-    <value>Are you sure you want to remove these {0} databases? ({1})</value>
+    <value>{count, plural, other {Are you sure you want to remove these {count} databases? ({names})}}</value>
     <comment>Database tools UI text.</comment>
   </data>
   <data name="Db_Manage_UpgradeNotStarted_Title" xml:space="preserve">
@@ -4833,66 +4676,23 @@
     <value>Another upgrade is already in progress.</value>
     <comment>Database tools UI text.</comment>
   </data>
-  <data name="Db_Manage_Remove_CloseReopenWarning_One" xml:space="preserve">
-    <value>Removing will close and reopen any affected log views.</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="Db_Manage_Remove_CloseReopenWarning_Many" xml:space="preserve">
-    <value>Removing these databases will close and reopen any affected log views.</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="Db_Manage_Remove_CancelThenRemove_One" xml:space="preserve">
-    <value>Upgrade in progress for: {0}. This will cancel the upgrade batch — which may include other files not in your selection — and then remove: {1}. Are you sure?</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="Db_Manage_Remove_CancelThenRemove_Many" xml:space="preserve">
-    <value>Upgrade in progress for: {0}. This will cancel the upgrade batches — which may include other files not in your selection — and then remove: {1}. Are you sure?</value>
-    <comment>Database tools UI text.</comment>
-  </data>
+  <data name="Db_Manage_Remove_CloseReopenWarning" xml:space="preserve"><value>{count, plural, =1 {Removing will close and reopen any affected log views.} other {Removing these databases will close and reopen any affected log views.}}</value></data>
+  <data name="Db_Manage_Remove_CancelThenRemove" xml:space="preserve"><value>{batchCount, plural, one {Upgrade in progress for: {upgradingNames}. This will cancel the upgrade batch — which may include other files not in your selection — and then remove: {fileNames}. Are you sure?} other {Upgrade in progress for: {upgradingNames}. This will cancel the upgrade batches — which may include other files not in your selection — and then remove: {fileNames}. Are you sure?}}</value></data>
   <data name="Db_Manage_Remove_SinglePlain" xml:space="preserve">
     <value>Are you sure you want to remove {0}?</value>
     <comment>Database tools UI text.</comment>
   </data>
-  <data name="Db_Manage_Remove_Title_One" xml:space="preserve">
-    <value>Remove Database</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="Db_Manage_Remove_Title_Many" xml:space="preserve">
-    <value>Remove {0} Databases</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="Db_Manage_RemoveConfirm_Accept_OneOne" xml:space="preserve">
-    <value>Cancel {0} upgrade and remove {1} database</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="Db_Manage_RemoveConfirm_Accept_OneMany" xml:space="preserve">
-    <value>Cancel {0} upgrade and remove {1} databases</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="Db_Manage_RemoveConfirm_Accept_ManyOne" xml:space="preserve">
-    <value>Cancel {0} upgrades and remove {1} database</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="Db_Manage_RemoveConfirm_Accept_ManyMany" xml:space="preserve">
-    <value>Cancel {0} upgrades and remove {1} databases</value>
-    <comment>Database tools UI text.</comment>
-  </data>
+  <data name="Db_Manage_Remove_Title" xml:space="preserve"><value>{count, plural, =1 {Remove Database} other {Remove {count} Databases}}</value></data>
+  <data name="Db_Manage_RemoveConfirm_Accept" xml:space="preserve"><value>{upgradeCount, plural, one {{databaseCount, plural, one {Cancel {upgradeCount} upgrade and remove {databaseCount} database} other {Cancel {upgradeCount} upgrade and remove {databaseCount} databases}}} other {{databaseCount, plural, one {Cancel {upgradeCount} upgrades and remove {databaseCount} database} other {Cancel {upgradeCount} upgrades and remove {databaseCount} databases}}}}</value></data>
   <data name="Db_Manage_Action_Remove" xml:space="preserve">
     <value>Remove</value>
     <comment>Database tools UI text.</comment>
   </data>
   <data name="Db_Manage_SubsetConfirm_Intro" xml:space="preserve">
-    <value>{0} of {1} selected databases will be upgraded.</value>
+    <value>{total, plural, other {{eligible} of {total} selected databases will be upgraded.}}</value>
     <comment>Database tools UI text.</comment>
   </data>
-  <data name="Db_Manage_SubsetConfirm_SkipHeader_One" xml:space="preserve">
-    <value>The following {0} database will be skipped:</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="Db_Manage_SubsetConfirm_SkipHeader_Many" xml:space="preserve">
-    <value>The following {0} databases will be skipped:</value>
-    <comment>Database tools UI text.</comment>
-  </data>
+  <data name="Db_Manage_SubsetConfirm_SkipHeader" xml:space="preserve"><value>{count, plural, one {The following {count} database will be skipped:} other {The following {count} databases will be skipped:}}</value></data>
   <data name="Db_Manage_SubsetConfirm_Title" xml:space="preserve">
     <value>Upgrade selected databases</value>
     <comment>Database tools UI text.</comment>
@@ -4901,22 +4701,8 @@
     <value>removal failed after confirmation</value>
     <comment>Database tools UI text.</comment>
   </data>
-  <data name="Db_Manage_Announcement_Removed_One" xml:space="preserve">
-    <value>Removed {0} database.</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="Db_Manage_Announcement_Removed_Many" xml:space="preserve">
-    <value>Removed {0} databases.</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="Db_Manage_Announcement_RemoveFailed_One" xml:space="preserve">
-    <value>{0} removal failed. First: {1} ({2}).</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="Db_Manage_Announcement_RemoveFailed_Many" xml:space="preserve">
-    <value>{0} removals failed. First: {1} ({2}).</value>
-    <comment>Database tools UI text.</comment>
-  </data>
+  <data name="Db_Manage_Announcement_Removed" xml:space="preserve"><value>{count, plural, one {Removed {count} database.} other {Removed {count} databases.}}</value></data>
+  <data name="Db_Manage_Announcement_RemoveFailed" xml:space="preserve"><value>{count, plural, one {{count} removal failed. First: {fileName} ({reason}).} other {{count} removals failed. First: {fileName} ({reason}).}}</value></data>
   <data name="Db_Manage_CannotRestoreInProgress" xml:space="preserve">
     <value>Cannot restore: a database upgrade is in progress.</value>
     <comment>Database tools UI text.</comment>
@@ -4933,14 +4719,7 @@
     <value>Selection cleared.</value>
     <comment>Database tools UI text.</comment>
   </data>
-  <data name="Db_Manage_Selection_One" xml:space="preserve">
-    <value>{0} database selected.</value>
-    <comment>Database tools UI text.</comment>
-  </data>
-  <data name="Db_Manage_Selection_Many" xml:space="preserve">
-    <value>{0} databases selected.</value>
-    <comment>Database tools UI text.</comment>
-  </data>
+  <data name="Db_Manage_Selection" xml:space="preserve"><value>{count, plural, one {{count} database selected.} other {{count} databases selected.}}</value></data>
   <data name="Modal_Yes" xml:space="preserve">
     <value>Yes</value>
     <comment>Shared dialog button.</comment>
@@ -5120,14 +4899,7 @@
     <value>No entries match filters.</value>
     <comment>Shown when entries exist but none match the active filters.</comment>
   </data>
-  <data name="DebugLog_Footer_Counter_One" xml:space="preserve">
-    <value>{0:N0} of {1:N0} entry</value>
-    <comment>Footer count when the total is exactly one entry. {0} is the filtered count, {1} is the total count (culture-aware N0).</comment>
-  </data>
-  <data name="DebugLog_Footer_Counter_Many" xml:space="preserve">
-    <value>{0:N0} of {1:N0} entries</value>
-    <comment>Footer count when the total is zero or more than one. {0} is the filtered count, {1} is the total count (culture-aware N0).</comment>
-  </data>
+  <data name="DebugLog_Footer_Counter" xml:space="preserve"><value>{total, plural, one {{filtered:N0} of {total:N0} entry} other {{filtered:N0} of {total:N0} entries}}</value></data>
   <data name="DebugLog_ExportDisabled_Loading" xml:space="preserve">
     <value>Wait for the log to finish loading</value>
     <comment>Reason the Export button is disabled while the log is still loading.</comment>

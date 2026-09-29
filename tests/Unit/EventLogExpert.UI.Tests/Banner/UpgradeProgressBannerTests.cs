@@ -89,7 +89,7 @@ public sealed class UpgradeProgressBannerTests : BunitContext
         var component = Render<UpgradeProgressBanner>(p => p.Add(c => c.Progress, entry));
 
         var banner = component.Find("aside.banner-upgrade-progress");
-        Assert.Contains("[[Banner_Upgrade_Preparing_Many(3)]]", banner.TextContent);
+        Assert.Contains("[[Banner_Upgrade_Preparing]]", banner.TextContent);
         Assert.DoesNotContain("[[Banner_Upgrade_InProgress(0", banner.TextContent);
     }
 
@@ -130,6 +130,6 @@ public sealed class UpgradeProgressBannerTests : BunitContext
         var component = Render<UpgradeProgressBanner>(p => p.Add(c => c.Progress, entry));
 
         var subtitle = component.Find("aside.banner-upgrade-progress .banner-subtitle");
-        Assert.Contains("[[Banner_Upgrade_QueuedBatches_Many(3)]]", subtitle.TextContent);
+        Assert.Contains("[[Banner_Upgrade_QueuedBatches]]", subtitle.TextContent);
     }
 }

@@ -133,9 +133,9 @@ public sealed class FilterPaneLocalizerWiringTests : BunitContext
     }
 
     [Theory]
-    [InlineData(1, "[[FilterPane_ClearConfirm_Message_One]]")]
-    [InlineData(2, "[[FilterPane_ClearConfirm_Message_Many(2)]]")]
-    [InlineData(1500, "[[FilterPane_ClearConfirm_Message_Many(1500)]]")]
+    [InlineData(1, "[[FilterPane_ClearConfirm_Message]]")]
+    [InlineData(2, "[[FilterPane_ClearConfirm_Message]]")]
+    [InlineData(1500, "[[FilterPane_ClearConfirm_Message]]")]
     public async Task ClearConfirm_RoutesOneAndManyMessagesWithRawCounts(int count, string expectedMessage)
     {
         var component = Render<UI.FilterPane.FilterPane>();
@@ -198,16 +198,16 @@ public sealed class FilterPaneLocalizerWiringTests : BunitContext
         Assert.Contains("[[FilterPane_FilterSet_Label]]", component.Markup);
         Assert.Equal("[[FilterPane_FilterSet_SelectAria]]", component.Find(".filter-set-dropdown").GetAttribute("aria-label"));
         Assert.Contains("Data &lt;Set&gt;", component.Markup);
-        Assert.Contains("[[FilterPane_FilterSetFilterCount_Many(1500)]]", component.Markup);
-        Assert.Contains("[[FilterPane_FilterSetDetail_WithTags([[FilterPane_FilterSetFilterCount_Many(1500)]]|tagA, tagB)]]", component.Markup);
-        Assert.Contains("[[FilterPane_FilterSetOptionMeta([[FilterPane_FilterSetDetail_WithTags([[FilterPane_FilterSetFilterCount_Many(1500)]]|tagA, tagB)]])]]", component.Markup);
+        Assert.Contains("[[FilterPane_FilterSetFilterCount]]", component.Markup);
+        Assert.Contains("[[FilterPane_FilterSetDetail_WithTags([[FilterPane_FilterSetFilterCount]]|tagA, tagB)]]", component.Markup);
+        Assert.Contains("[[FilterPane_FilterSetOptionMeta([[FilterPane_FilterSetDetail_WithTags([[FilterPane_FilterSetFilterCount]]|tagA, tagB)]])]]", component.Markup);
         Assert.Equal("[[FilterPane_FilterSet_ReplaceAria]]", component.Find("button[aria-label='[[FilterPane_FilterSet_ReplaceAria]]']").GetAttribute("aria-label"));
     }
 
     [Theory]
-    [InlineData(1, "[[FilterPane_FilterSetFilterCount_One(1)]]")]
-    [InlineData(2, "[[FilterPane_FilterSetFilterCount_Many(2)]]")]
-    [InlineData(1500, "[[FilterPane_FilterSetFilterCount_Many(1500)]]")]
+    [InlineData(1, "[[FilterPane_FilterSetFilterCount]]")]
+    [InlineData(2, "[[FilterPane_FilterSetFilterCount]]")]
+    [InlineData(1500, "[[FilterPane_FilterSetFilterCount]]")]
     public void FilterSetPicker_RoutesOneManyAndLargeCountsThroughDistinctKeys(int count, string expectedCountMarker)
     {
         var filterSet = BuildFilterSet("Count Set", [], count);

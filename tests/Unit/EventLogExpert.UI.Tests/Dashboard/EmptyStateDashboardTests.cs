@@ -15,6 +15,7 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Scenarios.Favorites;
 using EventLogExpert.Scenarios.Catalog;
+using EventLogExpert.UI.Common;
 using EventLogExpert.UI.Dashboard;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
@@ -263,9 +264,7 @@ public sealed class EmptyStateDashboardTests : BunitContext
 
         cut.Find(ActiveDetailLaunch).Click();
 
-        var channelCount = failed == 1
-            ? Localizer["Dashboard_Channel_One", failed].Value
-            : Localizer["Dashboard_Channel_Many", failed].Value;
+        string channelCount = PluralText.Format(Localizer, "Dashboard_Channel", ("count", failed));
         var expected = Localizer["Dashboard_Launch_OpenedWithUnavailable", "Application crashes", channelCount].Value;
         cut.WaitForAssertion(() => _announcer.Received(1).Announce(expected));
     }

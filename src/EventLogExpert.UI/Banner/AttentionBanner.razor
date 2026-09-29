@@ -1,5 +1,5 @@
 <aside class="banner banner-attention" role="alert">
-    <span class="banner-message">@LocalizedCount.OneOrManyRaw(Localizer, AttentionCount, "Banner_Attention_One", "Banner_Attention_Many")</span>
+    <span class="banner-message">@PluralText.Format(Localizer, "Banner_Attention", ("count", AttentionCount))</span>
 
     @CycleNav
 
