@@ -57,10 +57,10 @@ public sealed class HistogramTextComposerTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, false, "1/1/2024 1:45 PM to 1/1/2024 2:00 PM: 1 events.")]
-    [InlineData(true, false, "1/1/2024 1:45 PM to 1/1/2024 2:00 PM: 1 events, spike.")]
-    [InlineData(false, true, "1/1/2024 1:45 PM to 1/1/2024 2:00 PM: 1 events (2 Other (1 source), 1 Alpha).")]
-    [InlineData(true, true, "1/1/2024 1:45 PM to 1/1/2024 2:00 PM: 1 events (2 Other (1 source), 1 Alpha), spike.")]
+    [InlineData(false, false, "1/1/2024 1:45 PM to 1/1/2024 2:00 PM: 1 event.")]
+    [InlineData(true, false, "1/1/2024 1:45 PM to 1/1/2024 2:00 PM: 1 event, spike.")]
+    [InlineData(false, true, "1/1/2024 1:45 PM to 1/1/2024 2:00 PM: 1 event (2 Other (1 source), 1 Alpha).")]
+    [InlineData(true, true, "1/1/2024 1:45 PM to 1/1/2024 2:00 PM: 1 event (2 Other (1 source), 1 Alpha), spike.")]
     public void BinCursorAnnouncement_UsesTheTemplateForEachSpikeAndBreakdownCombination(
         bool isSpike,
         bool hasBreakdown,
@@ -89,15 +89,15 @@ public sealed class HistogramTextComposerTests : IDisposable
     }
 
     [Fact]
-    public void RegionAria_ErrorCodeEventsSingleCount_RendersPluralErrorCodeEvents()
+    public void RegionAria_ErrorCodeEventsSingleCount_RendersSingularErrorCodeEvent()
     {
         string text = HistogramTextComposer.RegionAria(_localizer, total: 1, HistogramEventNoun.ErrorCodeEvents, Start(), End(), []);
 
-        Assert.Equal("Timeline: 1 error-code events from 1/1/2024 1:45 PM to 1/1/2024 2:00 PM.", text);
+        Assert.Equal("Timeline: 1 error-code event from 1/1/2024 1:45 PM to 1/1/2024 2:00 PM.", text);
     }
 
     [Fact]
-    public void RegionAria_FormatsDateTimeWithGeneralShortPatternAndPluralOneCount()
+    public void RegionAria_FormatsDateTimeWithGeneralShortPatternAndSingularOneCount()
     {
         string text = HistogramTextComposer.RegionAria(
             _localizer,
@@ -107,7 +107,7 @@ public sealed class HistogramTextComposerTests : IDisposable
             End(),
             []);
 
-        Assert.Equal("Timeline: 1 events from 1/1/2024 1:45 PM to 1/1/2024 2:00 PM.", text);
+        Assert.Equal("Timeline: 1 event from 1/1/2024 1:45 PM to 1/1/2024 2:00 PM.", text);
     }
 
     [Fact]

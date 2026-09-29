@@ -14,19 +14,19 @@ public sealed class LocalizationMappingTests
 {
     private readonly MarkerLocalizer _localizer = new();
 
-    public static TheoryData<HistogramDimension, string, string> HistogramOverflowMappings() =>
+    public static TheoryData<HistogramDimension, string> HistogramOverflowMappings() =>
         new()
         {
-            { HistogramDimension.EventId, "Histogram_Overflow_EventId_One", "Histogram_Overflow_EventId_Many" },
-            { HistogramDimension.Source, "Histogram_Overflow_Source_One", "Histogram_Overflow_Source_Many" },
-            { HistogramDimension.TaskCategory, "Histogram_Overflow_TaskCategory_One", "Histogram_Overflow_TaskCategory_Many" },
-            { HistogramDimension.Opcode, "Histogram_Overflow_Opcode_One", "Histogram_Overflow_Opcode_Many" },
-            { HistogramDimension.Log, "Histogram_Overflow_Log_One", "Histogram_Overflow_Log_Many" },
-            { HistogramDimension.LogonType, "Histogram_Overflow_LogonType_One", "Histogram_Overflow_LogonType_Many" },
-            { HistogramDimension.TicketEncryptionType, "Histogram_Overflow_TicketEncryptionType_One", "Histogram_Overflow_TicketEncryptionType_Many" },
-            { HistogramDimension.ErrorCode, "Histogram_Overflow_ErrorCode_One", "Histogram_Overflow_ErrorCode_Many" },
-            { HistogramDimension.ProcessImage, "Histogram_Overflow_ProcessImage_One", "Histogram_Overflow_ProcessImage_Many" },
-            { HistogramDimension.ParentProcessImage, "Histogram_Overflow_ParentProcessImage_One", "Histogram_Overflow_ParentProcessImage_Many" }
+            { HistogramDimension.EventId, "Histogram_Overflow_EventId" },
+            { HistogramDimension.Source, "Histogram_Overflow_Source" },
+            { HistogramDimension.TaskCategory, "Histogram_Overflow_TaskCategory" },
+            { HistogramDimension.Opcode, "Histogram_Overflow_Opcode" },
+            { HistogramDimension.Log, "Histogram_Overflow_Log" },
+            { HistogramDimension.LogonType, "Histogram_Overflow_LogonType" },
+            { HistogramDimension.TicketEncryptionType, "Histogram_Overflow_TicketEncryptionType" },
+            { HistogramDimension.ErrorCode, "Histogram_Overflow_ErrorCode" },
+            { HistogramDimension.ProcessImage, "Histogram_Overflow_ProcessImage" },
+            { HistogramDimension.ParentProcessImage, "Histogram_Overflow_ParentProcessImage" }
         };
 
     [Fact]
@@ -58,17 +58,16 @@ public sealed class LocalizationMappingTests
     [MemberData(nameof(HistogramOverflowMappings))]
     public void HistogramGroupLabelFormatter_RoutesEveryCategoricalOverflowToLiteralKeys(
         HistogramDimension dimension,
-        string oneKey,
-        string manyKey)
+        string key)
     {
         Assert.Equal(
             "[[Histogram_Overflow_Bare]]",
             HistogramGroupLabelFormatter.Format(_localizer, new HistogramGroupLabel.CategoricalOther(dimension, 0)));
         Assert.Equal(
-            $"[[{oneKey}(1)]]",
+            $"[[{key}]]",
             HistogramGroupLabelFormatter.Format(_localizer, new HistogramGroupLabel.CategoricalOther(dimension, 1)));
         Assert.Equal(
-            $"[[{manyKey}(5)]]",
+            $"[[{key}]]",
             HistogramGroupLabelFormatter.Format(_localizer, new HistogramGroupLabel.CategoricalOther(dimension, 5)));
     }
 
@@ -98,16 +97,16 @@ public sealed class LocalizationMappingTests
     }
 
     [Theory]
-    [InlineData(HistogramEventNoun.Events, 1, "Histogram_EventNoun_Events_One")]
-    [InlineData(HistogramEventNoun.Events, 2, "Histogram_EventNoun_Events_Many")]
-    [InlineData(HistogramEventNoun.ErrorCodeEvents, 1, "Histogram_EventNoun_ErrorCodeEvents_One")]
-    [InlineData(HistogramEventNoun.ErrorCodeEvents, 2, "Histogram_EventNoun_ErrorCodeEvents_Many")]
+    [InlineData(HistogramEventNoun.Events, 1, "Histogram_EventNoun_Events")]
+    [InlineData(HistogramEventNoun.Events, 2, "Histogram_EventNoun_Events")]
+    [InlineData(HistogramEventNoun.ErrorCodeEvents, 1, "Histogram_EventNoun_ErrorCodeEvents")]
+    [InlineData(HistogramEventNoun.ErrorCodeEvents, 2, "Histogram_EventNoun_ErrorCodeEvents")]
     public void HistogramTextComposer_RoutesEveryEventNounToLiteralKey(
         HistogramEventNoun eventNoun,
         int count,
         string expectedKey)
     {
-        Assert.Equal($"[[{expectedKey}({count})]]", HistogramTextComposer.EventNoun(_localizer, eventNoun, count));
+        Assert.Equal($"[[{expectedKey}]]", HistogramTextComposer.EventNoun(_localizer, eventNoun, count));
     }
 
     [Fact]

@@ -111,7 +111,7 @@ public sealed class HistogramPaneLocalizerWiringTests : BunitContext
             "[[Histogram_Breakdown_Separator]]" +
             "[[Histogram_BreakdownItem(9|[[Histogram_Severity_Errors]])]]";
         string allDataAria =
-            $"[[Histogram_RegionAria_Breakdown(21|[[Histogram_EventNoun_Events_Many(21)]]|{s_start}|{s_start.AddHours(6)}|{allDataBreakdown})]]";
+            $"[[Histogram_RegionAria_Breakdown(21|[[Histogram_EventNoun_Events]]|{s_start}|{s_start.AddHours(6)}|{allDataBreakdown})]]";
 
         Assert.Equal(allDataAria, cut.Find(".histogram-scroll").GetAttribute("aria-label"));
         Assert.Contains("[[Histogram_Severity_Errors]]", cut.Find(".histogram-legend").TextContent, StringComparison.Ordinal);
@@ -123,7 +123,7 @@ public sealed class HistogramPaneLocalizerWiringTests : BunitContext
 
         string alphaTooltip = cut.FindAll("g[data-tip]")[1].GetAttribute("data-tip")!;
         Assert.Equal(
-            "[[Histogram_BarTooltip_Breakdown(2|[[Histogram_EventNoun_Events_Many(2)]]|01:00:00|01:59:59|[[Histogram_BreakdownItem(2|Alpha)]])]]",
+            "[[Histogram_BarTooltip_Breakdown(2|[[Histogram_EventNoun_Events]]|01:00:00|01:59:59|[[Histogram_BreakdownItem(2|Alpha)]])]]",
             alphaTooltip);
 
         cut.Find(".histogram-scroll").KeyDown(new KeyboardEventArgs { Key = "ArrowRight", ShiftKey = true });
@@ -132,7 +132,7 @@ public sealed class HistogramPaneLocalizerWiringTests : BunitContext
         string binStart = s_start.AddHours(1).ToString();
         string binEnd = s_start.AddHours(2).AddTicks(-1).ToString();
         Assert.Equal(
-            $"[[Histogram_BinCursor_Breakdown({binStart}|{binEnd}|2|[[Histogram_EventNoun_Events_Many(2)]]|[[Histogram_BreakdownItem(2|Alpha)]])]]",
+            $"[[Histogram_BinCursor_Breakdown({binStart}|{binEnd}|2|[[Histogram_EventNoun_Events]]|[[Histogram_BreakdownItem(2|Alpha)]])]]",
             cut.FindAll(".histogram-status")[1].TextContent);
 
         string windowBreakdown =
@@ -143,7 +143,7 @@ public sealed class HistogramPaneLocalizerWiringTests : BunitContext
         string windowEnd = s_start.AddHours(4).AddTicks(-1).ToString();
         cut.WaitForAssertion(
             () => Assert.Equal(
-                $"[[Histogram_WindowAnnouncement_Breakdown(10|[[Histogram_EventNoun_Events_Many(10)]]|{windowStart}|{windowEnd}|{windowBreakdown})]]",
+                $"[[Histogram_WindowAnnouncement_Breakdown(10|[[Histogram_EventNoun_Events]]|{windowStart}|{windowEnd}|{windowBreakdown})]]",
                 cut.FindAll(".histogram-status")[0].TextContent),
             s_wait);
     }

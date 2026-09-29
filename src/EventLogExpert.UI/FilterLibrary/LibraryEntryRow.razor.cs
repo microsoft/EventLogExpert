@@ -269,13 +269,11 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
         if (needsConfirm)
         {
             var message = Entry is LibraryEntryFilterSet filterSet ?
-                LocalizedCount.OneOrManyRaw(
+                PluralText.Format(
                     Localizer,
-                    filterSet.Filters.Count,
-                    "FilterLibrary_Entry_DeleteFilterSetMessage_One",
-                    "FilterLibrary_Entry_DeleteFilterSetMessage_Many",
-                    Entry.Name,
-                    filterSet.Filters.Count) :
+                    "FilterLibrary_Entry_DeleteFilterSetMessage",
+                    ("entryName", Entry.Name),
+                    ("filterCount", filterSet.Filters.Count)) :
                 Localizer["FilterLibrary_Entry_DeleteFilterMessage", Entry.Name];
 
             var confirmed = await AlertDialogService.ShowAlert(

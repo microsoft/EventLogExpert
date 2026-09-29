@@ -470,8 +470,8 @@ public sealed class FilterEditorLocalizerWiringTests : BunitContext
     [Theory]
     [InlineData(0, "?")]
     [InlineData(1, "alpha")]
-    [InlineData(2, "[[FilterEditor_PredicateSummary_ValueCount_Many(2)]]")]
-    [InlineData(1500, "[[FilterEditor_PredicateSummary_ValueCount_Many(1500)]]")]
+    [InlineData(2, "[[FilterEditor_PredicateSummary_ValueCount]]")]
+    [InlineData(1500, "[[FilterEditor_PredicateSummary_ValueCount]]")]
     public void PredicateSummary_ManyValueCounts_UseRequiredDisplayBranches(int count, string expectedValueLabel)
     {
         List<string> values = count switch
@@ -497,7 +497,7 @@ public sealed class FilterEditorLocalizerWiringTests : BunitContext
     }
 
     [Theory]
-    [InlineData(ComparisonOperator.Equals, MatchMode.Many, "a|b", "[[FilterEditor_PredicateSummary([[FilterLens_Property_TaskCategory]]|[[FilterEditor_PredicateSummary_Operator_In]]|[[FilterEditor_PredicateSummary_ValueCount_Many(2)]])]]")]
+    [InlineData(ComparisonOperator.Equals, MatchMode.Many, "a|b", "[[FilterEditor_PredicateSummary([[FilterLens_Property_TaskCategory]]|[[FilterEditor_PredicateSummary_Operator_In]]|[[FilterEditor_PredicateSummary_ValueCount]])]]")]
     [InlineData(ComparisonOperator.Contains, MatchMode.Single, "abc", "[[FilterEditor_PredicateSummary([[FilterLens_Property_TaskCategory]]|[[FilterEditor_PredicateSummary_Operator_Contains]]|abc)]]")]
     [InlineData(ComparisonOperator.NotContains, MatchMode.Single, "abc", "[[FilterEditor_PredicateSummary([[FilterLens_Property_TaskCategory]]|[[FilterEditor_PredicateSummary_Operator_NotContains]]|abc)]]")]
     [InlineData(ComparisonOperator.Equals, MatchMode.Single, "abc", "[[FilterEditor_PredicateSummary([[FilterLens_Property_TaskCategory]]|==|abc)]]")]

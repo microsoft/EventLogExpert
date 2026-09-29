@@ -27,38 +27,25 @@ internal static class HistogramGroupLabelFormatter
         dimension switch
         {
             HistogramDimension.EventId => foldedCount == 0 ? localizer["Histogram_Overflow_Bare"] :
-                localizer[foldedCount == 1 ? "Histogram_Overflow_EventId_One" : "Histogram_Overflow_EventId_Many",
-                    foldedCount],
+                PluralText.Format(localizer, "Histogram_Overflow_EventId", ("count", foldedCount)),
             HistogramDimension.Source => foldedCount == 0 ? localizer["Histogram_Overflow_Bare"] :
-                localizer[foldedCount == 1 ? "Histogram_Overflow_Source_One" : "Histogram_Overflow_Source_Many",
-                    foldedCount],
+                PluralText.Format(localizer, "Histogram_Overflow_Source", ("count", foldedCount)),
             HistogramDimension.TaskCategory => foldedCount == 0 ? localizer["Histogram_Overflow_Bare"] :
-                localizer[foldedCount == 1 ? "Histogram_Overflow_TaskCategory_One" :
-                        "Histogram_Overflow_TaskCategory_Many",
-                    foldedCount],
+                PluralText.Format(localizer, "Histogram_Overflow_TaskCategory", ("count", foldedCount)),
             HistogramDimension.Opcode => foldedCount == 0 ? localizer["Histogram_Overflow_Bare"] :
-                localizer[foldedCount == 1 ? "Histogram_Overflow_Opcode_One" : "Histogram_Overflow_Opcode_Many",
-                    foldedCount],
+                PluralText.Format(localizer, "Histogram_Overflow_Opcode", ("count", foldedCount)),
             HistogramDimension.Log => foldedCount == 0 ? localizer["Histogram_Overflow_Bare"] :
-                localizer[foldedCount == 1 ? "Histogram_Overflow_Log_One" : "Histogram_Overflow_Log_Many", foldedCount],
+                PluralText.Format(localizer, "Histogram_Overflow_Log", ("count", foldedCount)),
             HistogramDimension.LogonType => foldedCount == 0 ? localizer["Histogram_Overflow_Bare"] :
-                localizer[foldedCount == 1 ? "Histogram_Overflow_LogonType_One" : "Histogram_Overflow_LogonType_Many",
-                    foldedCount],
+                PluralText.Format(localizer, "Histogram_Overflow_LogonType", ("count", foldedCount)),
             HistogramDimension.TicketEncryptionType => foldedCount == 0 ? localizer["Histogram_Overflow_Bare"] :
-                localizer[foldedCount == 1 ? "Histogram_Overflow_TicketEncryptionType_One" :
-                        "Histogram_Overflow_TicketEncryptionType_Many",
-                    foldedCount],
+                PluralText.Format(localizer, "Histogram_Overflow_TicketEncryptionType", ("count", foldedCount)),
             HistogramDimension.ErrorCode => foldedCount == 0 ? localizer["Histogram_Overflow_Bare"] :
-                localizer[foldedCount == 1 ? "Histogram_Overflow_ErrorCode_One" : "Histogram_Overflow_ErrorCode_Many",
-                    foldedCount],
+                PluralText.Format(localizer, "Histogram_Overflow_ErrorCode", ("count", foldedCount)),
             HistogramDimension.ProcessImage => foldedCount == 0 ? localizer["Histogram_Overflow_Bare"] :
-                localizer[foldedCount == 1 ? "Histogram_Overflow_ProcessImage_One" :
-                        "Histogram_Overflow_ProcessImage_Many",
-                    foldedCount],
+                PluralText.Format(localizer, "Histogram_Overflow_ProcessImage", ("count", foldedCount)),
             HistogramDimension.ParentProcessImage => foldedCount == 0 ? localizer["Histogram_Overflow_Bare"] :
-                localizer[foldedCount == 1 ? "Histogram_Overflow_ParentProcessImage_One" :
-                        "Histogram_Overflow_ParentProcessImage_Many",
-                    foldedCount],
+                PluralText.Format(localizer, "Histogram_Overflow_ParentProcessImage", ("count", foldedCount)),
             _ => throw new ArgumentOutOfRangeException(nameof(dimension), dimension, null)
         };
 

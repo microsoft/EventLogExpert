@@ -17,7 +17,7 @@
             <span class="library-entry-name-text" data-tooltip="@Entry.Name" data-tooltip-overflow>@Entry.Name</span>
             @if (Entry is LibraryEntryFilterSet filterSet)
             {
-                <span class="library-entry-detail">@LocalizedCount.OneOrManyRaw(Localizer, filterSet.Filters.Count, "FilterLibrary_Entry_FilterCount_One", "FilterLibrary_Entry_FilterCount_Many", filterSet.Filters.Count)</span>
+                <span class="library-entry-detail">@PluralText.Format(Localizer, "FilterLibrary_Entry_FilterCount", ("count", filterSet.Filters.Count))</span>
             }
             @if (ActiveTab == LibraryTab.PreviouslyUsed)
             {
@@ -63,7 +63,7 @@
                         <Button CssClass="library-entry-tag-chip-more"
                             OnClick="ToggleEditTagsMode"
                             aria-describedby="@($"library-more-tags-{ActiveTab}-{Entry.Id.Value:N}")"
-                            aria-label="@Localizer["FilterLibrary_Entry_ShowAllTagsAria", Entry.Tags.Count]"
+                            aria-label="@(PluralText.Format(Localizer, "FilterLibrary_Entry_ShowAllTagsAria", ("count", Entry.Tags.Count)))"
                             data-tooltip="@string.Join(", ", Entry.Tags.Skip(inlineVisible))">
                             @Localizer["FilterLibrary_Entry_MoreTags", inlineHidden]
                         </Button>

@@ -126,7 +126,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         var preview = FilterImportTextComposer.Preview(new MarkerLocalizer(), preflight);
 
         Assert.Equal(1, summary.UpdatedTags);
-        Assert.Contains("[[FilterImport_TagUpdates_One(1)]]", preview);
+        Assert.Contains("[[FilterImport_TagUpdates]]", preview);
     }
 
     [Fact]
@@ -272,7 +272,7 @@ public sealed class FilterLibraryModalTests : BunitContext
         var summary = FilterImportTextComposer.Preview(new MarkerLocalizer(), preflight);
 
         Assert.DoesNotContain("FilterImport_TagUpdates", summary);
-        Assert.Contains("[[FilterImport_Overwrite_One(1)]]", summary);
+        Assert.Contains("[[FilterImport_Overwrite]]", summary);
     }
 
     [Fact]
@@ -289,7 +289,7 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var summary = FilterImportTextComposer.Preview(new MarkerLocalizer(), preflight);
 
-        Assert.Contains("[[FilterImport_Ambiguous_One(1)]]", summary);
+        Assert.Contains("[[FilterImport_Ambiguous]]", summary);
         Assert.DoesNotContain("manual", summary, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -319,7 +319,7 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var summary = FilterImportTextComposer.Preview(new MarkerLocalizer(), preflight);
 
-        Assert.Contains("[[FilterImport_TagUpdates_Many(2)]]", summary);
+        Assert.Contains("[[FilterImport_TagUpdates]]", summary);
     }
 
     [Fact]
@@ -335,7 +335,7 @@ public sealed class FilterLibraryModalTests : BunitContext
 
         var summary = FilterImportTextComposer.Preview(new MarkerLocalizer(), preflight);
 
-        Assert.Contains("[[FilterImport_TagUpdates_One(1)]]", summary);
+        Assert.Contains("[[FilterImport_TagUpdates]]", summary);
     }
 
     [Fact]
@@ -486,10 +486,10 @@ public sealed class FilterLibraryModalTests : BunitContext
     }
 
     [Theory]
-    [InlineData(0, "[[FilterLibrary_ExportedEntries_Many(0)]]")]
-    [InlineData(1, "[[FilterLibrary_ExportedEntries_One(1)]]")]
-    [InlineData(2, "[[FilterLibrary_ExportedEntries_Many(2)]]")]
-    public async Task OnExportAsync_RoutesExportedEntryCountAnnouncementThroughOneAndManyKeys(
+    [InlineData(0, "[[FilterLibrary_ExportedEntries]]")]
+    [InlineData(1, "[[FilterLibrary_ExportedEntries]]")]
+    [InlineData(2, "[[FilterLibrary_ExportedEntries]]")]
+    public async Task OnExportAsync_RoutesExportedEntryCountAnnouncementThroughPluralKey(
         int entryCount,
         string expectedAnnouncement)
     {
@@ -566,7 +566,7 @@ public sealed class FilterLibraryModalTests : BunitContext
             var importTask = InvokePrivateTask(component.Instance, "OnImportAsync");
 
             component.WaitForAssertion(() =>
-                Assert.Equal("[[FilterImport_EmptyValueMessage_One(1|Incoming)]]", component.Find(".inline-alert-message").TextContent));
+                Assert.Equal("[[FilterImport_EmptyValueMessage]]", component.Find(".inline-alert-message").TextContent));
             var normalizeButton = component.FindAll(".inline-alert button")
                 .Single(button => button.TextContent.Contains("[[FilterImport_Action_Normalize]]", StringComparison.Ordinal));
             await normalizeButton.ClickAsync(new MouseEventArgs());

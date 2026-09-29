@@ -118,14 +118,14 @@ public sealed class StatsLocalizerWiringTests : BunitContext
                 Assert.Equal("[[Stats_ResolutionCoverage]]", cut.Find(".stats-coverage-link").TextContent.Trim());
                 Assert.Equal("[[Stats_ResolutionCoverageAria]]", cut.Find(".stats-coverage-link").GetAttribute("aria-label"));
                 Assert.Equal(
-                    "[[Stats_Headline_Events_Many(100)]][[Stats_Headline_ErrorCritical_Many(5)]][[Stats_Headline_TopSources_One(1|60)]]",
+                    "[[Stats_Headline_Events]][[Stats_Headline_ErrorCritical]][[Stats_Headline_TopSources]]",
                     cut.Find(".stats-headline").TextContent);
                 Assert.Equal("[[Stats_SeverityBarLabel]]", cut.Find(".stats-severity-bar").GetAttribute("aria-label"));
                 Assert.Contains("[[Stats_SeveritySegmentTooltip", cut.Markup, StringComparison.Ordinal);
                 Assert.Contains("[[Severity_Level_Information]]", cut.Markup, StringComparison.Ordinal);
                 Assert.Contains("[[Stats_Dimension_Source]]", cut.Markup, StringComparison.Ordinal);
                 Assert.Contains("[[Stats_Row_IncludeAria([[Stats_Dimension_Source]]|Alpha)]]", cut.Markup, StringComparison.Ordinal);
-                Assert.Contains("[[Stats_Coverage_All_Source_One", cut.Markup, StringComparison.Ordinal);
+                Assert.Contains("[[Stats_Coverage_All_Source", cut.Markup, StringComparison.Ordinal);
             },
             s_wait);
     }

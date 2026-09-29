@@ -34,7 +34,7 @@ public sealed class StatusBarTextComposerTests : IDisposable
     [Fact]
     public void CoverageChipTooltip_LoadedCountAndUnresolvedCount_RoutesKeyWithBothCounts() =>
         Assert.Equal(
-            "[[StatusBar_Coverage_Tooltip(1,500|2,500)]]",
+            "[[StatusBar_Coverage_Tooltip]]",
             StatusBarTextComposer.CoverageTooltip(Localizer, 1500, 2500));
 
     public void Dispose()
@@ -44,8 +44,8 @@ public sealed class StatusBarTextComposerTests : IDisposable
     }
 
     [Theory]
-    [InlineData(1, "[[StatusBar_Filter_Lens_One]]")]
-    [InlineData(3, "[[StatusBar_Filter_Lens_Many(3)]]")]
+    [InlineData(1, "[[StatusBar_Filter_Lens]]")]
+    [InlineData(3, "[[StatusBar_Filter_Lens]]")]
     public void FilterIndicatorTooltip_LensesOnly_ReturnsLensCount(int lensCount, string expected) =>
         Assert.Equal(expected, StatusBarTextComposer.FilterIndicatorTooltip(Localizer, persistentActive: false, lensCount: lensCount));
 
@@ -55,7 +55,7 @@ public sealed class StatusBarTextComposerTests : IDisposable
 
     [Fact]
     public void FilterIndicatorTooltip_PersistentAndLenses_CombinesBoth() =>
-        Assert.Equal("[[StatusBar_Filter_ActiveLens_Many(2)]]", StatusBarTextComposer.FilterIndicatorTooltip(Localizer, persistentActive: true, lensCount: 2));
+        Assert.Equal("[[StatusBar_Filter_ActiveLens]]", StatusBarTextComposer.FilterIndicatorTooltip(Localizer, persistentActive: true, lensCount: 2));
 
     [Fact]
     public void FilterIndicatorTooltip_PersistentOnly_ReturnsFilterActive() =>
@@ -131,12 +131,12 @@ public sealed class StatusBarTextComposerTests : IDisposable
     [InlineData(1)]
     public void FormatCounts_SingleOrNoSelection_OmitsSelectedSuffix(int selectedCount) =>
         Assert.Equal(
-            "[[StatusBar_Counts_Total_Many(1,234)]]",
+            "[[StatusBar_Counts_Total]]",
             StatusBarTextComposer.Counts(Localizer, 1234, 1234, isFiltered: false, selectedCount: selectedCount));
 
     [Fact]
     public void FormatCounts_Unfiltered_ShowsTotalEvents() =>
-        Assert.Equal("[[StatusBar_Counts_Total_Many(1,234)]]", StatusBarTextComposer.Counts(Localizer, 1234, 1234, isFiltered: false, selectedCount: 0));
+        Assert.Equal("[[StatusBar_Counts_Total]]", StatusBarTextComposer.Counts(Localizer, 1234, 1234, isFiltered: false, selectedCount: 0));
 
     [Fact]
     public void FormatCoverageChip_UnresolvedCount_RoutesKeyWithGroupedCount() =>
@@ -171,7 +171,7 @@ public sealed class StatusBarTextComposerTests : IDisposable
         var summary = StatusBarTextComposer.Loading(Localizer, Loading(progresses));
 
         Assert.NotNull(summary);
-        Assert.Equal("[[StatusBar_Loading_ManyLogs(1,500)]]", summary.Value.Text);
+        Assert.Equal("[[StatusBar_Loading_ManyLogs]]", summary.Value.Text);
         Assert.Equal(1500, summary.Value.FailedEvents);
     }
 
@@ -260,7 +260,7 @@ public sealed class StatusBarTextComposerTests : IDisposable
             Loading(new LoadingProgress(100, 0), new LoadingProgress(50, 0)));
 
         Assert.NotNull(summary);
-        Assert.Equal("[[StatusBar_Loading_ManyLogs(2)]]", summary.Value.Text);
+        Assert.Equal("[[StatusBar_Loading_ManyLogs]]", summary.Value.Text);
     }
 
     [Fact]
@@ -316,7 +316,7 @@ public sealed class StatusBarTextComposerTests : IDisposable
         var active = Combined(groupId);
         var groups = new[] { new LogTabGroup(groupId, string.Empty, [EventLogId.Create(), EventLogId.Create(), EventLogId.Create()]) };
 
-        Assert.Equal("[[StatusBar_Source_CombinedCount_Many(3)]]", StatusBarTextComposer.Source(Localizer, active, [active], groups));
+        Assert.Equal("[[StatusBar_Source_CombinedCount]]", StatusBarTextComposer.Source(Localizer, active, [active], groups));
     }
 
     [Theory]

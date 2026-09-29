@@ -1791,13 +1791,8 @@
   <data name="Coverage_NoEvents" xml:space="preserve">
     <value>No events to analyze.</value>
   </data>
-  <data name="Coverage_TotalEvents_One" xml:space="preserve">
-    <value>1 event in the current view</value>
-    <comment>Singular form; the count is exactly 1 so there is no placeholder.</comment>
-  </data>
-  <data name="Coverage_TotalEvents_Many" xml:space="preserve">
-    <value>{0} events in the current view</value>
-    <comment>Plural form (count 2 or more). {0} is the event count, already formatted with the current-culture group separator.</comment>
+  <data name="Coverage_TotalEvents" xml:space="preserve">
+    <value>{count, plural, one {{count:N0} event in the current view} other {{count:N0} events in the current view}}</value>
   </data>
   <data name="Coverage_FilteredViewTooltip" xml:space="preserve">
     <value>Coverage reflects the current filtered view, not all loaded events.</value>
@@ -2347,10 +2342,7 @@
   <data name="FilterEditor_PredicateSummary_Operator_NotContains" xml:space="preserve">
     <value>doesn't contain</value>
   </data>
-  <data name="FilterEditor_PredicateSummary_ValueCount_Many" xml:space="preserve">
-    <value>{0} values</value>
-    <comment>{0} is the raw count of selected values; do not add number grouping.</comment>
-  </data>
+  <data name="FilterEditor_PredicateSummary_ValueCount" xml:space="preserve"><value>{count, plural, other {{count} values}}</value></data>
   <data name="FilterEditor_PredicateSummary" xml:space="preserve">
     <value>{0} {1} {2}</value>
     <comment>{0} is the filter property token, {1} is the localized operator, and {2} is the value text or raw value count.</comment>
@@ -2760,22 +2752,14 @@
   <data name="StatusBar_Source_Combined" xml:space="preserve">
     <value>Combined</value>
   </data>
-  <data name="StatusBar_Source_CombinedCount_One" xml:space="preserve">
-    <value>Combined ({0} logs)</value>
-    <comment>Neutral value intentionally keeps the previous naive plural "logs" for count 1; full plural rules are deferred to the Humanizer roadmap.</comment>
+  <data name="StatusBar_Source_CombinedCount" xml:space="preserve">
+    <value>{memberCount, plural, one {Combined ({memberCount} log)} other {Combined ({memberCount} logs)}}</value>
   </data>
-  <data name="StatusBar_Source_CombinedCount_Many" xml:space="preserve">
-    <value>Combined ({0} logs)</value>
-  </data>
-  <data name="StatusBar_Counts_Total_One" xml:space="preserve">
-    <value>{0} events</value>
-    <comment>Neutral value intentionally keeps the previous naive plural "events" for count 1; full plural rules are deferred to the Humanizer roadmap.</comment>
-  </data>
-  <data name="StatusBar_Counts_Total_Many" xml:space="preserve">
-    <value>{0} events</value>
+  <data name="StatusBar_Counts_Total" xml:space="preserve">
+    <value>{total, plural, one {{total:N0} event} other {{total:N0} events}}</value>
   </data>
   <data name="StatusBar_Counts_TotalSelected" xml:space="preserve">
-    <value>{0} events · {1} selected</value>
+    <value>{total, plural, other {{total:N0} events · {selected:N0} selected}}</value>
   </data>
   <data name="StatusBar_Counts_ShownOfTotal" xml:space="preserve">
     <value>{0} of {1} shown</value>
@@ -2792,8 +2776,7 @@
     <comment>Coverage adjective agreement and full plural handling are deferred to the Humanizer roadmap.</comment>
   </data>
   <data name="StatusBar_Coverage_Tooltip" xml:space="preserve">
-    <value>{0} unresolved of {1} events loaded in this tab/group. Filters are not applied - open Coverage for the current view's breakdown.</value>
-    <comment>Coverage adjective agreement and full plural handling are deferred to the Humanizer roadmap.</comment>
+    <value>{total, plural, one {{unresolved:N0} unresolved of {total:N0} event loaded in this tab/group. Filters are not applied - open Coverage for the current view's breakdown.} other {{unresolved:N0} unresolved of {total:N0} events loaded in this tab/group. Filters are not applied - open Coverage for the current view's breakdown.}}</value>
   </data>
   <data name="StatusBar_Loading_Pending" xml:space="preserve">
     <value>Loading...</value>
@@ -2808,7 +2791,7 @@
     <value>Loading: {0} ({1}%)</value>
   </data>
   <data name="StatusBar_Loading_ManyLogs" xml:space="preserve">
-    <value>Loading {0} logs...</value>
+    <value>{loadingCount, plural, other {Loading {loadingCount:N0} logs...}}</value>
   </data>
   <data name="StatusBar_Loading_Failed" xml:space="preserve">
     <value>Failed: {0}</value>
@@ -2875,17 +2858,11 @@
   <data name="StatusBar_Filter_Active" xml:space="preserve">
     <value>Filter active</value>
   </data>
-  <data name="StatusBar_Filter_Lens_One" xml:space="preserve">
-    <value>1 lens</value>
+  <data name="StatusBar_Filter_Lens" xml:space="preserve">
+    <value>{count, plural, one {{count} lens} other {{count} lenses}}</value>
   </data>
-  <data name="StatusBar_Filter_Lens_Many" xml:space="preserve">
-    <value>{0} lenses</value>
-  </data>
-  <data name="StatusBar_Filter_ActiveLens_One" xml:space="preserve">
-    <value>Filter + 1 lens</value>
-  </data>
-  <data name="StatusBar_Filter_ActiveLens_Many" xml:space="preserve">
-    <value>Filter + {0} lenses</value>
+  <data name="StatusBar_Filter_ActiveLens" xml:space="preserve">
+    <value>{count, plural, one {Filter + {count} lens} other {Filter + {count} lenses}}</value>
   </data>
   <data name="StatusBar_Stats_Show" xml:space="preserve">
     <value>Show statistics for these events</value>
@@ -2931,32 +2908,21 @@
   <data name="Stats_Headline_Computing" xml:space="preserve"><value>Computing statistics...</value></data>
   <data name="Stats_Headline_Empty" xml:space="preserve"><value>No events in the current view</value></data>
   <data name="Stats_Headline_RemoveLens" xml:space="preserve"><value>0 events - remove a lens to continue</value></data>
-  <data name="Stats_Headline_Events_One" xml:space="preserve"><value>{0} event</value></data>
-  <data name="Stats_Headline_Events_Many" xml:space="preserve"><value>{0} events</value></data>
-  <data name="Stats_Headline_ErrorCritical_One" xml:space="preserve"><value> - {0} error/critical</value><comment>Same English for one/many by design (the count is the {0} tally, e.g. '1 error/critical'); split so gendered/plural locales can differ.</comment></data>
-  <data name="Stats_Headline_ErrorCritical_Many" xml:space="preserve"><value> - {0} error/critical</value><comment>Same English for one/many by design (the count is the {0} tally, e.g. '1 error/critical'); split so gendered/plural locales can differ.</comment></data>
-  <data name="Stats_Headline_TopSources_One" xml:space="preserve"><value> - top {0} source = {1}%</value></data>
-  <data name="Stats_Headline_TopSources_Many" xml:space="preserve"><value> - top {0} sources = {1}%</value></data>
+  <data name="Stats_Headline_Events" xml:space="preserve"><value>{count, plural, one {{count:N0} event} other {{count:N0} events}}</value></data>
+  <data name="Stats_Headline_ErrorCritical" xml:space="preserve"><value>{errorCritical, plural, one { - {errorCritical:N0} error/critical} other { - {errorCritical:N0} error/critical}}</value></data>
+  <data name="Stats_Headline_TopSources" xml:space="preserve"><value>{count, plural, one { - top {count} source = {percent}%} other { - top {count} sources = {percent}%}}</value></data>
   <data name="Stats_Dimension_Source" xml:space="preserve"><value>Source</value></data>
   <data name="Stats_Dimension_EventId" xml:space="preserve"><value>Event ID</value></data>
   <data name="Stats_Dimension_TaskCategory" xml:space="preserve"><value>Task Category</value></data>
   <data name="Stats_Dimension_User" xml:space="preserve"><value>User</value></data>
-  <data name="Stats_Coverage_All_Source_One" xml:space="preserve"><value>All {0} source - {1}% of events</value></data>
-  <data name="Stats_Coverage_All_Source_Many" xml:space="preserve"><value>All {0} sources - {1}% of events</value></data>
-  <data name="Stats_Coverage_Top_Source_One" xml:space="preserve"><value>Top {0} of {1} source - {2}% of events</value></data>
-  <data name="Stats_Coverage_Top_Source_Many" xml:space="preserve"><value>Top {0} of {1} sources - {2}% of events</value></data>
-  <data name="Stats_Coverage_All_EventId_One" xml:space="preserve"><value>All {0} event ID - {1}% of events</value></data>
-  <data name="Stats_Coverage_All_EventId_Many" xml:space="preserve"><value>All {0} event IDs - {1}% of events</value></data>
-  <data name="Stats_Coverage_Top_EventId_One" xml:space="preserve"><value>Top {0} of {1} event ID - {2}% of events</value></data>
-  <data name="Stats_Coverage_Top_EventId_Many" xml:space="preserve"><value>Top {0} of {1} event IDs - {2}% of events</value></data>
-  <data name="Stats_Coverage_All_TaskCategory_One" xml:space="preserve"><value>All {0} task category - {1}% of events</value></data>
-  <data name="Stats_Coverage_All_TaskCategory_Many" xml:space="preserve"><value>All {0} task categories - {1}% of events</value></data>
-  <data name="Stats_Coverage_Top_TaskCategory_One" xml:space="preserve"><value>Top {0} of {1} task category - {2}% of events</value></data>
-  <data name="Stats_Coverage_Top_TaskCategory_Many" xml:space="preserve"><value>Top {0} of {1} task categories - {2}% of events</value></data>
-  <data name="Stats_Coverage_All_User_One" xml:space="preserve"><value>All {0} user - {1}% of events</value></data>
-  <data name="Stats_Coverage_All_User_Many" xml:space="preserve"><value>All {0} users - {1}% of events</value></data>
-  <data name="Stats_Coverage_Top_User_One" xml:space="preserve"><value>Top {0} of {1} user - {2}% of events</value></data>
-  <data name="Stats_Coverage_Top_User_Many" xml:space="preserve"><value>Top {0} of {1} users - {2}% of events</value></data>
+  <data name="Stats_Coverage_All_Source" xml:space="preserve"><value>{count, plural, one {All {count:N0} source - {percent}% of events} other {All {count:N0} sources - {percent}% of events}}</value></data>
+  <data name="Stats_Coverage_Top_Source" xml:space="preserve"><value>{distinctCount, plural, one {Top {shownCount} of {distinctCount:N0} source - {percent}% of events} other {Top {shownCount} of {distinctCount:N0} sources - {percent}% of events}}</value></data>
+  <data name="Stats_Coverage_All_EventId" xml:space="preserve"><value>{count, plural, one {All {count:N0} event ID - {percent}% of events} other {All {count:N0} event IDs - {percent}% of events}}</value></data>
+  <data name="Stats_Coverage_Top_EventId" xml:space="preserve"><value>{distinctCount, plural, one {Top {shownCount} of {distinctCount:N0} event ID - {percent}% of events} other {Top {shownCount} of {distinctCount:N0} event IDs - {percent}% of events}}</value></data>
+  <data name="Stats_Coverage_All_TaskCategory" xml:space="preserve"><value>{count, plural, one {All {count:N0} task category - {percent}% of events} other {All {count:N0} task categories - {percent}% of events}}</value></data>
+  <data name="Stats_Coverage_Top_TaskCategory" xml:space="preserve"><value>{distinctCount, plural, one {Top {shownCount} of {distinctCount:N0} task category - {percent}% of events} other {Top {shownCount} of {distinctCount:N0} task categories - {percent}% of events}}</value></data>
+  <data name="Stats_Coverage_All_User" xml:space="preserve"><value>{count, plural, one {All {count:N0} user - {percent}% of events} other {All {count:N0} users - {percent}% of events}}</value></data>
+  <data name="Stats_Coverage_Top_User" xml:space="preserve"><value>{distinctCount, plural, one {Top {shownCount} of {distinctCount:N0} user - {percent}% of events} other {Top {shownCount} of {distinctCount:N0} users - {percent}% of events}}</value></data>
   <!-- Histogram pane localization. Event/process/log values and decoded HRESULT symbols are data and remain verbatim in code. -->
   <data name="Histogram_GroupBy" xml:space="preserve"><value>Group by</value></data>
   <data name="Histogram_Legend_Hide" xml:space="preserve"><value>Hide {0}</value></data>
@@ -3023,26 +2989,16 @@
   <data name="Histogram_HighlightColor_Pink" xml:space="preserve"><value>Pink</value></data>
   <data name="Histogram_HighlightColor_DarkPink" xml:space="preserve"><value>Dark pink</value></data>
   <data name="Histogram_Overflow_Bare" xml:space="preserve"><value>Other</value></data>
-  <data name="Histogram_Overflow_EventId_One" xml:space="preserve"><value>Other (1 event ID)</value></data>
-  <data name="Histogram_Overflow_EventId_Many" xml:space="preserve"><value>Other ({0} event IDs)</value></data>
-  <data name="Histogram_Overflow_Source_One" xml:space="preserve"><value>Other (1 source)</value></data>
-  <data name="Histogram_Overflow_Source_Many" xml:space="preserve"><value>Other ({0} sources)</value></data>
-  <data name="Histogram_Overflow_TaskCategory_One" xml:space="preserve"><value>Other (1 task category)</value></data>
-  <data name="Histogram_Overflow_TaskCategory_Many" xml:space="preserve"><value>Other ({0} task categories)</value></data>
-  <data name="Histogram_Overflow_Opcode_One" xml:space="preserve"><value>Other (1 opcode)</value></data>
-  <data name="Histogram_Overflow_Opcode_Many" xml:space="preserve"><value>Other ({0} opcodes)</value></data>
-  <data name="Histogram_Overflow_Log_One" xml:space="preserve"><value>Other (1 log)</value></data>
-  <data name="Histogram_Overflow_Log_Many" xml:space="preserve"><value>Other ({0} logs)</value></data>
-  <data name="Histogram_Overflow_LogonType_One" xml:space="preserve"><value>Other (1 logon type)</value></data>
-  <data name="Histogram_Overflow_LogonType_Many" xml:space="preserve"><value>Other ({0} logon types)</value></data>
-  <data name="Histogram_Overflow_TicketEncryptionType_One" xml:space="preserve"><value>Other (1 ticket encryption type)</value></data>
-  <data name="Histogram_Overflow_TicketEncryptionType_Many" xml:space="preserve"><value>Other ({0} ticket encryption types)</value></data>
-  <data name="Histogram_Overflow_ErrorCode_One" xml:space="preserve"><value>Other (1 error code)</value></data>
-  <data name="Histogram_Overflow_ErrorCode_Many" xml:space="preserve"><value>Other ({0} error codes)</value></data>
-  <data name="Histogram_Overflow_ProcessImage_One" xml:space="preserve"><value>Other (1 process)</value></data>
-  <data name="Histogram_Overflow_ProcessImage_Many" xml:space="preserve"><value>Other ({0} processes)</value></data>
-  <data name="Histogram_Overflow_ParentProcessImage_One" xml:space="preserve"><value>Other (1 parent process)</value></data>
-  <data name="Histogram_Overflow_ParentProcessImage_Many" xml:space="preserve"><value>Other ({0} parent processes)</value></data>
+  <data name="Histogram_Overflow_EventId" xml:space="preserve"><value>{count, plural, one {Other ({count} event ID)} other {Other ({count} event IDs)}}</value></data>
+  <data name="Histogram_Overflow_Source" xml:space="preserve"><value>{count, plural, one {Other ({count} source)} other {Other ({count} sources)}}</value></data>
+  <data name="Histogram_Overflow_TaskCategory" xml:space="preserve"><value>{count, plural, one {Other ({count} task category)} other {Other ({count} task categories)}}</value></data>
+  <data name="Histogram_Overflow_Opcode" xml:space="preserve"><value>{count, plural, one {Other ({count} opcode)} other {Other ({count} opcodes)}}</value></data>
+  <data name="Histogram_Overflow_Log" xml:space="preserve"><value>{count, plural, one {Other ({count} log)} other {Other ({count} logs)}}</value></data>
+  <data name="Histogram_Overflow_LogonType" xml:space="preserve"><value>{count, plural, one {Other ({count} logon type)} other {Other ({count} logon types)}}</value></data>
+  <data name="Histogram_Overflow_TicketEncryptionType" xml:space="preserve"><value>{count, plural, one {Other ({count} ticket encryption type)} other {Other ({count} ticket encryption types)}}</value></data>
+  <data name="Histogram_Overflow_ErrorCode" xml:space="preserve"><value>{count, plural, one {Other ({count} error code)} other {Other ({count} error codes)}}</value></data>
+  <data name="Histogram_Overflow_ProcessImage" xml:space="preserve"><value>{count, plural, one {Other ({count} process)} other {Other ({count} processes)}}</value></data>
+  <data name="Histogram_Overflow_ParentProcessImage" xml:space="preserve"><value>{count, plural, one {Other ({count} parent process)} other {Other ({count} parent processes)}}</value></data>
   <data name="Histogram_Empty_Severity_VisibleRange" xml:space="preserve"><value>No events to chart in the current view.</value></data>
   <data name="Histogram_Empty_Severity_ThisView" xml:space="preserve"><value>No Severity values in this view.</value></data>
   <data name="Histogram_Empty_Source_VisibleRange" xml:space="preserve"><value>No events to chart in the current view.</value></data>
@@ -3065,10 +3021,8 @@
   <data name="Histogram_Empty_ProcessImage_ThisView" xml:space="preserve"><value>No process image names in this view.</value></data>
   <data name="Histogram_Empty_ParentProcessImage_VisibleRange" xml:space="preserve"><value>No parent process image names in the visible range.</value></data>
   <data name="Histogram_Empty_ParentProcessImage_ThisView" xml:space="preserve"><value>No parent process image names in this view.</value></data>
-  <data name="Histogram_EventNoun_Events_One" xml:space="preserve"><value>events</value><comment>Neutral value is intentionally plural to preserve the existing "1 events" output (byte-identity); other locales may use a true singular here.</comment></data>
-  <data name="Histogram_EventNoun_Events_Many" xml:space="preserve"><value>events</value></data>
-  <data name="Histogram_EventNoun_ErrorCodeEvents_One" xml:space="preserve"><value>error-code events</value><comment>Neutral value is intentionally plural to preserve the existing "1 error-code events" output (byte-identity); other locales may use a true singular here.</comment></data>
-  <data name="Histogram_EventNoun_ErrorCodeEvents_Many" xml:space="preserve"><value>error-code events</value></data>
+  <data name="Histogram_EventNoun_Events" xml:space="preserve"><value>{count, plural, one {event} other {events}}</value></data>
+  <data name="Histogram_EventNoun_ErrorCodeEvents" xml:space="preserve"><value>{count, plural, one {error-code event} other {error-code events}}</value></data>
   <data name="Histogram_BreakdownItem" xml:space="preserve"><value>{0} {1}</value><comment>Histogram breakdown item. {0} is a raw ungrouped count; {1} is a localized or verbatim group label.</comment></data>
   <data name="Histogram_BreakdownItem_Highlighted" xml:space="preserve"><value>{0} {1}, {2}</value><comment>{0} is a raw ungrouped count; {1} is a group label; {2} is a highlight description.</comment></data>
   <data name="Histogram_Breakdown_Separator" xml:space="preserve"><value>, </value></data>
@@ -3381,102 +3335,24 @@
     <value>Import preview:</value>
     <comment>Filter library import preview header.</comment>
   </data>
-  <data name="FilterImport_Added_One" xml:space="preserve">
-    <value>{0} new entry will be added</value>
-    <comment>Filter library import preview added-entry bullet. {0} is the entry count.</comment>
-  </data>
-  <data name="FilterImport_Added_Many" xml:space="preserve">
-    <value>{0} new entries will be added</value>
-    <comment>Filter library import preview added-entries bullet. {0} is the entry count.</comment>
-  </data>
-  <data name="FilterImport_Overwrite_One" xml:space="preserve">
-    <value>{0} existing entry WILL BE OVERWRITTEN (current filter content will be lost)</value>
-    <comment>Filter library import preview overwrite bullet. {0} is the entry count.</comment>
-  </data>
-  <data name="FilterImport_Overwrite_Many" xml:space="preserve">
-    <value>{0} existing entries WILL BE OVERWRITTEN (current filter content will be lost)</value>
-    <comment>Filter library import preview overwrites bullet. {0} is the entry count.</comment>
-  </data>
+  <data name="FilterImport_Added" xml:space="preserve"><value>{count, plural, one {{count} new entry will be added} other {{count} new entries will be added}}</value></data>
+  <data name="FilterImport_Overwrite" xml:space="preserve"><value>{count, plural, one {{count} existing entry WILL BE OVERWRITTEN (current filter content will be lost)} other {{count} existing entries WILL BE OVERWRITTEN (current filter content will be lost)}}</value></data>
   <data name="FilterImport_OverwriteNamesHeader" xml:space="preserve">
     <value>Names being overwritten:</value>
     <comment>Filter library import preview overwritten-name list header.</comment>
   </data>
-  <data name="FilterImport_TagUpdates_One" xml:space="preserve">
-    <value>{0} entry will be updated with tag changes</value>
-    <comment>Filter library import preview tag-update bullet. {0} is the entry count.</comment>
-  </data>
-  <data name="FilterImport_TagUpdates_Many" xml:space="preserve">
-    <value>{0} entries will be updated with tag changes</value>
-    <comment>Filter library import preview tag-updates bullet. {0} is the entry count.</comment>
-  </data>
-  <data name="FilterImport_Renames_One" xml:space="preserve">
-    <value>{0} existing entry will also be renamed (folder paths → tags)</value>
-    <comment>Filter library import preview legacy-folder rename bullet. {0} is the entry count.</comment>
-  </data>
-  <data name="FilterImport_Renames_Many" xml:space="preserve">
-    <value>{0} existing entries will also be renamed (folder paths → tags)</value>
-    <comment>Filter library import preview legacy-folder renames bullet. {0} is the entry count.</comment>
-  </data>
-  <data name="FilterImport_Ambiguous_One" xml:space="preserve">
-    <value>{0} ambiguous entry will be imported as new</value>
-    <comment>Filter library import preview ambiguous-match bullet. {0} is the entry count.</comment>
-  </data>
-  <data name="FilterImport_Ambiguous_Many" xml:space="preserve">
-    <value>{0} ambiguous entries will be imported as new</value>
-    <comment>Filter library import preview ambiguous-matches bullet. {0} is the entry count.</comment>
-  </data>
-  <data name="FilterImport_Skipped_One" xml:space="preserve">
-    <value>{0} exact duplicate will be skipped</value>
-    <comment>Filter library import preview skipped-duplicate bullet. {0} is the duplicate count.</comment>
-  </data>
-  <data name="FilterImport_Skipped_Many" xml:space="preserve">
-    <value>{0} exact duplicates will be skipped</value>
-    <comment>Filter library import preview skipped-duplicates bullet. {0} is the duplicate count.</comment>
-  </data>
-  <data name="FilterImport_KeepEmpty_One" xml:space="preserve">
-    <value>Keeping {0} entry with empty values as authored. An empty Contains matches every event and an empty NotContains matches none; depending on how a filter combines its criteria, that can force the whole filter to always match or never match.</value>
-    <comment>Filter library import confirmation notice for keeping empty values. {0} is the entry count.</comment>
-  </data>
-  <data name="FilterImport_KeepEmpty_Many" xml:space="preserve">
-    <value>Keeping {0} entries with empty values as authored. An empty Contains matches every event and an empty NotContains matches none; depending on how a filter combines its criteria, that can force the whole filter to always match or never match.</value>
-    <comment>Filter library import confirmation notice for keeping empty values. {0} is the entry count.</comment>
-  </data>
-  <data name="FilterImport_RemovedEmptyNotice_One" xml:space="preserve">
-    <value>Removed empty-criterion filters from {0} library item after removing empty values.</value>
-    <comment>Filter library import confirmation notice for removed empty-criterion filters. {0} is the item count.</comment>
-  </data>
-  <data name="FilterImport_RemovedEmptyNotice_Many" xml:space="preserve">
-    <value>Removed empty-criterion filters from {0} library items after removing empty values.</value>
-    <comment>Filter library import confirmation notice for removed empty-criterion filters. {0} is the item count.</comment>
-  </data>
-  <data name="FilterImport_NothingToImport_ItemOne_DupOne" xml:space="preserve">
-    <value>Nothing to import. Removed empty-criterion filters from {0} library item, skipped {1} duplicate.</value>
-    <comment>Filter library nothing-to-import message. {0} is the removed item count; {1} is the skipped duplicate count.</comment>
-  </data>
-  <data name="FilterImport_NothingToImport_ItemOne_DupMany" xml:space="preserve">
-    <value>Nothing to import. Removed empty-criterion filters from {0} library item, skipped {1} duplicates.</value>
-    <comment>Filter library nothing-to-import message. {0} is the removed item count; {1} is the skipped duplicate count.</comment>
-  </data>
-  <data name="FilterImport_NothingToImport_ItemMany_DupOne" xml:space="preserve">
-    <value>Nothing to import. Removed empty-criterion filters from {0} library items, skipped {1} duplicate.</value>
-    <comment>Filter library nothing-to-import message. {0} is the removed item count; {1} is the skipped duplicate count.</comment>
-  </data>
-  <data name="FilterImport_NothingToImport_ItemMany_DupMany" xml:space="preserve">
-    <value>Nothing to import. Removed empty-criterion filters from {0} library items, skipped {1} duplicates.</value>
-    <comment>Filter library nothing-to-import message. {0} is the removed item count; {1} is the skipped duplicate count.</comment>
-  </data>
+  <data name="FilterImport_TagUpdates" xml:space="preserve"><value>{count, plural, one {{count} entry will be updated with tag changes} other {{count} entries will be updated with tag changes}}</value></data>
+  <data name="FilterImport_Renames" xml:space="preserve"><value>{count, plural, one {{count} existing entry will also be renamed (folder paths → tags)} other {{count} existing entries will also be renamed (folder paths → tags)}}</value></data>
+  <data name="FilterImport_Ambiguous" xml:space="preserve"><value>{count, plural, one {{count} ambiguous entry will be imported as new} other {{count} ambiguous entries will be imported as new}}</value></data>
+  <data name="FilterImport_Skipped" xml:space="preserve"><value>{count, plural, one {{count} exact duplicate will be skipped} other {{count} exact duplicates will be skipped}}</value></data>
+  <data name="FilterImport_KeepEmpty" xml:space="preserve"><value>{count, plural, one {Keeping {count} entry with empty values as authored. An empty Contains matches every event and an empty NotContains matches none; depending on how a filter combines its criteria, that can force the whole filter to always match or never match.} other {Keeping {count} entries with empty values as authored. An empty Contains matches every event and an empty NotContains matches none; depending on how a filter combines its criteria, that can force the whole filter to always match or never match.}}</value></data>
+  <data name="FilterImport_RemovedEmptyNotice" xml:space="preserve"><value>{count, plural, one {Removed empty-criterion filters from {count} library item after removing empty values.} other {Removed empty-criterion filters from {count} library items after removing empty values.}}</value></data>
+  <data name="FilterImport_NothingToImport" xml:space="preserve"><value>{itemCount, plural, one {{duplicateCount, plural, one {Nothing to import. Removed empty-criterion filters from {itemCount} library item, skipped {duplicateCount} duplicate.} other {Nothing to import. Removed empty-criterion filters from {itemCount} library item, skipped {duplicateCount} duplicates.}}} other {{duplicateCount, plural, one {Nothing to import. Removed empty-criterion filters from {itemCount} library items, skipped {duplicateCount} duplicate.} other {Nothing to import. Removed empty-criterion filters from {itemCount} library items, skipped {duplicateCount} duplicates.}}}}</value></data>
   <data name="FilterImport_EmptyValueTitle" xml:space="preserve">
     <value>Filters with an empty value</value>
     <comment>Filter library empty-value import prompt title.</comment>
   </data>
-  <data name="FilterImport_EmptyValueMessage_One" xml:space="preserve">
-    <value>{0} library item contains a filter with an empty value: {1}. An empty Contains matches every event; an empty NotContains matches none. Normalize removes the empty values; if that leaves a Contains/NotContains criterion with no values, the whole filter is removed (including its other criteria). Import as-is keeps them all as authored. An as-is filter may lose its empty values or need repair if you later edit it in the Basic editor.</value>
-    <comment>Filter library empty-value import prompt message. {0} is the item count; {1} is the comma-separated item-name list.</comment>
-  </data>
-  <data name="FilterImport_EmptyValueMessage_Many" xml:space="preserve">
-    <value>{0} library items contain a filter with an empty value: {1}. An empty Contains matches every event; an empty NotContains matches none. Normalize removes the empty values; if that leaves a Contains/NotContains criterion with no values, the whole filter is removed (including its other criteria). Import as-is keeps them all as authored. An as-is filter may lose its empty values or need repair if you later edit it in the Basic editor.</value>
-    <comment>Filter library empty-value import prompt message. {0} is the item count; {1} is the comma-separated item-name list.</comment>
-  </data>
+  <data name="FilterImport_EmptyValueMessage" xml:space="preserve"><value>{count, plural, one {{count} library item contains a filter with an empty value: {entryNames}. An empty Contains matches every event; an empty NotContains matches none. Normalize removes the empty values; if that leaves a Contains/NotContains criterion with no values, the whole filter is removed (including its other criteria). Import as-is keeps them all as authored. An as-is filter may lose its empty values or need repair if you later edit it in the Basic editor.} other {{count} library items contain a filter with an empty value: {entryNames}. An empty Contains matches every event; an empty NotContains matches none. Normalize removes the empty values; if that leaves a Contains/NotContains criterion with no values, the whole filter is removed (including its other criteria). Import as-is keeps them all as authored. An as-is filter may lose its empty values or need repair if you later edit it in the Basic editor.}}</value></data>
   <data name="FilterImport_Action_Normalize" xml:space="preserve">
     <value>Normalize</value>
     <comment>Filter library empty-value prompt normalize action label.</comment>
@@ -3485,38 +3361,10 @@
     <value>Import as-is</value>
     <comment>Filter library empty-value prompt import-without-normalizing action label.</comment>
   </data>
-  <data name="FilterImport_Summary_TagOne" xml:space="preserve">
-    <value>Imported {0} new, replaced {1}, updated {2} tag, skipped {3}</value>
-    <comment>Filter library import completion announcement. {0} added; {1} replaced; {2} tag-updated; {3} skipped.</comment>
-  </data>
-  <data name="FilterImport_Summary_TagMany" xml:space="preserve">
-    <value>Imported {0} new, replaced {1}, updated {2} tags, skipped {3}</value>
-    <comment>Filter library import completion announcement. {0} added; {1} replaced; {2} tag-updated; {3} skipped.</comment>
-  </data>
-  <data name="FilterImport_Summary_TagOne_Ambiguous" xml:space="preserve">
-    <value>Imported {0} new, replaced {1}, updated {2} tag, skipped {3}, imported {4} ambiguous as new</value>
-    <comment>Filter library import completion announcement with ambiguous imports. {0} added; {1} replaced; {2} tag-updated; {3} skipped; {4} ambiguous.</comment>
-  </data>
-  <data name="FilterImport_Summary_TagMany_Ambiguous" xml:space="preserve">
-    <value>Imported {0} new, replaced {1}, updated {2} tags, skipped {3}, imported {4} ambiguous as new</value>
-    <comment>Filter library import completion announcement with ambiguous imports. {0} added; {1} replaced; {2} tag-updated; {3} skipped; {4} ambiguous.</comment>
-  </data>
-  <data name="FilterImport_Announcement_TagRemoved_One" xml:space="preserve">
-    <value>Removed tag '{0}' from {1} entry</value>
-    <comment>Filter library bulk tag-removal announcement. {0} is the tag; {1} is the affected entry count.</comment>
-  </data>
-  <data name="FilterImport_Announcement_TagRemoved_Many" xml:space="preserve">
-    <value>Removed tag '{0}' from {1} entries</value>
-    <comment>Filter library bulk tag-removal announcement. {0} is the tag; {1} is the affected entry count.</comment>
-  </data>
-  <data name="FilterImport_Announcement_TagRenamed_One" xml:space="preserve">
-    <value>Renamed tag '{0}' to '{1}' in {2} entry</value>
-    <comment>Filter library bulk tag-rename announcement. {0} is the old tag; {1} is the new tag; {2} is the affected entry count.</comment>
-  </data>
-  <data name="FilterImport_Announcement_TagRenamed_Many" xml:space="preserve">
-    <value>Renamed tag '{0}' to '{1}' in {2} entries</value>
-    <comment>Filter library bulk tag-rename announcement. {0} is the old tag; {1} is the new tag; {2} is the affected entry count.</comment>
-  </data>
+  <data name="FilterImport_Summary_Tag" xml:space="preserve"><value>{updatedTags, plural, one {Imported {added} new, replaced {replaced}, updated {updatedTags} tag, skipped {skipped}} other {Imported {added} new, replaced {replaced}, updated {updatedTags} tags, skipped {skipped}}}</value></data>
+  <data name="FilterImport_Summary_Tag_Ambiguous" xml:space="preserve"><value>{updatedTags, plural, one {Imported {added} new, replaced {replaced}, updated {updatedTags} tag, skipped {skipped}, imported {ambiguous} ambiguous as new} other {Imported {added} new, replaced {replaced}, updated {updatedTags} tags, skipped {skipped}, imported {ambiguous} ambiguous as new}}</value></data>
+  <data name="FilterImport_Announcement_TagRemoved" xml:space="preserve"><value>{count, plural, one {Removed tag '{tag}' from {count} entry} other {Removed tag '{tag}' from {count} entries}}</value></data>
+  <data name="FilterImport_Announcement_TagRenamed" xml:space="preserve"><value>{count, plural, one {Renamed tag '{oldTag}' to '{newTag}' in {count} entry} other {Renamed tag '{oldTag}' to '{newTag}' in {count} entries}}</value></data>
   <data name="FilterImport_Error_EmptyFile" xml:space="preserve">
     <value>Import file is empty.</value>
     <comment>Filter library import validation error.</comment>
@@ -3545,14 +3393,7 @@
     <value>Import file contains an entry with a missing name.</value>
     <comment>Filter library import validation error.</comment>
   </data>
-  <data name="FilterImport_Error_InvalidBasicFilters_One" xml:space="preserve">
-    <value>Import file contains a Basic filter that did not parse into a valid Basic filter: {0}. Remove or fix it and re-import.</value>
-    <comment>Filter library import validation error. {0} is the comma-separated entry-name list.</comment>
-  </data>
-  <data name="FilterImport_Error_InvalidBasicFilters_Many" xml:space="preserve">
-    <value>Import file contains Basic filters that did not parse into a valid Basic filter: {0}. Remove or fix them and re-import.</value>
-    <comment>Filter library import validation error. {0} is the comma-separated entry-name list.</comment>
-  </data>
+  <data name="FilterImport_Error_InvalidBasicFilters" xml:space="preserve"><value>{count, plural, one {Import file contains a Basic filter that did not parse into a valid Basic filter: {entryNames}. Remove or fix it and re-import.} other {Import file contains Basic filters that did not parse into a valid Basic filter: {entryNames}. Remove or fix them and re-import.}}</value></data>
   <data name="FilterImport_Error_EntryIdExpectedJsonString" xml:space="preserve">
     <value>Expected JSON string for LibraryEntryId, got {0}.</value>
     <comment>Filter library import validation error. {0} is the JSON token type.</comment>
@@ -3634,14 +3475,7 @@
     <value>Hide additional tags</value>
     <comment>Filter library hide extra tags button accessible name.</comment>
   </data>
-  <data name="FilterLibrary_ShowAdditionalTagsAria_One" xml:space="preserve">
-    <value>Show {0} additional tag</value>
-    <comment>Filter library show extra tag button accessible name. {0} is the hidden tag count.</comment>
-  </data>
-  <data name="FilterLibrary_ShowAdditionalTagsAria_Many" xml:space="preserve">
-    <value>Show {0} additional tags</value>
-    <comment>Filter library show extra tags button accessible name. {0} is the hidden tag count.</comment>
-  </data>
+  <data name="FilterLibrary_ShowAdditionalTagsAria" xml:space="preserve"><value>{count, plural, one {Show {count} additional tag} other {Show {count} additional tags}}</value></data>
   <data name="FilterLibrary_ShowLess" xml:space="preserve">
     <value>- less</value>
     <comment>Filter library collapse extra tags button text.</comment>
@@ -3654,14 +3488,7 @@
     <value>Export Filter Library</value>
     <comment>Filter library export file picker title.</comment>
   </data>
-  <data name="FilterLibrary_ExportedEntries_One" xml:space="preserve">
-    <value>Exported {0} entry</value>
-    <comment>Filter library export success announcement. {0} is the exported entry count.</comment>
-  </data>
-  <data name="FilterLibrary_ExportedEntries_Many" xml:space="preserve">
-    <value>Exported {0} entries</value>
-    <comment>Filter library export success announcement. {0} is the exported entry count.</comment>
-  </data>
+  <data name="FilterLibrary_ExportedEntries" xml:space="preserve"><value>{count, plural, one {Exported {count} entry} other {Exported {count} entries}}</value></data>
   <data name="FilterLibrary_ImportLibraryTitle" xml:space="preserve">
     <value>Import Filter Library</value>
     <comment>Filter library import file picker title.</comment>
@@ -3727,14 +3554,7 @@
     <value>Filters for {0}</value>
     <comment>Filter library expand filters button accessible name. {0} is the entry name.</comment>
   </data>
-  <data name="FilterLibrary_Entry_FilterCount_One" xml:space="preserve">
-    <value>({0} filter)</value>
-    <comment>Filter library filter set count label. {0} is the filter count.</comment>
-  </data>
-  <data name="FilterLibrary_Entry_FilterCount_Many" xml:space="preserve">
-    <value>({0} filters)</value>
-    <comment>Filter library filter set count label. {0} is the filter count.</comment>
-  </data>
+  <data name="FilterLibrary_Entry_FilterCount" xml:space="preserve"><value>{count, plural, one {({count} filter)} other {({count} filters)}}</value></data>
   <data name="FilterLibrary_Entry_TrackedAria" xml:space="preserve">
     <value>Automatically added from recent use</value>
     <comment>Filter library tracked badge accessible name.</comment>
@@ -3759,10 +3579,7 @@
     <value>Remove {0}</value>
     <comment>Filter library tag input chip remove button accessible name. {0} is the tag name.</comment>
   </data>
-  <data name="FilterLibrary_Entry_ShowAllTagsAria" xml:space="preserve">
-    <value>Show all {0} tags</value>
-    <comment>Filter library row show all tags button accessible name. {0} is the tag count.</comment>
-  </data>
+  <data name="FilterLibrary_Entry_ShowAllTagsAria" xml:space="preserve"><value>{count, plural, other {Show all {count} tags}}</value></data>
   <data name="FilterLibrary_Entry_MoreTags" xml:space="preserve">
     <value>+{0} more</value>
     <comment>Filter library row more tags button text. {0} is the hidden tag count.</comment>
@@ -3879,14 +3696,7 @@
     <value>Delete</value>
     <comment>Filter library row delete menu item and action label.</comment>
   </data>
-  <data name="FilterLibrary_Entry_DeleteFilterSetMessage_One" xml:space="preserve">
-    <value>This will permanently delete the filter set '{0}' with {1} filter. This cannot be undone.</value>
-    <comment>Filter library row delete filter set confirmation message. {0} is the entry name; {1} is the filter count.</comment>
-  </data>
-  <data name="FilterLibrary_Entry_DeleteFilterSetMessage_Many" xml:space="preserve">
-    <value>This will permanently delete the filter set '{0}' with {1} filters. This cannot be undone.</value>
-    <comment>Filter library row delete filter set confirmation message. {0} is the entry name; {1} is the filter count.</comment>
-  </data>
+  <data name="FilterLibrary_Entry_DeleteFilterSetMessage" xml:space="preserve"><value>{filterCount, plural, one {This will permanently delete the filter set '{entryName}' with {filterCount} filter. This cannot be undone.} other {This will permanently delete the filter set '{entryName}' with {filterCount} filters. This cannot be undone.}}</value></data>
   <data name="FilterLibrary_Entry_DeleteFilterMessage" xml:space="preserve">
     <value>This will permanently delete the filter '{0}'. This cannot be undone.</value>
     <comment>Filter library row delete filter confirmation message. {0} is the entry name.</comment>
@@ -4013,14 +3823,7 @@
     <value>Rename tag {0}</value>
     <comment>Filter library tag management rename input accessible name. {0} is the tag name.</comment>
   </data>
-  <data name="FilterLibrary_Tags_MergeAria_One" xml:space="preserve">
-    <value>Merge tag {0} into {1}, affects {2} entry</value>
-    <comment>Filter library tag management merge action accessible name. {0} is the source tag; {1} is the target tag; {2} is the affected entry count.</comment>
-  </data>
-  <data name="FilterLibrary_Tags_MergeAria_Many" xml:space="preserve">
-    <value>Merge tag {0} into {1}, affects {2} entries</value>
-    <comment>Filter library tag management merge action accessible name. {0} is the source tag; {1} is the target tag; {2} is the affected entry count.</comment>
-  </data>
+  <data name="FilterLibrary_Tags_MergeAria" xml:space="preserve"><value>{count, plural, one {Merge tag {tag} into {mergeTargetTag}, affects {count} entry} other {Merge tag {tag} into {mergeTargetTag}, affects {count} entries}}</value></data>
   <data name="FilterLibrary_Tags_MergeAction" xml:space="preserve">
     <value>Merge into '{0}'</value>
     <comment>Filter library tag management merge action label. {0} is the target tag.</comment>
@@ -4033,14 +3836,7 @@
     <value>Cancel rename</value>
     <comment>Filter library tag management cancel rename button accessible name.</comment>
   </data>
-  <data name="FilterLibrary_Tags_RemoveConfirm_One" xml:space="preserve">
-    <value>Remove from {0} entry?</value>
-    <comment>Filter library tag management delete confirmation text. {0} is the affected entry count.</comment>
-  </data>
-  <data name="FilterLibrary_Tags_RemoveConfirm_Many" xml:space="preserve">
-    <value>Remove from {0} entries?</value>
-    <comment>Filter library tag management delete confirmation text. {0} is the affected entry count.</comment>
-  </data>
+  <data name="FilterLibrary_Tags_RemoveConfirm" xml:space="preserve"><value>{count, plural, one {Remove from {count} entry?} other {Remove from {count} entries?}}</value></data>
   <data name="FilterLibrary_Tags_ConfirmDeleteAria" xml:space="preserve">
     <value>Confirm delete tag {0}</value>
     <comment>Filter library tag management confirm delete button accessible name. {0} is the tag name.</comment>

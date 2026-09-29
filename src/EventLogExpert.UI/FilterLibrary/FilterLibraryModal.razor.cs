@@ -371,12 +371,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
             await File.WriteAllTextAsync(path, json);
 
-            AnnouncementService.Announce(LocalizedCount.OneOrManyRaw(
-                Localizer,
-                entries.Count,
-                "FilterLibrary_ExportedEntries_One",
-                "FilterLibrary_ExportedEntries_Many",
-                entries.Count));
+            AnnouncementService.Announce(PluralText.Format(Localizer, "FilterLibrary_ExportedEntries", ("count", entries.Count)));
         }
         catch (Exception ex) when (
             ex is UnauthorizedAccessException or SecurityException or
@@ -824,12 +819,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
     }
 
     private string ShowAdditionalTagsAria(int hiddenTagsCount) =>
-        LocalizedCount.OneOrManyRaw(
-            Localizer,
-            hiddenTagsCount,
-            "FilterLibrary_ShowAdditionalTagsAria_One",
-            "FilterLibrary_ShowAdditionalTagsAria_Many",
-            hiddenTagsCount);
+        PluralText.Format(Localizer, "FilterLibrary_ShowAdditionalTagsAria", ("count", hiddenTagsCount));
 
     private async Task ShowImportExportErrorAsync(string title, string message)
     {

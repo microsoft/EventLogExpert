@@ -20,17 +20,17 @@ public sealed class FilterImportTextComposerTests
 
     public static TheoryData<ImportSummary, string> SummaryMarkerVariants() => new()
     {
-        { new ImportSummary(2, 12, 2, 3, 0), "[[FilterImport_Summary_TagMany(2|12|2|3)]]" },
-        { new ImportSummary(2, 12, 1, 3, 1), "[[FilterImport_Summary_TagOne_Ambiguous(2|12|1|3|1)]]" },
-        { new ImportSummary(2, 12, 2, 3, 1), "[[FilterImport_Summary_TagMany_Ambiguous(2|12|2|3|1)]]" }
+        { new ImportSummary(2, 12, 2, 3, 0), "[[FilterImport_Summary_Tag]]" },
+        { new ImportSummary(2, 12, 1, 3, 1), "[[FilterImport_Summary_Tag_Ambiguous]]" },
+        { new ImportSummary(2, 12, 2, 3, 1), "[[FilterImport_Summary_Tag_Ambiguous]]" }
     };
 
     [Fact]
-    public void EmptyValueMessage_ManyRoutesThroughManyKeyWithNames()
+    public void EmptyValueMessage_RoutesThroughPluralKey()
     {
         var actual = FilterImportTextComposer.EmptyValueMessage(_markerLocalizer, ["Entry A", "Entry B"]);
 
-        Assert.Equal("[[FilterImport_EmptyValueMessage_Many(2|Entry A, Entry B)]]", actual);
+        Assert.Equal("[[FilterImport_EmptyValueMessage]]", actual);
     }
 
     [Fact]
@@ -65,9 +65,9 @@ public sealed class FilterImportTextComposerTests
     }
 
     [Theory]
-    [InlineData(2, 0, false, "[[FilterImport_PreviewHeader]]\n  • [[FilterImport_Added_Many(2)]]\n  • [[FilterImport_Skipped_Many(0)]]")]
-    [InlineData(0, 1, false, "[[FilterImport_RemovedEmptyNotice_One(1)]]\n\n[[FilterImport_PreviewHeader]]\n  • [[FilterImport_Added_Many(0)]]\n  • [[FilterImport_Skipped_Many(0)]]")]
-    [InlineData(2, 1, true, "[[FilterImport_KeepEmpty_Many(2)]]\n[[FilterImport_RemovedEmptyNotice_One(1)]]\n\n[[FilterImport_PreviewHeader]]\n  • [[FilterImport_Added_Many(2)]]\n  • [[FilterImport_Skipped_Many(0)]]")]
+    [InlineData(2, 0, false, "[[FilterImport_PreviewHeader]]\n  • [[FilterImport_Added]]\n  • [[FilterImport_Skipped]]")]
+    [InlineData(0, 1, false, "[[FilterImport_RemovedEmptyNotice]]\n\n[[FilterImport_PreviewHeader]]\n  • [[FilterImport_Added]]\n  • [[FilterImport_Skipped]]")]
+    [InlineData(2, 1, true, "[[FilterImport_KeepEmpty]]\n[[FilterImport_RemovedEmptyNotice]]\n\n[[FilterImport_PreviewHeader]]\n  • [[FilterImport_Added]]\n  • [[FilterImport_Skipped]]")]
     public void ImportConfirmation_RoutesNoticeCountCombinations(
         int keptCount,
         int removedCount,
@@ -98,19 +98,19 @@ public sealed class FilterImportTextComposerTests
         var actual = FilterImportTextComposer.ImportConfirmation(_markerLocalizer, preflight, keptEmptyValuesAsIs: true);
 
         Assert.Equal(
-            "[[FilterImport_KeepEmpty_One(1)]]\n" +
-            "[[FilterImport_RemovedEmptyNotice_Many(2)]]\n\n" +
+            "[[FilterImport_KeepEmpty]]\n" +
+            "[[FilterImport_RemovedEmptyNotice]]\n\n" +
             "[[FilterImport_PreviewHeader]]\n" +
-            "  • [[FilterImport_Added_One(1)]]\n" +
-            "  • [[FilterImport_Skipped_One(1)]]",
+            "  • [[FilterImport_Added]]\n" +
+            "  • [[FilterImport_Skipped]]",
             actual);
     }
 
     [Theory]
-    [InlineData(1, 1, "[[FilterImport_NothingToImport_ItemOne_DupOne(1|1)]]")]
-    [InlineData(1, 2, "[[FilterImport_NothingToImport_ItemOne_DupMany(1|2)]]")]
-    [InlineData(2, 1, "[[FilterImport_NothingToImport_ItemMany_DupOne(2|1)]]")]
-    [InlineData(2, 2, "[[FilterImport_NothingToImport_ItemMany_DupMany(2|2)]]")]
+    [InlineData(1, 1, "[[FilterImport_NothingToImport]]")]
+    [InlineData(1, 2, "[[FilterImport_NothingToImport]]")]
+    [InlineData(2, 1, "[[FilterImport_NothingToImport]]")]
+    [InlineData(2, 2, "[[FilterImport_NothingToImport]]")]
     public void NothingToImport_RoutesEveryCountCombination(int itemCount, int duplicateCount, string expected)
     {
         var preflight = new ImportPreflight([], [], Enumerable.Range(0, duplicateCount).Select(index => BuildEntry($"Skipped {index}")).ToList())
@@ -218,8 +218,8 @@ public sealed class FilterImportTextComposerTests
 
         Assert.Equal(
             "[[FilterImport_PreviewHeader]]\n" +
-            "  • [[FilterImport_Added_Many(2)]]\n" +
-            "  • [[FilterImport_Overwrite_Many(12)]]\n" +
+            "  • [[FilterImport_Added]]\n" +
+            "  • [[FilterImport_Overwrite]]\n" +
             "[[FilterImport_OverwriteNamesHeader]]\n" +
             "  • Overwrite 01\n" +
             "  • Overwrite 02\n" +
@@ -232,10 +232,10 @@ public sealed class FilterImportTextComposerTests
             "  • Overwrite 09\n" +
             "  • Overwrite 10\n" +
             "  • [[FilterImport_MoreNames(2)]]\n" +
-            "  • [[FilterImport_TagUpdates_Many(3)]]\n" +
-            "  • [[FilterImport_Renames_One(1)]]\n" +
-            "  • [[FilterImport_Ambiguous_One(1)]]\n" +
-            "  • [[FilterImport_Skipped_Many(3)]]",
+            "  • [[FilterImport_TagUpdates]]\n" +
+            "  • [[FilterImport_Renames]]\n" +
+            "  • [[FilterImport_Ambiguous]]\n" +
+            "  • [[FilterImport_Skipped]]",
             actual);
     }
 
@@ -270,11 +270,11 @@ public sealed class FilterImportTextComposerTests
     }
 
     [Fact]
-    public void TagRenamed_RendersRawCountAtThirdPlaceholderWithoutGrouping()
+    public void TagRenamed_RendersRawCountWithoutGrouping()
     {
-        Assert.Equal(
-            "[[FilterImport_Announcement_TagRenamed_Many(old|new|1000)]]",
-            FilterImportTextComposer.TagRenamed(_markerLocalizer, "old", "new", 1000));
+        var actual = WithEnUsCulture(() => FilterImportTextComposer.TagRenamed(BuildLocalizer(), "old", "new", 1000));
+
+        Assert.Equal("Renamed tag 'old' to 'new' in 1000 entries", actual);
     }
 
     private static LibraryEntrySavedFilter BuildEntry(string name) =>

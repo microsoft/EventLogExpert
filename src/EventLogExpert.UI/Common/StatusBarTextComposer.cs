@@ -51,8 +51,8 @@ internal static class StatusBarTextComposer
 
         return (isFiltered, selectedCount >= 2) switch
         {
-            (false, false) => localizer[total == 1 ? "StatusBar_Counts_Total_One" : "StatusBar_Counts_Total_Many", formattedTotal],
-            (false, true) => localizer["StatusBar_Counts_TotalSelected", formattedTotal, FormatCount(selectedCount)],
+            (false, false) => PluralText.Format(localizer, "StatusBar_Counts_Total", ("total", total)),
+            (false, true) => PluralText.Format(localizer, "StatusBar_Counts_TotalSelected", ("total", total), ("selected", selectedCount)),
             (true, false) => localizer["StatusBar_Counts_ShownOfTotal", formattedShown, formattedTotal],
             _ => localizer["StatusBar_Counts_ShownOfTotalSelected", formattedShown, formattedTotal, FormatCount(selectedCount)]
         };
@@ -65,7 +65,7 @@ internal static class StatusBarTextComposer
         localizer["StatusBar_Coverage_Chip", FormatCount(unresolved)];
 
     internal static string CoverageTooltip(IStringLocalizer<SharedResource> localizer, int unresolved, int total) =>
-        localizer["StatusBar_Coverage_Tooltip", FormatCount(unresolved), FormatCount(total)];
+        PluralText.Format(localizer, "StatusBar_Coverage_Tooltip", ("unresolved", unresolved), ("total", total));
 
     internal static string? FilterIndicatorTooltip(IStringLocalizer<SharedResource> localizer, bool persistentActive, int lensCount)
     {
@@ -74,16 +74,7 @@ internal static class StatusBarTextComposer
             return persistentActive ? localizer["StatusBar_Filter_Active"].Value : null;
         }
 
-        if (persistentActive)
-        {
-            return lensCount == 1 ?
-                localizer["StatusBar_Filter_ActiveLens_One"].Value :
-                localizer["StatusBar_Filter_ActiveLens_Many", FormatRaw(lensCount)].Value;
-        }
-
-        return lensCount == 1 ?
-            localizer["StatusBar_Filter_Lens_One"].Value :
-            localizer["StatusBar_Filter_Lens_Many", FormatRaw(lensCount)].Value;
+        return PluralText.Format(localizer, persistentActive ? "StatusBar_Filter_ActiveLens" : "StatusBar_Filter_Lens", ("count", lensCount));
     }
 
     internal static StatusBarLoadingChip? Loading(
@@ -115,7 +106,7 @@ internal static class StatusBarTextComposer
             1 when singleLoaded == 0 => localizer["StatusBar_Loading_Pending"],
             1 when percent is { } loadedPercent => localizer["StatusBar_Loading_CountPercent", FormatCount(singleLoaded), FormatRaw(loadedPercent)],
             1 => localizer["StatusBar_Loading_Count", FormatCount(singleLoaded)],
-            _ => localizer["StatusBar_Loading_ManyLogs", FormatCount(loadingCount)]
+            _ => PluralText.Format(localizer, "StatusBar_Loading_ManyLogs", ("loadingCount", loadingCount))
         };
 
         return new StatusBarLoadingChip(text, totalFailed);
@@ -198,7 +189,7 @@ internal static class StatusBarTextComposer
         int memberCount = group.MemberIds.Count;
 
         return string.IsNullOrEmpty(group.Name) ?
-            localizer[memberCount == 1 ? "StatusBar_Source_CombinedCount_One" : "StatusBar_Source_CombinedCount_Many", FormatRaw(memberCount)] :
+            PluralText.Format(localizer, "StatusBar_Source_CombinedCount", ("memberCount", memberCount)) :
             group.Name;
     }
 

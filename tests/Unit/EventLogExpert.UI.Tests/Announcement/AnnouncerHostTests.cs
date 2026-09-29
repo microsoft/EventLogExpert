@@ -50,7 +50,7 @@ public sealed class AnnouncerHostTests : BunitContext
         var component = Render<AnnouncerHost>();
 
         Assert.Equal(
-            "[[FilterImport_Summary_TagOne(2|1|1|3)]]",
+            "[[FilterImport_Summary_Tag]]",
             component.Find("#app-announcer").TextContent);
     }
 
@@ -162,7 +162,7 @@ public sealed class AnnouncerHostTests : BunitContext
         var component = Render<AnnouncerHost>();
 
         Assert.Equal(
-            "[[FilterImport_Announcement_TagRemoved_Many(bug|2)]]",
+            "[[FilterImport_Announcement_TagRemoved]]",
             component.Find("#app-announcer").TextContent);
     }
 
@@ -174,7 +174,7 @@ public sealed class AnnouncerHostTests : BunitContext
         var component = Render<AnnouncerHost>();
 
         Assert.Equal(
-            "[[FilterImport_Announcement_TagRenamed_One(bug|defect|1)]]",
+            "[[FilterImport_Announcement_TagRenamed]]",
             component.Find("#app-announcer").TextContent);
     }
 

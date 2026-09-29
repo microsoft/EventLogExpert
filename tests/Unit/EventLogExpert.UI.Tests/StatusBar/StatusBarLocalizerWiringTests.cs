@@ -86,9 +86,9 @@ public sealed class StatusBarLocalizerWiringTests : BunitContext
         Assert.Equal("[[StatusBar_Stats_Show]]", cut.Find("button.status-bar-stats").GetAttribute("data-tooltip"));
         Assert.Contains("[[StatusBar_Counts_ShownOfTotalSelected(50|100|3)]]", cut.Markup, StringComparison.Ordinal);
         Assert.Equal("[[StatusBar_Coverage_AriaLabel(2)]]", cut.Find(".status-bar-coverage").GetAttribute("aria-label"));
-        Assert.Equal("[[StatusBar_Coverage_Tooltip(2|100)]]", cut.Find(".status-bar-coverage").GetAttribute("data-tooltip"));
+        Assert.Equal("[[StatusBar_Coverage_Tooltip]]", cut.Find(".status-bar-coverage").GetAttribute("data-tooltip"));
         Assert.Contains("[[StatusBar_Coverage_Chip(2)]]", cut.Markup, StringComparison.Ordinal);
-        Assert.Equal("[[StatusBar_Filter_ActiveLens_Many(2)]]", cut.Find(".status-bar-filter").GetAttribute("data-tooltip"));
+        Assert.Equal("[[StatusBar_Filter_ActiveLens]]", cut.Find(".status-bar-filter").GetAttribute("data-tooltip"));
         Assert.Equal("[[StatusBar_Filter_Chip]]", cut.Find(".status-bar-filter").TextContent);
         Assert.Equal("[[StatusBar_Activity_BufferFull]]", cut.Find(".status-bar-announce").TextContent);
         Assert.Contains("[[StatusBar_Memory_Value_Elevated(100 MB)]]", cut.Find(".status-bar-memory").TextContent, StringComparison.Ordinal);
@@ -106,9 +106,9 @@ public sealed class StatusBarLocalizerWiringTests : BunitContext
     }
 
     [Theory]
-    [InlineData(1, "[[StatusBar_Counts_Total_One(1)]]")]
-    [InlineData(2, "[[StatusBar_Counts_Total_Many(2)]]")]
-    public void Counts_RoutesOneAndManyThroughDistinctLocalizerKeys(int total, string expected)
+    [InlineData(1, "[[StatusBar_Counts_Total]]")]
+    [InlineData(2, "[[StatusBar_Counts_Total]]")]
+    public void Counts_RoutesThroughPluralLocalizerKey(int total, string expected)
     {
         var localizer = new MarkerLocalizer();
 
@@ -150,9 +150,9 @@ public sealed class StatusBarLocalizerWiringTests : BunitContext
     }
 
     [Theory]
-    [InlineData(false, 1, "[[StatusBar_Filter_Lens_One]]")]
+    [InlineData(false, 1, "[[StatusBar_Filter_Lens]]")]
     [InlineData(true, 0, "[[StatusBar_Filter_Active]]")]
-    [InlineData(true, 1, "[[StatusBar_Filter_ActiveLens_One]]")]
+    [InlineData(true, 1, "[[StatusBar_Filter_ActiveLens]]")]
     public void FilterTooltip_RoutesMutuallyExclusiveBranchesThroughTheLocalizer(
         bool persistentFilterActive,
         int lensCount,
@@ -201,9 +201,9 @@ public sealed class StatusBarLocalizerWiringTests : BunitContext
     }
 
     [Theory]
-    [InlineData(1, "[[StatusBar_Source_CombinedCount_One(1)]]")]
-    [InlineData(2, "[[StatusBar_Source_CombinedCount_Many(2)]]")]
-    public void Source_RoutesUnnamedGroupOneAndManyThroughDistinctLocalizerKeys(int memberCount, string expected)
+    [InlineData(1, "[[StatusBar_Source_CombinedCount]]")]
+    [InlineData(2, "[[StatusBar_Source_CombinedCount]]")]
+    public void Source_RoutesUnnamedGroupThroughPluralLocalizerKey(int memberCount, string expected)
     {
         var localizer = new MarkerLocalizer();
         var groupId = LogTabGroupId.Create();
