@@ -26,7 +26,9 @@ else if (_updating)
 }
 else if (_failed)
 {
-    <div class="resolution-coverage-status">@(_faultCause is { Length: > 0 } cause ? Localizer["Coverage_UnavailableWithCause", cause] : Localizer["Coverage_ComputeFailed"])</div>
+    <div class="resolution-coverage-status">
+        @(_faultCause is { Length: > 0 } cause ? Localizer["Coverage_UnavailableWithCause", cause] : Localizer["Coverage_ComputeFailed"])
+    </div>
 }
 else if (_report is not null && _report.Summary.Total == 0)
 {
@@ -39,7 +41,7 @@ else if (_report is not null)
 
     <div class="resolution-coverage-summary">
         <div class="resolution-coverage-scope">
-            <span>@LocalizedCount.OneOrMany(Localizer, _report.Summary.Total, "Coverage_TotalEvents_One", "Coverage_TotalEvents_Many")</span>
+            <span>@PluralText.Format(Localizer, "Coverage_TotalEvents", ("count", _report.Summary.Total))</span>
             @if (_isFiltered)
             {
                 <span class="resolution-coverage-badge"
@@ -50,7 +52,9 @@ else if (_report is not null)
             }
         </div>
         <div class="resolution-coverage-tallies">
-            <span class="resolution-tally">@Localizer["Coverage_ResolvedTallyLabel"] <strong>@FormatCount(_report.Summary.Resolved)</strong> (@FormatShare(_report.Summary.Resolved))</span>
+            <span class="resolution-tally">
+                @Localizer["Coverage_ResolvedTallyLabel"] <strong>@FormatCount(_report.Summary.Resolved)</strong> (@FormatShare(_report.Summary.Resolved))
+            </span>
             <span class="resolution-tally">@Localizer["Coverage_UnresolvedTallyLabel"] <strong>@FormatCount(Unresolved)</strong> (@FormatShare(Unresolved))</span>
         </div>
         @{

@@ -92,7 +92,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         var cut = Render<UI.StatusBar.StatusBar>();
 
         Assert.DoesNotContain("[[StatusBar_Counts_ShownOfTotal(0|1,500)]]", cut.Markup, StringComparison.Ordinal);
-        Assert.Contains("[[StatusBar_Counts_Total_Many(1,500)]]", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("[[StatusBar_Counts_Total]]", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -134,12 +134,12 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Equal("[[StatusBar_Filter_Lens_Many(2)]]", cut.Find(".status-bar-filter").GetAttribute("data-tooltip"));
+        Assert.Equal("[[StatusBar_Filter_Lens]]", cut.Find(".status-bar-filter").GetAttribute("data-tooltip"));
 
         _lensSource.Lenses.Returns(LensSummaries(3));
         cut.InvokeAsync(() => _lensSource.Changed += Raise.Event<Action>());
 
-        cut.WaitForAssertion(() => Assert.Equal("[[StatusBar_Filter_Lens_Many(3)]]", cut.Find(".status-bar-filter").GetAttribute("data-tooltip")));
+        cut.WaitForAssertion(() => Assert.Equal("[[StatusBar_Filter_Lens]]", cut.Find(".status-bar-filter").GetAttribute("data-tooltip")));
     }
 
     [Fact]
@@ -237,7 +237,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         var cut = Render<UI.StatusBar.StatusBar>();
 
         Assert.Contains("[[StatusBar_Counts_ShownOfTotal(300|1,500)]]", cut.Markup, StringComparison.Ordinal);
-        Assert.Equal("[[StatusBar_Filter_Lens_Many(2)]]", cut.Find(".status-bar-filter").GetAttribute("data-tooltip"));
+        Assert.Equal("[[StatusBar_Filter_Lens]]", cut.Find(".status-bar-filter").GetAttribute("data-tooltip"));
     }
 
     [Fact]
@@ -334,7 +334,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
     public void MultiSelect_ShowsSelectedSuffix_SingleSelectDoesNot()
     {
         SetActiveLog(total: 500, shown: 500, filter: Unfiltered, selected: 3);
-        Assert.Contains("[[StatusBar_Counts_TotalSelected(500|3)]]", Render<UI.StatusBar.StatusBar>().Markup, StringComparison.Ordinal);
+        Assert.Contains("[[StatusBar_Counts_TotalSelected]]", Render<UI.StatusBar.StatusBar>().Markup, StringComparison.Ordinal);
 
         _status = _status with { SelectionCount = 1 };
         Assert.DoesNotContain("[[StatusBar_Counts_TotalSelected", Render<UI.StatusBar.StatusBar>().Markup, StringComparison.Ordinal);
@@ -352,7 +352,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Contains("[[StatusBar_Loading_ManyLogs(2)]]", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("[[StatusBar_Loading_ManyLogs]]", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("[[StatusBar_Loading_Count(100)]]", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("[[StatusBar_Loading_Count(50)]]", cut.Markup, StringComparison.Ordinal);
         Assert.Contains("[[StatusBar_Loading_Failed(2)]]", cut.Markup, StringComparison.Ordinal);
@@ -464,7 +464,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         Assert.DoesNotContain("[[StatusBar_Counts_ShownOfTotal(200|1,500)]]", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("[[StatusBar_Counts_ShownOfTotal", cut.Markup, StringComparison.Ordinal);
 
-        Assert.Contains("[[StatusBar_Counts_Total_Many(1,500)]]", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("[[StatusBar_Counts_Total]]", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -588,7 +588,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
 
         var cut = Render<UI.StatusBar.StatusBar>();
 
-        Assert.Contains("[[StatusBar_Counts_Total_Many(1,500)]]", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("[[StatusBar_Counts_Total]]", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("[[StatusBar_Counts_ShownOfTotal", cut.Markup, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll(".status-bar-filter"));
     }

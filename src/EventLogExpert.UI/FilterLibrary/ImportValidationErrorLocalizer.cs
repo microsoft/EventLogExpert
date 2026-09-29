@@ -22,12 +22,11 @@ internal static class ImportValidationErrorLocalizer
         ImportValidationError.UnsupportedShape => localizer["FilterImport_Error_UnsupportedShape"],
         ImportValidationError.MissingEntryName => localizer["FilterImport_Error_MissingEntryName"],
         ImportValidationError.InvalidBasicFilters invalidBasicFilters =>
-            LocalizedCount.OneOrManyRaw(
+            PluralText.Format(
                 localizer,
-                invalidBasicFilters.InvalidFilterCount,
-                "FilterImport_Error_InvalidBasicFilters_One",
-                "FilterImport_Error_InvalidBasicFilters_Many",
-                string.Join(", ", invalidBasicFilters.EntryNames)),
+                "FilterImport_Error_InvalidBasicFilters",
+                ("count", invalidBasicFilters.InvalidFilterCount),
+                ("entryNames", string.Join(", ", invalidBasicFilters.EntryNames))),
         ImportValidationError.EntryIdExpectedJsonString expectedJsonString =>
             localizer["FilterImport_Error_EntryIdExpectedJsonString", expectedJsonString.ActualTokenType],
         ImportValidationError.EntryIdExpectedNonEmptyString => localizer["FilterImport_Error_EntryIdExpectedNonEmptyString"],

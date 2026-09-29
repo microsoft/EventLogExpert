@@ -154,14 +154,12 @@ public sealed partial class TagManagementPanel : ComponentBase
     }
 
     private string MergeAriaLabel(string tag, string mergeTargetTag, int count) =>
-        LocalizedCount.OneOrManyRaw(
+        PluralText.Format(
             Localizer,
-            count,
-            "FilterLibrary_Tags_MergeAria_One",
-            "FilterLibrary_Tags_MergeAria_Many",
-            tag,
-            mergeTargetTag,
-            count);
+            "FilterLibrary_Tags_MergeAria",
+            ("tag", tag),
+            ("mergeTargetTag", mergeTargetTag),
+            ("count", count));
 
     private void OnEditNameChanged()
     {
@@ -175,10 +173,5 @@ public sealed partial class TagManagementPanel : ComponentBase
     }
 
     private string RemoveConfirmLabel(int count) =>
-        LocalizedCount.OneOrManyRaw(
-            Localizer,
-            count,
-            "FilterLibrary_Tags_RemoveConfirm_One",
-            "FilterLibrary_Tags_RemoveConfirm_Many",
-            count);
+        PluralText.Format(Localizer, "FilterLibrary_Tags_RemoveConfirm", ("count", count));
 }

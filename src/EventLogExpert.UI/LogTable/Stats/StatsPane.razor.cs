@@ -239,41 +239,45 @@ public sealed partial class StatsPane
         return stats.Dimension switch
         {
             StatsDimension.Source => all ?
-                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_All_Source_One" : "Stats_Coverage_All_Source_Many",
-                    FormatCount(stats.DistinctCount),
-                    coveredPercent] :
-                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_Top_Source_One" : "Stats_Coverage_Top_Source_Many",
-                    stats.Top.Count,
-                    FormatCount(stats.DistinctCount),
-                    coveredPercent],
+                PluralText.Format(Localizer,
+                    "Stats_Coverage_All_Source",
+                    ("count", stats.DistinctCount),
+                    ("percent", coveredPercent)) :
+                PluralText.Format(Localizer,
+                    "Stats_Coverage_Top_Source",
+                    ("shownCount", stats.Top.Count),
+                    ("distinctCount", stats.DistinctCount),
+                    ("percent", coveredPercent)),
             StatsDimension.EventId => all ?
-                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_All_EventId_One" :
-                        "Stats_Coverage_All_EventId_Many",
-                    FormatCount(stats.DistinctCount),
-                    coveredPercent] :
-                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_Top_EventId_One" :
-                        "Stats_Coverage_Top_EventId_Many",
-                    stats.Top.Count,
-                    FormatCount(stats.DistinctCount),
-                    coveredPercent],
+                PluralText.Format(Localizer,
+                    "Stats_Coverage_All_EventId",
+                    ("count", stats.DistinctCount),
+                    ("percent", coveredPercent)) :
+                PluralText.Format(Localizer,
+                    "Stats_Coverage_Top_EventId",
+                    ("shownCount", stats.Top.Count),
+                    ("distinctCount", stats.DistinctCount),
+                    ("percent", coveredPercent)),
             StatsDimension.TaskCategory => all ?
-                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_All_TaskCategory_One" :
-                        "Stats_Coverage_All_TaskCategory_Many",
-                    FormatCount(stats.DistinctCount),
-                    coveredPercent] :
-                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_Top_TaskCategory_One" :
-                        "Stats_Coverage_Top_TaskCategory_Many",
-                    stats.Top.Count,
-                    FormatCount(stats.DistinctCount),
-                    coveredPercent],
+                PluralText.Format(Localizer,
+                    "Stats_Coverage_All_TaskCategory",
+                    ("count", stats.DistinctCount),
+                    ("percent", coveredPercent)) :
+                PluralText.Format(Localizer,
+                    "Stats_Coverage_Top_TaskCategory",
+                    ("shownCount", stats.Top.Count),
+                    ("distinctCount", stats.DistinctCount),
+                    ("percent", coveredPercent)),
             StatsDimension.User => all ?
-                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_All_User_One" : "Stats_Coverage_All_User_Many",
-                    FormatCount(stats.DistinctCount),
-                    coveredPercent] :
-                Localizer[stats.DistinctCount == 1 ? "Stats_Coverage_Top_User_One" : "Stats_Coverage_Top_User_Many",
-                    stats.Top.Count,
-                    FormatCount(stats.DistinctCount),
-                    coveredPercent],
+                PluralText.Format(Localizer,
+                    "Stats_Coverage_All_User",
+                    ("count", stats.DistinctCount),
+                    ("percent", coveredPercent)) :
+                PluralText.Format(Localizer,
+                    "Stats_Coverage_Top_User",
+                    ("shownCount", stats.Top.Count),
+                    ("distinctCount", stats.DistinctCount),
+                    ("percent", coveredPercent)),
             _ => throw new ArgumentOutOfRangeException(nameof(stats), stats.Dimension, null)
         };
     }
@@ -292,13 +296,13 @@ public sealed partial class StatsPane
                 Localizer["Stats_Headline_Empty"];
         }
 
-        string headline = Localizer[total == 1 ? "Stats_Headline_Events_One" : "Stats_Headline_Events_Many", FormatCount(total)];
+        string headline = PluralText.Format(Localizer, "Stats_Headline_Events", ("count", total));
 
         int errorCritical = slots[(int)SeverityLevel.Critical] + slots[(int)SeverityLevel.Error];
 
         if (errorCritical > 0)
         {
-            headline += Localizer[errorCritical == 1 ? "Stats_Headline_ErrorCritical_One" : "Stats_Headline_ErrorCritical_Many", FormatCount(errorCritical)].Value;
+            headline += PluralText.Format(Localizer, "Stats_Headline_ErrorCritical", ("errorCritical", errorCritical));
         }
 
         DimensionSection source = SectionFor(StatsDimension.Source);
@@ -312,7 +316,7 @@ public sealed partial class StatsPane
 
             int percent = (int)Math.Round(covered * 100.0 / total, MidpointRounding.AwayFromZero);
 
-            headline += Localizer[shown == 1 ? "Stats_Headline_TopSources_One" : "Stats_Headline_TopSources_Many", shown, percent].Value;
+            headline += PluralText.Format(Localizer, "Stats_Headline_TopSources", ("count", shown), ("percent", percent));
         }
 
         return headline;

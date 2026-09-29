@@ -122,13 +122,13 @@ public sealed class LibraryEntryRowTests : BunitContext
 
         await _alerts.Received(1).ShowAlert(
             "[[FilterLibrary_Entry_DeleteTitle]]",
-            "[[FilterLibrary_Entry_DeleteFilterSetMessage_Many(P|2)]]",
+            "[[FilterLibrary_Entry_DeleteFilterSetMessage]]",
             "[[FilterLibrary_Entry_DeleteMenu]]",
             "[[Modal_Cancel]]");
     }
 
     [Fact]
-    public async Task DeleteOnFilterSet_WithOneFilter_RoutesSingularFilterSetConfirmMessage()
+    public async Task DeleteOnFilterSet_WithOneFilter_RoutesFilterSetConfirmMessage()
     {
         var filterSet = BuildFilterSet("Solo", filterCount: 1);
         var component = RenderRow(filterSet);
@@ -139,7 +139,7 @@ public sealed class LibraryEntryRowTests : BunitContext
 
         await _alerts.Received(1).ShowAlert(
             "[[FilterLibrary_Entry_DeleteTitle]]",
-            "[[FilterLibrary_Entry_DeleteFilterSetMessage_One(Solo|1)]]",
+            "[[FilterLibrary_Entry_DeleteFilterSetMessage]]",
             "[[FilterLibrary_Entry_DeleteMenu]]",
             "[[Modal_Cancel]]");
     }
@@ -552,16 +552,16 @@ public sealed class LibraryEntryRowTests : BunitContext
         var component = RenderRow(filterSet);
 
         Assert.Contains("bi-collection", component.Find("i.library-entry-kind-icon").GetAttribute("class"));
-        Assert.Contains("[[FilterLibrary_Entry_FilterCount_Many(3)]]", component.Find(".library-entry-name").TextContent);
+        Assert.Contains("[[FilterLibrary_Entry_FilterCount]]", component.Find(".library-entry-name").TextContent);
     }
 
     [Fact]
-    public void Render_FilterSetEntry_WithOneFilter_RoutesSingularFilterCount()
+    public void Render_FilterSetEntry_WithOneFilter_RoutesFilterCount()
     {
         var filterSet = BuildFilterSet("P", filterCount: 1);
         var component = RenderRow(filterSet);
 
-        Assert.Contains("[[FilterLibrary_Entry_FilterCount_One(1)]]", component.Find(".library-entry-name").TextContent);
+        Assert.Contains("[[FilterLibrary_Entry_FilterCount]]", component.Find(".library-entry-name").TextContent);
     }
 
     [Fact]

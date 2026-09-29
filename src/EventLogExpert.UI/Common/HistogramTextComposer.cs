@@ -54,8 +54,8 @@ internal static class HistogramTextComposer
         HistogramEventNoun eventNoun,
         int count) => eventNoun switch
         {
-            HistogramEventNoun.Events => localizer[count == 1 ? "Histogram_EventNoun_Events_One" : "Histogram_EventNoun_Events_Many", count],
-            HistogramEventNoun.ErrorCodeEvents => localizer[count == 1 ? "Histogram_EventNoun_ErrorCodeEvents_One" : "Histogram_EventNoun_ErrorCodeEvents_Many", count],
+            HistogramEventNoun.Events => PluralText.Format(localizer, "Histogram_EventNoun_Events", ("count", count)),
+            HistogramEventNoun.ErrorCodeEvents => PluralText.Format(localizer, "Histogram_EventNoun_ErrorCodeEvents", ("count", count)),
             _ => throw new ArgumentOutOfRangeException(nameof(eventNoun), eventNoun, null)
         };
 

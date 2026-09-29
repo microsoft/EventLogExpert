@@ -118,7 +118,7 @@ public sealed partial class FilterPredicateEditor : ComponentBase
             {
                 0 => "?",
                 1 => ValueText(comparison, comparison.Values[0]),
-                var count => Localizer["FilterEditor_PredicateSummary_ValueCount_Many", count]
+                var count => PluralText.Format(Localizer, "FilterEditor_PredicateSummary_ValueCount", ("count", count))
             };
         }
 

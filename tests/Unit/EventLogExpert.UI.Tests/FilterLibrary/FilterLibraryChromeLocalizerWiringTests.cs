@@ -109,18 +109,18 @@ public sealed class FilterLibraryChromeLocalizerWiringTests : BunitContext
     }
 
     [Fact]
-    public void ModalTagOverflow_RoutesSingularAndPluralAdditionalTagsAriaThroughDistinctKeys()
+    public void ModalTagOverflow_RoutesAdditionalTagsAriaThroughPluralKey()
     {
         IRenderedComponent<FilterLibraryModal> singular = RenderModalWithTagCount(11);
         IElement singularOverflow = singular.Find(".library-tag-filter-chip-overflow");
 
-        Assert.Equal("[[FilterLibrary_ShowAdditionalTagsAria_One(1)]]", singularOverflow.GetAttribute("aria-label"));
+        Assert.Equal("[[FilterLibrary_ShowAdditionalTagsAria]]", singularOverflow.GetAttribute("aria-label"));
         Assert.Equal("[[FilterLibrary_ShowMore(1)]]", singularOverflow.TextContent.Trim());
 
         IRenderedComponent<FilterLibraryModal> plural = RenderModalWithTagCount(12);
         IElement pluralOverflow = plural.Find(".library-tag-filter-chip-overflow");
 
-        Assert.Equal("[[FilterLibrary_ShowAdditionalTagsAria_Many(2)]]", pluralOverflow.GetAttribute("aria-label"));
+        Assert.Equal("[[FilterLibrary_ShowAdditionalTagsAria]]", pluralOverflow.GetAttribute("aria-label"));
         Assert.Equal("[[FilterLibrary_ShowMore(2)]]", pluralOverflow.TextContent.Trim());
     }
 
@@ -149,7 +149,7 @@ public sealed class FilterLibraryChromeLocalizerWiringTests : BunitContext
 
         Assert.Equal("[[FilterLibrary_Entry_FilterKindAria]]", component.Find("i.library-entry-kind-icon").GetAttribute("aria-label"));
         Assert.Equal("[[FilterLibrary_Entry_RemoveTagAria(alpha)]]", component.Find(".library-entry-tag-chip-remove").GetAttribute("aria-label"));
-        Assert.Equal("[[FilterLibrary_Entry_ShowAllTagsAria(3)]]", component.Find(".library-entry-tag-chip-more").GetAttribute("aria-label"));
+        Assert.Equal("[[FilterLibrary_Entry_ShowAllTagsAria]]", component.Find(".library-entry-tag-chip-more").GetAttribute("aria-label"));
         Assert.Contains("[[FilterLibrary_Entry_MoreTags(1)]]", component.Markup);
         Assert.Equal("[[FilterLibrary_Entry_EditTagsAria(Entry)]]", component.Find(".library-entry-tag-add-inline").GetAttribute("aria-label"));
         Assert.Equal("[[FilterLibrary_Entry_ApplyAria(Entry)]]", component.Find("button.button-green").GetAttribute("aria-label"));
@@ -210,9 +210,9 @@ public sealed class FilterLibraryChromeLocalizerWiringTests : BunitContext
     }
 
     [Theory]
-    [InlineData(1, "[[FilterLibrary_Tags_RemoveConfirm_One(1)]]")]
-    [InlineData(2, "[[FilterLibrary_Tags_RemoveConfirm_Many(2)]]")]
-    public async Task TagPanelDelete_RoutesOneAndManyAffectedCountsThroughCorrectKeys(int count, string expectedConfirm)
+    [InlineData(1, "[[FilterLibrary_Tags_RemoveConfirm]]")]
+    [InlineData(2, "[[FilterLibrary_Tags_RemoveConfirm]]")]
+    public async Task TagPanelDelete_RoutesAffectedCountThroughPluralKey(int count, string expectedConfirm)
     {
         IReadOnlyList<LibraryEntry> entries = Enumerable.Range(0, count)
             .Select(index => BuildSavedFilter($"Entry {index}") with { Tags = ["source"] })
@@ -233,9 +233,9 @@ public sealed class FilterLibraryChromeLocalizerWiringTests : BunitContext
     }
 
     [Theory]
-    [InlineData(1, "[[FilterLibrary_Tags_MergeAria_One(source|target|1)]]")]
-    [InlineData(2, "[[FilterLibrary_Tags_MergeAria_Many(source|target|2)]]")]
-    public async Task TagPanelMerge_RoutesOneAndManyAffectedCountsThroughCorrectKeys(int count, string expectedAria)
+    [InlineData(1, "[[FilterLibrary_Tags_MergeAria]]")]
+    [InlineData(2, "[[FilterLibrary_Tags_MergeAria]]")]
+    public async Task TagPanelMerge_RoutesAffectedCountThroughPluralKey(int count, string expectedAria)
     {
         IReadOnlyList<LibraryEntry> entries = Enumerable.Range(0, count)
             .Select(index => BuildSavedFilter($"Entry {index}") with { Tags = ["source"] })

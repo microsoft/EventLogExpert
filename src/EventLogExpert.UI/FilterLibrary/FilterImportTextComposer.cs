@@ -14,13 +14,11 @@ internal static class FilterImportTextComposer
     private const int MaxPreviewedImportNames = 10;
 
     internal static string EmptyValueMessage(IStringLocalizer<SharedResource> localizer, IReadOnlyList<string> entryNames) =>
-        LocalizedCount.OneOrManyRaw(
+        PluralText.Format(
             localizer,
-            entryNames.Count,
-            "FilterImport_EmptyValueMessage_One",
-            "FilterImport_EmptyValueMessage_Many",
-            entryNames.Count,
-            string.Join(", ", entryNames));
+            "FilterImport_EmptyValueMessage",
+            ("count", entryNames.Count),
+            ("entryNames", string.Join(", ", entryNames)));
 
     internal static string EmptyValueTitle(IStringLocalizer<SharedResource> localizer) =>
         localizer["FilterImport_EmptyValueTitle"];
@@ -39,24 +37,14 @@ internal static class FilterImportTextComposer
         {
             var count = preflight.NormalizableEmptyValueEntryNames.Count;
 
-            notices.Add(LocalizedCount.OneOrManyRaw(
-                localizer,
-                count,
-                "FilterImport_KeepEmpty_One",
-                "FilterImport_KeepEmpty_Many",
-                count));
+            notices.Add(PluralText.Format(localizer, "FilterImport_KeepEmpty", ("count", count)));
         }
 
         if (preflight.NormalizeRemovedFilterNames.Count > 0)
         {
             var count = preflight.NormalizeRemovedFilterNames.Count;
 
-            notices.Add(LocalizedCount.OneOrManyRaw(
-                localizer,
-                count,
-                "FilterImport_RemovedEmptyNotice_One",
-                "FilterImport_RemovedEmptyNotice_Many",
-                count));
+            notices.Add(PluralText.Format(localizer, "FilterImport_RemovedEmptyNotice", ("count", count)));
         }
 
         var preview = Preview(localizer, preflight);
@@ -68,16 +56,11 @@ internal static class FilterImportTextComposer
         localizer["FilterImport_Action_Normalize"];
 
     internal static string NothingToImport(IStringLocalizer<SharedResource> localizer, ImportPreflight preflight) =>
-        LocalizedCount.OneOrManyRaw(
+        PluralText.Format(
             localizer,
-            preflight.NormalizeRemovedFilterNames.Count,
-            preflight.SkippedDuplicates.Count,
-            "FilterImport_NothingToImport_ItemOne_DupOne",
-            "FilterImport_NothingToImport_ItemOne_DupMany",
-            "FilterImport_NothingToImport_ItemMany_DupOne",
-            "FilterImport_NothingToImport_ItemMany_DupMany",
-            preflight.NormalizeRemovedFilterNames.Count,
-            preflight.SkippedDuplicates.Count);
+            "FilterImport_NothingToImport",
+            ("itemCount", preflight.NormalizeRemovedFilterNames.Count),
+            ("duplicateCount", preflight.SkippedDuplicates.Count));
 
     internal static string Preview(IStringLocalizer<SharedResource> localizer, ImportPreflight preflight)
     {
@@ -88,12 +71,7 @@ internal static class FilterImportTextComposer
 
         List<string> lines =
         [
-            BulletPrefix + LocalizedCount.OneOrManyRaw(
-                localizer,
-                preflight.ToAdd.Count,
-                "FilterImport_Added_One",
-                "FilterImport_Added_Many",
-                preflight.ToAdd.Count)
+            BulletPrefix + PluralText.Format(localizer, "FilterImport_Added", ("count", preflight.ToAdd.Count))
         ];
 
         if (preflight.ToReplace.Count > 0)
@@ -101,12 +79,7 @@ internal static class FilterImportTextComposer
             var conflictList = "\n" + localizer["FilterImport_OverwriteNamesHeader"] + "\n" +
                 FormatNameList(localizer, [.. preflight.ToReplace.Select(pair => pair.Incoming.Name)]);
 
-            lines.Add(BulletPrefix + LocalizedCount.OneOrManyRaw(
-                localizer,
-                preflight.ToReplace.Count,
-                "FilterImport_Overwrite_One",
-                "FilterImport_Overwrite_Many",
-                preflight.ToReplace.Count) + conflictList);
+            lines.Add(BulletPrefix + PluralText.Format(localizer, "FilterImport_Overwrite", ("count", preflight.ToReplace.Count)) + conflictList);
         }
 
         if (preflight.ToUpdate.Count > 0)
@@ -115,87 +88,47 @@ internal static class FilterImportTextComposer
 
             if (standaloneTagUpdates > 0)
             {
-                lines.Add(BulletPrefix + LocalizedCount.OneOrManyRaw(
-                    localizer,
-                    standaloneTagUpdates,
-                    "FilterImport_TagUpdates_One",
-                    "FilterImport_TagUpdates_Many",
-                    standaloneTagUpdates));
+                lines.Add(BulletPrefix + PluralText.Format(localizer, "FilterImport_TagUpdates", ("count", standaloneTagUpdates)));
             }
 
             var renameCount = preflight.ToUpdate.Count(pair => pair.Existing.Name.Contains('\\'));
 
             if (renameCount > 0)
             {
-                lines.Add(BulletPrefix + LocalizedCount.OneOrManyRaw(
-                    localizer,
-                    renameCount,
-                    "FilterImport_Renames_One",
-                    "FilterImport_Renames_Many",
-                    renameCount));
+                lines.Add(BulletPrefix + PluralText.Format(localizer, "FilterImport_Renames", ("count", renameCount)));
             }
         }
 
         if (preflight.AmbiguousMatches.Count > 0)
         {
-            lines.Add(BulletPrefix + LocalizedCount.OneOrManyRaw(
-                localizer,
-                preflight.AmbiguousMatches.Count,
-                "FilterImport_Ambiguous_One",
-                "FilterImport_Ambiguous_Many",
-                preflight.AmbiguousMatches.Count));
+            lines.Add(BulletPrefix + PluralText.Format(localizer, "FilterImport_Ambiguous", ("count", preflight.AmbiguousMatches.Count)));
         }
 
-        lines.Add(BulletPrefix + LocalizedCount.OneOrManyRaw(
-            localizer,
-            preflight.SkippedDuplicates.Count,
-            "FilterImport_Skipped_One",
-            "FilterImport_Skipped_Many",
-            preflight.SkippedDuplicates.Count));
+        lines.Add(BulletPrefix + PluralText.Format(localizer, "FilterImport_Skipped", ("count", preflight.SkippedDuplicates.Count)));
 
         return localizer["FilterImport_PreviewHeader"] + "\n" + string.Join('\n', lines);
     }
 
     internal static string Summary(IStringLocalizer<SharedResource> localizer, ImportSummary summary) =>
-        summary.Ambiguous > 0
-            ? LocalizedCount.OneOrManyRaw(
-                localizer,
-                summary.UpdatedTags,
-                "FilterImport_Summary_TagOne_Ambiguous",
-                "FilterImport_Summary_TagMany_Ambiguous",
-                summary.Added,
-                summary.Replaced,
-                summary.UpdatedTags,
-                summary.Skipped,
-                summary.Ambiguous)
-            : LocalizedCount.OneOrManyRaw(
-                localizer,
-                summary.UpdatedTags,
-                "FilterImport_Summary_TagOne",
-                "FilterImport_Summary_TagMany",
-                summary.Added,
-                summary.Replaced,
-                summary.UpdatedTags,
-                summary.Skipped);
+        PluralText.Format(
+            localizer,
+            summary.Ambiguous > 0 ? "FilterImport_Summary_Tag_Ambiguous" : "FilterImport_Summary_Tag",
+            ("added", summary.Added),
+            ("replaced", summary.Replaced),
+            ("updatedTags", summary.UpdatedTags),
+            ("skipped", summary.Skipped),
+            ("ambiguous", summary.Ambiguous));
 
     internal static string TagRemoved(IStringLocalizer<SharedResource> localizer, string tag, int count) =>
-        LocalizedCount.OneOrManyRaw(
-            localizer,
-            count,
-            "FilterImport_Announcement_TagRemoved_One",
-            "FilterImport_Announcement_TagRemoved_Many",
-            tag,
-            count);
+        PluralText.Format(localizer, "FilterImport_Announcement_TagRemoved", ("tag", tag), ("count", count));
 
     internal static string TagRenamed(IStringLocalizer<SharedResource> localizer, string oldTag, string newTag, int count) =>
-        LocalizedCount.OneOrManyRaw(
+        PluralText.Format(
             localizer,
-            count,
-            "FilterImport_Announcement_TagRenamed_One",
-            "FilterImport_Announcement_TagRenamed_Many",
-            oldTag,
-            newTag,
-            count);
+            "FilterImport_Announcement_TagRenamed",
+            ("oldTag", oldTag),
+            ("newTag", newTag),
+            ("count", count));
 
     private static string FormatNameList(IStringLocalizer<SharedResource> localizer, IReadOnlyList<string> names)
     {
