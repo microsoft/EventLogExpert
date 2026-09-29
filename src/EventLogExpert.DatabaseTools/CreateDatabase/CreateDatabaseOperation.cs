@@ -98,10 +98,9 @@ internal sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : O
 
             logger.User(LogLevel.Information,
                 new LocalizableText(
-                    excludeProviderNames.Count == 1 ?
-                        DatabaseToolsLogKeys.CreateSkippedProvidersOne :
-                        DatabaseToolsLogKeys.CreateSkippedProvidersMany,
-                    [excludeProviderNames.Count.ToString(), request.SkipProvidersInFile]));
+                    DatabaseToolsLogKeys.CreateSkippedProviders,
+                    [request.SkipProvidersInFile],
+                    PluralCount: excludeProviderNames.Count));
         }
 
         var filterRegex = EnsureBoundedTimeout(request.FilterRegex);

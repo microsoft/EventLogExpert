@@ -137,12 +137,16 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
             {
                 logger.User(LogLevel.Information,
                     new LocalizableText(DatabaseToolsLogKeys.MergeTargetContainsVersions,
-                        [identitiesAlreadyInTarget.Count.ToString()]));
+                        [],
+                        PluralCount: identitiesAlreadyInTarget.Count));
 
                 if (request.Overwrite)
                 {
                     logger.User(LogLevel.Information,
-                        new LocalizableText(DatabaseToolsLogKeys.MergeRemovingVersions, []));
+                        new LocalizableText(
+                            DatabaseToolsLogKeys.MergeRemovingVersions,
+                            [],
+                            PluralCount: identitiesAlreadyInTarget.Count));
 
                     // Delete only colliding identities so unrelated versions of the same provider survive.
                     foreach (var identity in identitiesAlreadyInTarget)
@@ -157,12 +161,16 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
 
                     logger.User(LogLevel.Information,
                         new LocalizableText(DatabaseToolsLogKeys.MergeRemovalCompleted,
-                            [identitiesAlreadyInTarget.Count.ToString()]));
+                            [],
+                            PluralCount: identitiesAlreadyInTarget.Count));
                 }
                 else
                 {
                     logger.User(LogLevel.Information,
-                        new LocalizableText(DatabaseToolsLogKeys.MergeVersionsSkipped, []));
+                        new LocalizableText(
+                            DatabaseToolsLogKeys.MergeVersionsSkipped,
+                            [],
+                            PluralCount: identitiesAlreadyInTarget.Count));
                 }
             }
 
@@ -217,7 +225,10 @@ internal sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Ope
             logger.Data(LogLevel.Information, string.Empty);
 
             logger.User(LogLevel.Information,
-                new LocalizableText(DatabaseToolsLogKeys.MergeCopiedVersions, [copiedCount.ToString()]));
+                new LocalizableText(
+                    DatabaseToolsLogKeys.MergeCopiedVersions,
+                    [],
+                    PluralCount: copiedCount));
 
             return DatabaseToolsOutcome.Succeeded;
         }

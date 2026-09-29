@@ -97,6 +97,12 @@ public sealed class MergeDatabaseCommandTests : IDisposable
         await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false)).ExecuteAsync(logger, null, CancellationToken.None);
 
         Assert.Equal(["vk1", "vk2"], ReadVersionKeys(target, Constants.FirstProviderName));
+
+        // The copied-versions message routes through the ICU PluralCount transport: one copied version selects the
+        // singular branch and renders the §3I-corrected "version" (not "version(s)"), not the raw ICU pattern.
+        var copied = Assert.Single(logger.Entries, entry => entry.Key == "DatabaseTools_Op_MergeCopiedVersions");
+        Assert.Equal(1L, copied.PluralCount);
+        Assert.Equal("Copied 1 provider version.", copied.Message);
     }
 
     [Fact]

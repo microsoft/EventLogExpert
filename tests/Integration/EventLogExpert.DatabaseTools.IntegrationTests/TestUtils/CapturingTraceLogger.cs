@@ -27,17 +27,19 @@ internal sealed class CapturingTraceLogger : IOperationLog
 
     public void User(LogLevel level, LocalizableText message) =>
         Entries.Add(new CapturedLogEntry(level,
-            _resolver.Resolve(message.Key, message.Args),
+            _resolver.Resolve(message.Key, message.Args, message.PluralCount),
             message.Key,
             message.Args,
-            DebugDetail: null));
+            DebugDetail: null,
+            PluralCount: message.PluralCount));
 
     public void User(LogLevel level, LocalizableText message, Exception diagnostic) =>
         Entries.Add(new CapturedLogEntry(level,
-            _resolver.Resolve(message.Key, message.Args),
+            _resolver.Resolve(message.Key, message.Args, message.PluralCount),
             message.Key,
             message.Args,
-            diagnostic.ToString()));
+            diagnostic.ToString(),
+            message.PluralCount));
 
     private void Add(LogLevel level, string message)
     {
@@ -72,4 +74,5 @@ internal sealed record CapturedLogEntry(
     string Message,
     string? Key = null,
     IReadOnlyList<string>? Args = null,
-    string? DebugDetail = null);
+    string? DebugDetail = null,
+    long? PluralCount = null);
