@@ -13,4 +13,15 @@
     <ProjectReference Include="..\EventLogExpert.Logging\EventLogExpert.Logging.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="EventLogExpert.UI.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- CLDR cardinal plural rules (Unicode-3.0); see Plural/THIRD-PARTY-NOTICES.md. Embedded unchanged; a checksum test guards it. -->
+    <EmbeddedResource Include="Plural\cldr-plurals-cardinal.json" />
+    <!-- Ship the Unicode notice with every artifact that references this assembly (flows transitively to the MSIX app + EventDbTool output). -->
+    <Content Include="Plural\THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
