@@ -36,8 +36,31 @@ public static class PluralServices
                 throw new InvalidOperationException("PluralServices has already been configured.");
             }
 
-            s_configured = true;
-            Volatile.Write(ref s_snapshot, new Snapshot(diagnostics, neutralPatternProvider, s_snapshot.Generation + 1));
+            InstallUnderLock(diagnostics, neutralPatternProvider);
+        }
+    }
+
+    /// <summary>
+    ///     Idempotent companion to <see cref="Configure" /> for composition roots that can run more than once per process
+    ///     (the database tool builds a fresh service provider for every command). The first caller wins and installs the
+    ///     services; later callers leave the installed services untouched instead of tripping the double-configuration guard.
+    /// </summary>
+    /// <returns><see langword="true" /> if this call installed the services; otherwise <see langword="false" />.</returns>
+    public static bool TryConfigure(IPluralDiagnostics diagnostics, INeutralPatternProvider neutralPatternProvider)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+        ArgumentNullException.ThrowIfNull(neutralPatternProvider);
+
+        lock (s_gate)
+        {
+            if (s_configured)
+            {
+                return false;
+            }
+
+            InstallUnderLock(diagnostics, neutralPatternProvider);
+
+            return true;
         }
     }
 
@@ -48,6 +71,12 @@ public static class PluralServices
             s_configured = false;
             Volatile.Write(ref s_snapshot, new Snapshot(NoOpPluralDiagnostics.Instance, s_defaultNeutralPatternProvider, s_snapshot.Generation + 1));
         }
+    }
+
+    private static void InstallUnderLock(IPluralDiagnostics diagnostics, INeutralPatternProvider neutralPatternProvider)
+    {
+        s_configured = true;
+        Volatile.Write(ref s_snapshot, new Snapshot(diagnostics, neutralPatternProvider, s_snapshot.Generation + 1));
     }
 
     public sealed record Snapshot(IPluralDiagnostics Diagnostics, INeutralPatternProvider NeutralPatternProvider, int Generation);

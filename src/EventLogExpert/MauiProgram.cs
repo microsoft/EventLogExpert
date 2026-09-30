@@ -4,6 +4,7 @@
 using EventLogExpert.Adapters.Settings;
 using EventLogExpert.DependencyInjection;
 using EventLogExpert.Eventing.Resolvers;
+using EventLogExpert.Localization.Plural;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Files;
@@ -109,6 +110,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<DatabaseRecoveryHost>();
 
         var mauiApp = builder.Build();
+
+        PluralServicesComposition.ConfigureFromLogger(
+            mauiApp.Services.GetRequiredService<ILogSourceFactory>().ForCategory(LogCategories.App));
 
         mauiApp.Services.GetRequiredService<IAttentionBannerService>();
         mauiApp.Services.GetRequiredService<DatabaseRecoveryHost>();
