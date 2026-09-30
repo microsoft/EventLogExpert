@@ -283,28 +283,26 @@ public sealed class FilterImportTextComposerTests
         // The updatedTags count must render as a standalone token in BOTH branches - "1" in the singular and a distinct
         // value in the plural - so a dropped {updatedTags} is caught in either branch.
         Assert.Matches(@"(?<![\d,])1(?![\d,])", singular);
-        Assert.Contains("4567", plural, StringComparison.Ordinal);
+        Assert.Contains(4567.ToString("N0", CultureInfo.GetCultureInfo("en-US")), plural, StringComparison.Ordinal);
 
-        // Every non-tag field's count lands verbatim and ungrouped in both renders.
+        // Every non-tag field's count lands grouped in both renders.
         foreach (string text in new[] { singular, plural })
         {
-            Assert.Contains("7010", text, StringComparison.Ordinal);
-            Assert.Contains("8020", text, StringComparison.Ordinal);
-            Assert.Contains("9030", text, StringComparison.Ordinal);
-            Assert.DoesNotContain("7,010", text, StringComparison.Ordinal);
+            Assert.Contains(7010.ToString("N0", CultureInfo.GetCultureInfo("en-US")), text, StringComparison.Ordinal);
+            Assert.Contains(8020.ToString("N0", CultureInfo.GetCultureInfo("en-US")), text, StringComparison.Ordinal);
+            Assert.Contains(9030.ToString("N0", CultureInfo.GetCultureInfo("en-US")), text, StringComparison.Ordinal);
         }
     }
 
     [Fact]
-    public void TagRenamed_RendersRawUngroupedCountAndCarriesBothTags()
+    public void TagRenamed_RendersGroupedCountAndCarriesBothTags()
     {
         var large = WithEnUsCulture(() => FilterImportTextComposer.TagRenamed(BuildLocalizer(), "alpha", "bravo", 1000));
         var singular = WithEnUsCulture(() => FilterImportTextComposer.TagRenamed(BuildLocalizer(), "alpha", "bravo", 1));
 
-        // The count renders raw (no thousands separator) in the plural branch and as a bounded "1" in the singular
+        // The count renders grouped in the plural branch and as a bounded "1" in the singular
         // branch, both tag arguments land, and the entry noun inflects - all without pinning the surrounding copy.
-        Assert.Contains("1000", large, StringComparison.Ordinal);
-        Assert.DoesNotContain("1,000", large, StringComparison.Ordinal);
+        Assert.Contains(1000.ToString("N0", CultureInfo.GetCultureInfo("en-US")), large, StringComparison.Ordinal);
         Assert.Matches(@"(?<![\d,])1(?![\d,])", singular);
         Assert.Contains("alpha", large, StringComparison.Ordinal);
         Assert.Contains("bravo", large, StringComparison.Ordinal);

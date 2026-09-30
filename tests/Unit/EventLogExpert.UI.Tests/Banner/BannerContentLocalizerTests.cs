@@ -449,7 +449,7 @@ public sealed class BannerContentLocalizerTests
         params string[] failureFragments)
     {
         // Routing (including the composed failure parts) is verified via the stable marker keys; the English is
-        // verified behaviorally: count-driven database/databases inflection, the raw count landing in both branches,
+        // verified behaviorally: count-driven database/databases inflection, the count landing in both branches,
         // and the failure filename/reason present - never a frozen full sentence.
         BannerContentText marker = ResolveWithMarker(build(1));
         Assert.Equal("[[Banner_Db_Import_Partial_Title]]", marker.Title);
@@ -461,7 +461,7 @@ public sealed class BannerContentLocalizerTests
         Assert.Equal("Import Completed with Errors", one.Title);
         Assert.NotEqual(NormalizeNumbers(one.Message), NormalizeNumbers(many.Message));
         Assert.Matches(@"(?<![\d,])1(?![\d,])", one.Message);
-        Assert.Contains("1000", many.Message, StringComparison.Ordinal);
+        Assert.Contains(1000.ToString("N0", CultureInfo.GetCultureInfo("en-US")), many.Message, StringComparison.Ordinal);
 
         foreach (string fragment in failureFragments)
         {
@@ -472,7 +472,7 @@ public sealed class BannerContentLocalizerTests
     private static void AssertImportSuccessRoutesAndInflects()
     {
         // Routing is verified via the stable marker keys; the English is verified behaviorally (count-driven
-        // database/databases + has/have, with the raw count landing ungrouped) rather than frozen byte-for-byte.
+        // database/databases + has/have, with the count landing grouped) rather than frozen byte-for-byte.
         BannerContentText marker = ResolveWithMarker(new DatabaseImportSummary(3, [], []));
         Assert.Equal("[[Banner_Db_Import_Success_Title]]", marker.Title);
         Assert.Equal("[[Banner_Db_Import_Success]]", marker.Message);
@@ -484,8 +484,7 @@ public sealed class BannerContentLocalizerTests
         Assert.Equal("Import Successful", many.Title);
         Assert.NotEqual(NormalizeNumbers(one.Message), NormalizeNumbers(many.Message));
         Assert.Matches(@"(?<![\d,])1(?![\d,])", one.Message);
-        Assert.Contains("1000", many.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("1,000", many.Message, StringComparison.Ordinal);
+        Assert.Contains(1000.ToString("N0", CultureInfo.GetCultureInfo("en-US")), many.Message, StringComparison.Ordinal);
     }
 
     private static void AssertResolved(

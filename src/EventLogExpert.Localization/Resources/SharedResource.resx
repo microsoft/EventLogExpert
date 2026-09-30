@@ -261,7 +261,7 @@
     <value>Databases</value>
     <comment>Title used when the attention banner posts a fallback database error.</comment>
   </data>
-  <data name="Banner_Attention" xml:space="preserve"><value>{count, plural, one {{count} database needs attention. Open Databases to enable or remove them.} other {{count} databases need attention. Open Databases to enable or remove them.}}</value></data>
+  <data name="Banner_Attention" xml:space="preserve"><value>{count, plural, one {{count:N0} database needs attention. Open Databases to enable or remove them.} other {{count:N0} databases need attention. Open Databases to enable or remove them.}}</value></data>
   <data name="Banner_Attention_OpenDatabases" xml:space="preserve">
     <value>Open Databases</value>
     <comment>Button text that opens the database tools from the attention banner.</comment>
@@ -326,8 +326,8 @@
     <value>Upgrading database {0} of {1}: {2} - {3}</value>
     <comment>Upgrade progress banner message. {0} is current batch position; {1} is batch size; {2} is database name; {3} is the raw upgrade phase.</comment>
   </data>
-  <data name="Banner_Upgrade_Preparing" xml:space="preserve"><value>{count, plural, one {Preparing upgrade of {count} database…} other {Preparing upgrade of {count} databases…}}</value></data>
-  <data name="Banner_Upgrade_QueuedBatches" xml:space="preserve"><value>{count, plural, one {(+{count} batch queued)} other {(+{count} batches queued)}}</value></data>
+  <data name="Banner_Upgrade_Preparing" xml:space="preserve"><value>{count, plural, one {Preparing upgrade of {count:N0} database…} other {Preparing upgrade of {count:N0} databases…}}</value></data>
+  <data name="Banner_Upgrade_QueuedBatches" xml:space="preserve"><value>{count, plural, one {(+{count:N0} batch queued)} other {(+{count:N0} batches queued)}}</value></data>
   <!-- Export banner messages. -->
   <data name="Banner_Export_Title" xml:space="preserve">
     <value>Export events</value>
@@ -411,7 +411,7 @@
     <value>upgrading '{0}'</value>
     <comment>Operation noun phrase for upgrading one named database. {0} is the file name.</comment>
   </data>
-  <data name="Banner_Db_OperationNoun_UpgradeBatch" xml:space="preserve"><value>{count, plural, one {upgrading {count} database} other {upgrading {count} databases}}</value></data>
+  <data name="Banner_Db_OperationNoun_UpgradeBatch" xml:space="preserve"><value>{count, plural, one {upgrading {count:N0} database} other {upgrading {count:N0} databases}}</value></data>
   <data name="Banner_Db_Import_Success_Title" xml:space="preserve">
     <value>Import Successful</value>
     <comment>Title for successful provider database imports.</comment>
@@ -420,7 +420,7 @@
     <value>No databases were imported.</value>
     <comment>Import result when no database was selected or imported.</comment>
   </data>
-  <data name="Banner_Db_Import_Success" xml:space="preserve"><value>{count, plural, one {{count} database has successfully been imported} other {{count} databases have successfully been imported}}</value></data>
+  <data name="Banner_Db_Import_Success" xml:space="preserve"><value>{count, plural, one {{count:N0} database has successfully been imported} other {{count:N0} databases have successfully been imported}}</value></data>
   <data name="Banner_Db_Import_Failed_Title" xml:space="preserve">
     <value>Import Failed</value>
     <comment>Title for failed provider database imports.</comment>
@@ -433,7 +433,7 @@
     <value>Import Completed with Errors</value>
     <comment>Title for provider database imports that partially succeed.</comment>
   </data>
-  <data name="Banner_Db_Import_Partial" xml:space="preserve"><value>{count, plural, one {{count} database imported} other {{count} databases imported}}</value></data>
+  <data name="Banner_Db_Import_Partial" xml:space="preserve"><value>{count, plural, one {{count:N0} database imported} other {{count:N0} databases imported}}</value></data>
   <data name="Banner_Db_Import_Partial_Message" xml:space="preserve">
     <value>{0}; {1}</value>
     <comment>Partial import message. {0} is the imported-count phrase; {1} is the composed failure summary.</comment>
@@ -507,7 +507,7 @@
     <value>ClassificationFailed</value>
     <comment>Database status token shown inside a provider-database failure message.</comment>
   </data>
-  <data name="Db_Manage_Upgrade_Cancelled" xml:space="preserve"><value>{count, plural, one {Upgraded {count} database; {cancelled} cancelled.} other {Upgraded {count} databases; {cancelled} cancelled.}}</value></data>
+  <data name="Db_Manage_Upgrade_Cancelled" xml:space="preserve"><value>{count, plural, one {Upgraded {count:N0} database; {cancelled:N0} cancelled.} other {Upgraded {count:N0} databases; {cancelled:N0} cancelled.}}</value></data>
   <data name="Db_Manage_Upgrade_SingleFailure" xml:space="preserve">
     <value>Upgrade of '{0}' failed: {1}</value>
     <comment>Upgrade announcement for a single failure. {0} is the file name; {1} is the failure reason.</comment>
@@ -516,7 +516,7 @@
     <value>Upgraded {0} of {1} databases; {2} failed. First failure: '{3}' — {4}</value>
     <comment>Upgrade announcement for multiple failures. {0} succeeded; {1} attempted; {2} failed; {3} first failed file name; {4} first failure reason.</comment>
   </data>
-  <data name="Db_Manage_Upgrade_Success" xml:space="preserve"><value>{count, plural, one {Upgraded {count} database.} other {Upgraded {count} databases.}}</value></data>
+  <data name="Db_Manage_Upgrade_Success" xml:space="preserve"><value>{count, plural, one {Upgraded {count:N0} database.} other {Upgraded {count:N0} databases.}}</value></data>
   <data name="Db_Badge_RecoveryRequired" xml:space="preserve">
     <value>Recovery required</value>
     <comment>Provider database row badge shown when an upgrade backup exists.</comment>
@@ -602,7 +602,7 @@
     <comment>Provider database OS stamp fallback.</comment>
   </data>
   <data name="Db_Entry_MixedOs_Count" xml:space="preserve">
-    <value>{count, plural, other {Mixed ({count} OS versions)}}</value>
+    <value>{count, plural, other {Mixed ({count:N0} OS versions)}}</value>
     <comment>Provider database OS stamp summary for multiple versions. {0} is the raw count from 2 through 9.</comment>
   </data>
   <data name="Db_Entry_MixedOs_Capped" xml:space="preserve">
@@ -687,7 +687,7 @@
     <value>Filter library not fully loaded</value>
     <comment>Title for a filter library load warning.</comment>
   </data>
-  <data name="Banner_Filter_NotLoaded_Message" xml:space="preserve"><value>{count, plural, one {{count} library entry couldn't be read and was left in place to avoid data loss. This usually means the library was written by a newer version of the app.} other {{count} library entries couldn't be read and were left in place to avoid data loss. This usually means the library was written by a newer version of the app.}}</value></data>
+  <data name="Banner_Filter_NotLoaded_Message" xml:space="preserve"><value>{count, plural, one {{count:N0} library entry couldn't be read and was left in place to avoid data loss. This usually means the library was written by a newer version of the app.} other {{count:N0} library entries couldn't be read and were left in place to avoid data loss. This usually means the library was written by a newer version of the app.}}</value></data>
   <data name="Banner_Filter_CreateFailed_Title" xml:space="preserve">
     <value>Couldn't create filter set</value>
     <comment>Title shown when creating a filter set in the filter library fails.</comment>
@@ -796,7 +796,7 @@
     <value>Empty log</value>
     <comment>Title for empty-log open warnings.</comment>
   </data>
-  <data name="Banner_EmptyLog" xml:space="preserve"><value>{logCount, plural, =1 {Log contains no events: {name}} other {{logCount} logs contained no events: {names}}}</value></data>
+  <data name="Banner_EmptyLog" xml:space="preserve"><value>{logCount, plural, =1 {Log contains no events: {name}} other {{logCount:N0} logs contained no events: {names}}}</value></data>
   <data name="Banner_List_Separator" xml:space="preserve">
     <value>, </value>
     <comment>Separator inserted between items when a banner joins a list (e.g. multiple empty-log names or import failure details). Include any trailing space the locale needs.</comment>
@@ -806,7 +806,7 @@
     <value>Database upgrade recovery</value>
     <comment>Title for the database recovery banner.</comment>
   </data>
-  <data name="Banner_Recovery_Needed" xml:space="preserve"><value>{count, plural, one {{count} database needs recovery from interrupted upgrade.} other {{count} databases need recovery from interrupted upgrade.}}</value></data>
+  <data name="Banner_Recovery_Needed" xml:space="preserve"><value>{count, plural, one {{count:N0} database needs recovery from interrupted upgrade.} other {{count:N0} databases need recovery from interrupted upgrade.}}</value></data>
   <data name="Banner_Recovery_Resolve" xml:space="preserve">
     <value>Resolve</value>
     <comment>Action label that opens the database recovery dialog.</comment>
@@ -1550,9 +1550,9 @@
   <data name="Correlation_Role_Child" xml:space="preserve">
     <value>Child</value>
   </data>
-  <data name="Correlation_Event" xml:space="preserve"><value>{count, plural, one {{count} event} other {{count} events}}</value></data>
-  <data name="Correlation_Error" xml:space="preserve"><value>{count, plural, one {{count} error} other {{count} errors}}</value></data>
-  <data name="Correlation_Warning" xml:space="preserve"><value>{count, plural, one {{count} warning} other {{count} warnings}}</value></data>
+  <data name="Correlation_Event" xml:space="preserve"><value>{count, plural, one {{count:N0} event} other {{count:N0} events}}</value></data>
+  <data name="Correlation_Error" xml:space="preserve"><value>{count, plural, one {{count:N0} error} other {{count:N0} errors}}</value></data>
+  <data name="Correlation_Warning" xml:space="preserve"><value>{count, plural, one {{count:N0} warning} other {{count:N0} warnings}}</value></data>
   <data name="Correlation_NoMessage" xml:space="preserve">
     <value>No message</value>
   </data>
@@ -1626,11 +1626,11 @@
     <comment>{0} is the localized start time; {1} is the localized end time.</comment>
   </data>
   <data name="Correlation_SharedTruncated" xml:space="preserve">
-    <value>{total, plural, other {Shared Activity ID: showing {shown} of {total} events (the selected event and the most recent errors/events).}}</value>
+    <value>{total, plural, other {Shared Activity ID: showing {shown:N0} of {total:N0} events (the selected event and the most recent errors/events).}}</value>
     <comment>{0} is the number of rendered events; {1} is the total event count. Activity ID is a Windows Event Log identifier name.</comment>
   </data>
   <data name="Correlation_Truncated" xml:space="preserve">
-    <value>{total, plural, other {Showing the newest {shown} of {total} events (plus the selected event).}}</value>
+    <value>{total, plural, other {Showing the newest {shown:N0} of {total:N0} events (plus the selected event).}}</value>
     <comment>{0} is the number of rendered events; {1} is the total event count.</comment>
   </data>
   <!-- Resolution coverage modal (step 2 localization). -->
@@ -2212,7 +2212,7 @@
   <data name="FilterEditor_PredicateSummary_Operator_NotContains" xml:space="preserve">
     <value>doesn't contain</value>
   </data>
-  <data name="FilterEditor_PredicateSummary_ValueCount" xml:space="preserve"><value>{count, plural, other {{count} values}}</value></data>
+  <data name="FilterEditor_PredicateSummary_ValueCount" xml:space="preserve"><value>{count, plural, other {{count:N0} values}}</value></data>
   <data name="FilterEditor_PredicateSummary" xml:space="preserve">
     <value>{0} {1} {2}</value>
     <comment>{0} is the filter property token, {1} is the localized operator, and {2} is the value text or raw value count.</comment>
@@ -2623,7 +2623,7 @@
     <value>Combined</value>
   </data>
   <data name="StatusBar_Source_CombinedCount" xml:space="preserve">
-    <value>{memberCount, plural, one {Combined ({memberCount} log)} other {Combined ({memberCount} logs)}}</value>
+    <value>{memberCount, plural, one {Combined ({memberCount:N0} log)} other {Combined ({memberCount:N0} logs)}}</value>
   </data>
   <data name="StatusBar_Counts_Total" xml:space="preserve">
     <value>{total, plural, one {{total:N0} event} other {{total:N0} events}}</value>
@@ -2729,10 +2729,10 @@
     <value>Filter active</value>
   </data>
   <data name="StatusBar_Filter_Lens" xml:space="preserve">
-    <value>{count, plural, one {{count} lens} other {{count} lenses}}</value>
+    <value>{count, plural, one {{count:N0} lens} other {{count:N0} lenses}}</value>
   </data>
   <data name="StatusBar_Filter_ActiveLens" xml:space="preserve">
-    <value>{count, plural, one {Filter + {count} lens} other {Filter + {count} lenses}}</value>
+    <value>{count, plural, one {Filter + {count:N0} lens} other {Filter + {count:N0} lenses}}</value>
   </data>
   <data name="StatusBar_Stats_Show" xml:space="preserve">
     <value>Show statistics for these events</value>
@@ -2780,19 +2780,19 @@
   <data name="Stats_Headline_RemoveLens" xml:space="preserve"><value>0 events - remove a lens to continue</value></data>
   <data name="Stats_Headline_Events" xml:space="preserve"><value>{count, plural, one {{count:N0} event} other {{count:N0} events}}</value></data>
   <data name="Stats_Headline_ErrorCritical" xml:space="preserve"><value>{errorCritical, plural, one { - {errorCritical:N0} error/critical} other { - {errorCritical:N0} error/critical}}</value></data>
-  <data name="Stats_Headline_TopSources" xml:space="preserve"><value>{count, plural, one { - top {count} source = {percent}%} other { - top {count} sources = {percent}%}}</value></data>
+  <data name="Stats_Headline_TopSources" xml:space="preserve"><value>{count, plural, one { - top {count:N0} source = {percent}%} other { - top {count:N0} sources = {percent}%}}</value></data>
   <data name="Stats_Dimension_Source" xml:space="preserve"><value>Source</value></data>
   <data name="Stats_Dimension_EventId" xml:space="preserve"><value>Event ID</value></data>
   <data name="Stats_Dimension_TaskCategory" xml:space="preserve"><value>Task Category</value></data>
   <data name="Stats_Dimension_User" xml:space="preserve"><value>User</value></data>
   <data name="Stats_Coverage_All_Source" xml:space="preserve"><value>{count, plural, one {All {count:N0} source - {percent}% of events} other {All {count:N0} sources - {percent}% of events}}</value></data>
-  <data name="Stats_Coverage_Top_Source" xml:space="preserve"><value>{distinctCount, plural, one {Top {shownCount} of {distinctCount:N0} source - {percent}% of events} other {Top {shownCount} of {distinctCount:N0} sources - {percent}% of events}}</value></data>
+  <data name="Stats_Coverage_Top_Source" xml:space="preserve"><value>{distinctCount, plural, one {Top {shownCount:N0} of {distinctCount:N0} source - {percent}% of events} other {Top {shownCount:N0} of {distinctCount:N0} sources - {percent}% of events}}</value></data>
   <data name="Stats_Coverage_All_EventId" xml:space="preserve"><value>{count, plural, one {All {count:N0} event ID - {percent}% of events} other {All {count:N0} event IDs - {percent}% of events}}</value></data>
-  <data name="Stats_Coverage_Top_EventId" xml:space="preserve"><value>{distinctCount, plural, one {Top {shownCount} of {distinctCount:N0} event ID - {percent}% of events} other {Top {shownCount} of {distinctCount:N0} event IDs - {percent}% of events}}</value></data>
+  <data name="Stats_Coverage_Top_EventId" xml:space="preserve"><value>{distinctCount, plural, one {Top {shownCount:N0} of {distinctCount:N0} event ID - {percent}% of events} other {Top {shownCount:N0} of {distinctCount:N0} event IDs - {percent}% of events}}</value></data>
   <data name="Stats_Coverage_All_TaskCategory" xml:space="preserve"><value>{count, plural, one {All {count:N0} task category - {percent}% of events} other {All {count:N0} task categories - {percent}% of events}}</value></data>
-  <data name="Stats_Coverage_Top_TaskCategory" xml:space="preserve"><value>{distinctCount, plural, one {Top {shownCount} of {distinctCount:N0} task category - {percent}% of events} other {Top {shownCount} of {distinctCount:N0} task categories - {percent}% of events}}</value></data>
+  <data name="Stats_Coverage_Top_TaskCategory" xml:space="preserve"><value>{distinctCount, plural, one {Top {shownCount:N0} of {distinctCount:N0} task category - {percent}% of events} other {Top {shownCount:N0} of {distinctCount:N0} task categories - {percent}% of events}}</value></data>
   <data name="Stats_Coverage_All_User" xml:space="preserve"><value>{count, plural, one {All {count:N0} user - {percent}% of events} other {All {count:N0} users - {percent}% of events}}</value></data>
-  <data name="Stats_Coverage_Top_User" xml:space="preserve"><value>{distinctCount, plural, one {Top {shownCount} of {distinctCount:N0} user - {percent}% of events} other {Top {shownCount} of {distinctCount:N0} users - {percent}% of events}}</value></data>
+  <data name="Stats_Coverage_Top_User" xml:space="preserve"><value>{distinctCount, plural, one {Top {shownCount:N0} of {distinctCount:N0} user - {percent}% of events} other {Top {shownCount:N0} of {distinctCount:N0} users - {percent}% of events}}</value></data>
   <!-- Histogram pane localization. Event/process/log values and decoded HRESULT symbols are data and remain verbatim in code. -->
   <data name="Histogram_GroupBy" xml:space="preserve"><value>Group by</value></data>
   <data name="Histogram_Legend_Hide" xml:space="preserve"><value>Hide {0}</value></data>
@@ -2859,16 +2859,16 @@
   <data name="Histogram_HighlightColor_Pink" xml:space="preserve"><value>Pink</value></data>
   <data name="Histogram_HighlightColor_DarkPink" xml:space="preserve"><value>Dark pink</value></data>
   <data name="Histogram_Overflow_Bare" xml:space="preserve"><value>Other</value></data>
-  <data name="Histogram_Overflow_EventId" xml:space="preserve"><value>{count, plural, one {Other ({count} event ID)} other {Other ({count} event IDs)}}</value></data>
-  <data name="Histogram_Overflow_Source" xml:space="preserve"><value>{count, plural, one {Other ({count} source)} other {Other ({count} sources)}}</value></data>
-  <data name="Histogram_Overflow_TaskCategory" xml:space="preserve"><value>{count, plural, one {Other ({count} task category)} other {Other ({count} task categories)}}</value></data>
-  <data name="Histogram_Overflow_Opcode" xml:space="preserve"><value>{count, plural, one {Other ({count} opcode)} other {Other ({count} opcodes)}}</value></data>
-  <data name="Histogram_Overflow_Log" xml:space="preserve"><value>{count, plural, one {Other ({count} log)} other {Other ({count} logs)}}</value></data>
-  <data name="Histogram_Overflow_LogonType" xml:space="preserve"><value>{count, plural, one {Other ({count} logon type)} other {Other ({count} logon types)}}</value></data>
-  <data name="Histogram_Overflow_TicketEncryptionType" xml:space="preserve"><value>{count, plural, one {Other ({count} ticket encryption type)} other {Other ({count} ticket encryption types)}}</value></data>
-  <data name="Histogram_Overflow_ErrorCode" xml:space="preserve"><value>{count, plural, one {Other ({count} error code)} other {Other ({count} error codes)}}</value></data>
-  <data name="Histogram_Overflow_ProcessImage" xml:space="preserve"><value>{count, plural, one {Other ({count} process)} other {Other ({count} processes)}}</value></data>
-  <data name="Histogram_Overflow_ParentProcessImage" xml:space="preserve"><value>{count, plural, one {Other ({count} parent process)} other {Other ({count} parent processes)}}</value></data>
+  <data name="Histogram_Overflow_EventId" xml:space="preserve"><value>{count, plural, one {Other ({count:N0} event ID)} other {Other ({count:N0} event IDs)}}</value></data>
+  <data name="Histogram_Overflow_Source" xml:space="preserve"><value>{count, plural, one {Other ({count:N0} source)} other {Other ({count:N0} sources)}}</value></data>
+  <data name="Histogram_Overflow_TaskCategory" xml:space="preserve"><value>{count, plural, one {Other ({count:N0} task category)} other {Other ({count:N0} task categories)}}</value></data>
+  <data name="Histogram_Overflow_Opcode" xml:space="preserve"><value>{count, plural, one {Other ({count:N0} opcode)} other {Other ({count:N0} opcodes)}}</value></data>
+  <data name="Histogram_Overflow_Log" xml:space="preserve"><value>{count, plural, one {Other ({count:N0} log)} other {Other ({count:N0} logs)}}</value></data>
+  <data name="Histogram_Overflow_LogonType" xml:space="preserve"><value>{count, plural, one {Other ({count:N0} logon type)} other {Other ({count:N0} logon types)}}</value></data>
+  <data name="Histogram_Overflow_TicketEncryptionType" xml:space="preserve"><value>{count, plural, one {Other ({count:N0} ticket encryption type)} other {Other ({count:N0} ticket encryption types)}}</value></data>
+  <data name="Histogram_Overflow_ErrorCode" xml:space="preserve"><value>{count, plural, one {Other ({count:N0} error code)} other {Other ({count:N0} error codes)}}</value></data>
+  <data name="Histogram_Overflow_ProcessImage" xml:space="preserve"><value>{count, plural, one {Other ({count:N0} process)} other {Other ({count:N0} processes)}}</value></data>
+  <data name="Histogram_Overflow_ParentProcessImage" xml:space="preserve"><value>{count, plural, one {Other ({count:N0} parent process)} other {Other ({count:N0} parent processes)}}</value></data>
   <data name="Histogram_Empty_Severity_VisibleRange" xml:space="preserve"><value>No events to chart in the current view.</value></data>
   <data name="Histogram_Empty_Severity_ThisView" xml:space="preserve"><value>No Severity values in this view.</value></data>
   <data name="Histogram_Empty_Source_VisibleRange" xml:space="preserve"><value>No events to chart in the current view.</value></data>
@@ -3044,7 +3044,7 @@
   <data name="FilterPane_FilterSet_SelectAria" xml:space="preserve">
     <value>Filter Set</value>
   </data>
-  <data name="FilterPane_FilterSetFilterCount" xml:space="preserve"><value>{count, plural, one {{count} filter} other {{count} filters}}</value></data>
+  <data name="FilterPane_FilterSetFilterCount" xml:space="preserve"><value>{count, plural, one {{count:N0} filter} other {{count:N0} filters}}</value></data>
   <data name="FilterPane_FilterSetDetail_WithTags" xml:space="preserve">
     <value>{0} · {1}</value>
     <comment>{0} is the localized filter count; {1} is the comma-joined tag list data.</comment>
@@ -3120,7 +3120,7 @@
   <data name="FilterPane_Announcement_SelectedScenarioMissing" xml:space="preserve">
     <value>Selected scenario no longer matches the loaded logs.</value>
   </data>
-  <data name="FilterPane_ClearConfirm_Message" xml:space="preserve"><value>{count, plural, one {Clear {count} filter? This cannot be undone.} other {Clear {count} filters? This cannot be undone.}}</value></data>
+  <data name="FilterPane_ClearConfirm_Message" xml:space="preserve"><value>{count, plural, one {Clear {count:N0} filter? This cannot be undone.} other {Clear {count:N0} filters? This cannot be undone.}}</value></data>
   <data name="FilterPane_ClearConfirm_Title" xml:space="preserve">
     <value>Clear All Filters</value>
   </data>
@@ -3192,24 +3192,24 @@
     <value>Import preview:</value>
     <comment>Filter library import preview header.</comment>
   </data>
-  <data name="FilterImport_Added" xml:space="preserve"><value>{count, plural, one {{count} new entry will be added} other {{count} new entries will be added}}</value></data>
-  <data name="FilterImport_Overwrite" xml:space="preserve"><value>{count, plural, one {{count} existing entry WILL BE OVERWRITTEN (current filter content will be lost)} other {{count} existing entries WILL BE OVERWRITTEN (current filter content will be lost)}}</value></data>
+  <data name="FilterImport_Added" xml:space="preserve"><value>{count, plural, one {{count:N0} new entry will be added} other {{count:N0} new entries will be added}}</value></data>
+  <data name="FilterImport_Overwrite" xml:space="preserve"><value>{count, plural, one {{count:N0} existing entry WILL BE OVERWRITTEN (current filter content will be lost)} other {{count:N0} existing entries WILL BE OVERWRITTEN (current filter content will be lost)}}</value></data>
   <data name="FilterImport_OverwriteNamesHeader" xml:space="preserve">
     <value>Names being overwritten:</value>
     <comment>Filter library import preview overwritten-name list header.</comment>
   </data>
-  <data name="FilterImport_TagUpdates" xml:space="preserve"><value>{count, plural, one {{count} entry will be updated with tag changes} other {{count} entries will be updated with tag changes}}</value></data>
-  <data name="FilterImport_Renames" xml:space="preserve"><value>{count, plural, one {{count} existing entry will also be renamed (folder paths → tags)} other {{count} existing entries will also be renamed (folder paths → tags)}}</value></data>
-  <data name="FilterImport_Ambiguous" xml:space="preserve"><value>{count, plural, one {{count} ambiguous entry will be imported as new} other {{count} ambiguous entries will be imported as new}}</value></data>
-  <data name="FilterImport_Skipped" xml:space="preserve"><value>{count, plural, one {{count} exact duplicate will be skipped} other {{count} exact duplicates will be skipped}}</value></data>
-  <data name="FilterImport_KeepEmpty" xml:space="preserve"><value>{count, plural, one {Keeping {count} entry with empty values as authored. An empty Contains matches every event and an empty NotContains matches none; depending on how a filter combines its criteria, that can force the whole filter to always match or never match.} other {Keeping {count} entries with empty values as authored. An empty Contains matches every event and an empty NotContains matches none; depending on how a filter combines its criteria, that can force the whole filter to always match or never match.}}</value></data>
-  <data name="FilterImport_RemovedEmptyNotice" xml:space="preserve"><value>{count, plural, one {Removed empty-criterion filters from {count} library item after removing empty values.} other {Removed empty-criterion filters from {count} library items after removing empty values.}}</value></data>
-  <data name="FilterImport_NothingToImport" xml:space="preserve"><value>{itemCount, plural, one {{duplicateCount, plural, one {Nothing to import. Removed empty-criterion filters from {itemCount} library item, skipped {duplicateCount} duplicate.} other {Nothing to import. Removed empty-criterion filters from {itemCount} library item, skipped {duplicateCount} duplicates.}}} other {{duplicateCount, plural, one {Nothing to import. Removed empty-criterion filters from {itemCount} library items, skipped {duplicateCount} duplicate.} other {Nothing to import. Removed empty-criterion filters from {itemCount} library items, skipped {duplicateCount} duplicates.}}}}</value></data>
+  <data name="FilterImport_TagUpdates" xml:space="preserve"><value>{count, plural, one {{count:N0} entry will be updated with tag changes} other {{count:N0} entries will be updated with tag changes}}</value></data>
+  <data name="FilterImport_Renames" xml:space="preserve"><value>{count, plural, one {{count:N0} existing entry will also be renamed (folder paths → tags)} other {{count:N0} existing entries will also be renamed (folder paths → tags)}}</value></data>
+  <data name="FilterImport_Ambiguous" xml:space="preserve"><value>{count, plural, one {{count:N0} ambiguous entry will be imported as new} other {{count:N0} ambiguous entries will be imported as new}}</value></data>
+  <data name="FilterImport_Skipped" xml:space="preserve"><value>{count, plural, one {{count:N0} exact duplicate will be skipped} other {{count:N0} exact duplicates will be skipped}}</value></data>
+  <data name="FilterImport_KeepEmpty" xml:space="preserve"><value>{count, plural, one {Keeping {count:N0} entry with empty values as authored. An empty Contains matches every event and an empty NotContains matches none; depending on how a filter combines its criteria, that can force the whole filter to always match or never match.} other {Keeping {count:N0} entries with empty values as authored. An empty Contains matches every event and an empty NotContains matches none; depending on how a filter combines its criteria, that can force the whole filter to always match or never match.}}</value></data>
+  <data name="FilterImport_RemovedEmptyNotice" xml:space="preserve"><value>{count, plural, one {Removed empty-criterion filters from {count:N0} library item after removing empty values.} other {Removed empty-criterion filters from {count:N0} library items after removing empty values.}}</value></data>
+  <data name="FilterImport_NothingToImport" xml:space="preserve"><value>{itemCount, plural, one {{duplicateCount, plural, one {Nothing to import. Removed empty-criterion filters from {itemCount:N0} library item, skipped {duplicateCount:N0} duplicate.} other {Nothing to import. Removed empty-criterion filters from {itemCount:N0} library item, skipped {duplicateCount:N0} duplicates.}}} other {{duplicateCount, plural, one {Nothing to import. Removed empty-criterion filters from {itemCount:N0} library items, skipped {duplicateCount:N0} duplicate.} other {Nothing to import. Removed empty-criterion filters from {itemCount:N0} library items, skipped {duplicateCount:N0} duplicates.}}}}</value></data>
   <data name="FilterImport_EmptyValueTitle" xml:space="preserve">
     <value>Filters with an empty value</value>
     <comment>Filter library empty-value import prompt title.</comment>
   </data>
-  <data name="FilterImport_EmptyValueMessage" xml:space="preserve"><value>{count, plural, one {{count} library item contains a filter with an empty value: {entryNames}. An empty Contains matches every event; an empty NotContains matches none. Normalize removes the empty values; if that leaves a Contains/NotContains criterion with no values, the whole filter is removed (including its other criteria). Import as-is keeps them all as authored. An as-is filter may lose its empty values or need repair if you later edit it in the Basic editor.} other {{count} library items contain a filter with an empty value: {entryNames}. An empty Contains matches every event; an empty NotContains matches none. Normalize removes the empty values; if that leaves a Contains/NotContains criterion with no values, the whole filter is removed (including its other criteria). Import as-is keeps them all as authored. An as-is filter may lose its empty values or need repair if you later edit it in the Basic editor.}}</value></data>
+  <data name="FilterImport_EmptyValueMessage" xml:space="preserve"><value>{count, plural, one {{count:N0} library item contains a filter with an empty value: {entryNames}. An empty Contains matches every event; an empty NotContains matches none. Normalize removes the empty values; if that leaves a Contains/NotContains criterion with no values, the whole filter is removed (including its other criteria). Import as-is keeps them all as authored. An as-is filter may lose its empty values or need repair if you later edit it in the Basic editor.} other {{count:N0} library items contain a filter with an empty value: {entryNames}. An empty Contains matches every event; an empty NotContains matches none. Normalize removes the empty values; if that leaves a Contains/NotContains criterion with no values, the whole filter is removed (including its other criteria). Import as-is keeps them all as authored. An as-is filter may lose its empty values or need repair if you later edit it in the Basic editor.}}</value></data>
   <data name="FilterImport_Action_Normalize" xml:space="preserve">
     <value>Normalize</value>
     <comment>Filter library empty-value prompt normalize action label.</comment>
@@ -3218,10 +3218,10 @@
     <value>Import as-is</value>
     <comment>Filter library empty-value prompt import-without-normalizing action label.</comment>
   </data>
-  <data name="FilterImport_Summary_Tag" xml:space="preserve"><value>{updatedTags, plural, one {Imported {added} new, replaced {replaced}, updated {updatedTags} tag, skipped {skipped}} other {Imported {added} new, replaced {replaced}, updated {updatedTags} tags, skipped {skipped}}}</value></data>
-  <data name="FilterImport_Summary_Tag_Ambiguous" xml:space="preserve"><value>{updatedTags, plural, one {Imported {added} new, replaced {replaced}, updated {updatedTags} tag, skipped {skipped}, imported {ambiguous} ambiguous as new} other {Imported {added} new, replaced {replaced}, updated {updatedTags} tags, skipped {skipped}, imported {ambiguous} ambiguous as new}}</value></data>
-  <data name="FilterImport_Announcement_TagRemoved" xml:space="preserve"><value>{count, plural, one {Removed tag '{tag}' from {count} entry} other {Removed tag '{tag}' from {count} entries}}</value></data>
-  <data name="FilterImport_Announcement_TagRenamed" xml:space="preserve"><value>{count, plural, one {Renamed tag '{oldTag}' to '{newTag}' in {count} entry} other {Renamed tag '{oldTag}' to '{newTag}' in {count} entries}}</value></data>
+  <data name="FilterImport_Summary_Tag" xml:space="preserve"><value>{updatedTags, plural, one {Imported {added:N0} new, replaced {replaced:N0}, updated {updatedTags:N0} tag, skipped {skipped:N0}} other {Imported {added:N0} new, replaced {replaced:N0}, updated {updatedTags:N0} tags, skipped {skipped:N0}}}</value></data>
+  <data name="FilterImport_Summary_Tag_Ambiguous" xml:space="preserve"><value>{updatedTags, plural, one {Imported {added:N0} new, replaced {replaced:N0}, updated {updatedTags:N0} tag, skipped {skipped:N0}, imported {ambiguous:N0} ambiguous as new} other {Imported {added:N0} new, replaced {replaced:N0}, updated {updatedTags:N0} tags, skipped {skipped:N0}, imported {ambiguous:N0} ambiguous as new}}</value></data>
+  <data name="FilterImport_Announcement_TagRemoved" xml:space="preserve"><value>{count, plural, one {Removed tag '{tag}' from {count:N0} entry} other {Removed tag '{tag}' from {count:N0} entries}}</value></data>
+  <data name="FilterImport_Announcement_TagRenamed" xml:space="preserve"><value>{count, plural, one {Renamed tag '{oldTag}' to '{newTag}' in {count:N0} entry} other {Renamed tag '{oldTag}' to '{newTag}' in {count:N0} entries}}</value></data>
   <data name="FilterImport_Error_EmptyFile" xml:space="preserve">
     <value>Import file is empty.</value>
     <comment>Filter library import validation error.</comment>
@@ -3332,7 +3332,7 @@
     <value>Hide additional tags</value>
     <comment>Filter library hide extra tags button accessible name.</comment>
   </data>
-  <data name="FilterLibrary_ShowAdditionalTagsAria" xml:space="preserve"><value>{count, plural, one {Show {count} additional tag} other {Show {count} additional tags}}</value></data>
+  <data name="FilterLibrary_ShowAdditionalTagsAria" xml:space="preserve"><value>{count, plural, one {Show {count:N0} additional tag} other {Show {count:N0} additional tags}}</value></data>
   <data name="FilterLibrary_ShowLess" xml:space="preserve">
     <value>- less</value>
     <comment>Filter library collapse extra tags button text.</comment>
@@ -3345,7 +3345,7 @@
     <value>Export Filter Library</value>
     <comment>Filter library export file picker title.</comment>
   </data>
-  <data name="FilterLibrary_ExportedEntries" xml:space="preserve"><value>{count, plural, one {Exported {count} entry} other {Exported {count} entries}}</value></data>
+  <data name="FilterLibrary_ExportedEntries" xml:space="preserve"><value>{count, plural, one {Exported {count:N0} entry} other {Exported {count:N0} entries}}</value></data>
   <data name="FilterLibrary_ImportLibraryTitle" xml:space="preserve">
     <value>Import Filter Library</value>
     <comment>Filter library import file picker title.</comment>
@@ -3411,7 +3411,7 @@
     <value>Filters for {0}</value>
     <comment>Filter library expand filters button accessible name. {0} is the entry name.</comment>
   </data>
-  <data name="FilterLibrary_Entry_FilterCount" xml:space="preserve"><value>{count, plural, one {({count} filter)} other {({count} filters)}}</value></data>
+  <data name="FilterLibrary_Entry_FilterCount" xml:space="preserve"><value>{count, plural, one {({count:N0} filter)} other {({count:N0} filters)}}</value></data>
   <data name="FilterLibrary_Entry_TrackedAria" xml:space="preserve">
     <value>Automatically added from recent use</value>
     <comment>Filter library tracked badge accessible name.</comment>
@@ -3436,7 +3436,7 @@
     <value>Remove {0}</value>
     <comment>Filter library tag input chip remove button accessible name. {0} is the tag name.</comment>
   </data>
-  <data name="FilterLibrary_Entry_ShowAllTagsAria" xml:space="preserve"><value>{count, plural, other {Show all {count} tags}}</value></data>
+  <data name="FilterLibrary_Entry_ShowAllTagsAria" xml:space="preserve"><value>{count, plural, other {Show all {count:N0} tags}}</value></data>
   <data name="FilterLibrary_Entry_MoreTags" xml:space="preserve">
     <value>+{0} more</value>
     <comment>Filter library row more tags button text. {0} is the hidden tag count.</comment>
@@ -3553,7 +3553,7 @@
     <value>Delete</value>
     <comment>Filter library row delete menu item and action label.</comment>
   </data>
-  <data name="FilterLibrary_Entry_DeleteFilterSetMessage" xml:space="preserve"><value>{filterCount, plural, one {This will permanently delete the filter set '{entryName}' with {filterCount} filter. This cannot be undone.} other {This will permanently delete the filter set '{entryName}' with {filterCount} filters. This cannot be undone.}}</value></data>
+  <data name="FilterLibrary_Entry_DeleteFilterSetMessage" xml:space="preserve"><value>{filterCount, plural, one {This will permanently delete the filter set '{entryName}' with {filterCount:N0} filter. This cannot be undone.} other {This will permanently delete the filter set '{entryName}' with {filterCount:N0} filters. This cannot be undone.}}</value></data>
   <data name="FilterLibrary_Entry_DeleteFilterMessage" xml:space="preserve">
     <value>This will permanently delete the filter '{0}'. This cannot be undone.</value>
     <comment>Filter library row delete filter confirmation message. {0} is the entry name.</comment>
@@ -3680,7 +3680,7 @@
     <value>Rename tag {0}</value>
     <comment>Filter library tag management rename input accessible name. {0} is the tag name.</comment>
   </data>
-  <data name="FilterLibrary_Tags_MergeAria" xml:space="preserve"><value>{count, plural, one {Merge tag {tag} into {mergeTargetTag}, affects {count} entry} other {Merge tag {tag} into {mergeTargetTag}, affects {count} entries}}</value></data>
+  <data name="FilterLibrary_Tags_MergeAria" xml:space="preserve"><value>{count, plural, one {Merge tag {tag} into {mergeTargetTag}, affects {count:N0} entry} other {Merge tag {tag} into {mergeTargetTag}, affects {count:N0} entries}}</value></data>
   <data name="FilterLibrary_Tags_MergeAction" xml:space="preserve">
     <value>Merge into '{0}'</value>
     <comment>Filter library tag management merge action label. {0} is the target tag.</comment>
@@ -3693,7 +3693,7 @@
     <value>Cancel rename</value>
     <comment>Filter library tag management cancel rename button accessible name.</comment>
   </data>
-  <data name="FilterLibrary_Tags_RemoveConfirm" xml:space="preserve"><value>{count, plural, one {Remove from {count} entry?} other {Remove from {count} entries?}}</value></data>
+  <data name="FilterLibrary_Tags_RemoveConfirm" xml:space="preserve"><value>{count, plural, one {Remove from {count:N0} entry?} other {Remove from {count:N0} entries?}}</value></data>
   <data name="FilterLibrary_Tags_ConfirmDeleteAria" xml:space="preserve">
     <value>Confirm delete tag {0}</value>
     <comment>Filter library tag management confirm delete button accessible name. {0} is the tag name.</comment>
@@ -3958,7 +3958,7 @@
     <comment>Database tools UI text.</comment>
   </data>
   <!-- Database Tools log view. -->
-  <data name="DatabaseTools_Log_EntryCount" xml:space="preserve"><value>{count, plural, one {{count} entry} other {{count} entries}}</value></data>
+  <data name="DatabaseTools_Log_EntryCount" xml:space="preserve"><value>{count, plural, one {{count:N0} entry} other {{count:N0} entries}}</value></data>
   <data name="DatabaseTools_Log_Copy" xml:space="preserve">
     <value>Copy</value>
     <comment>Database tools UI text.</comment>
@@ -4081,7 +4081,7 @@
     <value>Saving database. Please wait...</value>
   </data>
   <data name="DatabaseTools_Op_CreateSkippedProviders" xml:space="preserve">
-    <value>{count, plural, one {Found {count} provider in {0}. It will not be included in the new database.} other {Found {count} providers in {0}. These will not be included in the new database.}}</value>
+    <value>{count, plural, one {Found {count:N0} provider in {0}. It will not be included in the new database.} other {Found {count:N0} providers in {0}. These will not be included in the new database.}}</value>
   </data>
   <data name="DatabaseTools_Op_CreateSourceHiveNotCleanlyFlushed" xml:space="preserve">
     <value>The offline image's registry hive was not cleanly flushed; some providers may be missing from the database.</value>
@@ -4156,7 +4156,7 @@
     <value>Providers copied to new database:</value>
   </data>
   <data name="DatabaseTools_Op_DiffSkippingSecondSourceDuplicates" xml:space="preserve">
-    <value>{count, plural, one {Skipping up to {count} provider version from the second source that also appears in the first source.} other {Skipping up to {count} provider versions from the second source that also appear in the first source.}}</value>
+    <value>{count, plural, one {Skipping up to {count:N0} provider version from the second source that also appears in the first source.} other {Skipping up to {count:N0} provider versions from the second source that also appear in the first source.}}</value>
   </data>
   <data name="DatabaseTools_Op_DiffUnexpectedError" xml:space="preserve">
     <value>Unexpected error diffing databases.</value>
@@ -4198,7 +4198,7 @@
     <value>Cannot merge into '{0}'.</value>
   </data>
   <data name="DatabaseTools_Op_MergeCopiedVersions" xml:space="preserve">
-    <value>{count, plural, one {Copied {count} provider version.} other {Copied {count} provider versions.}}</value>
+    <value>{count, plural, one {Copied {count:N0} provider version.} other {Copied {count:N0} provider versions.}}</value>
   </data>
   <data name="DatabaseTools_Op_MergeCopyingVersions" xml:space="preserve">
     <value>Copying provider versions from the source...</value>
@@ -4213,13 +4213,13 @@
     <value>Failed to merge into database '{0}'.</value>
   </data>
   <data name="DatabaseTools_Op_MergeRemovalCompleted" xml:space="preserve">
-    <value>{count, plural, one {Removal of {count} provider version completed.} other {Removal of {count} provider versions completed.}}</value>
+    <value>{count, plural, one {Removal of {count:N0} provider version completed.} other {Removal of {count:N0} provider versions completed.}}</value>
   </data>
   <data name="DatabaseTools_Op_MergeRemovingVersions" xml:space="preserve">
     <value>{count, plural, =1 {Removing this provider version from the target database...} other {Removing these provider versions from the target database...}}</value>
   </data>
   <data name="DatabaseTools_Op_MergeTargetContainsVersions" xml:space="preserve">
-    <value>{count, plural, other {The target database already contains {count} of the source's provider versions.}}</value>
+    <value>{count, plural, other {The target database already contains {count:N0} of the source's provider versions.}}</value>
   </data>
   <data name="DatabaseTools_Op_MergeTargetFileNotFound" xml:space="preserve">
     <value>File not found: {0}</value>
@@ -4628,7 +4628,7 @@
     <value>Pending database changes</value>
     <comment>Database tools UI text.</comment>
   </data>
-  <data name="Db_Manage_PendingChange" xml:space="preserve"><value>{count, plural, one {{count} pending change} other {{count} pending changes}}</value></data>
+  <data name="Db_Manage_PendingChange" xml:space="preserve"><value>{count, plural, one {{count:N0} pending change} other {{count:N0} pending changes}}</value></data>
   <data name="Db_Manage_Discard" xml:space="preserve">
     <value>Discard</value>
     <comment>Database tools UI text.</comment>
@@ -4662,7 +4662,7 @@
     <comment>Database tools UI text.</comment>
   </data>
   <data name="Db_Manage_Remove_BulkPlain" xml:space="preserve">
-    <value>{count, plural, other {Are you sure you want to remove these {count} databases? ({names})}}</value>
+    <value>{count, plural, other {Are you sure you want to remove these {count:N0} databases? ({names})}}</value>
     <comment>Database tools UI text.</comment>
   </data>
   <data name="Db_Manage_UpgradeNotStarted_Title" xml:space="preserve">
@@ -4679,17 +4679,17 @@
     <value>Are you sure you want to remove {0}?</value>
     <comment>Database tools UI text.</comment>
   </data>
-  <data name="Db_Manage_Remove_Title" xml:space="preserve"><value>{count, plural, =1 {Remove Database} other {Remove {count} Databases}}</value></data>
-  <data name="Db_Manage_RemoveConfirm_Accept" xml:space="preserve"><value>{upgradeCount, plural, one {{databaseCount, plural, one {Cancel {upgradeCount} upgrade and remove {databaseCount} database} other {Cancel {upgradeCount} upgrade and remove {databaseCount} databases}}} other {{databaseCount, plural, one {Cancel {upgradeCount} upgrades and remove {databaseCount} database} other {Cancel {upgradeCount} upgrades and remove {databaseCount} databases}}}}</value></data>
+  <data name="Db_Manage_Remove_Title" xml:space="preserve"><value>{count, plural, =1 {Remove Database} other {Remove {count:N0} Databases}}</value></data>
+  <data name="Db_Manage_RemoveConfirm_Accept" xml:space="preserve"><value>{upgradeCount, plural, one {{databaseCount, plural, one {Cancel {upgradeCount:N0} upgrade and remove {databaseCount:N0} database} other {Cancel {upgradeCount:N0} upgrade and remove {databaseCount:N0} databases}}} other {{databaseCount, plural, one {Cancel {upgradeCount:N0} upgrades and remove {databaseCount:N0} database} other {Cancel {upgradeCount:N0} upgrades and remove {databaseCount:N0} databases}}}}</value></data>
   <data name="Db_Manage_Action_Remove" xml:space="preserve">
     <value>Remove</value>
     <comment>Database tools UI text.</comment>
   </data>
   <data name="Db_Manage_SubsetConfirm_Intro" xml:space="preserve">
-    <value>{total, plural, other {{eligible} of {total} selected databases will be upgraded.}}</value>
+    <value>{total, plural, other {{eligible:N0} of {total:N0} selected databases will be upgraded.}}</value>
     <comment>Database tools UI text.</comment>
   </data>
-  <data name="Db_Manage_SubsetConfirm_SkipHeader" xml:space="preserve"><value>{count, plural, one {The following {count} database will be skipped:} other {The following {count} databases will be skipped:}}</value></data>
+  <data name="Db_Manage_SubsetConfirm_SkipHeader" xml:space="preserve"><value>{count, plural, one {The following {count:N0} database will be skipped:} other {The following {count:N0} databases will be skipped:}}</value></data>
   <data name="Db_Manage_SubsetConfirm_Title" xml:space="preserve">
     <value>Upgrade selected databases</value>
     <comment>Database tools UI text.</comment>
@@ -4698,8 +4698,8 @@
     <value>removal failed after confirmation</value>
     <comment>Database tools UI text.</comment>
   </data>
-  <data name="Db_Manage_Announcement_Removed" xml:space="preserve"><value>{count, plural, one {Removed {count} database.} other {Removed {count} databases.}}</value></data>
-  <data name="Db_Manage_Announcement_RemoveFailed" xml:space="preserve"><value>{count, plural, one {{count} removal failed. First: {fileName} ({reason}).} other {{count} removals failed. First: {fileName} ({reason}).}}</value></data>
+  <data name="Db_Manage_Announcement_Removed" xml:space="preserve"><value>{count, plural, one {Removed {count:N0} database.} other {Removed {count:N0} databases.}}</value></data>
+  <data name="Db_Manage_Announcement_RemoveFailed" xml:space="preserve"><value>{count, plural, one {{count:N0} removal failed. First: {fileName} ({reason}).} other {{count:N0} removals failed. First: {fileName} ({reason}).}}</value></data>
   <data name="Db_Manage_CannotRestoreInProgress" xml:space="preserve">
     <value>Cannot restore: a database upgrade is in progress.</value>
     <comment>Database tools UI text.</comment>
@@ -4716,7 +4716,7 @@
     <value>Selection cleared.</value>
     <comment>Database tools UI text.</comment>
   </data>
-  <data name="Db_Manage_Selection" xml:space="preserve"><value>{count, plural, one {{count} database selected.} other {{count} databases selected.}}</value></data>
+  <data name="Db_Manage_Selection" xml:space="preserve"><value>{count, plural, one {{count:N0} database selected.} other {{count:N0} databases selected.}}</value></data>
   <data name="Modal_Yes" xml:space="preserve">
     <value>Yes</value>
     <comment>Shared dialog button.</comment>

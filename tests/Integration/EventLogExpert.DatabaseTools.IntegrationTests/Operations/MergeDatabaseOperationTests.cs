@@ -9,6 +9,7 @@ using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Localization;
 using EventLogExpert.Provider.Database.Context;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.DatabaseTools.IntegrationTests.Operations;
@@ -120,7 +121,7 @@ public sealed class MergeDatabaseCommandTests : IDisposable
         // The count must render as a standalone token in BOTH branches - "1" in the singular and a distinctive value in
         // the plural - so a {count} dropped from EITHER branch is caught (the noun inflection alone cannot mask it).
         Assert.Matches(@"(?<![\d,])1(?![\d,])", neutral.Resolve("DatabaseTools_Op_MergeCopiedVersions", [], 1L));
-        Assert.Contains("987654", neutral.Resolve("DatabaseTools_Op_MergeCopiedVersions", [], 987654L), StringComparison.Ordinal);
+        Assert.Contains(987654.ToString("N0", CultureInfo.InvariantCulture), neutral.Resolve("DatabaseTools_Op_MergeCopiedVersions", [], 987654L), StringComparison.Ordinal);
     }
 
     [Fact]

@@ -55,11 +55,60 @@ public sealed class LocalizationInfraTests
         @"==\s*1\b|\b1\s*==|!=\s*1\b|\b1\s*!=|\bis\s+not\s+1\b|\bis\s+1\b|\b1\s*=>",
         RegexOptions.Compiled);
 
+    private static readonly Regex s_icuPluralPattern = new(@"\{\s*[A-Za-z0-9_]+\s*,\s*plural\s*,", RegexOptions.Compiled);
+
     private static readonly Regex s_legacyCamelCasePluralWord = new(@"[a-z0-9](One|Many)(?=[_A-Z]|$)", RegexOptions.Compiled);
 
     private static readonly Regex s_legacyFourWayPluralKey = new(@"_Item\d+_Dup\d+$|_Accept_\d\d$", RegexOptions.Compiled);
 
     private static readonly Regex s_legacyTerminalPluralSegment = new(@"_(One|Many)(?=_|$)", RegexOptions.Compiled);
+
+    private static readonly string[] s_pluralQuantityArguments =
+    [
+        "count",
+        "total",
+        "databaseCount",
+        "duplicateCount",
+        "itemCount",
+        "filterCount",
+        "logCount",
+        "memberCount",
+        "shownCount",
+        "upgradeCount",
+        "shown",
+        "added",
+        "replaced",
+        "skipped",
+        "ambiguous",
+        "eligible",
+        "updatedTags",
+        "cancelled",
+        "distinctCount",
+        "filtered",
+        "loadingCount",
+        "selected",
+        "unresolved",
+        "errorCritical"
+    ];
+
+    // Non-quantity placeholders rendered inside plural branch bodies: percentages and strings only.
+    private static readonly string[] s_pluralRenderedPlaceholderAllowlist =
+    [
+        "percent",
+        "name",
+        "names",
+        "entryName",
+        "entryNames",
+        "fileName",
+        "fileNames",
+        "path",
+        "tag",
+        "newTag",
+        "oldTag",
+        "mergeTargetTag",
+        "reason",
+        "upgradingNames"
+    ];
 
     private static readonly Regex s_quotedIdentifierLiteral = new(@"""([A-Za-z0-9_]+)""", RegexOptions.Compiled);
 
@@ -306,6 +355,21 @@ public sealed class LocalizationInfraTests
 
         Assert.True(orphans.Count == 0, $"Authored-but-unreferenced RESX keys: {string.Join(", ", orphans)}");
     }
+
+    [Theory]
+    [InlineData("N0", true)]
+    [InlineData("n0", true)]
+    [InlineData("N2", false)]
+    [InlineData("N", false)]
+    [InlineData(" N0", false)]
+    [InlineData("N0 ", false)]
+    [InlineData("0,", false)]
+    [InlineData("#,0", false)]
+    [InlineData("D", false)]
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    public void ExactGroupedIntegerFormatPredicate_AcceptsOnlyN0(string? format, bool expected) =>
+        Assert.Equal(expected, IsExactGroupedIntegerFormat(format));
 
     [Fact]
     public void FilePickerNeutralValues_HaveExpectedPlaceholderArity()
@@ -656,7 +720,7 @@ public sealed class LocalizationInfraTests
     }
 
     [Fact]
-    public void NeutralHistogramCountsRemainUngrouped()
+    public void NeutralHistogramCountsRenderGroupedQuantities()
     {
         IStringLocalizer<SharedResource> localizer = BuildLocalizer();
 
@@ -664,8 +728,7 @@ public sealed class LocalizationInfraTests
             localizer,
             new HistogramGroupLabel.CategoricalOther(HistogramDimension.Source, 1200));
 
-        Assert.Contains(1200.ToString(CultureInfo.InvariantCulture), formatted, StringComparison.Ordinal);
-        Assert.DoesNotContain(1200.ToString("N0", CultureInfo.InvariantCulture), formatted, StringComparison.Ordinal);
+        Assert.Contains(1200.ToString("N0", CultureInfo.CurrentCulture), formatted, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -714,7 +777,7 @@ public sealed class LocalizationInfraTests
             neutralValues,
             "Stats_Headline_TopSources",
             "count",
-            [Raw("count"), Raw("percent")],
+            [Grouped("count"), Raw("percent")],
             ["one", "other"],
             RenderShape.SingularPluralDiffer,
             expectedPrefix: " - ");
@@ -944,13 +1007,13 @@ public sealed class LocalizationInfraTests
 
         (string Key, string Selector, PluralArgument[] Arguments, string[] Categories, RenderShape Shape)[] pluralExpected =
         [
-            ("StatusBar_Source_CombinedCount", "memberCount", [Raw("memberCount")], ["one", "other"], RenderShape.SingularPluralDiffer),
+            ("StatusBar_Source_CombinedCount", "memberCount", [Grouped("memberCount")], ["one", "other"], RenderShape.SingularPluralDiffer),
             ("StatusBar_Counts_Total", "total", [Grouped("total")], ["one", "other"], RenderShape.SingularPluralDiffer),
             ("StatusBar_Counts_TotalSelected", "total", [Grouped("total"), Grouped("selected")], ["other"], RenderShape.UniformAcrossCount),
             ("StatusBar_Coverage_Tooltip", "total", [Grouped("unresolved"), Grouped("total")], ["one", "other"], RenderShape.SingularPluralDiffer),
             ("StatusBar_Loading_ManyLogs", "loadingCount", [Grouped("loadingCount")], ["other"], RenderShape.UniformAcrossCount),
-            ("StatusBar_Filter_Lens", "count", [Raw("count")], ["one", "other"], RenderShape.SingularPluralDiffer),
-            ("StatusBar_Filter_ActiveLens", "count", [Raw("count")], ["one", "other"], RenderShape.SingularPluralDiffer)
+            ("StatusBar_Filter_Lens", "count", [Grouped("count")], ["one", "other"], RenderShape.SingularPluralDiffer),
+            ("StatusBar_Filter_ActiveLens", "count", [Grouped("count")], ["one", "other"], RenderShape.SingularPluralDiffer)
         ];
 
         foreach ((string key, string selector, PluralArgument[] arguments, string[] categories, RenderShape shape) in pluralExpected)
@@ -987,6 +1050,31 @@ public sealed class LocalizationInfraTests
             .OrderBy(offender => offender, StringComparer.Ordinal)
             .ToList();
         AssertNoOffenders(legacyDatabaseToolsConstants, "Legacy DatabaseTools plural key constants remain");
+    }
+
+    [Fact]
+    public void PluralGuard_DetectsCompactPluralBareQuantityOffender()
+    {
+        string pattern = "{count,plural,one {{count:N0} x} other {{count} y}}";
+        IReadOnlyList<string> offenders = PluralQuantityPlaceholderOffenders([new KeyValuePair<string, string>("Synthetic_Compact", pattern)]);
+
+        string offender = Assert.Single(offenders);
+        Assert.Contains("Synthetic_Compact", offender, StringComparison.Ordinal);
+        Assert.Contains("quantity {count} must use :N0", offender, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PluralQuantityPlaceholders_RenderGroupedNumericFormats()
+    {
+        HashSet<string> observedQuantityArguments = new(StringComparer.Ordinal);
+        IReadOnlyList<string> offenders = PluralQuantityPlaceholderOffenders(
+            ResxValues().Where(pair => s_icuPluralPattern.IsMatch(pair.Value)),
+            observedQuantityArguments);
+
+        Assert.Empty(offenders);
+        Assert.Equal(
+            s_pluralQuantityArguments.OrderBy(argument => argument, StringComparer.Ordinal),
+            observedQuantityArguments.OrderBy(argument => argument, StringComparer.Ordinal));
     }
 
     [Fact]
@@ -1406,6 +1494,15 @@ public sealed class LocalizationInfraTests
         return calls;
     }
 
+    private static IReadOnlyList<RenderedPlaceholder> ExtractRenderedPlaceholders(string pattern)
+    {
+        var placeholders = new List<RenderedPlaceholder>();
+
+        ParseRenderedPlaceholders(pattern, 0, pattern.Length, placeholders);
+
+        return placeholders;
+    }
+
     // Reports any retired count-driven One/Many key selection in production source. The testable core
     // `ScanForLegacyCountDrivenSelections` works on whole statement spans, so a precomputed local is caught even when
     // the eventual localization call is a separate statement; the per-span decision lives in
@@ -1423,6 +1520,27 @@ public sealed class LocalizationInfraTests
             .Where(IsLegacyPluralKeyName)
             .OrderBy(key => key, StringComparer.Ordinal)
             .ToList();
+
+    private static int FindMatchingBrace(string text, int openBrace, int end)
+    {
+        int depth = 0;
+
+        for (int position = openBrace; position < end; position++)
+        {
+            if (text[position] == '{') { depth++; }
+            else if (text[position] == '}')
+            {
+                depth--;
+
+                if (depth == 0)
+                {
+                    return position;
+                }
+            }
+        }
+
+        return end;
+    }
 
     private static IReadOnlyList<string> FindTextOccurrences(IEnumerable<string> paths, string token) =>
         paths.SelectMany(path =>
@@ -1455,6 +1573,9 @@ public sealed class LocalizationInfraTests
         return match.Success ? match.Index : -1;
     }
 
+    private static bool IsExactGroupedIntegerFormat(string? format) =>
+        string.Equals(format, "N0", StringComparison.OrdinalIgnoreCase);
+
     // A code fragment that selects a retired One/Many key from a count comparison. Requires BOTH signals so an ordinary
     // "count == 1" branch or an unrelated method named "SelectMany" is not mistaken for the retired mechanism.
     private static bool IsLegacyCountDrivenPluralSelection(string code) =>
@@ -1475,6 +1596,108 @@ public sealed class LocalizationInfraTests
 
     private static string NormalizeFormattedNumbers(string value) =>
         Regex.Replace(value, @"\d+(?:,\d{3})*(?:\.\d+)?", "#");
+
+    private static int ParseIcuBlock(
+        string text,
+        int openBrace,
+        int end,
+        List<RenderedPlaceholder> placeholders)
+    {
+        int position = openBrace + 1;
+        SkipWhiteSpace(text, ref position, end);
+        string name = ParsePlaceholderName(text, ref position, end);
+        SkipWhiteSpace(text, ref position, end);
+
+        if (position >= end)
+        {
+            return end;
+        }
+
+        if (text[position] == '}')
+        {
+            placeholders.Add(new RenderedPlaceholder(name, null));
+            return position + 1;
+        }
+
+        if (text[position] == ':')
+        {
+            position++;
+            int formatStart = position;
+
+            while (position < end && text[position] != '}') { position++; }
+
+            placeholders.Add(new RenderedPlaceholder(name, text[formatStart..position]));
+            return position < end ? position + 1 : end;
+        }
+
+        if (text[position] != ',')
+        {
+            return SkipBalancedBlock(text, openBrace, end);
+        }
+
+        position++;
+        SkipWhiteSpace(text, ref position, end);
+        string kind = ParsePlaceholderName(text, ref position, end);
+        SkipWhiteSpace(text, ref position, end);
+
+        if (!string.Equals(kind, "plural", StringComparison.Ordinal) || position >= end || text[position] != ',')
+        {
+            return SkipBalancedBlock(text, openBrace, end);
+        }
+
+        position++;
+        return ParsePluralBranches(text, position, end, placeholders);
+    }
+
+    private static string ParsePlaceholderName(string text, ref int position, int end)
+    {
+        int start = position;
+
+        while (position < end && (char.IsAsciiLetterOrDigit(text[position]) || text[position] == '_'))
+        {
+            position++;
+        }
+
+        return text[start..position];
+    }
+
+    private static int ParsePluralBranches(
+        string text,
+        int start,
+        int end,
+        List<RenderedPlaceholder> placeholders)
+    {
+        int position = start;
+
+        while (position < end)
+        {
+            SkipWhiteSpace(text, ref position, end);
+
+            if (position >= end)
+            {
+                return end;
+            }
+
+            if (text[position] == '}')
+            {
+                return position + 1;
+            }
+
+            while (position < end && text[position] != '{') { position++; }
+
+            if (position >= end)
+            {
+                return end;
+            }
+
+            int branchStart = position + 1;
+            int branchEnd = FindMatchingBrace(text, position, end);
+            ParseRenderedPlaceholders(text, branchStart, branchEnd, placeholders);
+            position = branchEnd + 1;
+        }
+
+        return end;
+    }
 
     // Extracts the selector variable and the top-level CLDR category tokens ("one", "other", "=1", ...) from an ICU
     // plural pattern, skipping balanced branch bodies so nested placeholders like {total:N0} are never mistaken for a
@@ -1520,6 +1743,26 @@ public sealed class LocalizationInfraTests
         return (body[..firstComma].Trim(), categories);
     }
 
+    private static void ParseRenderedPlaceholders(
+        string text,
+        int start,
+        int end,
+        List<RenderedPlaceholder> placeholders)
+    {
+        int position = start;
+
+        while (position < end)
+        {
+            if (text[position] == '{')
+            {
+                position = ParseIcuBlock(text, position, end, placeholders);
+                continue;
+            }
+
+            position++;
+        }
+    }
+
     private static int PlaceholderArity(string value)
     {
         var indexes = Regex.Matches(value, @"\{(\d+)(?::[^}]*)?\}")
@@ -1527,6 +1770,54 @@ public sealed class LocalizationInfraTests
             .ToList();
 
         return indexes.Count == 0 ? 0 : indexes.Max() + 1;
+    }
+
+    private static IReadOnlyList<string> PluralQuantityPlaceholderOffenders(
+        IEnumerable<KeyValuePair<string, string>> patterns,
+        ISet<string>? observedQuantityArguments = null)
+    {
+        HashSet<string> quantityArguments = new(s_pluralQuantityArguments, StringComparer.Ordinal);
+        HashSet<string> allowedBareArguments = new(s_pluralRenderedPlaceholderAllowlist, StringComparer.Ordinal);
+        var offenders = new List<string>();
+
+        foreach ((string key, string pattern) in patterns)
+        {
+            foreach (RenderedPlaceholder placeholder in ExtractRenderedPlaceholders(pattern))
+            {
+                if (allowedBareArguments.Contains(placeholder.Name))
+                {
+                    if (placeholder.Format is not null)
+                    {
+                        offenders.Add($"{key}: allowlisted {{{placeholder.Name}:{placeholder.Format}}} must not carry a format");
+                    }
+
+                    continue;
+                }
+
+                if (key == "DatabaseTools_Op_CreateSkippedProviders" &&
+                    placeholder.Name == "0" &&
+                    placeholder.Format is null)
+                {
+                    continue;
+                }
+
+                if (quantityArguments.Contains(placeholder.Name))
+                {
+                    observedQuantityArguments?.Add(placeholder.Name);
+
+                    if (!IsExactGroupedIntegerFormat(placeholder.Format))
+                    {
+                        offenders.Add($"{key}: quantity {{{placeholder.Name}{(placeholder.Format is null ? string.Empty : ":" + placeholder.Format)}}} must use :N0");
+                    }
+
+                    continue;
+                }
+
+                offenders.Add($"{key}: unclassified {{{placeholder.Name}{(placeholder.Format is null ? string.Empty : ":" + placeholder.Format)}}}");
+            }
+        }
+
+        return offenders;
     }
 
     private static PluralArgument Raw(string name) => new(name, Grouped: false);
@@ -1636,6 +1927,21 @@ public sealed class LocalizationInfraTests
     private static string SingleLine(string value) =>
         Regex.Replace(value, @"\s+", " ").Trim();
 
+    private static int SkipBalancedBlock(string text, int openBrace, int end)
+    {
+        int closeBrace = FindMatchingBrace(text, openBrace, end);
+
+        return closeBrace < end ? closeBrace + 1 : end;
+    }
+
+    private static void SkipWhiteSpace(string text, ref int position, int end)
+    {
+        while (position < end && char.IsWhiteSpace(text[position]))
+        {
+            position++;
+        }
+    }
+
     private static IReadOnlyList<string> SplitArguments(string callArguments)
     {
         var arguments = new List<string>();
@@ -1740,4 +2046,6 @@ public sealed class LocalizationInfraTests
 
     // A declared plural argument plus whether the pattern must group it (":N0") or emit it raw.
     private readonly record struct PluralArgument(string Name, bool Grouped);
+
+    private readonly record struct RenderedPlaceholder(string Name, string? Format);
 }
