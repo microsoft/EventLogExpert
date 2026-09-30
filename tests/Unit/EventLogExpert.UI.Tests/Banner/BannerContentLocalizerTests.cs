@@ -17,6 +17,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace EventLogExpert.UI.Tests.Banner;
 
@@ -66,36 +67,21 @@ public sealed class BannerContentLocalizerTests
             "[[Banner_Db_Import_None]]",
             "Import Successful",
             "No databases were imported.");
-        AssertResolved(
-            new DatabaseImportSummary(1, [], []),
-            "[[Banner_Db_Import_Success_Title]]",
-            "[[Banner_Db_Import_Success]]",
-            "Import Successful",
-            "1 database has successfully been imported");
-        AssertResolved(
-            new DatabaseImportSummary(3, [], []),
-            "[[Banner_Db_Import_Success_Title]]",
-            "[[Banner_Db_Import_Success]]",
-            "Import Successful",
-            "3 databases have successfully been imported");
+        AssertImportSuccessRoutesAndInflects();
         AssertResolved(
             new DatabaseImportSummary(0, [new ImportFailure("A.db", new DatabaseFailureReason.NativeDetail("bad"))], []),
             "[[Banner_Db_Import_Failed_Title]]",
             "[[Banner_Db_Import_Failed_Message([[Banner_Db_Import_FailureSummary([[Banner_Db_Import_FailurePart(A.db|bad)]])]])]]",
             "Import Failed",
             "No databases were imported; failed: A.db (bad)");
-        AssertResolved(
-            new DatabaseImportSummary(1, [new ImportFailure("A.db", new DatabaseFailureReason.NativeDetail("bad"))], []),
-            "[[Banner_Db_Import_Partial_Title]]",
+        AssertImportPartialRoutesAndInflects(
+            count => new DatabaseImportSummary(count, [new ImportFailure("A.db", new DatabaseFailureReason.NativeDetail("bad"))], []),
             "[[Banner_Db_Import_Partial_Message([[Banner_Db_Import_Partial]]|[[Banner_Db_Import_FailureSummary([[Banner_Db_Import_FailurePart(A.db|bad)]])]])]]",
-            "Import Completed with Errors",
-            "1 database imported; failed: A.db (bad)");
-        AssertResolved(
-            new DatabaseImportSummary(2, [], [new ImportFailure("B.db", new DatabaseFailureReason.NativeDetail("schema"))]),
-            "[[Banner_Db_Import_Partial_Title]]",
+            "A.db", "bad");
+        AssertImportPartialRoutesAndInflects(
+            count => new DatabaseImportSummary(count, [], [new ImportFailure("B.db", new DatabaseFailureReason.NativeDetail("schema"))]),
             "[[Banner_Db_Import_Partial_Message([[Banner_Db_Import_Partial]]|[[Banner_Db_Import_FailureSummary([[Banner_Db_Import_UpgradeFailurePart(B.db|schema)]])]])]]",
-            "Import Completed with Errors",
-            "2 databases imported; failed: B.db upgrade (schema)");
+            "B.db", "schema");
     }
 
     [Fact]
@@ -274,9 +260,16 @@ public sealed class BannerContentLocalizerTests
         BannerContentText many = ResolveWithEnUs(new ExportComplete(1000, @"C:\events.csv"));
 
         Assert.Equal("Export complete", one.Title);
-        Assert.Equal("Exported 1 event to C:\\events.csv.", one.Message);
         Assert.Equal("Export complete", many.Title);
-        Assert.Equal("Exported 1,000 events to C:\\events.csv.", many.Message);
+
+        // Behavioral (not byte-frozen): the one/other branches differ only in the inflected noun once numbers are
+        // normalized away, the path argument lands in both, and the large count is grouped ("1,000", never "1000").
+        Assert.NotEqual(NormalizeNumbers(one.Message), NormalizeNumbers(many.Message));
+        Assert.Contains(@"C:\events.csv", one.Message, StringComparison.Ordinal);
+        Assert.Contains(@"C:\events.csv", many.Message, StringComparison.Ordinal);
+        Assert.Matches(@"(?<![\d,])1(?![\d,])", one.Message);
+        Assert.Contains(1000.ToString("N0", CultureInfo.InvariantCulture), many.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("1000", many.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -450,6 +443,51 @@ public sealed class BannerContentLocalizerTests
         Assert.Equal(actionBearingPreformatted.RequiresAction, resolvedAction.ActionLabel is not null);
     }
 
+    private static void AssertImportPartialRoutesAndInflects(
+        Func<int, DatabaseImportSummary> build,
+        string markerMessage,
+        params string[] failureFragments)
+    {
+        // Routing (including the composed failure parts) is verified via the stable marker keys; the English is
+        // verified behaviorally: count-driven database/databases inflection, the raw count landing in both branches,
+        // and the failure filename/reason present - never a frozen full sentence.
+        BannerContentText marker = ResolveWithMarker(build(1));
+        Assert.Equal("[[Banner_Db_Import_Partial_Title]]", marker.Title);
+        Assert.Equal(markerMessage, marker.Message);
+
+        BannerContentText one = ResolveWithEnUs(build(1));
+        BannerContentText many = ResolveWithEnUs(build(1000));
+
+        Assert.Equal("Import Completed with Errors", one.Title);
+        Assert.NotEqual(NormalizeNumbers(one.Message), NormalizeNumbers(many.Message));
+        Assert.Matches(@"(?<![\d,])1(?![\d,])", one.Message);
+        Assert.Contains("1000", many.Message, StringComparison.Ordinal);
+
+        foreach (string fragment in failureFragments)
+        {
+            Assert.Contains(fragment, one.Message, StringComparison.Ordinal);
+        }
+    }
+
+    private static void AssertImportSuccessRoutesAndInflects()
+    {
+        // Routing is verified via the stable marker keys; the English is verified behaviorally (count-driven
+        // database/databases + has/have, with the raw count landing ungrouped) rather than frozen byte-for-byte.
+        BannerContentText marker = ResolveWithMarker(new DatabaseImportSummary(3, [], []));
+        Assert.Equal("[[Banner_Db_Import_Success_Title]]", marker.Title);
+        Assert.Equal("[[Banner_Db_Import_Success]]", marker.Message);
+
+        BannerContentText one = ResolveWithEnUs(new DatabaseImportSummary(1, [], []));
+        BannerContentText many = ResolveWithEnUs(new DatabaseImportSummary(1000, [], []));
+
+        Assert.Equal("Import Successful", one.Title);
+        Assert.Equal("Import Successful", many.Title);
+        Assert.NotEqual(NormalizeNumbers(one.Message), NormalizeNumbers(many.Message));
+        Assert.Matches(@"(?<![\d,])1(?![\d,])", one.Message);
+        Assert.Contains("1000", many.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("1,000", many.Message, StringComparison.Ordinal);
+    }
+
     private static void AssertResolved(
         BannerMessage content,
         string markerTitle,
@@ -491,6 +529,9 @@ public sealed class BannerContentLocalizerTests
 
         return new DatabaseService(registry, classification, upgrade, import, recovery);
     }
+
+    private static string NormalizeNumbers(string value) =>
+        Regex.Replace(value, @"\d+(?:,\d{3})*(?:\.\d+)?", "#");
 
     private static BannerContentText ResolveWithEnUs(BannerMessage content)
     {

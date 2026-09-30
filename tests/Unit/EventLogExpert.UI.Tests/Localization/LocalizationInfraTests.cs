@@ -9,6 +9,7 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Localization;
+using EventLogExpert.Localization.Plural;
 using EventLogExpert.Provider.Schema;
 using EventLogExpert.Runtime.ActivityCorrelation;
 using EventLogExpert.Runtime.Common.Clipboard;
@@ -50,6 +51,28 @@ namespace EventLogExpert.UI.Tests.Localization;
 [Collection(CultureSensitiveCollection.Name)]
 public sealed class LocalizationInfraTests
 {
+    private static readonly Regex s_countOneComparison = new(
+        @"==\s*1\b|\b1\s*==|!=\s*1\b|\b1\s*!=|\bis\s+not\s+1\b|\bis\s+1\b|\b1\s*=>",
+        RegexOptions.Compiled);
+
+    private static readonly Regex s_legacyCamelCasePluralWord = new(@"[a-z0-9](One|Many)(?=[_A-Z]|$)", RegexOptions.Compiled);
+
+    private static readonly Regex s_legacyFourWayPluralKey = new(@"_Item\d+_Dup\d+$|_Accept_\d\d$", RegexOptions.Compiled);
+
+    private static readonly Regex s_legacyTerminalPluralSegment = new(@"_(One|Many)(?=_|$)", RegexOptions.Compiled);
+
+    private static readonly Regex s_quotedIdentifierLiteral = new(@"""([A-Za-z0-9_]+)""", RegexOptions.Compiled);
+
+    private enum RenderShape
+    {
+        // render(count=1) and render(count=2) differ after number-normalization: a genuine one/other split.
+        SingularPluralDiffer,
+
+        // render(count=1) and render(count=2) are identical after number-normalization: an other-only pattern, or a
+        // pattern that authors both branches but renders them the same (a noun that does not inflect).
+        UniformAcrossCount
+    }
+
     [Fact]
     public void ColumnDisplayValues_MirrorToFullString()
     {
@@ -144,9 +167,7 @@ public sealed class LocalizationInfraTests
         Assert.Equal(
             SchemaStateMessages.UnrecognizedSchema(SchemaStateMessages.TargetLabel, "{0}"),
             neutralValues[DatabaseToolsLogKeys.SchemaUnrecognizedTarget]);
-        Assert.Equal(
-            "Database '{0}' is at schema v{1}; this version is no longer supported. Upgrade through an older EventLogExpert release that supports v3 first, or delete the file.",
-            neutralValues[DatabaseToolsLogKeys.UpgradeUnsupportedV1OrV2Schema]);
+        Assert.Equal(2, PlaceholderArity(neutralValues[DatabaseToolsLogKeys.UpgradeUnsupportedV1OrV2Schema]));
     }
 
     [Fact]
@@ -287,27 +308,96 @@ public sealed class LocalizationInfraTests
     }
 
     [Fact]
-    public void FilePickerNeutralValues_HaveExpectedArityAndByteExactEnglish()
+    public void FilePickerNeutralValues_HaveExpectedPlaceholderArity()
     {
         var neutralValues = ResxValues();
-        (string Key, int Arity, string Value)[] expected =
+        (string Key, int Arity)[] expected =
         [
-            ("FilePicker_Error_FirstExtensionBlank", 0, "The first extension cannot be null or whitespace."),
-            ("FilePicker_Error_NoExtensions", 0, "At least one extension must be supplied."),
-            ("FilePicker_Error_NoFileTypeChoice", 0, "At least one file-type choice must be supplied."),
-            ("FilePicker_Filter_AllFiles", 0, "All files"),
-            ("FilePicker_Filter_SupportedTypes", 1, "Supported types ({0})"),
-            ("FilePicker_Title_OpenEventLogs", 0, "Open Event Logs"),
-            ("FilePicker_Title_SaveAs", 0, "Save As"),
-            ("FilePicker_Title_SelectFolder", 0, "Select Folder")
+            ("FilePicker_Error_FirstExtensionBlank", 0),
+            ("FilePicker_Error_NoExtensions", 0),
+            ("FilePicker_Error_NoFileTypeChoice", 0),
+            ("FilePicker_Filter_AllFiles", 0),
+            ("FilePicker_Filter_SupportedTypes", 1),
+            ("FilePicker_Title_OpenEventLogs", 0),
+            ("FilePicker_Title_SaveAs", 0),
+            ("FilePicker_Title_SelectFolder", 0)
         ];
 
-        foreach (var (key, arity, value) in expected)
+        foreach ((string key, int arity) in expected)
         {
-            Assert.True(neutralValues.TryGetValue(key, out var neutral), $"Missing neutral RESX value for {key}.");
-            Assert.Equal(value, neutral);
+            Assert.True(neutralValues.TryGetValue(key, out string? neutral), $"Missing neutral RESX value for {key}.");
             Assert.Equal(arity, PlaceholderArity(neutral));
         }
+
+        Assert.Equal(
+            expected.Select(entry => entry.Key).OrderBy(key => key, StringComparer.Ordinal),
+            neutralValues.Keys.Where(key => key.StartsWith("FilePicker_", StringComparison.Ordinal)).OrderBy(key => key, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void LegacyPluralDetectors_FlagRetiredSpellingsButSpareLegitimateNames()
+    {
+        // Positive controls: the NoLegacyPluralMechanismsRemain guard is only meaningful if these retired spellings
+        // actually trip its detectors. Terminal "_One"/"_Many", CamelCase One/Many words (even before a later suffix),
+        // the mashed "OneMany", terminal CamelCase, and the four-way "_ItemN_DupN"/"_Accept_NN" forms must all flag.
+        foreach (string offender in new[]
+        {
+            "Banner_Export_Complete_One", "Banner_Export_Complete_Many", "WidgetOne", "WidgetMany",
+            "TagOne_Ambiguous", "ItemOne_DupMany", "Accept_OneMany", "Filter_Item1_Dup2", "Filter_Accept_12",
+            "Update_Alert_One_Message", "Update_Alert_Many_Message"
+        })
+        {
+            Assert.True(IsLegacyPluralKeyName(offender), $"Expected '{offender}' to be flagged as a legacy plural key name.");
+        }
+
+        // Negative controls: real keys and ordinary words that merely contain the substrings must be spared, or the
+        // guard would false-positive and force churn on unrelated names.
+        foreach (string legitimate in new[]
+        {
+            "StatusBar_Loading_ManyLogs", "StatusBar_Counts_Total", "Db_Badge_None", "Details_Property_Money",
+            "Explain_Zone", "Correlation_Component_Ready", "Settings_Phone_Number"
+        })
+        {
+            Assert.False(IsLegacyPluralKeyName(legitimate), $"Expected '{legitimate}' to be spared by the legacy plural key guard.");
+        }
+
+        // The count-driven selection predicate must catch each retired comparison spelling (==, reversed, !=, is,
+        // switch arm, precomputed local) paired with a One/Many key.
+        foreach (string selection in new[]
+        {
+            "Localizer[count == 1 ? \"Foo_One\" : \"Foo_Many\"]",
+            "Localizer[1 == count ? \"Foo_One\" : \"Foo_Many\"]",
+            "Localizer[count != 1 ? \"Foo_Many\" : \"Foo_One\"]",
+            "Localizer[count is 1 ? \"FooOne\" : \"FooMany\"]",
+            "var key = count == 1 ? \"Foo_One\" : \"Foo_Many\";",
+            "count switch { 1 => \"Foo_One\", _ => \"Foo_Many\" }"
+        })
+        {
+            Assert.True(IsLegacyCountDrivenPluralSelection(selection), $"Expected '{selection}' to be flagged as a count-driven plural selection.");
+        }
+
+        // ...but a count comparison without a One/Many key, a One/Many key without a count comparison, and an unrelated
+        // method named "SelectMany"/"WaitOne" must all be spared.
+        foreach (string benign in new[]
+        {
+            "Localizer[\"StatusBar_Counts_Total\", total]",
+            "Localizer[isActive ? \"Filter_On\" : \"Filter_Off\"]",
+            "if (count == 1) { LoadSingle(); }",
+            "entries.SelectMany(e => e.Tags).Count == 1"
+        })
+        {
+            Assert.False(IsLegacyCountDrivenPluralSelection(benign), $"Expected '{benign}' to be spared by the count-driven plural selection guard.");
+        }
+
+        // Exercise the whole source scanner (not just the predicate): a precomputed-local offender in synthetic source
+        // must be reported even though the retired ternary and the eventual Localizer[key] call are separate
+        // statements, while a clean source (a proper PluralText.Format plus an unrelated SelectMany) yields nothing.
+        Assert.NotEmpty(ScanForLegacyCountDrivenSelections(
+            "void M(int count) {\n    var key = count == 1 ? \"Foo_One\" : \"Foo_Many\";\n    _ = Localizer[key, count];\n}",
+            "Synthetic.cs"));
+        Assert.Empty(ScanForLegacyCountDrivenSelections(
+            "void M(int count) {\n    _ = PluralText.Format(Localizer, \"Foo\", (\"count\", count));\n    var many = items.SelectMany(x => x.Tags).Count;\n}",
+            "Synthetic.cs"));
     }
 
     [Fact]
@@ -570,9 +660,12 @@ public sealed class LocalizationInfraTests
     {
         IStringLocalizer<SharedResource> localizer = BuildLocalizer();
 
-        Assert.Equal(
-            "Other (1200 sources)",
-            HistogramGroupLabelFormatter.Format(localizer, new HistogramGroupLabel.CategoricalOther(HistogramDimension.Source, 1200)));
+        string formatted = HistogramGroupLabelFormatter.Format(
+            localizer,
+            new HistogramGroupLabel.CategoricalOther(HistogramDimension.Source, 1200));
+
+        Assert.Contains(1200.ToString(CultureInfo.InvariantCulture), formatted, StringComparison.Ordinal);
+        Assert.DoesNotContain(1200.ToString("N0", CultureInfo.InvariantCulture), formatted, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -601,26 +694,55 @@ public sealed class LocalizationInfraTests
     }
 
     [Fact]
-    public void NeutralHistogramSpaceBearingValues_KeepExactWhitespace()
+    public void NeutralHistogramSpaceBearingValues_PreserveSeparatorAndBranchPrefixes()
     {
         var neutralValues = ResxValues();
 
         Assert.Equal(", ", neutralValues["Histogram_Breakdown_Separator"]);
-        Assert.Contains("one { - {errorCritical:N0} error/critical}", neutralValues["Stats_Headline_ErrorCritical"], StringComparison.Ordinal);
-        Assert.Contains("other { - {errorCritical:N0} error/critical}", neutralValues["Stats_Headline_ErrorCritical"], StringComparison.Ordinal);
-        Assert.Contains("one { - top {count} source = {percent}%}", neutralValues["Stats_Headline_TopSources"], StringComparison.Ordinal);
-        Assert.Contains("other { - top {count} sources = {percent}%}", neutralValues["Stats_Headline_TopSources"], StringComparison.Ordinal);
+
+        // ErrorCritical authors both one/other branches, but they are intentionally identical (the noun does not
+        // inflect), so its shape is uniform across counts; TopSources genuinely inflects. Both keep the " - " prefix.
+        AssertPluralPatternBehavior(
+            neutralValues,
+            "Stats_Headline_ErrorCritical",
+            "errorCritical",
+            [Grouped("errorCritical")],
+            ["one", "other"],
+            RenderShape.UniformAcrossCount,
+            expectedPrefix: " - ");
+        AssertPluralPatternBehavior(
+            neutralValues,
+            "Stats_Headline_TopSources",
+            "count",
+            [Raw("count"), Raw("percent")],
+            ["one", "other"],
+            RenderShape.SingularPluralDiffer,
+            expectedPrefix: " - ");
     }
 
     [Fact]
     public void NeutralHistogramSummaryTemplates_KeepGeneralShortDateFormat()
     {
         var neutralValues = ResxValues();
+        string[] keys =
+        [
+            "Histogram_RegionAria",
+            "Histogram_RegionAria_Breakdown",
+            "Histogram_WindowAnnouncement",
+            "Histogram_WindowAnnouncement_Breakdown"
+        ];
 
-        Assert.Equal("Timeline: {0} {1} from {2:g} to {3:g}.", neutralValues["Histogram_RegionAria"]);
-        Assert.Equal("Timeline: {0} {1} from {2:g} to {3:g}, {4}.", neutralValues["Histogram_RegionAria_Breakdown"]);
-        Assert.Equal("Showing {2:g} to {3:g}: {0} {1}.", neutralValues["Histogram_WindowAnnouncement"]);
-        Assert.Equal("Showing {2:g} to {3:g}: {0} {1}, {4}.", neutralValues["Histogram_WindowAnnouncement_Breakdown"]);
+        foreach (string key in keys)
+        {
+            Assert.True(neutralValues.TryGetValue(key, out string? value), $"Missing neutral RESX value for {key}.");
+            Assert.Contains("{2:g}", value, StringComparison.Ordinal);
+            Assert.Contains("{3:g}", value, StringComparison.Ordinal);
+        }
+
+        Assert.Equal(4, PlaceholderArity(neutralValues["Histogram_RegionAria"]));
+        Assert.Equal(5, PlaceholderArity(neutralValues["Histogram_RegionAria_Breakdown"]));
+        Assert.Equal(4, PlaceholderArity(neutralValues["Histogram_WindowAnnouncement"]));
+        Assert.Equal(5, PlaceholderArity(neutralValues["Histogram_WindowAnnouncement_Breakdown"]));
     }
 
     [Fact]
@@ -763,66 +885,108 @@ public sealed class LocalizationInfraTests
     }
 
     [Fact]
-    public void NeutralStatusBarValues_KeepByteIdenticalEnglish()
+    public void NeutralStatusBarValues_HaveExpectedPlaceholderArityAndPluralBehavior()
     {
         var neutralValues = ResxValues();
-        (string Key, string Value)[] expected =
+        (string Key, int Arity)[] expected =
         [
-            ("StatusBar_Source_None", "No log open"),
-            ("StatusBar_Source_AllLogs", "All logs ({0})"),
-            ("StatusBar_Source_Combined", "Combined"),
-            ("StatusBar_Source_CombinedCount", "{memberCount, plural, one {Combined ({memberCount} log)} other {Combined ({memberCount} logs)}}"),
-            ("StatusBar_Counts_Total", "{total, plural, one {{total:N0} event} other {{total:N0} events}}"),
-            ("StatusBar_Counts_TotalSelected", "{total, plural, other {{total:N0} events · {selected:N0} selected}}"),
-            ("StatusBar_Counts_ShownOfTotal", "{0} of {1} shown"),
-            ("StatusBar_Counts_ShownOfTotalSelected", "{0} of {1} shown · {2} selected"),
-            ("StatusBar_Coverage_Chip", "{0} unresolved"),
-            ("StatusBar_Coverage_AriaLabel", "Resolution and coverage: {0} unresolved. Open for details."),
-            ("StatusBar_Coverage_Tooltip", "{total, plural, one {{unresolved:N0} unresolved of {total:N0} event loaded in this tab/group. Filters are not applied - open Coverage for the current view's breakdown.} other {{unresolved:N0} unresolved of {total:N0} events loaded in this tab/group. Filters are not applied - open Coverage for the current view's breakdown.}}"),
-            ("StatusBar_Loading_Pending", "Loading..."),
-            ("StatusBar_Loading_PendingPercent", "Loading... ({0}%)"),
-            ("StatusBar_Loading_Count", "Loading: {0}"),
-            ("StatusBar_Loading_CountPercent", "Loading: {0} ({1}%)"),
-            ("StatusBar_Loading_ManyLogs", "{loadingCount, plural, other {Loading {loadingCount:N0} logs...}}"),
-            ("StatusBar_Loading_Failed", "Failed: {0}"),
-            ("StatusBar_Memory_Value_Normal", "Memory: {0}"),
-            ("StatusBar_Memory_Value_Elevated", "Memory: {0} · Elevated"),
-            ("StatusBar_Memory_Value_High", "Memory: {0} · High"),
-            ("StatusBar_Memory_Announce_Normal", "Memory usage normal"),
-            ("StatusBar_Memory_Announce_Elevated", "Memory usage elevated"),
-            ("StatusBar_Memory_Announce_High", "Memory usage high"),
-            ("StatusBar_Memory_Tooltip_Normal", "Managed heap (app data): {0} - drops as logs close. Process working set: {1} - the OS may release this later."),
-            ("StatusBar_Memory_Tooltip_Elevated", "Managed heap (app data): {0} - drops as logs close. Process working set: {1} - the OS may release this later. Level: elevated."),
-            ("StatusBar_Memory_Tooltip_High", "Managed heap (app data): {0} - drops as logs close. Process working set: {1} - the OS may release this later. Level: high."),
-            ("StatusBar_Activity_Fault", "These events could not be prepared"),
-            ("StatusBar_Activity_BufferFull", "Buffer full"),
-            ("StatusBar_Activity_Loading", "Loading"),
-            ("StatusBar_Activity_LoadingEvents", "Loading events"),
-            ("StatusBar_Activity_Reordering", "Reordering events"),
-            ("StatusBar_Activity_ContinuouslyUpdating", "Continuously updating"),
-            ("StatusBar_Resolver_FailedToOpen", "Error: Failed to open {0}"),
-            ("StatusBar_Resolver_NoResolver", "Error: No event resolver available"),
-            ("StatusBar_Resolver_FailedToLoad", "Error: Failed to load {0}"),
-            ("StatusBar_Filter_Chip", "Filtered"),
-            ("StatusBar_Filter_Active", "Filter active"),
-            ("StatusBar_Filter_Lens", "{count, plural, one {{count} lens} other {{count} lenses}}"),
-            ("StatusBar_Filter_ActiveLens", "{count, plural, one {Filter + {count} lens} other {Filter + {count} lenses}}"),
-            ("StatusBar_Stats_Show", "Show statistics for these events"),
-            ("StatusBar_Stats_Hide", "Hide statistics for these events"),
-            ("StatusBar_NewEvents_Label", "New Events: {0}"),
-            ("StatusBar_NewEvents_None", "No new events to load"),
-            ("StatusBar_NewEvents_Load", "Load new events into the view")
+            ("StatusBar_Source_None", 0),
+            ("StatusBar_Source_AllLogs", 1),
+            ("StatusBar_Source_Combined", 0),
+            ("StatusBar_Source_CombinedCount", 0),
+            ("StatusBar_Counts_Total", 0),
+            ("StatusBar_Counts_TotalSelected", 0),
+            ("StatusBar_Counts_ShownOfTotal", 2),
+            ("StatusBar_Counts_ShownOfTotalSelected", 3),
+            ("StatusBar_Coverage_Chip", 1),
+            ("StatusBar_Coverage_AriaLabel", 1),
+            ("StatusBar_Coverage_Tooltip", 0),
+            ("StatusBar_Loading_Pending", 0),
+            ("StatusBar_Loading_PendingPercent", 1),
+            ("StatusBar_Loading_Count", 1),
+            ("StatusBar_Loading_CountPercent", 2),
+            ("StatusBar_Loading_ManyLogs", 0),
+            ("StatusBar_Loading_Failed", 1),
+            ("StatusBar_Memory_Value_Normal", 1),
+            ("StatusBar_Memory_Value_Elevated", 1),
+            ("StatusBar_Memory_Value_High", 1),
+            ("StatusBar_Memory_Announce_Normal", 0),
+            ("StatusBar_Memory_Announce_Elevated", 0),
+            ("StatusBar_Memory_Announce_High", 0),
+            ("StatusBar_Memory_Tooltip_Normal", 2),
+            ("StatusBar_Memory_Tooltip_Elevated", 2),
+            ("StatusBar_Memory_Tooltip_High", 2),
+            ("StatusBar_Activity_Fault", 0),
+            ("StatusBar_Activity_BufferFull", 0),
+            ("StatusBar_Activity_Loading", 0),
+            ("StatusBar_Activity_LoadingEvents", 0),
+            ("StatusBar_Activity_Reordering", 0),
+            ("StatusBar_Activity_ContinuouslyUpdating", 0),
+            ("StatusBar_Resolver_FailedToOpen", 1),
+            ("StatusBar_Resolver_NoResolver", 0),
+            ("StatusBar_Resolver_FailedToLoad", 1),
+            ("StatusBar_Filter_Chip", 0),
+            ("StatusBar_Filter_Active", 0),
+            ("StatusBar_Filter_Lens", 0),
+            ("StatusBar_Filter_ActiveLens", 0),
+            ("StatusBar_Stats_Show", 0),
+            ("StatusBar_Stats_Hide", 0),
+            ("StatusBar_NewEvents_Label", 1),
+            ("StatusBar_NewEvents_None", 0),
+            ("StatusBar_NewEvents_Load", 0)
         ];
 
-        foreach ((string key, string value) in expected)
+        foreach ((string key, int arity) in expected)
         {
             Assert.True(neutralValues.TryGetValue(key, out string? actual), $"Missing neutral RESX value for {key}.");
-            Assert.Equal(value, actual);
+            Assert.Equal(arity, PlaceholderArity(actual));
+        }
+
+        (string Key, string Selector, PluralArgument[] Arguments, string[] Categories, RenderShape Shape)[] pluralExpected =
+        [
+            ("StatusBar_Source_CombinedCount", "memberCount", [Raw("memberCount")], ["one", "other"], RenderShape.SingularPluralDiffer),
+            ("StatusBar_Counts_Total", "total", [Grouped("total")], ["one", "other"], RenderShape.SingularPluralDiffer),
+            ("StatusBar_Counts_TotalSelected", "total", [Grouped("total"), Grouped("selected")], ["other"], RenderShape.UniformAcrossCount),
+            ("StatusBar_Coverage_Tooltip", "total", [Grouped("unresolved"), Grouped("total")], ["one", "other"], RenderShape.SingularPluralDiffer),
+            ("StatusBar_Loading_ManyLogs", "loadingCount", [Grouped("loadingCount")], ["other"], RenderShape.UniformAcrossCount),
+            ("StatusBar_Filter_Lens", "count", [Raw("count")], ["one", "other"], RenderShape.SingularPluralDiffer),
+            ("StatusBar_Filter_ActiveLens", "count", [Raw("count")], ["one", "other"], RenderShape.SingularPluralDiffer)
+        ];
+
+        foreach ((string key, string selector, PluralArgument[] arguments, string[] categories, RenderShape shape) in pluralExpected)
+        {
+            AssertPluralPatternBehavior(neutralValues, key, selector, arguments, categories, shape);
         }
 
         Assert.Equal(
             expected.Select(entry => entry.Key).OrderBy(key => key, StringComparer.Ordinal),
             neutralValues.Keys.Where(key => key.StartsWith("StatusBar_", StringComparison.Ordinal)).OrderBy(key => key, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void NoLegacyPluralMechanismsRemain()
+    {
+        string deletedCountWrapperToken = "Localized" + "Count";
+        IReadOnlyList<string> deletedWrapperReferences = FindTextOccurrences(
+            EnumerateRepositoryTextFiles("src", "tests"),
+            deletedCountWrapperToken);
+        AssertNoOffenders(deletedWrapperReferences, "Deleted count-wrapper references remain");
+
+        IReadOnlyList<string> legacyKeySelections = FindLegacyCountDrivenKeySelections();
+        AssertNoOffenders(legacyKeySelections, "Count-driven singular/plural key selections remain");
+
+        IReadOnlyList<string> legacyResourceKeys = FindLegacyPluralResourceKeys();
+        AssertNoOffenders(legacyResourceKeys, "Legacy plural resource keys remain");
+
+        IReadOnlyList<string> legacyDatabaseToolsConstants = typeof(DatabaseToolsLogKeys)
+            .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+            .Where(field => field is { IsLiteral: true, IsInitOnly: false } && field.FieldType == typeof(string))
+            .Select(field => (field.Name, Value: (string)field.GetRawConstantValue()!))
+            .Where(field => IsLegacyPluralKeyName(field.Name) || IsLegacyPluralKeyName(field.Value))
+            .Select(field => $"{field.Name} = {field.Value}")
+            .OrderBy(offender => offender, StringComparer.Ordinal)
+            .ToList();
+        AssertNoOffenders(legacyDatabaseToolsConstants, "Legacy DatabaseTools plural key constants remain");
     }
 
     [Fact]
@@ -898,9 +1062,10 @@ public sealed class LocalizationInfraTests
 
         string resolved = resolver.Resolve(DatabaseToolsLogKeys.RunnerProtocolMismatch, ["3", "4"]);
 
-        Assert.Equal(
-            "Helper IPC protocol version mismatch: helper sent 3, runner expected 4. The helper EXE may be from a different app version - reinstall the MSIX so the main app and helper ship together.",
-            resolved);
+        Assert.Contains("3", resolved, StringComparison.Ordinal);
+        Assert.Contains("4", resolved, StringComparison.Ordinal);
+        Assert.DoesNotContain("{0}", resolved, StringComparison.Ordinal);
+        Assert.DoesNotContain("{1}", resolved, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -978,63 +1143,157 @@ public sealed class LocalizationInfraTests
     }
 
     [Fact]
-    public void UpdatesAndTitleNeutralValues_HaveExpectedArityAndByteExactEnglish()
+    public void UpdatesAndTitleNeutralValues_HaveExpectedPlaceholderArity()
     {
         var neutralValues = ResxValues();
-        (string Key, int Arity, string Value)[] expected =
+        (string Key, int Arity)[] expected =
         [
-            ("Modal_Yes", 0, "Yes"),
-            ("Modal_No", 0, "No"),
-            ("Update_Alert_CheckUnavailable_Title", 0, "Update Check Unavailable"),
-            ("Update_Alert_CheckUnavailable_Message", 0, "Update checks are disabled for development builds."),
-            ("Update_Alert_NoUpdates_Title", 0, "No Updates Available"),
-            ("Update_Alert_NoUpdates_Message", 0, "You are currently running the latest version."),
-            ("Update_Alert_Failure_Title", 0, "Update Failure"),
-            ("Update_Alert_RetrieveFailed_Message", 1, "Failed to retrieve latest releases:\r\n{0}"),
-            ("Update_Alert_InstallFailed_Message", 1, "Update failed to install:\r\n{0}"),
-            ("Update_Alert_Unavailable_Title", 0, "Update Unavailable"),
-            ("Update_Alert_Unavailable_Message", 0, "No compatible update package was found."),
-            ("Update_Alert_Available_Title", 0, "Update Available"),
-            ("Update_Alert_Available_Message", 0,
-                "A new version has been detected, would you like to install and reload the application?"),
-            ("Update_Alert_ReleaseNotesFailed_Title", 0, "Release Notes Failure"),
-            ("Update_Alert_ReleaseNotesFailed_Message", 0, "Failed to get release notes for the current version"),
-            ("AppTitle_Qualifier_Development", 0, " (Development)"),
-            ("AppTitle_Qualifier_Preview", 0, " (Preview)"),
-            ("AppTitle_Qualifier_Admin", 0, " (Admin)"),
-            ("AppTitle_Progress_Installing", 1, "Installing: {0}%"),
-            ("AppTitle_Progress_Relaunch", 0, "Relaunch to Apply Update"),
-            ("ReleaseNotes_TitleWithVersion", 1, "Release notes for v{0}"),
-            ("ReleaseNotes_AriaLabel", 0, "Release Notes")
+            ("Modal_Yes", 0),
+            ("Modal_No", 0),
+            ("Update_Alert_CheckUnavailable_Title", 0),
+            ("Update_Alert_CheckUnavailable_Message", 0),
+            ("Update_Alert_NoUpdates_Title", 0),
+            ("Update_Alert_NoUpdates_Message", 0),
+            ("Update_Alert_Failure_Title", 0),
+            ("Update_Alert_RetrieveFailed_Message", 1),
+            ("Update_Alert_InstallFailed_Message", 1),
+            ("Update_Alert_Unavailable_Title", 0),
+            ("Update_Alert_Unavailable_Message", 0),
+            ("Update_Alert_Available_Title", 0),
+            ("Update_Alert_Available_Message", 0),
+            ("Update_Alert_ReleaseNotesFailed_Title", 0),
+            ("Update_Alert_ReleaseNotesFailed_Message", 0),
+            ("AppTitle_Qualifier_Development", 0),
+            ("AppTitle_Qualifier_Preview", 0),
+            ("AppTitle_Qualifier_Admin", 0),
+            ("AppTitle_Progress_Installing", 1),
+            ("AppTitle_Progress_Relaunch", 0),
+            ("ReleaseNotes_TitleWithVersion", 1),
+            ("ReleaseNotes_AriaLabel", 0)
         ];
 
-        foreach (var (key, arity, value) in expected)
+        foreach ((string key, int arity) in expected)
         {
-            Assert.True(neutralValues.TryGetValue(key, out var neutral), $"Missing neutral RESX value for {key}.");
-            Assert.Equal(value, neutral);
+            Assert.True(neutralValues.TryGetValue(key, out string? neutral), $"Missing neutral RESX value for {key}.");
             Assert.Equal(arity, PlaceholderArity(neutral));
         }
     }
 
     [Fact]
-    public void UpdatesAndTitleWhitespaceSensitiveValues_ResolveByteExactThroughResourceManager()
+    public void UpdatesAndTitleWhitespaceSensitiveValues_PreserveLoadBearingSeparatorsThroughResourceManager()
     {
-        // The XML-parse guard above cannot catch a dropped xml:space="preserve" (XDocument preserves leaf
-        // whitespace unconditionally); resolving through the compiled ResourceManager does, protecting the
-        // window-title byte-identity that depends on the leading-space qualifiers.
         var localizer = BuildLocalizer();
-        (string Key, string Value)[] expected =
-        [
-            ("AppTitle_Qualifier_Development", " (Development)"),
-            ("AppTitle_Qualifier_Preview", " (Preview)"),
-            ("AppTitle_Qualifier_Admin", " (Admin)"),
-            ("Update_Alert_RetrieveFailed_Message", "Failed to retrieve latest releases:\r\n{0}"),
-            ("Update_Alert_InstallFailed_Message", "Update failed to install:\r\n{0}")
-        ];
 
-        foreach (var (key, value) in expected)
+        foreach (string key in new[]
         {
-            Assert.Equal(value, localizer[key].Value);
+            "AppTitle_Qualifier_Development",
+            "AppTitle_Qualifier_Preview",
+            "AppTitle_Qualifier_Admin"
+        })
+        {
+            string value = localizer[key].Value;
+
+            Assert.StartsWith(" ", value, StringComparison.Ordinal);
+            Assert.False(string.IsNullOrWhiteSpace(value));
+        }
+
+        foreach (string key in new[]
+        {
+            "Update_Alert_RetrieveFailed_Message",
+            "Update_Alert_InstallFailed_Message"
+        })
+        {
+            Assert.EndsWith("\r\n{0}", localizer[key].Value, StringComparison.Ordinal);
+        }
+    }
+
+    // Distinct 4-digit sentinel per argument index (2002, 3003, 4004, ...): all plural (never the "one" boundary) and
+    // mutually non-substring in both raw and grouped ("2,002") form, so one argument's value cannot mask another's
+    // presence or grouping when the render is searched.
+    private static int ArgumentSentinel(int index) => (1000 * (index + 2)) + (index + 2);
+
+    private static void AssertNoOffenders(IReadOnlyList<string> offenders, string message) =>
+        Assert.True(offenders.Count == 0, $"{message}: {string.Join("; ", offenders)}");
+
+    // Verifies that a migrated single-key plural pattern behaves as intended, without freezing its English copy. The
+    // checks are engineered so a false pass is hard to manufacture:
+    //   1. Structure  - the selector variable and authored CLDR category set must match expectations, so a resx edit
+    //                   that renames the selector or adds/drops a branch fails loudly.
+    //   2. Selection  - only the selector varies across the 1/2 boundary (other arguments pinned), so a surviving
+    //                   normalized difference (or its absence) is attributable to branch selection alone.
+    //   3. Per-branch landing + grouping - EVERY authored branch is rendered (selector := 1 for "one", a large plural
+    //                   sentinel for "other", the literal for "=N") with each argument at a DISTINCT sentinel, and each
+    //                   argument must appear in its expected numeric form (and NOT the opposite form). This catches an
+    //                   argument dropped or reformatted in ONLY one branch. Grouping of the selector itself is checked
+    //                   only where its value is large: at count 1 a grouped and a raw selector render identically, so
+    //                   that case has no observable behavior to guard.
+    //   4. Order / swap - in the all-distinct render the arguments must appear in the caller's declared TEXTUAL order,
+    //                   so swapping two same-format placeholders in the pattern (which binds values by name) is caught
+    //                   by an oracle independent of the pattern itself.
+    // Callers therefore declare `arguments` in the order the placeholders appear in the neutral English text.
+    private static void AssertPluralPatternBehavior(
+        IReadOnlyDictionary<string, string> neutralValues,
+        string key,
+        string selector,
+        IReadOnlyList<PluralArgument> arguments,
+        IReadOnlyList<string> expectedCategories,
+        RenderShape renderShape,
+        string? expectedPrefix = null)
+    {
+        Assert.True(neutralValues.TryGetValue(key, out string? pattern), $"Missing neutral RESX value for {key}.");
+
+        (string parsedSelector, IReadOnlyList<string> parsedCategories) = ParsePluralShape(pattern!);
+        Assert.Equal(selector, parsedSelector);
+        Assert.Equal(
+            expectedCategories.OrderBy(category => category, StringComparer.Ordinal),
+            parsedCategories.OrderBy(category => category, StringComparer.Ordinal));
+
+        int selectorSentinel = ArgumentSentinel(IndexOfArgument(arguments, selector));
+
+        string singular = RenderPlural(pattern!, SentinelValues(arguments, (selector, 1)));
+        string plural = RenderPlural(pattern!, SentinelValues(arguments, (selector, 2)));
+
+        if (renderShape == RenderShape.SingularPluralDiffer)
+        {
+            Assert.NotEqual(NormalizeFormattedNumbers(singular), NormalizeFormattedNumbers(plural));
+        }
+        else
+        {
+            Assert.Equal(NormalizeFormattedNumbers(singular), NormalizeFormattedNumbers(plural));
+        }
+
+        foreach (string category in expectedCategories)
+        {
+            int selectorValue = SelectorValueForCategory(category, selectorSentinel);
+            string branch = RenderPlural(pattern!, SentinelValues(arguments, (selector, selectorValue)));
+            int previousIndex = -1;
+
+            foreach (PluralArgument argument in arguments)
+            {
+                int value = argument.Name == selector ? selectorValue : ArgumentSentinel(IndexOfArgument(arguments, argument.Name));
+                string groupedForm = value.ToString("N0", CultureInfo.InvariantCulture);
+                string rawForm = value.ToString(CultureInfo.InvariantCulture);
+                string expectedForm = argument.Grouped ? groupedForm : rawForm;
+
+                Assert.Contains(expectedForm, branch, StringComparison.Ordinal);
+
+                if (value >= 1000)
+                {
+                    Assert.DoesNotContain(argument.Grouped ? rawForm : groupedForm, branch, StringComparison.Ordinal);
+                }
+
+                // Declared textual order must hold IN THIS branch, so a swap confined to a single branch is caught. The
+                // value is matched on numeric-token boundaries so a small selector value (e.g. "1") is never found
+                // inside another argument's digits.
+                int index = IndexOfNumericToken(branch, expectedForm);
+                Assert.True(index > previousIndex, $"Argument '{argument.Name}' ({expectedForm}) is out of declared textual order in the '{category}' branch: '{branch}'.");
+                previousIndex = index;
+            }
+
+            if (expectedPrefix is not null)
+            {
+                Assert.StartsWith(expectedPrefix, branch, StringComparison.Ordinal);
+            }
         }
     }
 
@@ -1065,6 +1324,40 @@ public sealed class LocalizationInfraTests
             .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
             .Where(field => field is { IsLiteral: true, IsInitOnly: false } && field.FieldType == typeof(string))
             .ToDictionary(field => field.Name, field => (string)field.GetRawConstantValue()!, StringComparer.Ordinal);
+
+    private static IEnumerable<string> EnumerateRepositoryTextFiles(params string[] roots)
+    {
+        string[] extensions =
+        [
+            ".cs",
+            ".csproj",
+            ".json",
+            ".md",
+            ".props",
+            ".razor",
+            ".resx",
+            ".targets",
+            ".xaml",
+            ".xml"
+        ];
+
+        foreach (string root in roots)
+        {
+            string fullRoot = Path.Combine(LocalizationSourceScan.RepositoryRoot, root);
+
+            foreach (string path in Directory.EnumerateFiles(fullRoot, "*.*", SearchOption.AllDirectories))
+            {
+                if (path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) ||
+                    path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) ||
+                    !extensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                yield return path;
+            }
+        }
+    }
 
     private static IReadOnlyList<string> ExtractMethodCalls(string source, string methodName)
     {
@@ -1113,6 +1406,120 @@ public sealed class LocalizationInfraTests
         return calls;
     }
 
+    // Reports any retired count-driven One/Many key selection in production source. The testable core
+    // `ScanForLegacyCountDrivenSelections` works on whole statement spans, so a precomputed local is caught even when
+    // the eventual localization call is a separate statement; the per-span decision lives in
+    // IsLegacyCountDrivenPluralSelection, which the positive-control test exercises directly.
+    private static IReadOnlyList<string> FindLegacyCountDrivenKeySelections() =>
+        LocalizationSourceScan.EnumerateProductionSource()
+            .SelectMany(path => ScanForLegacyCountDrivenSelections(
+                File.ReadAllText(path),
+                Path.GetRelativePath(LocalizationSourceScan.RepositoryRoot, path)))
+            .OrderBy(offender => offender, StringComparer.Ordinal)
+            .ToList();
+
+    private static IReadOnlyList<string> FindLegacyPluralResourceKeys() =>
+        ResxKeys()
+            .Where(IsLegacyPluralKeyName)
+            .OrderBy(key => key, StringComparer.Ordinal)
+            .ToList();
+
+    private static IReadOnlyList<string> FindTextOccurrences(IEnumerable<string> paths, string token) =>
+        paths.SelectMany(path =>
+            File.ReadLines(path)
+                .Select((line, index) => (Line: line, Number: index + 1))
+                .Where(entry => entry.Line.Contains(token, StringComparison.Ordinal))
+                .Select(entry => $"{Path.GetRelativePath(LocalizationSourceScan.RepositoryRoot, path)}:{entry.Number}:{entry.Line.Trim()}"))
+            .OrderBy(offender => offender, StringComparer.Ordinal)
+            .ToList();
+
+    private static PluralArgument Grouped(string name) => new(name, Grouped: true);
+
+    private static int IndexOfArgument(IReadOnlyList<PluralArgument> arguments, string name)
+    {
+        for (int index = 0; index < arguments.Count; index++)
+        {
+            if (arguments[index].Name == name) { return index; }
+        }
+
+        Assert.Fail($"Declared arguments do not include '{name}'.");
+        return -1;
+    }
+
+    // Finds a rendered numeric value as a standalone token (not embedded in another number), so a selector rendered as
+    // "1" is not matched inside "1000" or another argument's grouped digits.
+    private static int IndexOfNumericToken(string text, string numericForm)
+    {
+        Match match = Regex.Match(text, $@"(?<![\d,]){Regex.Escape(numericForm)}(?![\d,])");
+
+        return match.Success ? match.Index : -1;
+    }
+
+    // A code fragment that selects a retired One/Many key from a count comparison. Requires BOTH signals so an ordinary
+    // "count == 1" branch or an unrelated method named "SelectMany" is not mistaken for the retired mechanism.
+    private static bool IsLegacyCountDrivenPluralSelection(string code) =>
+        s_countOneComparison.IsMatch(code) && ReferencesLegacyPluralKeyToken(code);
+
+    // A resx/key-constant name that still encodes the retired two-form selector: a "_One"/"_Many" segment terminal or
+    // before a later suffix ("Foo_One_Ambiguous"), a CamelCase "One"/"Many" word (lowercase/digit before;
+    // uppercase/underscore/end after, so real words like "ManyLogs" and "None" are spared), or the retired four-way
+    // "_ItemN_DupN"/"_Accept_NN" spellings. The exact contract - including the spared names - is pinned by
+    // LegacyPluralDetectors_Flag... below.
+    private static bool IsLegacyPluralKeyName(string name) =>
+        s_legacyTerminalPluralSegment.IsMatch(name) ||
+        s_legacyCamelCasePluralWord.IsMatch(name) ||
+        s_legacyFourWayPluralKey.IsMatch(name);
+
+    private static int LineNumber(string source, int index) =>
+        source.Take(index).Count(character => character == '\n') + 1;
+
+    private static string NormalizeFormattedNumbers(string value) =>
+        Regex.Replace(value, @"\d+(?:,\d{3})*(?:\.\d+)?", "#");
+
+    // Extracts the selector variable and the top-level CLDR category tokens ("one", "other", "=1", ...) from an ICU
+    // plural pattern, skipping balanced branch bodies so nested placeholders like {total:N0} are never mistaken for a
+    // category.
+    private static (string Selector, IReadOnlyList<string> Categories) ParsePluralShape(string pattern)
+    {
+        string trimmed = pattern.Trim();
+        Assert.StartsWith("{", trimmed, StringComparison.Ordinal);
+        Assert.EndsWith("}", trimmed, StringComparison.Ordinal);
+
+        string body = trimmed[1..^1];
+        int firstComma = body.IndexOf(',');
+        Assert.True(firstComma > 0, $"Plural pattern '{pattern}' has no selector.");
+        int secondComma = body.IndexOf(',', firstComma + 1);
+        Assert.True(secondComma > firstComma, $"Plural pattern '{pattern}' has no plural keyword.");
+        Assert.Equal("plural", body[(firstComma + 1)..secondComma].Trim());
+
+        var categories = new List<string>();
+        int position = secondComma + 1;
+
+        while (position < body.Length)
+        {
+            while (position < body.Length && char.IsWhiteSpace(body[position])) { position++; }
+            if (position >= body.Length) { break; }
+
+            int tokenStart = position;
+            while (position < body.Length && body[position] != '{') { position++; }
+            Assert.True(position < body.Length, $"Plural category in '{pattern}' has no branch body.");
+            categories.Add(body[tokenStart..position].Trim());
+
+            int depth = 0;
+            do
+            {
+                if (body[position] == '{') { depth++; }
+                else if (body[position] == '}') { depth--; }
+                position++;
+            }
+            while (position < body.Length && depth > 0);
+
+            Assert.Equal(0, depth);
+        }
+
+        return (body[..firstComma].Trim(), categories);
+    }
+
     private static int PlaceholderArity(string value)
     {
         var indexes = Regex.Matches(value, @"\{(\d+)(?::[^}]*)?\}")
@@ -1120,6 +1527,35 @@ public sealed class LocalizationInfraTests
             .ToList();
 
         return indexes.Count == 0 ? 0 : indexes.Max() + 1;
+    }
+
+    private static PluralArgument Raw(string name) => new(name, Grouped: false);
+
+    // True when the code references a retired plural KEY as a quoted string literal. Each quoted identifier is checked
+    // with the same IsLegacyPluralKeyName predicate as the resource-key guard, so the legitimate
+    // "StatusBar_Loading_ManyLogs" key (and ordinary words) are spared even though they contain "Many".
+    private static bool ReferencesLegacyPluralKeyToken(string code)
+    {
+        foreach (Match match in s_quotedIdentifierLiteral.Matches(code))
+        {
+            if (IsLegacyPluralKeyName(match.Groups[1].Value)) { return true; }
+        }
+
+        return false;
+    }
+
+    private static string RenderPlural(string pattern, IReadOnlyDictionary<string, int> argumentValues)
+    {
+        Dictionary<string, object?> values = argumentValues.ToDictionary(
+            pair => pair.Key,
+            pair => (object?)pair.Value,
+            StringComparer.Ordinal);
+
+        return new IcuMessageFormatter().Format(
+            pattern,
+            values,
+            CultureInfo.InvariantCulture,
+            CultureInfo.GetCultureInfo("en-US"));
     }
 
     private static IReadOnlyList<string> ResxKeys() =>
@@ -1138,6 +1574,67 @@ public sealed class LocalizationInfraTests
                 data => (string)data.Attribute("name")!,
                 data => data.Element("value")?.Value ?? string.Empty,
                 StringComparer.Ordinal);
+
+    // Splits source into ';'-delimited statement spans and reports each that both compares a count to 1 and references
+    // a retired One/Many key. Statement granularity (rather than only Localizer[...]/LocalizableText(...) spans) is what
+    // lets a precomputed `var key = count == 1 ? "X_One" : "X_Many";` be detected.
+    private static IReadOnlyList<string> ScanForLegacyCountDrivenSelections(string source, string label)
+    {
+        var offenders = new List<string>();
+        int spanStart = 0;
+
+        for (int index = 0; index <= source.Length; index++)
+        {
+            if (index < source.Length && source[index] != ';') { continue; }
+
+            string span = source[spanStart..index];
+
+            if (IsLegacyCountDrivenPluralSelection(span))
+            {
+                offenders.Add($"{label}:{LineNumber(source, spanStart)}:{SingleLine(span)}");
+            }
+
+            spanStart = index + 1;
+        }
+
+        return offenders;
+    }
+
+    // The selector value that lands rendering in a given authored branch: 1 selects "one", a large plural sentinel
+    // selects "other" (never "one"/"=N"), and "=N" is selected by its own literal.
+    private static int SelectorValueForCategory(string category, int otherSentinel)
+    {
+        if (category == "one") { return 1; }
+        if (category == "other") { return otherSentinel; }
+        if (category.StartsWith("=", StringComparison.Ordinal)) { return int.Parse(category[1..], CultureInfo.InvariantCulture); }
+
+        Assert.Fail($"Unhandled plural category '{category}'.");
+        return 0;
+    }
+
+    // Assigns each argument its distinct sentinel; an optional override pins one argument (the selector) to a specific
+    // count so the caller can hold the field fixed while probing the 1/2 selection boundary.
+    private static IReadOnlyDictionary<string, int> SentinelValues(
+        IReadOnlyList<PluralArgument> arguments,
+        (string Selector, int Value)? selectorOverride)
+    {
+        Dictionary<string, int> values = new(StringComparer.Ordinal);
+
+        for (int index = 0; index < arguments.Count; index++)
+        {
+            values[arguments[index].Name] = ArgumentSentinel(index);
+        }
+
+        if (selectorOverride is { } selector)
+        {
+            values[selector.Selector] = selector.Value;
+        }
+
+        return values;
+    }
+
+    private static string SingleLine(string value) =>
+        Regex.Replace(value, @"\s+", " ").Trim();
 
     private static IReadOnlyList<string> SplitArguments(string callArguments)
     {
@@ -1240,4 +1737,7 @@ public sealed class LocalizationInfraTests
             Services.AddSingleton(provider => new DisplayIndicatorGate(provider.GetRequiredService<IOrderedViewSource>()));
         }
     }
+
+    // A declared plural argument plus whether the pattern must group it (":N0") or emit it raw.
+    private readonly record struct PluralArgument(string Name, bool Grouped);
 }

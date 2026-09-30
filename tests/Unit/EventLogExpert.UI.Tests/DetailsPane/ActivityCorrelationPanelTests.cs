@@ -12,9 +12,11 @@ using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.Common;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using NSubstitute;
+using System.Text.RegularExpressions;
 using PanelComponent = EventLogExpert.UI.DetailsPane.ActivityCorrelationPanel;
 
 namespace EventLogExpert.UI.Tests.DetailsPane;
@@ -161,8 +163,26 @@ public sealed class ActivityCorrelationPanelTests : BunitContext
 
         var cut = RenderActive();
 
-        cut.WaitForAssertion(() => Assert.Contains("2 errors", cut.Markup));
-        Assert.Contains("1 warning", cut.Markup);
+        // Copy-robust: assert the header contains each count rendered through the same ICU plural keys the component
+        // uses (so "errors"/"warning" copy edits do not break the test), and that those keys genuinely inflect.
+        var localizer = Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+        static string Normalize(string value) => Regex.Replace(value, @"\d+(?:,\d{3})*(?:\.\d+)?", "#");
+
+        // Each key must carry its count (bounded) in BOTH branches and inflect - so a count-free pattern like
+        // "{count, plural, one {error} other {errors}}", or a {count} dropped from either branch, is caught.
+        foreach (string key in new[] { "Correlation_Error", "Correlation_Warning" })
+        {
+            string one = PluralText.Format(localizer, key, ("count", 1));
+            string two = PluralText.Format(localizer, key, ("count", 2));
+
+            Assert.Matches(@"(?<![\d,])1(?![\d,])", one);
+            Assert.Matches(@"(?<![\d,])2(?![\d,])", two);
+            Assert.NotEqual(Normalize(one), Normalize(two));
+        }
+
+        // The component shows the error count (2) and warning count (1) rendered through those same keys.
+        cut.WaitForAssertion(() => Assert.Contains(PluralText.Format(localizer, "Correlation_Error", ("count", 2)), cut.Markup, StringComparison.Ordinal));
+        Assert.Contains(PluralText.Format(localizer, "Correlation_Warning", ("count", 1)), cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]

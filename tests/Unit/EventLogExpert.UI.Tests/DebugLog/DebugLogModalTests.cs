@@ -53,8 +53,10 @@ public sealed class DebugLogModalTests : BunitContext
 
         var component = Render<DebugLogModal>();
 
+        // This test's subject is the filter editor; wait on the loaded count structure ("shown of total") without
+        // coupling to the footer counter's plural copy.
         await component.WaitForAssertionAsync(() =>
-            Assert.Equal("1 of 1 entry", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+            Assert.StartsWith("1 of 1", component.Find(".debug-log-footer-counter").TextContent.Trim(), StringComparison.Ordinal));
 
         Assert.Empty(component.FindAll(".debug-log-filter-editor"));
         Assert.Empty(component.FindAll(".debug-log-filter-chip"));
@@ -72,8 +74,10 @@ public sealed class DebugLogModalTests : BunitContext
 
         var component = Render<DebugLogModal>();
 
+        // This test's subject is the counter's live-region attributes; wait on the loaded count structure without
+        // coupling to its plural copy.
         await component.WaitForAssertionAsync(() =>
-            Assert.Equal("1 of 1 entry", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+            Assert.StartsWith("1 of 1", component.Find(".debug-log-footer-counter").TextContent.Trim(), StringComparison.Ordinal));
 
         var counter = component.Find(".debug-log-footer-counter");
         Assert.Equal("status", counter.GetAttribute("role"));

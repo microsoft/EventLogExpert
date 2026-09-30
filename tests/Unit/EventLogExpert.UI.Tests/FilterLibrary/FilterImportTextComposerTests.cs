@@ -11,6 +11,7 @@ using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace EventLogExpert.UI.Tests.FilterLibrary;
 
@@ -106,6 +107,28 @@ public sealed class FilterImportTextComposerTests
             actual);
     }
 
+    [Fact]
+    public void NothingToImport_InflectsItemAndDuplicateNounsIndependently()
+    {
+        string bothOne = WithEnUsCulture(() => FilterImportTextComposer.NothingToImport(BuildLocalizer(), BuildNothingToImportPreflight(1, 1)));
+        string itemManyDupOne = WithEnUsCulture(() => FilterImportTextComposer.NothingToImport(BuildLocalizer(), BuildNothingToImportPreflight(71, 1)));
+        string itemOneDupMany = WithEnUsCulture(() => FilterImportTextComposer.NothingToImport(BuildLocalizer(), BuildNothingToImportPreflight(1, 93)));
+
+        // Nested plural: the item count and the duplicate count each drive their own noun independently. Normalizing
+        // numbers isolates each inflection so the assertions survive copy edits to the surrounding sentence.
+        Assert.NotEqual(NormalizeNumbers(bothOne), NormalizeNumbers(itemManyDupOne));
+        Assert.NotEqual(NormalizeNumbers(bothOne), NormalizeNumbers(itemOneDupMany));
+
+        // Each count must land in BOTH of its branches, matched on numeric-token boundaries: item as bounded "1"
+        // (singular, from the 1/93 render) and 71 (plural, from the 71/1 render); duplicate as bounded "1" (singular,
+        // from the 71/1 render) and 93 (plural, from the 1/93 render). So a count dropped from EITHER of its branches
+        // is caught.
+        Assert.Matches(@"(?<![\d,])1(?![\d,])", itemOneDupMany);
+        Assert.Contains("71", itemManyDupOne, StringComparison.Ordinal);
+        Assert.Matches(@"(?<![\d,])1(?![\d,])", itemManyDupOne);
+        Assert.Contains("93", itemOneDupMany, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(1, 1, "[[FilterImport_NothingToImport]]")]
     [InlineData(1, 2, "[[FilterImport_NothingToImport]]")]
@@ -119,20 +142,6 @@ public sealed class FilterImportTextComposerTests
         };
 
         Assert.Equal(expected, FilterImportTextComposer.NothingToImport(_markerLocalizer, preflight));
-    }
-
-    [Theory]
-    [InlineData(1, 1, "Nothing to import. Removed empty-criterion filters from 1 library item, skipped 1 duplicate.")]
-    [InlineData(1, 2, "Nothing to import. Removed empty-criterion filters from 1 library item, skipped 2 duplicates.")]
-    [InlineData(2, 1, "Nothing to import. Removed empty-criterion filters from 2 library items, skipped 1 duplicate.")]
-    [InlineData(2, 2, "Nothing to import. Removed empty-criterion filters from 2 library items, skipped 2 duplicates.")]
-    public void NothingToImport_UsesApprovedGrammarCorrections(int itemCount, int duplicateCount, string expected)
-    {
-        var preflight = BuildNothingToImportPreflight(itemCount, duplicateCount);
-
-        var actual = WithEnUsCulture(() => FilterImportTextComposer.NothingToImport(BuildLocalizer(), preflight));
-
-        Assert.Equal(expected, actual);
     }
 
     [Fact]
@@ -260,21 +269,46 @@ public sealed class FilterImportTextComposerTests
         Assert.Equal(expected, FilterImportTextComposer.Summary(_markerLocalizer, summary));
 
     [Fact]
-    public void Summary_TagOne_ProducesByteIdenticalEnglish()
+    public void Summary_TagCount_SelectsSingularOrPluralTagNounAndCarriesEachCount()
     {
-        var summary = new ImportSummary(2, 12, 1, 3, 0);
+        // Mutually non-substring counts for the non-tag fields so a dropped or misplaced argument cannot be masked by
+        // another field's digits (unlike "2" hiding inside "12"); only updatedTags varies across the 1/2 boundary.
+        var singular = WithEnUsCulture(() => FilterImportTextComposer.Summary(BuildLocalizer(), new ImportSummary(7010, 8020, 1, 9030, 0)));
+        var plural = WithEnUsCulture(() => FilterImportTextComposer.Summary(BuildLocalizer(), new ImportSummary(7010, 8020, 4567, 9030, 0)));
 
-        var actual = WithEnUsCulture(() => FilterImportTextComposer.Summary(BuildLocalizer(), summary));
+        // The updatedTags count drives the tag noun (singular vs plural); normalizing numbers isolates that inflection
+        // so the assertion survives copy edits to the surrounding sentence.
+        Assert.NotEqual(NormalizeNumbers(singular), NormalizeNumbers(plural));
 
-        Assert.Equal("Imported 2 new, replaced 12, updated 1 tag, skipped 3", actual);
+        // The updatedTags count must render as a standalone token in BOTH branches - "1" in the singular and a distinct
+        // value in the plural - so a dropped {updatedTags} is caught in either branch.
+        Assert.Matches(@"(?<![\d,])1(?![\d,])", singular);
+        Assert.Contains("4567", plural, StringComparison.Ordinal);
+
+        // Every non-tag field's count lands verbatim and ungrouped in both renders.
+        foreach (string text in new[] { singular, plural })
+        {
+            Assert.Contains("7010", text, StringComparison.Ordinal);
+            Assert.Contains("8020", text, StringComparison.Ordinal);
+            Assert.Contains("9030", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("7,010", text, StringComparison.Ordinal);
+        }
     }
 
     [Fact]
-    public void TagRenamed_RendersRawCountWithoutGrouping()
+    public void TagRenamed_RendersRawUngroupedCountAndCarriesBothTags()
     {
-        var actual = WithEnUsCulture(() => FilterImportTextComposer.TagRenamed(BuildLocalizer(), "old", "new", 1000));
+        var large = WithEnUsCulture(() => FilterImportTextComposer.TagRenamed(BuildLocalizer(), "alpha", "bravo", 1000));
+        var singular = WithEnUsCulture(() => FilterImportTextComposer.TagRenamed(BuildLocalizer(), "alpha", "bravo", 1));
 
-        Assert.Equal("Renamed tag 'old' to 'new' in 1000 entries", actual);
+        // The count renders raw (no thousands separator) in the plural branch and as a bounded "1" in the singular
+        // branch, both tag arguments land, and the entry noun inflects - all without pinning the surrounding copy.
+        Assert.Contains("1000", large, StringComparison.Ordinal);
+        Assert.DoesNotContain("1,000", large, StringComparison.Ordinal);
+        Assert.Matches(@"(?<![\d,])1(?![\d,])", singular);
+        Assert.Contains("alpha", large, StringComparison.Ordinal);
+        Assert.Contains("bravo", large, StringComparison.Ordinal);
+        Assert.NotEqual(NormalizeNumbers(singular), NormalizeNumbers(large));
     }
 
     private static LibraryEntrySavedFilter BuildEntry(string name) =>
@@ -304,6 +338,9 @@ public sealed class FilterImportTextComposerTests
         {
             NormalizeRemovedFilterNames = Enumerable.Range(0, itemCount).Select(index => $"Removed {index}").ToList(),
         };
+
+    private static string NormalizeNumbers(string value) =>
+        Regex.Replace(value, @"\d+(?:,\d{3})*(?:\.\d+)?", "#");
 
     private static string OriginalStandaloneRenamePreview(ImportPreflight preflight)
     {
