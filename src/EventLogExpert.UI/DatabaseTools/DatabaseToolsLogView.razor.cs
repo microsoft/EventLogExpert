@@ -14,6 +14,7 @@ using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
+using System.Globalization;
 
 namespace EventLogExpert.UI.DatabaseTools;
 
@@ -166,7 +167,10 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
     }
 
     private static string FormatEntry(LogRecord entry) =>
-        $"[{entry.TimestampUtc:HH:mm:ss.fff}] [{entry.Level}] {entry.Message}";
+        string.Create(CultureInfo.InvariantCulture, $"[{FormatLogTime(entry.TimestampUtc)}] [{entry.Level}] {entry.Message}");
+
+    private static string FormatLogTime(DateTime utc) =>
+        utc.ToString("HH\\:mm\\:ss\\.fff", CultureInfo.InvariantCulture);
 
     private static string SeverityClass(LogLevel level) => level switch
     {

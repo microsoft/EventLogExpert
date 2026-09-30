@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Localization;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Security;
 
 namespace EventLogExpert.UI.FilterLibrary;
@@ -82,9 +83,9 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
 
     private IReadOnlyList<(LibraryTab Tab, string Label)> CurrentTabLabels =>
     [
-        (LibraryTab.Saved, $"{LibraryTabLocalizer.Label(Localizer, LibraryTab.Saved)} ({SavedEntries.Count})"),
-        (LibraryTab.Favorites, $"{LibraryTabLocalizer.Label(Localizer, LibraryTab.Favorites)} ({FavoriteEntries.Count})"),
-        (LibraryTab.PreviouslyUsed, $"{LibraryTabLocalizer.Label(Localizer, LibraryTab.PreviouslyUsed)} ({PreviouslyUsedEntries.Count})"),
+        (LibraryTab.Saved, string.Create(CultureInfo.CurrentCulture, $"{LibraryTabLocalizer.Label(Localizer, LibraryTab.Saved)} ({SavedEntries.Count:N0})")),
+        (LibraryTab.Favorites, string.Create(CultureInfo.CurrentCulture, $"{LibraryTabLocalizer.Label(Localizer, LibraryTab.Favorites)} ({FavoriteEntries.Count:N0})")),
+        (LibraryTab.PreviouslyUsed, string.Create(CultureInfo.CurrentCulture, $"{LibraryTabLocalizer.Label(Localizer, LibraryTab.PreviouslyUsed)} ({PreviouslyUsedEntries.Count:N0})")),
     ];
 
     [Inject] private IFilterLibraryExportService ExportService { get; init; } = null!;

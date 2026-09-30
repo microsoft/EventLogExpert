@@ -13,6 +13,7 @@ using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Globalization;
 
 namespace EventLogExpert.UI.DatabaseTools.Tabs;
 
@@ -178,7 +179,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
             _ => LogLevel.Information
         };
 
-        string durationSeconds = result.Duration.TotalSeconds.ToString("F1");
+        string durationSeconds = result.Duration.TotalSeconds.ToString("F1", CultureInfo.CurrentCulture);
         var message = result.Outcome switch
         {
             DatabaseToolsOutcome.Succeeded => Localizer["DatabaseTools_OutcomeMessage_Succeeded", durationSeconds],

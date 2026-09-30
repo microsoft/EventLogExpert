@@ -30,6 +30,22 @@ public sealed class DetailsReaderFormatterCultureTests
     private static readonly CultureInfo s_english = CultureInfo.GetCultureInfo("en-US");
 
     [Fact]
+    public void BuildEventCopyText_DateValueUsesCurrentCulture()
+    {
+        ResolvedEvent @event = EventDataTestFactory.CreateEventWithData(("LogonType", 3)) with
+        {
+            TimeCreated = new DateTime(2026, 8, 26, 17, 57, 5, DateTimeKind.Utc)
+        };
+
+        string english = RunUnderCulture(s_english, () => DetailsReaderFormatter.BuildEventCopyText(Model(@event)));
+        string contrast = RunUnderCulture(s_contrast, () => DetailsReaderFormatter.BuildEventCopyText(Model(@event)));
+
+        Assert.Contains(@event.TimeCreated.ToString(s_english), english, StringComparison.Ordinal);
+        Assert.Contains(@event.TimeCreated.ToString(s_contrast), contrast, StringComparison.Ordinal);
+        Assert.NotEqual(english, contrast);
+    }
+
+    [Fact]
     public void BuildEventCopyText_EmitsEnglishStructuralLabels_UnderForeignCulture()
     {
         // The fixture populates EVERY conditionally-emitted section (Source, Level, Message, EventData, UserData) so a

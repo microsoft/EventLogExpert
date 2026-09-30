@@ -26,6 +26,33 @@ public sealed class EventCopyFormatterCultureTests
     private static readonly ImmutableList<ColumnName> s_order =
         ImmutableList.Create(ColumnName.Level, ColumnName.Source, ColumnName.EventId);
 
+    [Theory]
+    [InlineData(EventCopyFormat.Simple)]
+    [InlineData(EventCopyFormat.Full)]
+    public async Task FormatAsync_EventIdDoesNotGroupLargeValues_UnderForeignCulture(EventCopyFormat format)
+    {
+        CultureInfo culture = CultureInfo.GetCultureInfo("fi-FI");
+
+        string result = await FormatUnderCultureAsync(culture, format, id: 1234567);
+
+        Assert.Contains("1234567", result, StringComparison.Ordinal);
+        Assert.DoesNotContain("1" + culture.NumberFormat.NumberGroupSeparator + "234", result, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(EventCopyFormat.Simple)]
+    [InlineData(EventCopyFormat.Full)]
+    public async Task FormatAsync_EventIdUsesInvariantNegativeSign_UnderCustomCulture(EventCopyFormat format)
+    {
+        CultureInfo culture = CultureInfo.GetCultureInfo("fi-FI").Clone() as CultureInfo ?? throw new InvalidOperationException("Expected cloneable culture.");
+        culture.NumberFormat.NegativeSign = "[MINUS]";
+
+        string result = await FormatUnderCultureAsync(culture, format, id: -1234567);
+
+        Assert.Contains("-1234567", result, StringComparison.Ordinal);
+        Assert.DoesNotContain(culture.NumberFormat.NegativeSign, result, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task FormatAsync_FullFormat_RoutesCultureSensitiveDateThroughCopyText() =>
         Assert.Contains("[[Date(26.8.2026 17.57.05)]]", await FormatUnderContrastCultureAsync(EventCopyFormat.Full), StringComparison.Ordinal);
@@ -43,13 +70,16 @@ public sealed class EventCopyFormatterCultureTests
 
     private static SelectionEntry Entry(EventLocator locator) => new(locator, locator, null);
 
-    private static async Task<string> FormatUnderContrastCultureAsync(EventCopyFormat format)
+    private static Task<string> FormatUnderContrastCultureAsync(EventCopyFormat format) =>
+        FormatUnderCultureAsync(CultureInfo.GetCultureInfo("fi-FI"), format, id: 4000);
+
+    private static async Task<string> FormatUnderCultureAsync(CultureInfo culture, EventCopyFormat format, int id)
     {
         var locator = new EventLocator(s_logId, 0, 0);
         var @event = new ResolvedEvent("Application", LogPathType.Channel)
         {
             RecordId = 1,
-            Id = 4000,
+            Id = id,
             Source = "ProviderA",
             Description = "Alpha",
             TimeCreated = new DateTime(2026, 8, 26, 17, 57, 5, DateTimeKind.Utc)
@@ -62,7 +92,7 @@ public sealed class EventCopyFormatterCultureTests
         var formatter = new EventCopyFormatter(detailResolver, Substitute.For<IEventXmlResolver>(), CopyText());
 
         return await RunUnderCultureAsync(
-            CultureInfo.GetCultureInfo("fi-FI"),
+            culture,
             () => formatter.FormatAsync(
                 new EventCopyRequest([Entry(locator)], null, s_columns, s_order, format, TimeZoneInfo.Utc),
                 TestContext.Current.CancellationToken));

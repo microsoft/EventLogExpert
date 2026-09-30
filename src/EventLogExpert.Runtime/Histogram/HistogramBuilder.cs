@@ -553,7 +553,7 @@ public static class HistogramBuilder
             keptCount,
             HistogramDimension.EventId);
         string[] keys = Array.ConvertAll(targetIds, id => id.ToString(CultureInfo.InvariantCulture));
-        string[] labels = Array.ConvertAll(targetIds, id => id.ToString(CultureInfo.CurrentCulture));
+        string[] labels = Array.ConvertAll(targetIds, id => id.ToString(CultureInfo.InvariantCulture));
         IReadOnlyList<HistogramGroup> groups = HistogramGroups.ForCategories(keys, labels, otherLabel);
 
         return (slotCounts, slotCount, groups, FoldGroupMasks(slotColorMask, groups));

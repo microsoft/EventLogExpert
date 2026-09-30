@@ -10,6 +10,7 @@ using System.Buffers;
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -363,7 +364,7 @@ internal sealed partial class DescriptionFormatter(
         IReadOnlyDictionary<string, ValueMapDefinition> maps) => property.Kind switch
     {
         EventPropertyKind.Boolean => property.AsBoolean ? "true" : "false",
-        EventPropertyKind.DateTime => property.AsDateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"),
+        EventPropertyKind.DateTime => property.AsDateTime.ToString(@"yyyy\-MM\-dd\THH\:mm\:ss\.fffffff00K", CultureInfo.InvariantCulture),
         EventPropertyKind.Reference => FormatReferenceProperty(property.Reference),
         _ => FormatNumericProperty(property, outType, mapName, maps)
     };

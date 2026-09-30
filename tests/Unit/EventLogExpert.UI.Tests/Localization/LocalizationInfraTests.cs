@@ -1091,7 +1091,7 @@ public sealed class LocalizationInfraTests
     }
 
     [Fact]
-    public void StatusBarNumberFormatting_MixesGroupedLoadingAndRawNewEvents()
+    public void StatusBarNumberFormatting_GroupsLoadingAndNewEvents()
     {
         IStringLocalizer<SharedResource> localizer = BuildLocalizer();
         var loading = StatusBarTextComposer.Loading(
@@ -1107,7 +1107,7 @@ public sealed class LocalizationInfraTests
 
         var cut = context.Render<UI.StatusBar.StatusBar>();
 
-        Assert.Contains("1000", cut.Find("button.status-bar-newevents").TextContent, StringComparison.Ordinal);
+        Assert.Contains(1000.ToString("N0", CultureInfo.CurrentCulture), cut.Find("button.status-bar-newevents").TextContent, StringComparison.Ordinal);
     }
 
     [Fact]
