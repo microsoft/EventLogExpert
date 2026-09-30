@@ -266,6 +266,21 @@ public readonly struct EventFieldValue
         _ => string.Empty
     };
 
+    public string AsString(CultureInfo culture)
+    {
+        ArgumentNullException.ThrowIfNull(culture);
+
+        return _kind switch
+        {
+            EventFieldValueKind.Int64 => _bits.ToString(culture),
+            EventFieldValueKind.UInt64 => unchecked((ulong)_bits).ToString(culture),
+            EventFieldValueKind.Double => BitConverter.Int64BitsToDouble(_bits).ToString(culture),
+            EventFieldValueKind.Single => BitConverter.Int32BitsToSingle((int)_bits).ToString(culture),
+            EventFieldValueKind.DateTime => DateTime.FromBinary(_bits).ToString(culture),
+            _ => AsString()
+        };
+    }
+
     public override string ToString() => AsString();
 
     private static string JoinArray(Array array)

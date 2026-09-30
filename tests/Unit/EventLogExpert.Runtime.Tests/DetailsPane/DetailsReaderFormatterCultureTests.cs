@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Structured;
 using EventLogExpert.Eventing.TestUtils;
+using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using System.Globalization;
@@ -28,6 +29,11 @@ public sealed class DetailsReaderFormatterCultureTests
 {
     private static readonly CultureInfo s_contrast = CultureInfo.GetCultureInfo("fi-FI");
     private static readonly CultureInfo s_english = CultureInfo.GetCultureInfo("en-US");
+    private static readonly TimeZoneInfo s_plusThree = TimeZoneInfo.CreateCustomTimeZone(
+        "Slice3PlusThree",
+        TimeSpan.FromHours(3),
+        "Slice3PlusThree",
+        "Slice3PlusThree");
 
     [Fact]
     public void BuildEventCopyText_DateValueUsesCurrentCulture()
@@ -86,22 +92,6 @@ public sealed class DetailsReaderFormatterCultureTests
     }
 
     [Fact]
-    public void BuildFieldsCopyText_NumericFieldValues_StayInvariant_UnderForeignCulture()
-    {
-        // A double whose invariant rendering ("1.5") differs from fi-FI's ("1,5" decimal comma): today the field value
-        // routes through EventFieldValue.AsString (InvariantCulture), so both captures are byte-identical; if that ever
-        // regressed to CurrentCulture the fi-FI capture would diverge and fail this guard. A bare positive integer would
-        // format identically under both cultures and could not detect that regression.
-        ResolvedEvent @event = EventDataTestFactory.CreateEventWithData(("Ratio", 1.5), ("Account", "CONTOSO\\alice"));
-
-        string english = RunUnderCulture(s_english, () => DetailsReaderFormatter.BuildFieldsCopyText(Model(@event).EventData));
-        string contrast = RunUnderCulture(s_contrast, () => DetailsReaderFormatter.BuildFieldsCopyText(Model(@event).EventData));
-
-        Assert.Equal(english, contrast);
-        Assert.Contains("1.5", english, StringComparison.Ordinal); // the culture-varying value is actually present
-    }
-
-    [Fact]
     public void BuildPropertiesCopyText_EmitsEnglishHeaderLabels_UnderForeignCulture()
     {
         ResolvedEvent @event = new ResolvedEvent("TestLog", LogPathType.Channel) with
@@ -121,9 +111,100 @@ public sealed class DetailsReaderFormatterCultureTests
         }
     }
 
+    [Fact]
+    public void EventDataArray_DisplayItemsUseCurrentCultureAndCopyItemsStayInvariant()
+    {
+        ResolvedEvent @event = EventDataTestFactory.CreateEventWithData(("Ratios", new[] { 1.5, 2.25 }));
+
+        DetailsField field = RunUnderCulture(s_contrast, () => EventDataField(@event, "Ratios"));
+
+        Assert.Equal([1.5.ToString(s_contrast), 2.25.ToString(s_contrast)], field.PreviewLines);
+        Assert.Equal("1.5\n2.25", field.CopyValue);
+        Assert.Contains(s_contrast.NumberFormat.NumberDecimalSeparator, field.PreviewLines[0], StringComparison.Ordinal);
+        Assert.DoesNotContain(s_contrast.NumberFormat.NumberDecimalSeparator, field.CopyValue, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EventDataDateTimeArray_DisplayItemsUseCurrentCultureInTimeZoneAndCopyItemsStayInvariant()
+    {
+        var first = new DateTime(2026, 8, 26, 17, 57, 5, DateTimeKind.Utc);
+        var second = new DateTime(2026, 8, 26, 18, 2, 3, DateTimeKind.Utc);
+        ResolvedEvent @event = EventDataTestFactory.CreateEventWithData(("Times", new[] { first, second }));
+
+        DetailsField field = RunUnderCulture(s_contrast, () => EventDataField(@event, "Times", s_plusThree));
+
+        Assert.Equal(
+            [first.ConvertTimeZone(s_plusThree).ToString(s_contrast), second.ConvertTimeZone(s_plusThree).ToString(s_contrast)],
+            field.PreviewLines);
+        Assert.Equal(
+            string.Join('\n', first.ToString(CultureInfo.InvariantCulture), second.ToString(CultureInfo.InvariantCulture)),
+            field.CopyValue);
+    }
+
+    [Fact]
+    public void EventDataDateTime_DisplayUsesCurrentCultureInTimeZoneAndCopyUsesOriginalRoundTrip()
+    {
+        var timestamp = new DateTime(2026, 8, 26, 17, 57, 5, 123, DateTimeKind.Utc).AddTicks(4567);
+        ResolvedEvent @event = EventDataTestFactory.CreateEventWithData(("SeenAt", timestamp));
+
+        DetailsField field = RunUnderCulture(s_contrast, () => EventDataField(@event, "SeenAt", s_plusThree));
+        DateTime converted = timestamp.ConvertTimeZone(s_plusThree);
+
+        Assert.Equal(converted.ToString(s_contrast), field.PreviewLines[0]);
+        Assert.Equal(timestamp.ToString("O", CultureInfo.InvariantCulture), field.CopyValue);
+        Assert.Equal(
+            timestamp,
+            DateTime.ParseExact(field.CopyValue, "O", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind));
+    }
+
+    [Fact]
+    public void EventDataDouble_DisplayUsesCurrentCultureAndCopyStaysInvariant()
+    {
+        ResolvedEvent @event = EventDataTestFactory.CreateEventWithData(("Ratio", 1.5), ("Account", "CONTOSO\\alice"));
+
+        DetailsField field = RunUnderCulture(s_contrast, () => EventDataField(@event, "Ratio"));
+        string copy = RunUnderCulture(s_contrast, () => DetailsReaderFormatter.BuildFieldsCopyText(Model(@event).EventData));
+
+        Assert.Contains(s_contrast.NumberFormat.NumberDecimalSeparator, field.PreviewLines[0], StringComparison.Ordinal);
+        Assert.Equal(1.5.ToString(s_contrast), field.PreviewLines[0]);
+        Assert.Equal("1.5", field.CopyValue);
+        Assert.Contains("1.5", copy, StringComparison.Ordinal);
+        Assert.DoesNotContain(1.5.ToString(s_contrast), copy, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EventDataInt64_DisplayUsesCurrentCultureNegativeSignAndCopyStaysInvariant()
+    {
+        CultureInfo culture = CultureInfo.GetCultureInfo("fi-FI").Clone() as CultureInfo ?? throw new InvalidOperationException("Expected cloneable culture.");
+        culture.NumberFormat.NegativeSign = "[MINUS]";
+        ResolvedEvent @event = EventDataTestFactory.CreateEventWithData(("Counter", -1234567L));
+
+        DetailsField field = RunUnderCulture(culture, () => EventDataField(@event, "Counter"));
+
+        Assert.Contains(culture.NumberFormat.NegativeSign, field.PreviewLines[0], StringComparison.Ordinal);
+        Assert.Equal((-1234567L).ToString(culture), field.PreviewLines[0]);
+        Assert.Equal((-1234567L).ToString(CultureInfo.InvariantCulture), field.CopyValue);
+        Assert.Contains("-", field.CopyValue, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EventDataInt64_DisplayUsesCurrentCultureWithoutGrouping()
+    {
+        ResolvedEvent @event = EventDataTestFactory.CreateEventWithData(("Counter", 1234567L));
+
+        DetailsField field = RunUnderCulture(s_contrast, () => EventDataField(@event, "Counter"));
+
+        Assert.Equal(1234567L.ToString(s_contrast), field.PreviewLines[0]);
+        Assert.DoesNotContain(s_contrast.NumberFormat.NumberGroupSeparator, field.PreviewLines[0], StringComparison.Ordinal);
+        Assert.Equal(1234567L.ToString(CultureInfo.InvariantCulture), field.CopyValue);
+    }
+
+    private static DetailsField EventDataField(ResolvedEvent @event, string label, TimeZoneInfo? timeZone = null) =>
+        Assert.Single(DetailsReaderFormatter.BuildModel(@event, timeZone ?? TimeZoneInfo.Utc).EventData, field => string.Equals(field.Label, label, StringComparison.Ordinal));
+
     private static DetailsReaderModel Model(ResolvedEvent @event) => DetailsReaderFormatter.BuildModel(@event, TimeZoneInfo.Utc);
 
-    private static string RunUnderCulture(CultureInfo culture, Func<string> build)
+    private static T RunUnderCulture<T>(CultureInfo culture, Func<T> build)
     {
         CultureInfo priorCulture = CultureInfo.CurrentCulture;
         CultureInfo priorUiCulture = CultureInfo.CurrentUICulture;

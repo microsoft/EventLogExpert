@@ -281,10 +281,12 @@ public static class DetailsReaderFormatter
         return new RenderedValue(lines, lines, string.Empty, IsTruncated: false, IsMuted: true, Placeholder: kind);
     }
 
-    private static RenderedValue RenderArray(string[] items) =>
-        items.Length == 0 ?
+    private static RenderedValue RenderArray(string[] items) => RenderArray(items, items);
+
+    private static RenderedValue RenderArray(string[] displayItems, string[] copyItems) =>
+        displayItems.Length == 0 ?
             Placeholder(PlaceholderKind.NoValues, EmptyArrayPlaceholder) :
-            new RenderedValue(items, items, string.Join('\n', items), IsTruncated: false, IsMuted: false);
+            new RenderedValue(displayItems, displayItems, string.Join('\n', copyItems), IsTruncated: false, IsMuted: false);
 
     private static RenderedValue RenderBytes(byte[] bytes)
     {
@@ -308,44 +310,63 @@ public static class DetailsReaderFormatter
         return new RenderedValue(lines, lines, copyValue, IsTruncated: false, IsMuted: false, IsMonospace: true);
     }
 
-    private static RenderedValue RenderScalarText(string text)
-    {
-        if (text.Length == 0) { return Placeholder(PlaceholderKind.Empty, EmptyStringPlaceholder); }
+    private static RenderedValue RenderScalarText(string text) => RenderScalarText(text, text);
 
-        if (text.Length > LongTextPreviewLength)
+    private static RenderedValue RenderScalarText(string displayText, string copyText)
+    {
+        if (displayText.Length == 0) { return Placeholder(PlaceholderKind.Empty, EmptyStringPlaceholder); }
+
+        if (displayText.Length > LongTextPreviewLength)
         {
-            return new RenderedValue([$"{text[..LongTextPreviewLength]}..."],
-                [text],
-                text,
+            return new RenderedValue([$"{displayText[..LongTextPreviewLength]}..."],
+                [displayText],
+                copyText,
                 IsTruncated: true,
                 IsMuted: false);
         }
 
-        string[] lines = [text];
+        string[] lines = [displayText];
 
-        return new RenderedValue(lines, lines, text, IsTruncated: false, IsMuted: false);
+        return new RenderedValue(lines, lines, copyText, IsTruncated: false, IsMuted: false);
     }
 
     private static RenderedValue RenderValue(in EventFieldValue value, TimeZoneInfo timeZone)
     {
         if (value.TryGetStringArray(out string[]? strings)) { return RenderArray(strings); }
 
-        if (value.TryGetArray(out Array? array)) { return RenderArray(ToStringItems(array)); }
+        if (value.TryGetArray(out Array? array)) { return RenderArray(ToDisplayStringItems(array, timeZone), ToStringItems(array)); }
 
         if (value.TryGetBytes(out byte[]? bytes)) { return RenderBytes(bytes); }
 
         if (value.TryGetDateTime(out DateTime timestamp))
         {
-            return RenderScalarText(timestamp.ConvertTimeZone(timeZone).ToString(CultureInfo.CurrentCulture));
+            return RenderScalarText(
+                timestamp.ConvertTimeZone(timeZone).ToString(CultureInfo.CurrentCulture),
+                value.AsString());
         }
 
         if (value.Kind == EventFieldValueKind.Null) { return Placeholder(PlaceholderKind.NullValue, NullValuePlaceholder); }
 
-        RenderedValue scalar = RenderScalarText(value.AsString());
+        RenderedValue scalar = RenderScalarText(value.AsString(CultureInfo.CurrentCulture), value.AsString());
 
         // GUIDs and SIDs scan better fixed-width; general strings and numbers keep the app's sans-serif.
         return value.Kind is EventFieldValueKind.Guid or EventFieldValueKind.Sid ?
             scalar with { IsMonospace = true } : scalar;
+    }
+
+    private static string[] ToDisplayStringItems(Array array, TimeZoneInfo timeZone)
+    {
+        string[] items = new string[array.Length];
+
+        for (int i = 0; i < array.Length; i++)
+        {
+            object? item = array.GetValue(i);
+            items[i] = item is DateTime dateTime ?
+                dateTime.ConvertTimeZone(timeZone).ToString(CultureInfo.CurrentCulture) :
+                Convert.ToString(item, CultureInfo.CurrentCulture) ?? string.Empty;
+        }
+
+        return items;
     }
 
     private static DetailsField ToField(string label, RenderedValue rendered, EventFieldExplanation explanation) =>
