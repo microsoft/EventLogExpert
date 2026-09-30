@@ -289,14 +289,12 @@ public sealed class BannerLocalizationTests : BunitContext
         {
             Assert.Equal("Exporting events...", localizer["Banner_Export_Progress"].Value);
             Assert.Equal("Database upgrade recovery", localizer["Banner_Recovery_Needed_Title"].Value);
-            // Count-driven inflection (database/databases, needs/need) without freezing the sentence; the raw count is
-            // ungrouped even past a thousand.
+            // Count-driven inflection (database/databases, needs/need) without freezing the sentence.
             string recoveryOne = PluralText.Format(localizer, "Banner_Recovery_Needed", ("count", 1));
             string recoveryMany = PluralText.Format(localizer, "Banner_Recovery_Needed", ("count", 1000));
             Assert.NotEqual(NormalizeNumbers(recoveryOne), NormalizeNumbers(recoveryMany));
             Assert.Matches(@"(?<![\d,])1(?![\d,])", recoveryOne);
-            Assert.Contains("1000", recoveryMany, StringComparison.Ordinal);
-            Assert.DoesNotContain("1,000", recoveryMany, StringComparison.Ordinal);
+            Assert.Contains(1000.ToString("N0", CultureInfo.GetCultureInfo("en-US")), recoveryMany, StringComparison.Ordinal);
             Assert.Equal("Resolve", localizer["Banner_Recovery_Resolve"].Value);
             Assert.Equal("Database recovery failed", localizer["Banner_Recovery_Failed_Title"].Value);
             Assert.Equal("Failed to restore 'x' from backup.", localizer["Banner_Recovery_Failed_Restore", "x"].Value);
