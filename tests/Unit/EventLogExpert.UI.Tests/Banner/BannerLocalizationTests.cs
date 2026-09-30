@@ -21,6 +21,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace EventLogExpert.UI.Tests.Banner;
 
@@ -280,7 +281,7 @@ public sealed class BannerLocalizationTests : BunitContext
     }
 
     [Fact]
-    public void NeutralExportProgressAndRecoveryKeys_KeepByteIdenticalEnglish()
+    public void NeutralExportProgressAndRecoveryKeys_HaveExpectedEnglishAndRecoveryInflects()
     {
         IStringLocalizer<SharedResource> localizer = BuildLocalizer();
 
@@ -288,12 +289,14 @@ public sealed class BannerLocalizationTests : BunitContext
         {
             Assert.Equal("Exporting events...", localizer["Banner_Export_Progress"].Value);
             Assert.Equal("Database upgrade recovery", localizer["Banner_Recovery_Needed_Title"].Value);
-            Assert.Equal(
-                "1 database needs recovery from interrupted upgrade.",
-                PluralText.Format(localizer, "Banner_Recovery_Needed", ("count", 1)));
-            Assert.Equal(
-                "3 databases need recovery from interrupted upgrade.",
-                PluralText.Format(localizer, "Banner_Recovery_Needed", ("count", 3)));
+            // Count-driven inflection (database/databases, needs/need) without freezing the sentence; the raw count is
+            // ungrouped even past a thousand.
+            string recoveryOne = PluralText.Format(localizer, "Banner_Recovery_Needed", ("count", 1));
+            string recoveryMany = PluralText.Format(localizer, "Banner_Recovery_Needed", ("count", 1000));
+            Assert.NotEqual(NormalizeNumbers(recoveryOne), NormalizeNumbers(recoveryMany));
+            Assert.Matches(@"(?<![\d,])1(?![\d,])", recoveryOne);
+            Assert.Contains("1000", recoveryMany, StringComparison.Ordinal);
+            Assert.DoesNotContain("1,000", recoveryMany, StringComparison.Ordinal);
             Assert.Equal("Resolve", localizer["Banner_Recovery_Resolve"].Value);
             Assert.Equal("Database recovery failed", localizer["Banner_Recovery_Failed_Title"].Value);
             Assert.Equal("Failed to restore 'x' from backup.", localizer["Banner_Recovery_Failed_Restore", "x"].Value);
@@ -401,6 +404,9 @@ public sealed class BannerLocalizationTests : BunitContext
         preformatted.Title == title &&
         preformatted.Message == text &&
         preformatted.ActionLabel == actionLabel;
+
+    private static string NormalizeNumbers(string value) =>
+        Regex.Replace(value, @"\d+(?:,\d{3})*(?:\.\d+)?", "#");
 
     private static void WithEnUsCulture(Action assertion)
     {

@@ -6,6 +6,7 @@ using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.CreateDatabase;
 using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Eventing.TestUtils.Constants;
+using EventLogExpert.Localization;
 using EventLogExpert.Provider.Database.Context;
 using EventLogExpert.Provider.Database.Hashing;
 using Microsoft.Data.Sqlite;
@@ -337,7 +338,25 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         // singular branch and renders formatted text (not the raw ICU pattern).
         var skipped = Assert.Single(logger.Entries, entry => entry.Key == "DatabaseTools_Op_CreateSkippedProviders");
         Assert.Equal(1L, skipped.PluralCount);
-        Assert.Equal($"Found 1 provider in {skipSource}. It will not be included in the new database.", skipped.Message);
+
+        // Copy-robust: the emitted message equals a fresh neutral render of this key at the emitted count and source
+        // argument (both move together if the wording changes), carries the source path, and renders formatted text
+        // (no raw ICU pattern). The one/other branches must also genuinely differ, so a regression that collapses the
+        // singular/plural correction to identical branches is caught.
+        var neutral = new SharedResourceNeutralResolver();
+        static string Normalize(string value) => Regex.Replace(value, @"\d+(?:,\d{3})*(?:\.\d+)?", "#");
+
+        Assert.Equal(neutral.Resolve("DatabaseTools_Op_CreateSkippedProviders", [skipSource], 1L), skipped.Message);
+        Assert.Contains(skipSource, skipped.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("{count", skipped.Message, StringComparison.Ordinal);
+        Assert.NotEqual(
+            Normalize(neutral.Resolve("DatabaseTools_Op_CreateSkippedProviders", [skipSource], 1L)),
+            Normalize(neutral.Resolve("DatabaseTools_Op_CreateSkippedProviders", [skipSource], 2L)));
+
+        // The count must render as a standalone token in BOTH branches - "1" in the singular and a distinctive value in
+        // the plural - so a {count} dropped from EITHER branch is caught (the noun inflection alone cannot mask it).
+        Assert.Matches(@"(?<![\d,])1(?![\d,])", neutral.Resolve("DatabaseTools_Op_CreateSkippedProviders", ["src"], 1L));
+        Assert.Contains("987654", neutral.Resolve("DatabaseTools_Op_CreateSkippedProviders", ["src"], 987654L), StringComparison.Ordinal);
     }
 
     [Fact]

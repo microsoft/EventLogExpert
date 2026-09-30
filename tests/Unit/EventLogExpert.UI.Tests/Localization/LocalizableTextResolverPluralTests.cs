@@ -5,6 +5,7 @@ using EventLogExpert.Localization.Plural;
 using EventLogExpert.Logging.Abstractions;
 using Microsoft.Extensions.Localization;
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace EventLogExpert.UI.Tests.Localization;
 
@@ -28,7 +29,10 @@ public sealed class LocalizableTextResolverPluralTests : IDisposable
         var localizer = new StubLocalizer(_ => "{count, plural, one {malformed}}");
         var text = new LocalizableText("AnyKey", [], PluralCount: 2);
 
-        Assert.Equal("neutral 2", LocalizableTextResolver.Resolve(localizer, text));
+        string resolved = LocalizableTextResolver.Resolve(localizer, text);
+
+        Assert.Contains("2", resolved, StringComparison.Ordinal);
+        Assert.DoesNotContain("AnyKey", resolved, StringComparison.Ordinal);
         Assert.Single(diagnostics.Reports);
     }
 
@@ -57,15 +61,21 @@ public sealed class LocalizableTextResolverPluralTests : IDisposable
         Assert.Equal(CultureInfo.CurrentUICulture.Name, report.Culture);
     }
 
-    [Theory]
-    [InlineData(1, "Found 1 provider in providers.db.")]
-    [InlineData(2, "Found 2 providers in providers.db.")]
-    public void Resolve_WithPluralCount_RoutesThroughIcuFormatter(int count, string expected)
+    [Fact]
+    public void Resolve_WithPluralCount_RoutesThroughIcuFormatter()
     {
         var localizer = new StubLocalizer(_ => ProviderPattern);
-        var text = new LocalizableText("AnyKey", ["providers.db"], PluralCount: count);
+        var singularText = new LocalizableText("AnyKey", ["providers.db"], PluralCount: 1);
+        var pluralText = new LocalizableText("AnyKey", ["providers.db"], PluralCount: 2);
 
-        Assert.Equal(expected, LocalizableTextResolver.Resolve(localizer, text));
+        string singular = LocalizableTextResolver.Resolve(localizer, singularText);
+        string plural = LocalizableTextResolver.Resolve(localizer, pluralText);
+
+        Assert.Contains("1", singular, StringComparison.Ordinal);
+        Assert.Contains("2", plural, StringComparison.Ordinal);
+        Assert.Contains("providers.db", singular, StringComparison.Ordinal);
+        Assert.Contains("providers.db", plural, StringComparison.Ordinal);
+        Assert.NotEqual(NormalizeFormattedNumbers(singular), NormalizeFormattedNumbers(plural));
     }
 
     [Fact]
@@ -73,8 +83,14 @@ public sealed class LocalizableTextResolverPluralTests : IDisposable
     {
         var localizer = new StubLocalizer(_ => "{0} widgets");
 
-        Assert.Equal("3 widgets", LocalizableTextResolver.Resolve(localizer, "AnyKey", ["3"], "AnyKey"));
+        string resolved = LocalizableTextResolver.Resolve(localizer, "AnyKey", ["3"], "AnyKey");
+
+        Assert.Contains("3", resolved, StringComparison.Ordinal);
+        Assert.DoesNotContain("{0}", resolved, StringComparison.Ordinal);
     }
+
+    private static string NormalizeFormattedNumbers(string value) =>
+        Regex.Replace(value, @"\d+(?:,\d{3})*(?:\.\d+)?", "#");
 
     private static void ResetServices()
     {

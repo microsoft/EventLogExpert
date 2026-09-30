@@ -6,8 +6,10 @@ using EventLogExpert.DatabaseTools.Common.Operations;
 using EventLogExpert.DatabaseTools.MergeDatabase;
 using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Eventing.TestUtils.Constants;
+using EventLogExpert.Localization;
 using EventLogExpert.Provider.Database.Context;
 using Microsoft.Extensions.Logging;
+using System.Text.RegularExpressions;
 
 namespace EventLogExpert.DatabaseTools.IntegrationTests.Operations;
 
@@ -102,7 +104,23 @@ public sealed class MergeDatabaseCommandTests : IDisposable
         // singular branch and renders the §3I-corrected "version" (not "version(s)"), not the raw ICU pattern.
         var copied = Assert.Single(logger.Entries, entry => entry.Key == "DatabaseTools_Op_MergeCopiedVersions");
         Assert.Equal(1L, copied.PluralCount);
-        Assert.Equal("Copied 1 provider version.", copied.Message);
+
+        // Copy-robust: the emitted message equals a fresh neutral render of this key at the emitted count and renders
+        // formatted text (no raw ICU pattern). The one/other branches must also genuinely differ, so a regression that
+        // reverts the §3I "version"/"versions" correction to identical branches is caught.
+        var neutral = new SharedResourceNeutralResolver();
+        static string Normalize(string value) => Regex.Replace(value, @"\d+(?:,\d{3})*(?:\.\d+)?", "#");
+
+        Assert.Equal(neutral.Resolve("DatabaseTools_Op_MergeCopiedVersions", [], 1L), copied.Message);
+        Assert.DoesNotContain("{count", copied.Message, StringComparison.Ordinal);
+        Assert.NotEqual(
+            Normalize(neutral.Resolve("DatabaseTools_Op_MergeCopiedVersions", [], 1L)),
+            Normalize(neutral.Resolve("DatabaseTools_Op_MergeCopiedVersions", [], 2L)));
+
+        // The count must render as a standalone token in BOTH branches - "1" in the singular and a distinctive value in
+        // the plural - so a {count} dropped from EITHER branch is caught (the noun inflection alone cannot mask it).
+        Assert.Matches(@"(?<![\d,])1(?![\d,])", neutral.Resolve("DatabaseTools_Op_MergeCopiedVersions", [], 1L));
+        Assert.Contains("987654", neutral.Resolve("DatabaseTools_Op_MergeCopiedVersions", [], 987654L), StringComparison.Ordinal);
     }
 
     [Fact]
