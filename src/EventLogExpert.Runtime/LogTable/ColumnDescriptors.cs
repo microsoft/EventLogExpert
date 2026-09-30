@@ -35,7 +35,7 @@ public static class ColumnDescriptors
         var accessors = new ColumnDescriptor[Enum.GetValues<ColumnName>().Length];
 
         accessors[(int)ColumnName.RecordId] =
-            new(EventFieldId.RecordId, null, static (e, _) => e.RecordId?.ToString() ?? string.Empty);
+            new(EventFieldId.RecordId, null, static (e, _) => e.RecordId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty);
         accessors[(int)ColumnName.Level] =
             new(EventFieldId.Level, EventProperty.Level, static (e, _) => e.Level);
         accessors[(int)ColumnName.DateAndTime] =
@@ -50,15 +50,15 @@ public static class ColumnDescriptors
         accessors[(int)ColumnName.Source] =
             new(EventFieldId.Source, EventProperty.Source, static (e, _) => e.Source);
         accessors[(int)ColumnName.EventId] =
-            new(EventFieldId.Id, EventProperty.Id, static (e, _) => e.Id.ToString());
+            new(EventFieldId.Id, EventProperty.Id, static (e, _) => e.Id.ToString(CultureInfo.InvariantCulture));
         accessors[(int)ColumnName.TaskCategory] =
             new(EventFieldId.TaskCategory, EventProperty.TaskCategory, static (e, _) => e.TaskCategory);
         accessors[(int)ColumnName.Keywords] =
             new(EventFieldId.KeywordsDisplay, EventProperty.Keywords, static (e, _) => e.KeywordsDisplayName);
         accessors[(int)ColumnName.ProcessId] =
-            new(EventFieldId.ProcessId, EventProperty.ProcessId, static (e, _) => e.ProcessId?.ToString() ?? string.Empty);
+            new(EventFieldId.ProcessId, EventProperty.ProcessId, static (e, _) => e.ProcessId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty);
         accessors[(int)ColumnName.ThreadId] =
-            new(EventFieldId.ThreadId, EventProperty.ThreadId, static (e, _) => e.ThreadId?.ToString() ?? string.Empty);
+            new(EventFieldId.ThreadId, EventProperty.ThreadId, static (e, _) => e.ThreadId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty);
         accessors[(int)ColumnName.User] =
             new(EventFieldId.UserDisplayName, EventProperty.UserDisplayName, static (e, _) => e.UserDisplayName);
         accessors[(int)ColumnName.Opcode] =

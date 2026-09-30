@@ -155,7 +155,7 @@ internal static class StatusBarTextComposer
     }
 
     internal static string NewEventsLabel(IStringLocalizer<SharedResource> localizer, int newEventCount) =>
-        localizer["StatusBar_NewEvents_Label", FormatRaw(newEventCount)];
+        localizer["StatusBar_NewEvents_Label", FormatCount(newEventCount)];
 
     internal static string Source(
         IStringLocalizer<SharedResource> localizer,
@@ -179,7 +179,7 @@ internal static class StatusBarTextComposer
                 if (!table.IsCombined) { openLogs++; }
             }
 
-            return localizer["StatusBar_Source_AllLogs", FormatRaw(openLogs)];
+            return localizer["StatusBar_Source_AllLogs", FormatCount(openLogs)];
         }
 
         LogTabGroup? group = groups.FirstOrDefault(candidate => candidate.Id == groupId);
@@ -201,17 +201,19 @@ internal static class StatusBarTextComposer
 
         return bytes switch
         {
-            >= OneGibibyte => $"{bytes / (double)OneGibibyte:0.0} GB",
-            >= OneMebibyte => $"{bytes / (double)OneMebibyte:0} MB",
-            >= OneKibibyte => $"{bytes / (double)OneKibibyte:0} KB",
-            _ => $"{bytes} B"
+            >= OneGibibyte => string.Create(CultureInfo.CurrentCulture, $"{bytes / (double)OneGibibyte:N1} GB"),
+            >= OneMebibyte => string.Create(CultureInfo.CurrentCulture, $"{bytes / (double)OneMebibyte:N0} MB"),
+            >= OneKibibyte => string.Create(CultureInfo.CurrentCulture, $"{bytes / (double)OneKibibyte:N0} KB"),
+            _ => string.Create(CultureInfo.CurrentCulture, $"{bytes:N0} B")
         };
     }
 
     private static string FormatCount(int value) => value.ToString("N0", CultureInfo.CurrentCulture);
 
     private static string FormatMebibytes(long mebibytes) =>
-        mebibytes >= 1024 ? $"{mebibytes / 1024.0:0.0} GB" : $"{mebibytes:N0} MB";
+        mebibytes >= 1024 ?
+            string.Create(CultureInfo.CurrentCulture, $"{mebibytes / 1024.0:N1} GB") :
+            string.Create(CultureInfo.CurrentCulture, $"{mebibytes:N0} MB");
 
     private static string FormatRaw(int value) => value.ToString(CultureInfo.CurrentCulture);
 

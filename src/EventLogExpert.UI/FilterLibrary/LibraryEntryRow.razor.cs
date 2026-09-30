@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
+using System.Globalization;
 
 namespace EventLogExpert.UI.FilterLibrary;
 
@@ -240,7 +241,7 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
 
         return diff.TotalDays < 7 ?
             Localizer["FilterLibrary_Entry_RelativeTime_Days", (int)diff.TotalDays] :
-            lastUsed.ToLocalTime().ToString("yyyy-MM-dd");
+            lastUsed.ToLocalTime().ToString("d", CultureInfo.CurrentCulture);
     }
 
     private bool HasDuplicateNameOfSameKind(string candidateName)

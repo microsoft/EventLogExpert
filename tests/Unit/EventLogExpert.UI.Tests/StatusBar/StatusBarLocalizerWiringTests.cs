@@ -20,6 +20,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
+using System.Globalization;
 
 namespace EventLogExpert.UI.Tests.StatusBar;
 
@@ -102,7 +103,7 @@ public sealed class StatusBarLocalizerWiringTests : BunitContext
 
         var newEventsButton = cut.Find("button.status-bar-newevents");
         Assert.Equal("[[StatusBar_NewEvents_Load]]", newEventsButton.GetAttribute("data-tooltip"));
-        Assert.Equal("[[StatusBar_NewEvents_Label(1000)]]", newEventsButton.TextContent.Trim());
+        Assert.Equal($"[[StatusBar_NewEvents_Label({1000.ToString("N0", CultureInfo.CurrentCulture)})]]", newEventsButton.TextContent.Trim());
     }
 
     [Theory]

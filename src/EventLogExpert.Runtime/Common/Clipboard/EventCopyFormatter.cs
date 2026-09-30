@@ -7,6 +7,7 @@ using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.LogTable;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
@@ -137,7 +138,7 @@ internal sealed class EventCopyFormatter(
                 builder.Append($"\"{@event.Level}\" ");
                 builder.Append($"\"{@event.TimeCreated.ConvertTimeZone(request.TimeZone)}\" ");
                 builder.Append($"\"{@event.Source}\" ");
-                builder.Append($"\"{@event.Id}\" ");
+                builder.Append(string.Create(CultureInfo.InvariantCulture, $"\"{@event.Id}\" "));
                 builder.Append($"\"{@event.Description}\"");
                 break;
             case EventCopyFormat.Xml:
@@ -149,7 +150,7 @@ internal sealed class EventCopyFormatter(
                 builder.AppendLine(_copyText.FieldLine(EventCopyFullField.LogName, @event.LogName));
                 builder.AppendLine(_copyText.FieldLine(EventCopyFullField.Source, @event.Source));
                 builder.AppendLine(_copyText.FieldLine(EventCopyFullField.Date, @event.TimeCreated.ConvertTimeZone(request.TimeZone).ToString()));
-                builder.AppendLine(_copyText.FieldLine(EventCopyFullField.EventId, @event.Id.ToString()));
+                builder.AppendLine(_copyText.FieldLine(EventCopyFullField.EventId, @event.Id.ToString(CultureInfo.InvariantCulture)));
                 builder.AppendLine(_copyText.FieldLine(EventCopyFullField.TaskCategory, @event.TaskCategory));
                 builder.AppendLine(_copyText.FieldLine(EventCopyFullField.Level, @event.Level));
                 builder.AppendLine(_copyText.FieldLine(EventCopyFullField.Keywords, @event.KeywordsDisplayName));

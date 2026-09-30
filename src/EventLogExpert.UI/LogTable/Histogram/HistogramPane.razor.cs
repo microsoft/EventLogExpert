@@ -467,9 +467,9 @@ public sealed partial class HistogramPane
                 render.WindowStartTicks,
                 render.WindowEndTicks);
             var display = ToDisplay(new DateTime(ticks, DateTimeKind.Utc));
-            string text = crossesDay
-                ? $"{display:d} {display:HH:mm}"
-                : $"{display:HH:mm:ss}";
+            string text = crossesDay ?
+                string.Create(CultureInfo.InvariantCulture, $"{display:yyyy-MM-dd HH\\:mm}") :
+                string.Create(CultureInfo.InvariantCulture, $"{display:HH\\:mm\\:ss}");
             string anchor = index == 0 ? "start" : index == count - 1 ? "end" : "middle";
 
             labels.Add(new AxisLabel(x, text, anchor));

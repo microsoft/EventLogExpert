@@ -4,6 +4,7 @@
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Histogram;
 using Microsoft.Extensions.Localization;
+using System.Globalization;
 
 namespace EventLogExpert.UI.Common;
 
@@ -18,8 +19,13 @@ internal static class HistogramTextComposer
         bool windowCrossesDay,
         IReadOnlyList<HistogramBreakdownItem> breakdownItems)
     {
-        string startText = windowCrossesDay ? $"{start:d} {start:HH:mm:ss}" : $"{start:HH:mm:ss}";
-        string endText = windowCrossesDay ? $"{end:d} {end:HH:mm:ss}" : $"{end:HH:mm:ss}";
+        // Timeline labels use fixed Gregorian text for stable axis alignment.
+        string startText = windowCrossesDay ?
+            string.Create(CultureInfo.InvariantCulture, $"{start:yyyy-MM-dd HH\\:mm\\:ss}") :
+            string.Create(CultureInfo.InvariantCulture, $"{start:HH\\:mm\\:ss}");
+        string endText = windowCrossesDay ?
+            string.Create(CultureInfo.InvariantCulture, $"{end:yyyy-MM-dd HH\\:mm\\:ss}") :
+            string.Create(CultureInfo.InvariantCulture, $"{end:HH\\:mm\\:ss}");
         string noun = EventNoun(localizer, eventNoun, total);
         string breakdown = GroupBreakdown(localizer, breakdownItems);
 
