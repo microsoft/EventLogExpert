@@ -3,6 +3,7 @@
 
 using EventLogExpert.DatabaseTools.DependencyInjection;
 using EventLogExpert.EventDbTool.Commands;
+using EventLogExpert.Localization.Plural;
 using EventLogExpert.Logging;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Loggers;
@@ -17,8 +18,9 @@ namespace EventLogExpert.EventDbTool;
 
 internal class Program
 {
-    internal static ServiceProvider BuildServiceProvider(bool verbose) =>
-        new ServiceCollection()
+    internal static ServiceProvider BuildServiceProvider(bool verbose)
+    {
+        var serviceProvider = new ServiceCollection()
             .AddSingleton(new ConsoleSink(verbose ? LogLevel.Trace : LogLevel.Information))
             .AddEventLogLocalization()
             .AddSingleton<ITraceLogger>(static sp =>
@@ -32,6 +34,11 @@ internal class Program
                     verbose ? LogLevel.Trace : LogLevel.Information))
             .AddDatabaseToolsServices()
             .BuildServiceProvider();
+
+        PluralServicesComposition.ConfigureFromLogger(serviceProvider.GetRequiredService<ITraceLogger>());
+
+        return serviceProvider;
+    }
 
     private static bool IsElevated()
     {

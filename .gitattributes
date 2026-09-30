@@ -1,0 +1,5 @@
+# The CLDR plural-rule data is byte-checksummed by
+# CldrPluralRulesTests.EmbeddedResource_MatchesRecordedCldrChecksum; pin it to LF so the embedded bytes (and the
+# recorded SHA-256) are identical on every platform, including CI runners whose default core.autocrlf=true would
+# otherwise inject CRLF at checkout and break the checksum.
+src/EventLogExpert.Localization/Plural/cldr-plurals-cardinal.json text eol=lf
