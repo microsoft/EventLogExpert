@@ -146,9 +146,10 @@
             <tbody @oncontextmenu="InvokeContextMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
             @if (Presentation.ActiveTabId is not null)
             {
+                @* SpacerElement="tr" keeps Blazor Virtualize's off-screen spacers as valid <tbody> children; the default <div> spacer is an invalid tbody child and corrupts the grouped grid's scroll geometry in WebView2. *@
                 @if (_rowView is null)
                 {
-                    <Virtualize Context="row" ItemSize="@EventRowHeightPixels" ItemsProvider="LoadEventViewport" @ref="_eventVirtualize">
+                    <Virtualize Context="row" ItemSize="@EventRowHeightPixels" ItemsProvider="LoadEventViewport" SpacerElement="tr" @ref="_eventVirtualize">
                         @RenderEventRow(row)
                     </Virtualize>
                 }
@@ -156,7 +157,7 @@
                 {
                     var view = _rowView;
 
-                    <Virtualize Context="row" ItemSize="@EventRowHeightPixels" Items="view">
+                    <Virtualize Context="row" ItemSize="@EventRowHeightPixels" Items="view" SpacerElement="tr">
                         @if (row.Kind == TableRowKind.Header)
                         {
                             var group = view.GroupAt(row);
