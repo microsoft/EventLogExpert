@@ -134,6 +134,20 @@ public sealed class LogTablePaneGroupingTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public async Task GroupedVirtualize_UsesTrSpacerElement_SoSpacersAreValidTbodyChildren()
+    {
+        _logTableState.Value.Returns(BuildState(ColumnName.Source, Collapsed(), Event(1, "Alpha")));
+
+        var cut = Render<LogTablePane>();
+        await cut.InvokeAsync(() => Services.GetRequiredService<IStore>().InitializeAsync());
+        await cut.InvokeAsync(() =>
+            Services.GetRequiredService<IDispatcher>().Dispatch(new SetActiveTableAction(EventLogId.Create())));
+
+        cut.WaitForAssertion(() =>
+            Assert.Equal("tr", cut.FindComponent<Virtualize<TableRow>>().Instance.SpacerElement));
+    }
+
+    [Fact]
     public void Grouped_AllCollapsed_ArrowDown_MovesFocusBetweenHeadersWithoutSelecting()
     {
         var cut = RenderGrouped(Collapsed("Alpha", "Beta"), Event(1, "Alpha"), Event(2, "Beta"));
@@ -712,6 +726,20 @@ public sealed class LogTablePaneGroupingTests : CultureSensitiveBunitContext
 
         cut.WaitForAssertion(() =>
             Assert.Equal(22f, cut.FindComponent<Virtualize<DisplayRow>>().Instance.ItemSize));
+    }
+
+    [Fact]
+    public async Task UngroupedVirtualize_UsesTrSpacerElement_SoSpacersAreValidTbodyChildren()
+    {
+        _logTableState.Value.Returns(BuildState(groupBy: null, Collapsed(), Event(1, "Alpha")));
+
+        var cut = Render<LogTablePane>();
+        await cut.InvokeAsync(() => Services.GetRequiredService<IStore>().InitializeAsync());
+        await cut.InvokeAsync(() =>
+            Services.GetRequiredService<IDispatcher>().Dispatch(new SetActiveTableAction(EventLogId.Create())));
+
+        cut.WaitForAssertion(() =>
+            Assert.Equal("tr", cut.FindComponent<Virtualize<DisplayRow>>().Instance.SpacerElement));
     }
 
     [Fact]
