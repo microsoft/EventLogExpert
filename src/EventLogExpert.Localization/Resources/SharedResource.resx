@@ -2905,7 +2905,7 @@
   <data name="Histogram_BinCursor" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3}.</value></data>
   <data name="Histogram_BinCursor_Spike" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3}, spike.</value></data>
   <data name="Histogram_BinCursor_Breakdown" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3} ({4}).</value></data>
-  <data name="Histogram_BinCursor_Spike_Breakdown" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3} ({4}), spike.</value></data>  <!-- Filter pane localization. Counts remain raw and ungrouped for byte-identical en-US output. -->
+  <data name="Histogram_BinCursor_Spike_Breakdown" xml:space="preserve"><value>{0:g} to {1:g}: {2} {3} ({4}), spike.</value></data>  <!-- Filter pane localization. Plural count quantities group per culture (:N0); intentionally raw composite readouts like [Active Filters: {0}] keep their count ungrouped by design. -->
   <data name="FilterPane_AddBasicTitle" xml:space="preserve">
     <value>Add Basic filter</value>
   </data>
