@@ -80,6 +80,7 @@ public sealed class LocalizationInfraTests
         "replaced",
         "skipped",
         "ambiguous",
+        "batchCount",
         "eligible",
         "updatedTags",
         "cancelled",
@@ -1053,6 +1054,15 @@ public sealed class LocalizationInfraTests
     }
 
     [Fact]
+    public void PluralGuard_AllowsKnownPluralSelector()
+    {
+        string pattern = "{count, plural, one {{count:N0} x} other {{count:N0} y}}";
+        IReadOnlyList<string> offenders = PluralQuantityPlaceholderOffenders([new KeyValuePair<string, string>("Synthetic_KnownSelector", pattern)]);
+
+        Assert.Empty(offenders);
+    }
+
+    [Fact]
     public void PluralGuard_DetectsCompactPluralBareQuantityOffender()
     {
         string pattern = "{count,plural,one {{count:N0} x} other {{count} y}}";
@@ -1061,6 +1071,28 @@ public sealed class LocalizationInfraTests
         string offender = Assert.Single(offenders);
         Assert.Contains("Synthetic_Compact", offender, StringComparison.Ordinal);
         Assert.Contains("quantity {count} must use :N0", offender, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PluralGuard_DetectsNestedUnknownPluralSelector()
+    {
+        string pattern = "{count, plural, one {{count:N0} x} other {{inner, plural, one {nested} other {nested}}}}";
+        IReadOnlyList<string> offenders = PluralQuantityPlaceholderOffenders([new KeyValuePair<string, string>("Synthetic_NestedUnknownSelector", pattern)]);
+
+        string offender = Assert.Single(offenders);
+        Assert.Contains("Synthetic_NestedUnknownSelector", offender, StringComparison.Ordinal);
+        Assert.Contains("'inner'", offender, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PluralGuard_DetectsUnknownPluralSelector()
+    {
+        string pattern = "{mystery, plural, one {x} other {y}}";
+        IReadOnlyList<string> offenders = PluralQuantityPlaceholderOffenders([new KeyValuePair<string, string>("Synthetic_UnknownSelector", pattern)]);
+
+        string offender = Assert.Single(offenders);
+        Assert.Contains("Synthetic_UnknownSelector", offender, StringComparison.Ordinal);
+        Assert.Contains("'mystery'", offender, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1494,6 +1526,16 @@ public sealed class LocalizationInfraTests
         return calls;
     }
 
+    private static IReadOnlyList<string> ExtractPluralSelectors(string pattern)
+    {
+        var placeholders = new List<RenderedPlaceholder>();
+        var selectors = new List<string>();
+
+        ParseRenderedPlaceholders(pattern, 0, pattern.Length, placeholders, selectors);
+
+        return selectors;
+    }
+
     private static IReadOnlyList<RenderedPlaceholder> ExtractRenderedPlaceholders(string pattern)
     {
         var placeholders = new List<RenderedPlaceholder>();
@@ -1601,7 +1643,8 @@ public sealed class LocalizationInfraTests
         string text,
         int openBrace,
         int end,
-        List<RenderedPlaceholder> placeholders)
+        List<RenderedPlaceholder> placeholders,
+        List<string> pluralSelectors)
     {
         int position = openBrace + 1;
         SkipWhiteSpace(text, ref position, end);
@@ -1640,13 +1683,17 @@ public sealed class LocalizationInfraTests
         string kind = ParsePlaceholderName(text, ref position, end);
         SkipWhiteSpace(text, ref position, end);
 
+        // Non-plural named ICU blocks (e.g. {x, select, ...}) are skipped wholesale, so rendered placeholders
+        // and plural selectors nested inside them are intentionally not surfaced. The resx has no such blocks
+        // today; revisit this recursion if select/selectordinal patterns are introduced.
         if (!string.Equals(kind, "plural", StringComparison.Ordinal) || position >= end || text[position] != ',')
         {
             return SkipBalancedBlock(text, openBrace, end);
         }
 
         position++;
-        return ParsePluralBranches(text, position, end, placeholders);
+        pluralSelectors.Add(name);
+        return ParsePluralBranches(text, position, end, placeholders, pluralSelectors);
     }
 
     private static string ParsePlaceholderName(string text, ref int position, int end)
@@ -1665,7 +1712,8 @@ public sealed class LocalizationInfraTests
         string text,
         int start,
         int end,
-        List<RenderedPlaceholder> placeholders)
+        List<RenderedPlaceholder> placeholders,
+        List<string> pluralSelectors)
     {
         int position = start;
 
@@ -1692,7 +1740,7 @@ public sealed class LocalizationInfraTests
 
             int branchStart = position + 1;
             int branchEnd = FindMatchingBrace(text, position, end);
-            ParseRenderedPlaceholders(text, branchStart, branchEnd, placeholders);
+            ParseRenderedPlaceholders(text, branchStart, branchEnd, placeholders, pluralSelectors);
             position = branchEnd + 1;
         }
 
@@ -1747,15 +1795,17 @@ public sealed class LocalizationInfraTests
         string text,
         int start,
         int end,
-        List<RenderedPlaceholder> placeholders)
+        List<RenderedPlaceholder> placeholders,
+        List<string>? pluralSelectors = null)
     {
+        pluralSelectors ??= [];
         int position = start;
 
         while (position < end)
         {
             if (text[position] == '{')
             {
-                position = ParseIcuBlock(text, position, end, placeholders);
+                position = ParseIcuBlock(text, position, end, placeholders, pluralSelectors);
                 continue;
             }
 
@@ -1782,6 +1832,17 @@ public sealed class LocalizationInfraTests
 
         foreach ((string key, string pattern) in patterns)
         {
+            foreach (string selector in ExtractPluralSelectors(pattern))
+            {
+                if (quantityArguments.Contains(selector))
+                {
+                    observedQuantityArguments?.Add(selector);
+                    continue;
+                }
+
+                offenders.Add($"{key}: plural selector '{selector}' is not a known quantity argument");
+            }
+
             foreach (RenderedPlaceholder placeholder in ExtractRenderedPlaceholders(pattern))
             {
                 if (allowedBareArguments.Contains(placeholder.Name))
