@@ -380,7 +380,7 @@ function registerKeyHandlers(table, signal) {
             // to act on, so trapping these keys would only swallow the
             // user's normal scroll/select-all gestures while focus sits
             // on the focusable container.
-            if (!table.querySelector("tbody tr")) {
+            if (!table.querySelector("tbody tr[aria-rowindex]")) {
                 return;
             }
 
@@ -430,12 +430,13 @@ export function scrollToRow(offset) {
         return;
     }
 
-    // Sample a body row's height (as computePageSize does) instead of
+    // Sample a real data row's height (as computePageSize does) instead of
     // getElementsByTagName("tr")[0] - that first row is the <thead> header,
     // whose height can diverge from the 22px data rows and would skew the
-    // scroll target, magnified by a deep offset.
+    // scroll target, magnified by a deep offset. The [aria-rowindex] filter
+    // also skips Virtualize's spacer <tr>s, whose height spans many rows.
     const applyScroll = () => {
-        const bodyRow = table.querySelector("tbody tr");
+        const bodyRow = table.querySelector("tbody tr[aria-rowindex]");
 
         if (!bodyRow) {
             return;
@@ -479,9 +480,10 @@ function computePageSize(table) {
         return 0;
     }
 
-    // Sample only body rows so the header row's height (which can differ
-    // from data rows) doesn't skew the page-size calculation.
-    const row = table.querySelector("tbody tr");
+    // Sample only real data rows (via [aria-rowindex]) so neither the header
+    // row's height nor a Virtualize spacer <tr> (whose height spans many
+    // rows) skews the page-size calculation.
+    const row = table.querySelector("tbody tr[aria-rowindex]");
     // Fall back to a default row height (~22px) when no body row has
     // rendered yet so the first PageDown still performs a sensible jump
     // instead of returning 0 and forcing callers to handle an
@@ -531,9 +533,10 @@ export function focusEventTableRow(index) {
 
     if (tryFocus()) { return; }
 
-    // Sample only body rows so the header row's height doesn't skew
-    // the scroll-target calculation.
-    const sampleRow = table.querySelector("tbody tr");
+    // Sample only real data rows (via [aria-rowindex]) so neither the header
+    // row's height nor a Virtualize spacer <tr> skews the scroll-target
+    // calculation.
+    const sampleRow = table.querySelector("tbody tr[aria-rowindex]");
     const rowHeight = sampleRow ? sampleRow.getBoundingClientRect().height : 22;
 
     if (rowHeight) {

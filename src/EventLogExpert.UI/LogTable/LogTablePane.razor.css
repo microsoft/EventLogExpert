@@ -234,10 +234,18 @@ tr {
 .group-header-row { cursor: pointer; }
 
 .group-header-row > td {
-    border-top: 1px solid var(--clr-lightblue);
+    /* 1px top rule via inset box-shadow, not border-top: box-shadow is layout-neutral, so it can't add height and break <Virtualize ItemSize>'s uniform-row-height assumption the way a collapsed border could if font metrics ever grew. (The actual scroll fix is SpacerElement="tr".) */
+    box-shadow: inset 0 1px 0 var(--clr-lightblue);
     border-right: none;
     font-weight: 600;
     background-color: var(--background-darkgray);
+}
+
+/* box-shadow computes to none in forced-colors, so redraw the separator with a border (auto-remapped by High Contrast, not suppressed). A border is used rather than re-asserting the shadow with forced-color-adjust:none, because forced-color-adjust is inherited and would leak the header's authored colors past the UA remapping. The 1px fits the row min-height slack, so it stays layout-neutral. */
+@media (forced-colors: active) {
+    .group-header-row > td {
+        border-top: 1px solid CanvasText;
+    }
 }
 
 /* Header focus ring. outline-offset insets it so border-collapse doesn't clip the <tr>
