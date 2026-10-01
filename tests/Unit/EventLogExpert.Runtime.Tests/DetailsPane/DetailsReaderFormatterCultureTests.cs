@@ -125,10 +125,12 @@ public sealed class DetailsReaderFormatterCultureTests
     }
 
     [Fact]
-    public void EventDataDateTimeArray_DisplayItemsUseCurrentCultureInTimeZoneAndCopyItemsStayInvariant()
+    public void EventDataDateTimeArray_DisplayItemsUseCurrentCultureInTimeZoneAndCopyItemsRoundTrip()
     {
-        var first = new DateTime(2026, 8, 26, 17, 57, 5, DateTimeKind.Utc);
-        var second = new DateTime(2026, 8, 26, 18, 2, 3, DateTimeKind.Utc);
+        // Sub-second ticks discriminate the round-trippable "O" copy format from the general invariant format, which
+        // would silently drop them (and DateTimeKind), leaving a copied DateTime[] unable to round-trip.
+        var first = new DateTime(2026, 8, 26, 17, 57, 5, 123, DateTimeKind.Utc).AddTicks(4567);
+        var second = new DateTime(2026, 8, 26, 18, 2, 3, 456, DateTimeKind.Utc).AddTicks(7890);
         ResolvedEvent @event = EventDataTestFactory.CreateEventWithData(("Times", new[] { first, second }));
 
         DetailsField field = RunUnderCulture(s_contrast, () => EventDataField(@event, "Times", s_plusThree));
@@ -136,9 +138,19 @@ public sealed class DetailsReaderFormatterCultureTests
         Assert.Equal(
             [first.ConvertTimeZone(s_plusThree).ToString(s_contrast), second.ConvertTimeZone(s_plusThree).ToString(s_contrast)],
             field.PreviewLines);
-        Assert.Equal(
-            string.Join('\n', first.ToString(CultureInfo.InvariantCulture), second.ToString(CultureInfo.InvariantCulture)),
-            field.CopyValue);
+
+        string[] copyLines = field.CopyValue.Split('\n');
+        Assert.Equal(first.ToString("O", CultureInfo.InvariantCulture), copyLines[0]);
+        Assert.Equal(second.ToString("O", CultureInfo.InvariantCulture), copyLines[1]);
+
+        DateTime firstRoundTrip = DateTime.ParseExact(copyLines[0], "O", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+        DateTime secondRoundTrip = DateTime.ParseExact(copyLines[1], "O", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+        Assert.Equal(first, firstRoundTrip);
+        Assert.Equal(second, secondRoundTrip);
+
+        // DateTime equality ignores Kind, so pin it explicitly: the whole point of "O" is preserving DateTimeKind.
+        Assert.Equal(DateTimeKind.Utc, firstRoundTrip.Kind);
+        Assert.Equal(DateTimeKind.Utc, secondRoundTrip.Kind);
     }
 
     [Fact]

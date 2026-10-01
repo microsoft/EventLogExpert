@@ -390,7 +390,12 @@ public static class DetailsReaderFormatter
 
         for (int i = 0; i < array.Length; i++)
         {
-            items[i] = Convert.ToString(array.GetValue(i), CultureInfo.InvariantCulture) ?? string.Empty;
+            object? item = array.GetValue(i);
+
+            // "O" preserves sub-second ticks and DateTimeKind so copied DateTimes round-trip; matches the scalar AsString() path.
+            items[i] = item is DateTime dateTime ?
+                dateTime.ToString("O", CultureInfo.InvariantCulture) :
+                Convert.ToString(item, CultureInfo.InvariantCulture) ?? string.Empty;
         }
 
         return items;
