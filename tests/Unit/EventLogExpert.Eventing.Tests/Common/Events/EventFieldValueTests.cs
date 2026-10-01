@@ -61,6 +61,32 @@ public sealed class EventFieldValueTests
     }
 
     [Fact]
+    public void FromProperty_DateTimeArray_AsStringRoundTripsEachElementInvariant()
+    {
+        DateTime[] source = new[]
+        {
+            new DateTime(2024, 1, 2, 3, 4, 5, DateTimeKind.Utc).AddTicks(1234567),
+            new DateTime(2024, 6, 7, 8, 9, 10, DateTimeKind.Utc).AddTicks(7654321)
+        };
+
+        EventFieldValue value = EventFieldValue.FromProperty(EventProperty.FromReference(source));
+
+        Assert.Equal(EventFieldValueKind.Array, value.Kind);
+
+        string[] tokens = value.AsString().Split(", ");
+
+        Assert.Equal(source.Length, tokens.Length);
+
+        for (int i = 0; i < source.Length; i++)
+        {
+            DateTime parsed = DateTime.ParseExact(tokens[i], "O", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+
+            Assert.Equal(source[i].Ticks, parsed.Ticks);
+            Assert.Equal(source[i].Kind, parsed.Kind);
+        }
+    }
+
+    [Fact]
     public void FromProperty_Double_ProjectsToDouble()
     {
         EventFieldValue value = EventFieldValue.FromProperty(1.5d);
@@ -68,6 +94,15 @@ public sealed class EventFieldValueTests
         Assert.Equal(EventFieldValueKind.Double, value.Kind);
         Assert.True(value.TryGetDouble(out double result));
         Assert.Equal(1.5d, result);
+    }
+
+    [Fact]
+    public void FromProperty_EmptyDateTimeArray_AsStringIsEmpty()
+    {
+        EventFieldValue value = EventFieldValue.FromProperty(EventProperty.FromReference(Array.Empty<DateTime>()));
+
+        Assert.Equal(EventFieldValueKind.Array, value.Kind);
+        Assert.Equal(string.Empty, value.AsString());
     }
 
     [Fact]
@@ -102,6 +137,20 @@ public sealed class EventFieldValueTests
     }
 
     [Fact]
+    public void FromProperty_ObjectArrayWithNullElement_FormatsDateTimeAndRendersNullAsEmpty()
+    {
+        DateTime moment = new DateTime(2024, 11, 5, 6, 7, 8, DateTimeKind.Utc).AddTicks(9012345);
+
+        EventFieldValue value = EventFieldValue.FromProperty(EventProperty.FromReference(new object?[] { moment, null }));
+
+        string[] tokens = value.AsString().Split(", ");
+
+        Assert.Equal(2, tokens.Length);
+        Assert.Equal(moment.Ticks, DateTime.ParseExact(tokens[0], "O", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).Ticks);
+        Assert.Equal(string.Empty, tokens[1]);
+    }
+
+    [Fact]
     public void FromProperty_ReferenceShapes_DisambiguateByRuntimeType()
     {
         Assert.Equal(EventFieldValueKind.String, EventFieldValue.FromProperty((EventProperty)"x").Kind);
@@ -126,6 +175,26 @@ public sealed class EventFieldValueTests
             Assert.True(value.TryGetInt64(out long result));
             Assert.Equal(-5, result);
         }
+    }
+
+    [Theory]
+    [InlineData(DateTimeKind.Utc)]
+    [InlineData(DateTimeKind.Unspecified)]
+    [InlineData(DateTimeKind.Local)]
+    public void FromProperty_SingleDateTimeArray_PreservesTicksAndKind(DateTimeKind kind)
+    {
+        DateTime source = new DateTime(2024, 3, 14, 15, 9, 26, kind).AddTicks(5358979);
+
+        EventFieldValue value = EventFieldValue.FromProperty(EventProperty.FromReference(new[] { source }));
+
+        string asString = value.AsString();
+
+        Assert.DoesNotContain(", ", asString);
+
+        DateTime parsed = DateTime.ParseExact(asString, "O", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+
+        Assert.Equal(source.Ticks, parsed.Ticks);
+        Assert.Equal(kind, parsed.Kind);
     }
 
     [Fact]

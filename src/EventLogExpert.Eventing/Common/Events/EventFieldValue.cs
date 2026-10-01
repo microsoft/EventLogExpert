@@ -289,7 +289,12 @@ public readonly struct EventFieldValue
 
         for (int i = 0; i < array.Length; i++)
         {
-            parts[i] = Convert.ToString(array.GetValue(i), CultureInfo.InvariantCulture) ?? string.Empty;
+            object? element = array.GetValue(i);
+
+            // "O" preserves sub-second ticks and DateTimeKind so a DateTime[] canonical string round-trips; mirrors the scalar AsString() path.
+            parts[i] = element is DateTime dateTime ?
+                dateTime.ToString("O", CultureInfo.InvariantCulture) :
+                Convert.ToString(element, CultureInfo.InvariantCulture) ?? string.Empty;
         }
 
         return string.Join(", ", parts);
