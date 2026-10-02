@@ -2355,6 +2355,14 @@
   <data name="LogTable_GroupByNone" xml:space="preserve">
     <value>(none)</value>
   </data>
+  <data name="LogTable_GroupByColumn" xml:space="preserve">
+    <value>Group by {0}</value>
+    <comment>{0} is the localized column label.</comment>
+  </data>
+  <data name="LogTable_UnGroupByColumn" xml:space="preserve">
+    <value>Remove grouping by {0}</value>
+    <comment>{0} is the localized column label.</comment>
+  </data>
   <data name="LogTable_ExcludeEventsBefore" xml:space="preserve">
     <value>Exclude Events Before</value>
   </data>

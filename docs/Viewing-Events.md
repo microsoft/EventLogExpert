@@ -41,13 +41,15 @@ The `User` column shows the best-available account identity, resolved offline (n
 
 - `Copy Selected` / `Copy Selected (Simple)` / `Copy Selected (XML)` / `Copy Selected (Full)` — same four formats as the `Edit` menu.
 - `Exclude Events Before` / `Exclude Events After` — sets a date filter using the right-clicked event's timestamp as the boundary.
+- `Group by <column>` - groups by the right-clicked cell's column when that column is groupable.
+- `Group By` submenu - groups by a supported column or turns grouping off with `(none)`.
 - `Include` and `Exclude` submenus — each lists the field comparisons applicable to a single right-clicked event; a field is enabled only when the event carries a value for it (otherwise it is shown disabled with a reason). Picking an enabled one creates a new basic filter (or exclusion) for that field equal to the right-clicked event's value. `Description`, `Xml`, and the advanced-only `User ID` are not offered; the fields that can produce a filter are `Event ID`, `Activity ID`, `Level`, `Keywords`, `Source`, `Task Category`, `Process ID`, `Thread ID`, `User` (the resolved account name, or the raw SID when that is all the event carries), and `Log Name`.
 
 ### Grouping
 
-Group the table by any column except `Description` so related events fold under a shared header row. Grouping is most useful for an identifier such as `Activity ID`, but works for every column in the `Group By` submenu.
+Group the table by any column except `Description`, `Record ID`, and `Date and Time` so related events fold under a shared header row. Grouping is most useful for an identifier such as `Activity ID`, but works for every column in the `Group By` submenu.
 
-**Turning grouping on.** Right-click a column header and pick a column from the `Group By` submenu; `(none)` turns grouping off. Groups are ordered by the grouped value, and events within each group keep the current `Order By` sort. Each header row shows the column name, the group value (or `(none)` when that value is empty), and the event count — for example `Activity ID: {guid} (42)`.
+**Turning grouping on.** Right-click a column header, cell, or row and pick a column from the `Group By` submenu; `(none)` turns grouping off. A cell right-click also offers `Group by <column>` for the clicked column when it is groupable. Groups are ordered by the grouped value, and events within each group keep the current `Order By` sort. Each header row shows the column name, the group value (or `(none)` when that value is empty), and the event count - for example `Activity ID: {guid} (42)`.
 
 **Group direction.** `Group Descending` (on the group header's right-click menu) flips the order of the groups themselves between ascending and descending. It does not change the per-event `Order By` direction.
 

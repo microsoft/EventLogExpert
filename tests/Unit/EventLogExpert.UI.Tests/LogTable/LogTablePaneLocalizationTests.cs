@@ -90,6 +90,65 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void CellContextMenu_GroupableCell_IncludesDirectGroupByItemWithoutGroupBySubmenu()
+    {
+        var cut = RenderTable(
+            groupBy: null,
+            ImmutableHashSet<string>.Empty,
+            orderBy: ColumnName.Level,
+            [ColumnName.Level, ColumnName.DateAndTime],
+            Event(1, "Alpha"));
+
+        OpenMenu(cut, "tbody tr.table-row td:nth-child(1)");
+
+        AssertMenuContains("[[LogTable_GroupByColumn([[Column_Level]])]]");
+        Assert.DoesNotContain(_capturedMenu!, item => item.Label == "[[LogTable_GroupBy]]");
+    }
+
+    [Fact]
+    public async Task CellContextMenu_GroupableCell_WhenAlreadyGrouped_IncludesDirectUngroupItem()
+    {
+        var cut = RenderTable(
+            groupBy: ColumnName.Level,
+            ImmutableHashSet<string>.Empty,
+            orderBy: ColumnName.Level,
+            [ColumnName.Level, ColumnName.DateAndTime],
+            Event(1, "Alpha"));
+
+        OpenMenu(cut, "tbody tr.table-row td:nth-child(1)");
+        _logTableCommands.ClearReceivedCalls();
+
+        var item = _capturedMenu!.Single(item => item.Label == "[[LogTable_UnGroupByColumn([[Column_Level]])]]");
+        Assert.DoesNotContain(_capturedMenu!, menuItem => menuItem.Label == "[[LogTable_GroupBy]]");
+
+        await item.OnClickAsync!();
+
+        _logTableCommands.Received().SetGroupBy(null);
+    }
+
+    [Fact]
+    public void CellContextMenu_NonGroupableCell_OmitsDirectGroupByItemButKeepsGroupBySubmenu()
+    {
+        var cut = RenderTable(
+            groupBy: null,
+            ImmutableHashSet<string>.Empty,
+            orderBy: ColumnName.Level,
+            [ColumnName.Level, ColumnName.DateAndTime],
+            Event(1, "Alpha"));
+
+        OpenMenu(cut, "tbody tr.table-row td:nth-child(2)");
+
+        Assert.DoesNotContain(
+            _capturedMenu!,
+            item => item.Label.StartsWith("[[LogTable_GroupByColumn(", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            _capturedMenu!,
+            item => item.Label.StartsWith("[[LogTable_UnGroupByColumn(", StringComparison.Ordinal));
+        AssertMenuContains("[[LogTable_GroupBy]]");
+        AssertMenuContains("[[LogTable_GroupByNone]]", ChildrenOf("[[LogTable_GroupBy]]"));
+    }
+
+    [Fact]
     public void CellFilterMenu_RendersColumnAndLevelValueMarkers()
     {
         var @event = Event(1, "Alpha") with { Level = "Information" };
@@ -117,6 +176,22 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
         AssertMenuContains("[[Column_Level]]", ChildrenOf("[[LogTable_OrderBy]]"));
         AssertMenuContains("[[Column_Source]]", ChildrenOf("[[LogTable_GroupBy]]"));
         AssertMenuContains("[[Column_Level]]", ChildrenOf("[[LogTable_GroupBy]]"));
+    }
+
+    [Fact]
+    public void ColumnMenu_GroupBySubmenu_ContainsOnlyGroupableColumnMarkers()
+    {
+        var cut = RenderTable(groupBy: null, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, Event(1, "Alpha"));
+
+        OpenMenu(cut, "thead");
+
+        var groupBy = ChildrenOf("[[LogTable_GroupBy]]");
+        AssertMenuContains("[[Column_Source]]", groupBy);
+        AssertMenuContains("[[Column_Level]]", groupBy);
+        AssertMenuContains("[[Column_EventId]]", groupBy);
+        Assert.DoesNotContain(groupBy, item => item.Label == "[[Column_DateAndTime]]");
+        AssertMenuContains("[[Column_DateAndTime]]");
+        AssertMenuContains("[[Column_DateAndTime]]", ChildrenOf("[[LogTable_OrderBy]]"));
     }
 
     [Fact]
@@ -175,10 +250,29 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
         AssertMenuContains("[[LogTable_NearTime_15Minutes]]", nearTime);
         AssertMenuContains("[[LogTable_NearTime_1Hour]]", nearTime);
 
+        AssertMenuContains("[[LogTable_GroupBy]]");
+        AssertMenuContains("[[LogTable_GroupByNone]]", ChildrenOf("[[LogTable_GroupBy]]"));
+
         var moreFields = ChildrenOf("[[LogTable_MoreFields]]");
         AssertMenuContains("[[LogTable_Include]]", moreFields);
         AssertMenuContains("[[LogTable_Exclude]]", moreFields);
         Assert.Contains(moreFields.SelectMany(item => item.Children ?? []), item => item.DisabledReason == "[[LogTable_NoCellValue]]");
+    }
+
+    [Fact]
+    public void EventContextMenu_RowMenu_IncludesGroupBySubmenuWithoutDirectGroupByItem()
+    {
+        var @event = Event(1, "Alpha");
+        var cut = RenderTable(groupBy: null, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, @event);
+        _selectedEvent.Current.Returns(Focus(@event, 0));
+
+        OpenMenu(cut, "tbody");
+
+        AssertMenuContains("[[LogTable_GroupBy]]");
+        AssertMenuContains("[[LogTable_GroupByNone]]", ChildrenOf("[[LogTable_GroupBy]]"));
+        Assert.DoesNotContain(
+            _capturedMenu!,
+            item => item.Label.StartsWith("[[LogTable_GroupByColumn(", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -219,6 +313,34 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public async Task GroupByMenu_WhenCommittedColumnClicked_DispatchesSetGroupBy()
+    {
+        var cut = RenderTable(groupBy: ColumnName.Source, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, Event(1, "Alpha"));
+
+        OpenMenu(cut, "thead");
+        _logTableCommands.ClearReceivedCalls();
+        var source = ChildrenOf("[[LogTable_GroupBy]]").Single(item => item.Label == "[[Column_Source]]");
+
+        await source.OnClickAsync!();
+
+        _logTableCommands.Received().SetGroupBy(ColumnName.Source);
+    }
+
+    [Fact]
+    public async Task GroupByMenu_WhenNoneClickedWhileUngrouped_DispatchesSetGroupBy()
+    {
+        var cut = RenderTable(groupBy: null, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, Event(1, "Alpha"));
+
+        OpenMenu(cut, "thead");
+        _logTableCommands.ClearReceivedCalls();
+        var none = ChildrenOf("[[LogTable_GroupBy]]").Single(item => item.Label == "[[LogTable_GroupByNone]]");
+
+        await none.OnClickAsync!();
+
+        _logTableCommands.Received().SetGroupBy(null);
+    }
+
+    [Fact]
     public void GroupContextMenu_RoutesEveryGroupActionThroughMarkerLocalizer()
     {
         var expanded = RenderTable(ColumnName.Source, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, Event(1, "Alpha"));
@@ -229,11 +351,26 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
         AssertMenuContains("[[Menu_View_CollapseAllGroups]]");
         AssertMenuContains("[[Menu_View_GroupDescending]]");
         AssertMenuContains("[[LogTable_SelectGroup]]");
+        AssertMenuContains("[[LogTable_UnGroupByColumn([[Column_Source]])]]");
 
         var collapsed = RenderTable(ColumnName.Source, ImmutableHashSet.Create(StringComparer.Ordinal, "Alpha"), orderBy: ColumnName.Source, Event(1, "Alpha"));
         OpenMenu(collapsed, "tr.group-header-row");
 
         AssertMenuContains("[[LogTable_ExpandGroup]]");
+    }
+
+    [Fact]
+    public async Task GroupContextMenu_Ungroup_DispatchesSetGroupByNull()
+    {
+        var cut = RenderTable(ColumnName.Source, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, Event(1, "Alpha"));
+
+        OpenMenu(cut, "tr.group-header-row");
+        _logTableCommands.ClearReceivedCalls();
+        var item = _capturedMenu!.Single(item => item.Label == "[[LogTable_UnGroupByColumn([[Column_Source]])]]");
+
+        await item.OnClickAsync!();
+
+        _logTableCommands.Received().SetGroupBy(null);
     }
 
     [Fact]

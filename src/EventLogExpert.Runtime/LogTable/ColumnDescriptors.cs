@@ -30,6 +30,27 @@ public static class ColumnDescriptors
         return (accessor.GroupText ?? accessor.CellText)(@event, context);
     }
 
+    public static bool IsGroupable(ColumnName column) =>
+        column switch
+        {
+            ColumnName.RecordId or ColumnName.DateAndTime => false,
+            ColumnName.Level
+                or ColumnName.ActivityId
+                or ColumnName.Log
+                or ColumnName.ComputerName
+                or ColumnName.Source
+                or ColumnName.EventId
+                or ColumnName.TaskCategory
+                or ColumnName.Keywords
+                or ColumnName.ProcessId
+                or ColumnName.ThreadId
+                or ColumnName.User
+                or ColumnName.Opcode => true,
+            _ => throw new ArgumentOutOfRangeException(nameof(column),
+                column,
+                "No accessor is registered for the column.")
+        };
+
     private static ColumnDescriptor[] BuildAccessors()
     {
         var accessors = new ColumnDescriptor[Enum.GetValues<ColumnName>().Length];
