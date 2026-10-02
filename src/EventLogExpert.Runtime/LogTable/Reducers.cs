@@ -390,17 +390,19 @@ internal sealed class Reducers
     }
 
     [ReducerMethod]
-    public static LogTableState ReduceSetOrderBy(LogTableState state, SetOrderByAction action) =>
-        RetainServedView(state, state.RequestedOrderBy.Equals(action.OrderBy) ?
-            state with
-            {
-                RequestedOrderBy = null,
-                RequestedIsDescending = true
-            } :
-            state with
-            {
-                RequestedOrderBy = action.OrderBy
-            });
+    public static LogTableState ReduceSetOrderBy(LogTableState state, SetOrderByAction action)
+    {
+        if (action.OrderBy is null)
+        {
+            return state.RequestedOrderBy is null && state.RequestedIsDescending ?
+                state :
+                RetainServedView(state, state with { RequestedOrderBy = null, RequestedIsDescending = true });
+        }
+
+        return state.RequestedOrderBy.Equals(action.OrderBy) ?
+            state :
+            RetainServedView(state, state with { RequestedOrderBy = action.OrderBy });
+    }
 
     [ReducerMethod]
     public static LogTableState ReduceSetTabGroupCollapsed(LogTableState state, SetTabGroupCollapsedAction action)

@@ -120,6 +120,20 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public async Task ColumnMenu_OrderByDefault_DispatchesSetOrderByNull()
+    {
+        var cut = RenderTable(groupBy: null, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, Event(1, "Alpha"));
+
+        OpenMenu(cut, "thead");
+        _logTableCommands.ClearReceivedCalls();
+        var defaultItem = ChildrenOf("[[LogTable_OrderBy]]").Single(item => item.Label == "[[LogTable_OrderByDefault]]");
+
+        await defaultItem.OnClickAsync!();
+
+        _logTableCommands.Received().SetOrderBy(null);
+    }
+
+    [Fact]
     public void ColumnMenu_RoutesEveryChromeItemThroughMarkerLocalizer()
     {
         var cut = RenderTable(groupBy: null, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, Event(1, "Alpha"));
@@ -127,6 +141,7 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
         OpenMenu(cut, "thead");
 
         AssertMenuContains("[[LogTable_OrderBy]]");
+        AssertMenuContains("[[LogTable_OrderByDefault]]", ChildrenOf("[[LogTable_OrderBy]]"));
         AssertMenuContains("[[LogTable_GroupBy]]");
         AssertMenuContains("[[LogTable_GroupByNone]]", ChildrenOf("[[LogTable_GroupBy]]"));
         AssertMenuContains("[[LogTable_ResetColumnDefaults]]");

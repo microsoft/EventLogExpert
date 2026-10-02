@@ -835,6 +835,49 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
+    public void ReduceSetOrderBy_WhenAlreadyDefaultAndDefaultSelected_IsNoOp()
+    {
+        var state = new LogTableState { RequestedOrderBy = null, RequestedIsDescending = true };
+
+        var result = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(null));
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
+    public void ReduceSetOrderBy_WhenCommittedColumnReselected_IsIdempotent()
+    {
+        var state = new LogTableState { RequestedOrderBy = ColumnName.Source, RequestedIsDescending = false };
+
+        var result = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.Source));
+
+        Assert.Same(state, result);
+        Assert.Equal(ColumnName.Source, result.RequestedOrderBy);
+    }
+
+    [Fact]
+    public void ReduceSetOrderBy_WhenDefaultSelectedWithStaleAscending_RestoresDescendingDefault()
+    {
+        var state = new LogTableState { RequestedOrderBy = null, RequestedIsDescending = false };
+
+        var result = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(null));
+
+        Assert.Null(result.RequestedOrderBy);
+        Assert.True(result.RequestedIsDescending);
+    }
+
+    [Fact]
+    public void ReduceSetOrderBy_WhenDefaultSelected_ClearsToDefaultOrder()
+    {
+        var state = new LogTableState { RequestedOrderBy = ColumnName.Source, RequestedIsDescending = false };
+
+        var result = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(null));
+
+        Assert.Null(result.RequestedOrderBy);
+        Assert.True(result.RequestedIsDescending);
+    }
+
+    [Fact]
     public void ReduceToggleGroupCollapsed_TogglesKey()
     {
         var collapsed = Reducers.ReduceToggleGroupCollapsed(

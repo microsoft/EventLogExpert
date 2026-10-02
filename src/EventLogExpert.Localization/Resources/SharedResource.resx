@@ -2415,6 +2415,9 @@
   <data name="LogTable_OrderBy" xml:space="preserve">
     <value>Order By</value>
   </data>
+  <data name="LogTable_OrderByDefault" xml:space="preserve">
+    <value>(default)</value>
+  </data>
   <data name="LogTable_GroupBy" xml:space="preserve">
     <value>Group By</value>
   </data>
