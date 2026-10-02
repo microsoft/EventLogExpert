@@ -517,6 +517,25 @@ public sealed partial class LogTablePane
         items.Add(MenuItem.Separator());
     }
 
+    private bool AppendGroupByDirectItem(List<MenuItem> items, ColumnName? column)
+    {
+        if (column is not { } cellColumn || !ColumnDescriptors.IsGroupable(cellColumn)) { return false; }
+
+        string columnLabel = ColumnNameLocalizer.Label(Localizer, cellColumn);
+
+        items.Add(Presentation.Ordering.GroupBy.Equals(cellColumn) ?
+            MenuItem.Item(
+                Localizer["LogTable_UnGroupByColumn", columnLabel].Value,
+                () => LogTableCommands.SetGroupBy(null)) :
+            MenuItem.Item(
+                Localizer["LogTable_GroupByColumn", columnLabel].Value,
+                () => LogTableCommands.SetGroupBy(cellColumn)));
+
+        items.Add(MenuItem.Separator());
+
+        return true;
+    }
+
     private void ApplyNavSelection(EventLocator target, bool shift)
     {
         if (shift)
@@ -539,6 +558,32 @@ public sealed partial class LogTablePane
         {
             FilterPaneCommands.SetFilter(filter);
         }
+    }
+
+    private IReadOnlyList<MenuItem> BuildGroupByMenuItems()
+    {
+        var ordering = Presentation.Ordering;
+
+        var items = new List<MenuItem>
+        {
+            MenuItem.Item(Localizer["LogTable_GroupByNone"].Value,
+                () => LogTableCommands.SetGroupBy(null),
+                isChecked: ordering.GroupBy is null)
+        };
+
+        foreach (var (column, _) in Presentation.Columns)
+        {
+            if (!ColumnDescriptors.IsGroupable(column)) { continue; }
+
+            var capturedColumn = column;
+            
+            items.Add(MenuItem.Item(
+                ColumnNameLocalizer.Label(Localizer, column),
+                () => LogTableCommands.SetGroupBy(capturedColumn),
+                isChecked: ordering.GroupBy.Equals(capturedColumn)));
+        }
+
+        return items;
     }
 
     private IReadOnlyList<SelectionEntry> BuildRange(EventLocator anchor, EventLocator selected)
@@ -957,7 +1002,8 @@ public sealed partial class LogTablePane
         var items = new List<MenuItem>();
 
         AppendCellFilterItems(items, detail, column);
-        items.AddRange(ShowContextMenuItems(detail));
+        bool directGroupByAdded = AppendGroupByDirectItem(items, column);
+        items.AddRange(ShowContextMenuItems(detail, includeGroupBySubmenu: !directGroupByAdded));
 
         MenuService.OpenAt(args.ClientX, args.ClientY, items, openedByKeyboard: ContextMenuInvocation.WasKeyboardTriggered(args));
     }
@@ -1427,24 +1473,7 @@ public sealed partial class LogTablePane
 
         items.Add(MenuItem.SubMenu(Localizer["LogTable_OrderBy"].Value, orderItems));
 
-        var groupItems = new List<MenuItem>
-        {
-            MenuItem.Item(
-                Localizer["LogTable_GroupByNone"].Value,
-                () => { if (ordering.GroupBy is not null) { LogTableCommands.SetGroupBy(null); } },
-                isChecked: ordering.GroupBy is null)
-        };
-
-        foreach (var (column, _) in columns)
-        {
-            var capturedColumn = column;
-            groupItems.Add(MenuItem.Item(
-                ColumnNameLocalizer.Label(Localizer, column),
-                () => { if (!ordering.GroupBy.Equals(capturedColumn)) { LogTableCommands.SetGroupBy(capturedColumn); } },
-                isChecked: ordering.GroupBy.Equals(capturedColumn)));
-        }
-
-        items.Add(MenuItem.SubMenu(Localizer["LogTable_GroupBy"].Value, groupItems));
+        items.Add(MenuItem.SubMenu(Localizer["LogTable_GroupBy"].Value, BuildGroupByMenuItems()));
 
         items.Add(MenuItem.Separator());
         items.Add(MenuItem.Item(
@@ -1454,10 +1483,10 @@ public sealed partial class LogTablePane
         return items;
     }
 
-    private IReadOnlyList<MenuItem> ShowContextMenuItems(ResolvedEvent selectedEvent)
+    private IReadOnlyList<MenuItem> ShowContextMenuItems(ResolvedEvent selectedEvent, bool includeGroupBySubmenu = true)
     {
-        return
-        [
+        var items = new List<MenuItem>
+        {
             MenuItem.Item(Localizer["Menu_Edit_CopySelected"].Value, () => ClipboardService.CopySelectedEvent(EventCopyFormat.Default)),
             MenuItem.Item(Localizer["Menu_Edit_CopySelectedSimple"].Value, () => ClipboardService.CopySelectedEvent(EventCopyFormat.Simple)),
             MenuItem.Item(Localizer["Menu_Edit_CopySelectedXml"].Value, () => ClipboardService.CopySelectedEvent(EventCopyFormat.Xml)),
@@ -1508,15 +1537,24 @@ public sealed partial class LogTablePane
                         Localizer["LogTable_NearTime_1Hour"].Value,
                         () => FilterLensCommands.ShowEventsNearTime(
                             selectedEvent.TimeCreated, TimeSpan.FromHours(1), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
-                ]),
-            MenuItem.Separator(),
-            MenuItem.SubMenu(
-                Localizer["LogTable_MoreFields"].Value,
-                [
-                    MenuItem.SubMenu(Localizer["LogTable_Include"].Value, ShowEventFieldItems(selectedEvent, false)),
-                    MenuItem.SubMenu(Localizer["LogTable_Exclude"].Value, ShowEventFieldItems(selectedEvent, true)),
-                ]),
-        ];
+                ])
+        };
+
+        if (includeGroupBySubmenu)
+        {
+            items.Add(MenuItem.Separator());
+            items.Add(MenuItem.SubMenu(Localizer["LogTable_GroupBy"].Value, BuildGroupByMenuItems()));
+        }
+
+        items.Add(MenuItem.Separator());
+        items.Add(MenuItem.SubMenu(
+            Localizer["LogTable_MoreFields"].Value,
+            [
+                MenuItem.SubMenu(Localizer["LogTable_Include"].Value, ShowEventFieldItems(selectedEvent, false)),
+                MenuItem.SubMenu(Localizer["LogTable_Exclude"].Value, ShowEventFieldItems(selectedEvent, true)),
+            ]));
+
+        return items;
     }
 
     private IReadOnlyList<MenuItem> ShowEventFieldItems(ResolvedEvent selectedEvent, bool exclude)
@@ -1543,9 +1581,9 @@ public sealed partial class LogTablePane
     private IReadOnlyList<MenuItem> ShowGroupContextMenuItems(EventGroup group)
     {
         bool collapsedNow = Presentation.IsGroupCollapsed(group.Key);
-
-        return
-        [
+        var ordering = Presentation.Ordering;
+        var items = new List<MenuItem>
+        {
             MenuItem.Item(
                 collapsedNow ? Localizer["LogTable_ExpandGroup"].Value : Localizer["LogTable_CollapseGroup"].Value,
                 () => UserSetGroupCollapsed(group.Key, !collapsedNow)),
@@ -1555,10 +1593,20 @@ public sealed partial class LogTablePane
             MenuItem.Item(
                 Localizer["Menu_View_GroupDescending"].Value,
                 () => LogTableCommands.ToggleGroupSortDirection(),
-                isChecked: Presentation.Ordering.IsGroupDescending),
+                isChecked: ordering.IsGroupDescending),
             MenuItem.Separator(),
             MenuItem.Item(Localizer["LogTable_SelectGroup"].Value, () => SelectGroupByKey(group.Key)),
-        ];
+        };
+
+        if (ordering.GroupBy is { } groupBy)
+        {
+            items.Add(MenuItem.Separator());
+            items.Add(MenuItem.Item(
+                Localizer["LogTable_UnGroupByColumn", ColumnNameLocalizer.Label(Localizer, groupBy)].Value,
+                () => LogTableCommands.SetGroupBy(null)));
+        }
+
+        return items;
     }
 
     private void ToggleGroupCollapsed(string groupKey)

@@ -374,7 +374,8 @@ internal sealed class Reducers
         return RetainServedView(state, state with
         {
             RequestedGroupBy = action.GroupBy,
-            RequestedIsGroupDescending = false
+            // Re-selecting the committed group column preserves its direction; a different column starts ascending.
+            RequestedIsGroupDescending = action.GroupBy == state.GroupBy && state.IsGroupDescending
         });
     }
 

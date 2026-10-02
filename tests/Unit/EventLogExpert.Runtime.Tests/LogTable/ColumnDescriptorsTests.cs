@@ -109,6 +109,41 @@ public sealed class ColumnDescriptorsTests
             ColumnDescriptors.GetGroupText(sample, column, Context));
     }
 
+    [Fact]
+    public void IsGroupable_EveryRegisteredColumn_HasGroupabilityDecision()
+    {
+        foreach (ColumnName column in Enum.GetValues<ColumnName>())
+        {
+            _ = ColumnDescriptors.IsGroupable(column);
+        }
+    }
+
+    [Theory]
+    [InlineData(ColumnName.Level)]
+    [InlineData(ColumnName.ActivityId)]
+    [InlineData(ColumnName.Log)]
+    [InlineData(ColumnName.ComputerName)]
+    [InlineData(ColumnName.Source)]
+    [InlineData(ColumnName.EventId)]
+    [InlineData(ColumnName.TaskCategory)]
+    [InlineData(ColumnName.Keywords)]
+    [InlineData(ColumnName.ProcessId)]
+    [InlineData(ColumnName.ThreadId)]
+    [InlineData(ColumnName.User)]
+    [InlineData(ColumnName.Opcode)]
+    public void IsGroupable_GroupableColumn_ReturnsTrue(ColumnName column) =>
+        Assert.True(ColumnDescriptors.IsGroupable(column));
+
+    [Theory]
+    [InlineData(ColumnName.RecordId)]
+    [InlineData(ColumnName.DateAndTime)]
+    public void IsGroupable_NonGroupableColumn_ReturnsFalse(ColumnName column) =>
+        Assert.False(ColumnDescriptors.IsGroupable(column));
+
+    [Fact]
+    public void IsGroupable_OutOfRangeColumn_Throws() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => ColumnDescriptors.IsGroupable((ColumnName)999));
+
     private static ResolvedEvent SampleEvent() =>
         new(@"C:\logs\App.evtx", LogPathType.File)
         {

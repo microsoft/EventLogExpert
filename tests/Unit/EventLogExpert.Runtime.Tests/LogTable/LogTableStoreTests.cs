@@ -783,6 +783,39 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
+    public void ReduceSetGroupBy_WhenCommittedColumnReselectedDuringPendingRegroup_PreservesDirection()
+    {
+        var state = new LogTableState
+        {
+            GroupBy = ColumnName.Source,
+            IsGroupDescending = true,
+            RequestedGroupBy = ColumnName.Level
+        };
+
+        var result = Reducers.ReduceSetGroupBy(state, new SetGroupByAction(ColumnName.Source));
+
+        Assert.Equal(ColumnName.Source, result.RequestedGroupBy);
+        Assert.True(result.RequestedIsGroupDescending);
+    }
+
+    [Fact]
+    public void ReduceSetGroupBy_WhenDifferentColumnSelected_ResetsDirection()
+    {
+        var state = new LogTableState
+        {
+            GroupBy = ColumnName.Source,
+            IsGroupDescending = true,
+            RequestedGroupBy = ColumnName.Source,
+            RequestedIsGroupDescending = true
+        };
+
+        var result = Reducers.ReduceSetGroupBy(state, new SetGroupByAction(ColumnName.Level));
+
+        Assert.Equal(ColumnName.Level, result.RequestedGroupBy);
+        Assert.False(result.RequestedIsGroupDescending);
+    }
+
+    [Fact]
     public void ReduceSetGroupBy_WhenNullAndAdopted_ClearsCommittedGrouping()
     {
         var state = SeedTabled(
