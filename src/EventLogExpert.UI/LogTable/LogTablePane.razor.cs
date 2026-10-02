@@ -1408,7 +1408,14 @@ public sealed partial class LogTablePane
 
         items.Add(MenuItem.Separator());
 
-        var orderItems = new List<MenuItem>();
+        var orderItems = new List<MenuItem>
+        {
+            MenuItem.Item(
+                Localizer["LogTable_OrderByDefault"].Value,
+                () => LogTableCommands.SetOrderBy(null),
+                isChecked: ordering.OrderBy is null)
+        };
+
         foreach (var (column, _) in columns)
         {
             var capturedColumn = column;
