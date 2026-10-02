@@ -29,6 +29,7 @@ public sealed class StatusBarLocalizerWiringTests : BunitContext
     private readonly IEventLogCommands _eventLogCommands = Substitute.For<IEventLogCommands>();
     private readonly IFilterAppliedSource _filterApplied = Substitute.For<IFilterAppliedSource>();
     private readonly IFilterLensSource _lensSource = Substitute.For<IFilterLensSource>();
+    private readonly ILogTableCommands _logTableCommands = Substitute.For<ILogTableCommands>();
     private readonly IModalCoordinator _modalCoordinator = Substitute.For<IModalCoordinator>();
     private readonly IStatsCommands _statsCommands = Substitute.For<IStatsCommands>();
     private readonly IStatsVisibilitySource _statsVisibility = Substitute.For<IStatsVisibilitySource>();
@@ -46,6 +47,7 @@ public sealed class StatusBarLocalizerWiringTests : BunitContext
         Services.AddSingleton(_eventLogCommands);
         Services.AddSingleton(_filterApplied);
         Services.AddSingleton(_lensSource);
+        Services.AddSingleton(_logTableCommands);
         Services.AddSingleton(_modalCoordinator);
         Services.AddSingleton(_statsCommands);
         Services.AddSingleton(_statsVisibility);

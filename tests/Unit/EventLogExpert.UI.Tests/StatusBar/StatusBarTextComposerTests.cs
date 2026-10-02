@@ -32,6 +32,18 @@ public sealed class StatusBarTextComposerTests : IDisposable
     private IStringLocalizer<SharedResource> Localizer => _localizer;
 
     [Fact]
+    public void ClearGroupAria_RoutesKeyWithColumnLabel() =>
+        Assert.Equal(
+            "[[StatusBar_ClearGroup_Aria([[Column_Source]])]]",
+            StatusBarTextComposer.ClearGroupAria(Localizer, ColumnName.Source));
+
+    [Fact]
+    public void ClearSortAria_RoutesKeyWithColumnLabel() =>
+        Assert.Equal(
+            "[[StatusBar_ClearSort_Aria([[Column_Source]])]]",
+            StatusBarTextComposer.ClearSortAria(Localizer, ColumnName.Source));
+
+    [Fact]
     public void CoverageChipTooltip_LoadedCountAndUnresolvedCount_RoutesKeyWithBothCounts() =>
         Assert.Equal(
             "[[StatusBar_Coverage_Tooltip]]",
@@ -320,6 +332,18 @@ public sealed class StatusBarTextComposerTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false, "[[StatusBar_GroupDirection_AscAria([[Column_Level]])]]")]
+    [InlineData(true, "[[StatusBar_GroupDirection_DescAria([[Column_Level]])]]")]
+    public void GroupDirectionAria_EncodesDirectionInTheKey(bool isGroupDescending, string expected) =>
+        Assert.Equal(expected, StatusBarTextComposer.GroupDirectionAria(Localizer, ColumnName.Level, isGroupDescending));
+
+    [Fact]
+    public void GroupedChip_RoutesKeyWithColumnLabel() =>
+        Assert.Equal(
+            "[[StatusBar_GroupedChip([[Column_Level]])]]",
+            StatusBarTextComposer.GroupedChip(Localizer, ColumnName.Level));
+
+    [Theory]
     [InlineData(MemoryUsageLevel.Normal, "[[StatusBar_Memory_Announce_Normal]]")]
     [InlineData(MemoryUsageLevel.Elevated, "[[StatusBar_Memory_Announce_Elevated]]")]
     [InlineData(MemoryUsageLevel.High, "[[StatusBar_Memory_Announce_High]]")]
@@ -352,6 +376,18 @@ public sealed class StatusBarTextComposerTests : IDisposable
         Assert.Equal(
             "[[StatusBar_Memory_Tooltip_Normal(100 MB|200 B)]]",
             StatusBarTextComposer.MemoryTooltip(Localizer, 100, 200, MemoryUsageLevel.Normal));
+
+    [Theory]
+    [InlineData(false, "[[StatusBar_SortDirection_AscAria([[Column_Source]])]]")]
+    [InlineData(true, "[[StatusBar_SortDirection_DescAria([[Column_Source]])]]")]
+    public void SortDirectionAria_EncodesDirectionInTheKey(bool isDescending, string expected) =>
+        Assert.Equal(expected, StatusBarTextComposer.SortDirectionAria(Localizer, ColumnName.Source, isDescending));
+
+    [Fact]
+    public void SortedChip_RoutesKeyWithColumnLabel() =>
+        Assert.Equal(
+            "[[StatusBar_SortedChip([[Column_Source]])]]",
+            StatusBarTextComposer.SortedChip(Localizer, ColumnName.Source));
 
     private static void AssertVerbatim(string expected, string actual)
     {

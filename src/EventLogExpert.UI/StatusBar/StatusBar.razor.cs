@@ -27,6 +27,8 @@ public sealed partial class StatusBar
 
     [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
 
+    [Inject] private ILogTableCommands LogTableCommands { get; init; } = null!;
+
     [Inject] private IModalCoordinator ModalCoordinator { get; init; } = null!;
 
     [Inject] private IStatsCommands StatsCommands { get; init; } = null!;
@@ -57,6 +59,10 @@ public sealed partial class StatusBar
         base.OnInitialized();
     }
 
+    private void ClearGroup() => LogTableCommands.SetGroupBy(null);
+
+    private void ClearSort() => LogTableCommands.SetOrderBy(null);
+
     private void LoadNewEvents() => EventLogCommands.LoadNewEvents();
 
     private void OpenCoverage() => _ = ModalCoordinator.OpenResolutionCoverageAsync();
@@ -71,6 +77,10 @@ public sealed partial class StatusBar
 
         return shown.Sentence;
     }
+
+    private void ToggleGroup() => LogTableCommands.ToggleGroupSortDirection();
+
+    private void ToggleSort() => LogTableCommands.ToggleSortDirection();
 
     private void ToggleStats() => StatsCommands.SetVisible(!StatsVisibility.IsVisible);
 }
