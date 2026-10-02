@@ -10,6 +10,9 @@
     var isFiltered = FilterApplied.IsFilteringEnabled;
     var isLoading = !status.LoadingActivities.IsEmpty;
 
+    var ordering = Presentation.Ordering;
+    var hasActiveTab = Presentation.ActiveTabId is not null;
+
     var loadingSummary = StatusBarTextComposer.Loading(Localizer, status.LoadingActivities);
 
     var source = StatusBarTextComposer.Source(Localizer, activeTable, status.Tabs, status.Groups);
@@ -81,6 +84,50 @@
             <span aria-hidden="true" class="status-bar-sep">|</span>
             <span class="status-bar-filter" data-tooltip="@filterTooltip">@Localizer["StatusBar_Filter_Chip"]</span>
             <span class="visually-hidden">@filterTooltip</span>
+        }
+
+        @if (hasActiveTab && ordering.OrderBy is { } sortColumn)
+        {
+            var sortedLabel = StatusBarTextComposer.SortedChip(Localizer, sortColumn);
+
+            <span aria-hidden="true" class="status-bar-sep">|</span>
+            <span class="status-bar-order-chip status-bar-sort-chip">
+                <span class="status-bar-order-label" data-tooltip="@sortedLabel" data-tooltip-overflow>@sortedLabel</span>
+                <button aria-label="@StatusBarTextComposer.SortDirectionAria(Localizer, sortColumn, ordering.IsDescending)"
+                    class="status-bar-order-dir status-bar-sort-dir"
+                    @onclick="ToggleSort"
+                    type="button">
+                    <i aria-hidden="true" class="bi bi-caret-@(ordering.IsDescending ? "down" : "up")"></i>
+                </button>
+                <button aria-label="@StatusBarTextComposer.ClearSortAria(Localizer, sortColumn)"
+                    class="status-bar-order-remove status-bar-sort-remove"
+                    @onclick="ClearSort"
+                    type="button">
+                    <i aria-hidden="true" class="bi bi-x-lg"></i>
+                </button>
+            </span>
+        }
+
+        @if (hasActiveTab && ordering.GroupBy is { } groupColumn)
+        {
+            var groupedLabel = StatusBarTextComposer.GroupedChip(Localizer, groupColumn);
+
+            <span aria-hidden="true" class="status-bar-sep">|</span>
+            <span class="status-bar-group-chip status-bar-order-chip">
+                <span class="status-bar-order-label" data-tooltip="@groupedLabel" data-tooltip-overflow>@groupedLabel</span>
+                <button aria-label="@StatusBarTextComposer.GroupDirectionAria(Localizer, groupColumn, ordering.IsGroupDescending)"
+                    class="status-bar-group-dir status-bar-order-dir"
+                    @onclick="ToggleGroup"
+                    type="button">
+                    <i aria-hidden="true" class="bi bi-caret-@(ordering.IsGroupDescending ? "down" : "up")"></i>
+                </button>
+                <button aria-label="@StatusBarTextComposer.ClearGroupAria(Localizer, groupColumn)"
+                    class="status-bar-group-remove status-bar-order-remove"
+                    @onclick="ClearGroup"
+                    type="button">
+                    <i aria-hidden="true" class="bi bi-x-lg"></i>
+                </button>
+            </span>
         }
     </div>
 

@@ -997,7 +997,15 @@ public sealed class LocalizationInfraTests
             ("StatusBar_Stats_Hide", 0),
             ("StatusBar_NewEvents_Label", 1),
             ("StatusBar_NewEvents_None", 0),
-            ("StatusBar_NewEvents_Load", 0)
+            ("StatusBar_NewEvents_Load", 0),
+            ("StatusBar_SortedChip", 1),
+            ("StatusBar_GroupedChip", 1),
+            ("StatusBar_SortDirection_AscAria", 1),
+            ("StatusBar_SortDirection_DescAria", 1),
+            ("StatusBar_GroupDirection_AscAria", 1),
+            ("StatusBar_GroupDirection_DescAria", 1),
+            ("StatusBar_ClearSort_Aria", 1),
+            ("StatusBar_ClearGroup_Aria", 1)
         ];
 
         foreach ((string key, int arity) in expected)
@@ -2070,6 +2078,7 @@ public sealed class LocalizationInfraTests
             var eventLogCommands = Substitute.For<IEventLogCommands>();
             var filterApplied = Substitute.For<IFilterAppliedSource>();
             var lensSource = Substitute.For<IFilterLensSource>();
+            var logTableCommands = Substitute.For<ILogTableCommands>();
             var modalCoordinator = Substitute.For<IModalCoordinator>();
             var statsCommands = Substitute.For<IStatsCommands>();
             var statsVisibility = Substitute.For<IStatsVisibilitySource>();
@@ -2096,6 +2105,7 @@ public sealed class LocalizationInfraTests
             Services.AddSingleton(eventLogCommands);
             Services.AddSingleton(filterApplied);
             Services.AddSingleton(lensSource);
+            Services.AddSingleton(logTableCommands);
             Services.AddSingleton(modalCoordinator);
             Services.AddSingleton(statsCommands);
             Services.AddSingleton(statsVisibility);

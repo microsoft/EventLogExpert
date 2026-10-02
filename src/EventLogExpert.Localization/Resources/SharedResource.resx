@@ -2760,6 +2760,38 @@
   <data name="StatusBar_NewEvents_Load" xml:space="preserve">
     <value>Load new events into the view</value>
   </data>
+  <data name="StatusBar_SortedChip" xml:space="preserve">
+    <value>Sorted by {0}</value>
+    <comment>{0} is the localized column label.</comment>
+  </data>
+  <data name="StatusBar_GroupedChip" xml:space="preserve">
+    <value>Grouped by {0}</value>
+    <comment>{0} is the localized column label.</comment>
+  </data>
+  <data name="StatusBar_SortDirection_AscAria" xml:space="preserve">
+    <value>Sorted by {0}: ascending. Activate to sort descending.</value>
+    <comment>{0} is the localized column label.</comment>
+  </data>
+  <data name="StatusBar_SortDirection_DescAria" xml:space="preserve">
+    <value>Sorted by {0}: descending. Activate to sort ascending.</value>
+    <comment>{0} is the localized column label.</comment>
+  </data>
+  <data name="StatusBar_GroupDirection_AscAria" xml:space="preserve">
+    <value>Grouped by {0}: ascending. Activate to sort groups descending.</value>
+    <comment>{0} is the localized column label.</comment>
+  </data>
+  <data name="StatusBar_GroupDirection_DescAria" xml:space="preserve">
+    <value>Grouped by {0}: descending. Activate to sort groups ascending.</value>
+    <comment>{0} is the localized column label.</comment>
+  </data>
+  <data name="StatusBar_ClearSort_Aria" xml:space="preserve">
+    <value>Remove sort by {0}</value>
+    <comment>{0} is the localized column label.</comment>
+  </data>
+  <data name="StatusBar_ClearGroup_Aria" xml:space="preserve">
+    <value>Remove grouping by {0}</value>
+    <comment>{0} is the localized column label.</comment>
+  </data>
   <!-- Stats pane + detail modal localization. Count arguments are pre-formatted in code unless noted. -->
   <data name="Stats_AriaLabel" xml:space="preserve"><value>Statistics</value></data>
   <data name="Stats_Title" xml:space="preserve"><value>Statistics</value></data>

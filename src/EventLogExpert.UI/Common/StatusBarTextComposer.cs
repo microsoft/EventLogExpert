@@ -39,6 +39,12 @@ internal static class StatusBarTextComposer
         };
     }
 
+    internal static string ClearGroupAria(IStringLocalizer<SharedResource> localizer, ColumnName column) =>
+        localizer["StatusBar_ClearGroup_Aria", ColumnNameLocalizer.Label(localizer, column)];
+
+    internal static string ClearSortAria(IStringLocalizer<SharedResource> localizer, ColumnName column) =>
+        localizer["StatusBar_ClearSort_Aria", ColumnNameLocalizer.Label(localizer, column)];
+
     internal static string Counts(
         IStringLocalizer<SharedResource> localizer,
         int total,
@@ -76,6 +82,14 @@ internal static class StatusBarTextComposer
 
         return PluralText.Format(localizer, persistentActive ? "StatusBar_Filter_ActiveLens" : "StatusBar_Filter_Lens", ("count", lensCount));
     }
+
+    internal static string GroupDirectionAria(IStringLocalizer<SharedResource> localizer, ColumnName column, bool isGroupDescending) =>
+        localizer[
+            isGroupDescending ? "StatusBar_GroupDirection_DescAria" : "StatusBar_GroupDirection_AscAria",
+            ColumnNameLocalizer.Label(localizer, column)];
+
+    internal static string GroupedChip(IStringLocalizer<SharedResource> localizer, ColumnName column) =>
+        localizer["StatusBar_GroupedChip", ColumnNameLocalizer.Label(localizer, column)];
 
     internal static StatusBarLoadingChip? Loading(
         IStringLocalizer<SharedResource> localizer,
@@ -156,6 +170,14 @@ internal static class StatusBarTextComposer
 
     internal static string NewEventsLabel(IStringLocalizer<SharedResource> localizer, int newEventCount) =>
         localizer["StatusBar_NewEvents_Label", FormatCount(newEventCount)];
+
+    internal static string SortDirectionAria(IStringLocalizer<SharedResource> localizer, ColumnName column, bool isDescending) =>
+        localizer[
+            isDescending ? "StatusBar_SortDirection_DescAria" : "StatusBar_SortDirection_AscAria",
+            ColumnNameLocalizer.Label(localizer, column)];
+
+    internal static string SortedChip(IStringLocalizer<SharedResource> localizer, ColumnName column) =>
+        localizer["StatusBar_SortedChip", ColumnNameLocalizer.Label(localizer, column)];
 
     internal static string Source(
         IStringLocalizer<SharedResource> localizer,
