@@ -77,13 +77,20 @@ internal sealed class OrderedViewSource : IOrderedViewSource, IDisposable
     {
         var activeTable = state.EventTables.FirstOrDefault(table => table.Id == state.ActiveEventLogId);
 
-        var ordering = new DisplayOrdering(state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending);
-
         IEventColumnView view = activeTable is null ?
             LogTableState.EmptyView :
             state.DisplayedEventsForTab(activeTable);
 
         var presentationState = state.PresentationState;
+        var showCommittedOrdering = presentationState == PresentationState.Faulted;
+
+        var ordering = new DisplayOrdering(state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending)
+        {
+            RequestedOrderBy = showCommittedOrdering ? state.OrderBy : state.RequestedOrderBy,
+            RequestedIsDescending = showCommittedOrdering ? state.IsDescending : state.RequestedIsDescending,
+            RequestedGroupBy = showCommittedOrdering ? state.GroupBy : state.RequestedGroupBy,
+            RequestedIsGroupDescending = showCommittedOrdering ? state.IsGroupDescending : state.RequestedIsGroupDescending
+        };
 
         return new OrderedViewPresentation(
             view,

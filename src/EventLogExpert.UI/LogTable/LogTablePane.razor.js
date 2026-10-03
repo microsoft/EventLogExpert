@@ -444,7 +444,7 @@ export function scrollToRow(offset) {
 
         container.scrollTo({
             top: Math.max(0, bodyRow.offsetHeight * offset - container.offsetHeight / 3),
-            behavior: "smooth"
+            behavior: "auto"
         });
     };
 

@@ -289,6 +289,37 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void GroupedChip_FollowsRequestedColumnAndDirection_Optimistically()
+    {
+        SetOrdering(new DisplayOrdering(OrderBy: null, IsDescending: true, GroupBy: ColumnName.Source, IsGroupDescending: true)
+        {
+            RequestedGroupBy = ColumnName.Level,
+            RequestedIsGroupDescending = false
+        });
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        var chip = cut.Find(".status-bar-group-chip");
+        Assert.Equal("[[StatusBar_GroupedChip([[Column_Level]])]]", chip.QuerySelector(".status-bar-order-label")!.TextContent);
+        Assert.Equal("[[StatusBar_GroupDirection_AscAria([[Column_Level]])]]", chip.QuerySelector("button.status-bar-group-dir")!.GetAttribute("aria-label"));
+        Assert.NotNull(chip.QuerySelector("button.status-bar-group-dir i.bi-caret-up"));
+        Assert.Equal("[[StatusBar_ClearGroup_Aria([[Column_Level]])]]", chip.QuerySelector("button.status-bar-group-remove")!.GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public void GroupedChip_HiddenByRequestedClear_EvenWhenCommittedStillGrouped()
+    {
+        SetOrdering(new DisplayOrdering(OrderBy: null, IsDescending: true, GroupBy: ColumnName.Level, IsGroupDescending: false)
+        {
+            RequestedGroupBy = null
+        });
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Empty(cut.FindAll(".status-bar-group-chip"));
+    }
+
+    [Fact]
     public void GroupedChip_Rendered_WithAscendingCaret_WhenGroupingAscending()
     {
         SetOrdering(new DisplayOrdering(
@@ -714,6 +745,37 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
     {
         SetOrdering(new DisplayOrdering(
             OrderBy: null, IsDescending: true, GroupBy: null, IsGroupDescending: false));
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Empty(cut.FindAll(".status-bar-sort-chip"));
+    }
+
+    [Fact]
+    public void SortedChip_FollowsRequestedColumnAndDirection_Optimistically()
+    {
+        SetOrdering(new DisplayOrdering(OrderBy: ColumnName.Level, IsDescending: true, GroupBy: null, IsGroupDescending: false)
+        {
+            RequestedOrderBy = ColumnName.Source,
+            RequestedIsDescending = false
+        });
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        var chip = cut.Find(".status-bar-sort-chip");
+        Assert.Equal("[[StatusBar_SortedChip([[Column_Source]])]]", chip.QuerySelector(".status-bar-order-label")!.TextContent);
+        Assert.Equal("[[StatusBar_SortDirection_AscAria([[Column_Source]])]]", chip.QuerySelector("button.status-bar-sort-dir")!.GetAttribute("aria-label"));
+        Assert.NotNull(chip.QuerySelector("button.status-bar-sort-dir i.bi-caret-up"));
+        Assert.Equal("[[StatusBar_ClearSort_Aria([[Column_Source]])]]", chip.QuerySelector("button.status-bar-sort-remove")!.GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public void SortedChip_HiddenByRequestedClear_EvenWhenCommittedStillSorted()
+    {
+        SetOrdering(new DisplayOrdering(OrderBy: ColumnName.Source, IsDescending: true, GroupBy: null, IsGroupDescending: false)
+        {
+            RequestedOrderBy = null
+        });
 
         var cut = Render<UI.StatusBar.StatusBar>();
 

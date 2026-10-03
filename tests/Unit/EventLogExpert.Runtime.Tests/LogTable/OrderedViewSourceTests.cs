@@ -261,6 +261,26 @@ public sealed class OrderedViewSourceTests
     }
 
     [Fact]
+    public void FaultedView_ProjectsCommittedOrderingAsRequested_SoIndicatorsMatchTheServedRows()
+    {
+        var harness = new Harness();
+        harness.OpenLog(Event(1, "Alpha"), Event(2, "Beta"), Event(3, "Alpha"));
+        harness.SetCommittedOrdering(ColumnName.Source, isDescending: false, groupBy: ColumnName.Source, isGroupDescending: false);
+        harness.SetRequestedOrdering(ColumnName.Level, isDescending: true, groupBy: ColumnName.Level, isGroupDescending: true);
+
+        harness.SetFaultCause("boom");
+
+        OrderedViewPresentation published = harness.Published[^1];
+
+        Assert.Equal(PresentationState.Faulted, published.State);
+        Assert.Equal(ColumnName.Source, published.Ordering.OrderBy);
+        Assert.Equal(ColumnName.Source, published.Ordering.RequestedOrderBy);
+        Assert.False(published.Ordering.RequestedIsDescending);
+        Assert.Equal(ColumnName.Source, published.Ordering.RequestedGroupBy);
+        Assert.False(published.Ordering.RequestedIsGroupDescending);
+    }
+
+    [Fact]
     public void PublicationLog_AcrossALifecycle_DescribesTheDisplayAtEveryStep()
     {
         var harness = new Harness();
@@ -302,6 +322,10 @@ public sealed class OrderedViewSourceTests
 
         Assert.Equal(ColumnName.Source, published.Ordering.GroupBy);
         Assert.Equal(ColumnName.Source, published.Ordering.OrderBy);
+        Assert.Equal(ColumnName.Level, published.Ordering.RequestedGroupBy);
+        Assert.Equal(ColumnName.Level, published.Ordering.RequestedOrderBy);
+        Assert.True(published.Ordering.RequestedIsDescending);
+        Assert.True(published.Ordering.RequestedIsGroupDescending);
         Assert.False(IsFragmentedBy(published.View, ColumnName.Source));
     }
 

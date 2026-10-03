@@ -86,18 +86,18 @@
             <span class="visually-hidden">@filterTooltip</span>
         }
 
-        @if (hasActiveTab && ordering.OrderBy is { } sortColumn)
+        @if (hasActiveTab && ordering.RequestedOrderBy is { } sortColumn)
         {
             var sortedLabel = StatusBarTextComposer.SortedChip(Localizer, sortColumn);
 
             <span aria-hidden="true" class="status-bar-sep">|</span>
             <span class="status-bar-order-chip status-bar-sort-chip">
                 <span class="status-bar-order-label" data-tooltip="@sortedLabel" data-tooltip-overflow>@sortedLabel</span>
-                <button aria-label="@StatusBarTextComposer.SortDirectionAria(Localizer, sortColumn, ordering.IsDescending)"
+                <button aria-label="@StatusBarTextComposer.SortDirectionAria(Localizer, sortColumn, ordering.RequestedIsDescending)"
                     class="status-bar-order-dir status-bar-sort-dir"
                     @onclick="ToggleSort"
                     type="button">
-                    <i aria-hidden="true" class="bi bi-caret-@(ordering.IsDescending ? "down" : "up")"></i>
+                    <i aria-hidden="true" class="bi bi-caret-@(ordering.RequestedIsDescending ? "down" : "up")"></i>
                 </button>
                 <button aria-label="@StatusBarTextComposer.ClearSortAria(Localizer, sortColumn)"
                     class="status-bar-order-remove status-bar-sort-remove"
@@ -108,18 +108,18 @@
             </span>
         }
 
-        @if (hasActiveTab && ordering.GroupBy is { } groupColumn)
+        @if (hasActiveTab && ordering.RequestedGroupBy is { } groupColumn)
         {
             var groupedLabel = StatusBarTextComposer.GroupedChip(Localizer, groupColumn);
 
             <span aria-hidden="true" class="status-bar-sep">|</span>
             <span class="status-bar-group-chip status-bar-order-chip">
                 <span class="status-bar-order-label" data-tooltip="@groupedLabel" data-tooltip-overflow>@groupedLabel</span>
-                <button aria-label="@StatusBarTextComposer.GroupDirectionAria(Localizer, groupColumn, ordering.IsGroupDescending)"
+                <button aria-label="@StatusBarTextComposer.GroupDirectionAria(Localizer, groupColumn, ordering.RequestedIsGroupDescending)"
                     class="status-bar-group-dir status-bar-order-dir"
                     @onclick="ToggleGroup"
                     type="button">
-                    <i aria-hidden="true" class="bi bi-caret-@(ordering.IsGroupDescending ? "down" : "up")"></i>
+                    <i aria-hidden="true" class="bi bi-caret-@(ordering.RequestedIsGroupDescending ? "down" : "up")"></i>
                 </button>
                 <button aria-label="@StatusBarTextComposer.ClearGroupAria(Localizer, groupColumn)"
                     class="status-bar-group-remove status-bar-order-remove"
