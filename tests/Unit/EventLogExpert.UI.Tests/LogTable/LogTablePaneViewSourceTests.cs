@@ -548,17 +548,30 @@ public sealed class LogTablePaneViewSourceTests : CultureSensitiveBunitContext
     }
 
     [Fact]
-    public void SortIndicator_DescribesThePresentationsOrder_NotTheRequestedOne()
+    public void SortIndicator_FollowsTheRequestedColumnAndDirection_Optimistically()
     {
         SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
-        SetPresentationOrdering(ColumnName.Source, isDescending: true, Event(1, "Alpha"), Event(2, "Beta"));
+
+        var presentation = new OrderedViewPresentation(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+            _logId,
+            new DisplayOrdering(OrderBy: null, IsDescending: true, GroupBy: null, IsGroupDescending: false)
+            {
+                RequestedOrderBy = ColumnName.Source,
+                RequestedIsDescending = false
+            },
+            PresentationState.Current,
+            Revision: 1)
+        { Columns = s_sourceColumn };
+
+        _viewSource.Current.Returns(presentation);
 
         var cut = Render<LogTablePane>();
 
         var header = cut.Find("th[data-column='Source']");
 
-        Assert.Equal("descending", header.GetAttribute("aria-sort"));
-        Assert.NotEmpty(cut.FindAll("th[data-column='Source'] .menu-toggle"));
+        Assert.Equal("ascending", header.GetAttribute("aria-sort"));
+        Assert.Equal("false", cut.Find("th[data-column='Source'] .menu-toggle").GetAttribute("data-rotate"));
     }
 
     [Fact]
@@ -645,19 +658,6 @@ public sealed class LogTablePaneViewSourceTests : CultureSensitiveBunitContext
             DisplayViewTestFactory.Identity(events, groupBy),
             _logId,
             new DisplayOrdering(null, false, groupBy, false),
-            PresentationState.Current,
-            Revision: 1)
-        { Columns = s_sourceColumn };
-
-        _viewSource.Current.Returns(presentation);
-    }
-
-    private void SetPresentationOrdering(ColumnName orderBy, bool isDescending, params ResolvedEvent[] events)
-    {
-        var presentation = new OrderedViewPresentation(
-            DisplayViewTestFactory.Identity(events),
-            _logId,
-            new DisplayOrdering(orderBy, isDescending, null, false),
             PresentationState.Current,
             Revision: 1)
         { Columns = s_sourceColumn };
