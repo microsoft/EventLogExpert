@@ -349,7 +349,6 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
         AssertMenuContains("[[LogTable_CollapseGroup]]");
         AssertMenuContains("[[Menu_View_ExpandAllGroups]]");
         AssertMenuContains("[[Menu_View_CollapseAllGroups]]");
-        AssertMenuContains("[[Menu_View_GroupDescending]]");
         AssertMenuContains("[[LogTable_SelectGroup]]");
         AssertMenuContains("[[LogTable_UnGroupByColumn([[Column_Source]])]]");
 

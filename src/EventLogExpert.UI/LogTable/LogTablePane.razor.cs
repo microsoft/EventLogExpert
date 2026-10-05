@@ -1590,11 +1590,6 @@ public sealed partial class LogTablePane
             MenuItem.Item(Localizer["Menu_View_ExpandAllGroups"].Value, () => LogTableCommands.SetAllGroupsCollapsed(false)),
             MenuItem.Item(Localizer["Menu_View_CollapseAllGroups"].Value, () => LogTableCommands.SetAllGroupsCollapsed(true)),
             MenuItem.Separator(),
-            MenuItem.Item(
-                Localizer["Menu_View_GroupDescending"].Value,
-                () => LogTableCommands.ToggleGroupSortDirection(),
-                isChecked: ordering.IsGroupDescending),
-            MenuItem.Separator(),
             MenuItem.Item(Localizer["LogTable_SelectGroup"].Value, () => SelectGroupByKey(group.Key)),
         };
 
@@ -1614,6 +1609,8 @@ public sealed partial class LogTablePane
         _findExpandedGroupKeys.Remove(groupKey);
         LogTableCommands.ToggleGroupCollapsed(groupKey);
     }
+
+    private void ToggleGroupSorting() => LogTableCommands.ToggleGroupSortDirection();
 
     private void ToggleSorting() => LogTableCommands.ToggleSortDirection();
 

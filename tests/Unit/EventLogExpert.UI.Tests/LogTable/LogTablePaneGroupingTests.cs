@@ -528,7 +528,7 @@ public sealed class LogTablePaneGroupingTests : CultureSensitiveBunitContext
         Assert.NotNull(items);
         Assert.Contains(items!, m => m.Label == "[[Menu_View_ExpandAllGroups]]");
         Assert.Contains(items!, m => m.Label == "[[Menu_View_CollapseAllGroups]]");
-        Assert.Contains(items!, m => m.Label == "[[Menu_View_GroupDescending]]");
+        Assert.DoesNotContain(items!, m => m.Label == "[[Menu_View_GroupDescending]]");
         Assert.Contains(items!, m => m.Label == "[[LogTable_SelectGroup]]");
     }
 

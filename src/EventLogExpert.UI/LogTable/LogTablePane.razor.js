@@ -211,7 +211,7 @@ function enableColumnReorder(table, signal) {
             }
 
             if (e.target.classList.contains("table-divider") ||
-                e.target.closest(".menu-toggle")) {
+                e.target.closest(".menu-toggle, .th-indicators")) {
                 return;
             }
 
