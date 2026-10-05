@@ -58,6 +58,7 @@
                 class="status-bar-stats"
                 data-tooltip="@(StatsVisibility.IsVisible ? Localizer["StatusBar_Stats_Hide"] : Localizer["StatusBar_Stats_Show"])"
                 @onclick="ToggleStats"
+                @ref="_statsButton"
                 type="button">
                 <span class="status-bar-counts">
                     @StatusBarTextComposer.Counts(Localizer, scoped.Total, shown, isFiltered && describesActiveTab, status.SelectionCount)
@@ -96,6 +97,7 @@
                 <button aria-label="@StatusBarTextComposer.SortDirectionAria(Localizer, sortColumn, ordering.RequestedIsDescending)"
                     class="status-bar-order-dir status-bar-sort-dir"
                     @onclick="ToggleSort"
+                    @ref="_sortDirButton"
                     type="button">
                     <i aria-hidden="true" class="bi bi-caret-@(ordering.RequestedIsDescending ? "down" : "up")"></i>
                 </button>
@@ -118,6 +120,7 @@
                 <button aria-label="@StatusBarTextComposer.GroupDirectionAria(Localizer, groupColumn, ordering.RequestedIsGroupDescending)"
                     class="status-bar-group-dir status-bar-order-dir"
                     @onclick="ToggleGroup"
+                    @ref="_groupDirButton"
                     type="button">
                     <i aria-hidden="true" class="bi bi-caret-@(ordering.RequestedIsGroupDescending ? "down" : "up")"></i>
                 </button>

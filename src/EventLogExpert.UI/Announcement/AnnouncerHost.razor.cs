@@ -47,6 +47,14 @@ public sealed partial class AnnouncerHost : ComponentBase, IDisposable
                 FilterImportTextComposer.TagRemoved(Localizer, tag, count),
             AnnouncementPayload.TagRenamed(var oldTag, var newTag, var count) =>
                 FilterImportTextComposer.TagRenamed(Localizer, oldTag, newTag, count),
+            AnnouncementPayload.TableSorted(var column, var isDescending) =>
+                TableOrderingTextComposer.SortAnnouncement(Localizer, column, isDescending),
+            AnnouncementPayload.TableSortCleared _ =>
+                TableOrderingTextComposer.SortClearedAnnouncement(Localizer),
+            AnnouncementPayload.TableGrouped(var column, var isGroupDescending) =>
+                TableOrderingTextComposer.GroupAnnouncement(Localizer, column, isGroupDescending),
+            AnnouncementPayload.TableGroupCleared _ =>
+                TableOrderingTextComposer.GroupClearedAnnouncement(Localizer),
             _ => throw new ArgumentOutOfRangeException(nameof(current.Payload), current.Payload, null)
         };
 

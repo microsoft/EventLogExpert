@@ -223,6 +223,23 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void ColumnSortedAndGrouped_ExposesSortAndGroupStateIndependently()
+    {
+        var cut = RenderTable(groupBy: ColumnName.Source, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, Event(1, "Alpha"));
+
+        var sourceHeader = cut.Find("th[data-column=\"Source\"]");
+        Assert.Equal("[[Column_Source]]", sourceHeader.GetAttribute("aria-label"));
+        Assert.Equal("ascending", sourceHeader.GetAttribute("aria-sort"));
+        Assert.Equal("[[Table_GroupedColumnDescription_Ascending]]", sourceHeader.GetAttribute("aria-description"));
+        Assert.Equal(
+            "[[StatusBar_SortDirection_AscAria([[Column_Source]])]]",
+            cut.Find("button.menu-toggle.sort-toggle").GetAttribute("aria-label"));
+        Assert.Equal(
+            "[[StatusBar_GroupDirection_AscAria([[Column_Source]])]]",
+            cut.Find("button.menu-toggle.group-toggle").GetAttribute("aria-label"));
+    }
+
+    [Fact]
     public void EventContextMenu_RoutesEveryEventActionThroughMarkerLocalizer()
     {
         var @event = Event(1, "Alpha");
@@ -393,6 +410,19 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void GroupedColumnHeader_PinsAccessibleNameAndExposesGroupState()
+    {
+        var cut = RenderTable(groupBy: ColumnName.Source, ImmutableHashSet<string>.Empty, orderBy: null, Event(1, "Alpha"));
+
+        var sourceHeader = cut.Find("th[data-column=\"Source\"]");
+        Assert.Equal("[[Column_Source]]", sourceHeader.GetAttribute("aria-label"));
+        Assert.Equal("[[Table_GroupedColumnDescription_Ascending]]", sourceHeader.GetAttribute("aria-description"));
+        Assert.Equal(
+            "[[StatusBar_GroupDirection_AscAria([[Column_Source]])]]",
+            cut.Find("button.menu-toggle.group-toggle").GetAttribute("aria-label"));
+    }
+
+    [Fact]
     public void LevelCell_RendersSeverityMarker()
     {
         var @event = Event(1, "Alpha") with { Level = "Information" };
@@ -407,8 +437,18 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
         var cut = RenderTable(groupBy: null, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, Event(1, "Alpha"));
 
         Assert.Equal("[[Table_Aria]]", cut.Find("table#eventTable").GetAttribute("aria-label"));
-        Assert.Equal("[[Table_ToggleSortAria]]", cut.Find("button.menu-toggle").GetAttribute("aria-label"));
+        Assert.Equal(
+            "[[StatusBar_SortDirection_AscAria([[Column_Source]])]]",
+            cut.Find("button.menu-toggle.sort-toggle").GetAttribute("aria-label"));
         Assert.Contains("[[Table_ColumnHeader_Description]]", cut.Find("th.description").TextContent);
+    }
+
+    [Fact]
+    public void UngroupedColumnHeader_OmitsGroupDescription()
+    {
+        var cut = RenderTable(groupBy: null, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, Event(1, "Alpha"));
+
+        Assert.Null(cut.Find("th[data-column=\"Source\"]").GetAttribute("aria-description"));
     }
 
     private static void AssertMenuContains(string label, IReadOnlyList<MenuItem> items) =>

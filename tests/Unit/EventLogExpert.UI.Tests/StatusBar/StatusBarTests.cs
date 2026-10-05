@@ -741,6 +741,35 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void SortRemoveButton_Click_RestoresFocus_WhenGroupChipRemains()
+    {
+        SetOrdering(new DisplayOrdering(
+            OrderBy: ColumnName.Source, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false));
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        cut.Find("button.status-bar-sort-remove").Click();
+
+        // The removed chip's [x] would otherwise leave focus on <body>; the handler moves it (a FocusAsync JS call).
+        cut.WaitForAssertion(() =>
+            Assert.Contains(JSInterop.Invocations, invocation =>
+                invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [Fact]
+    public void SortRemoveButton_Click_RestoresFocus_WhenOnlyChip()
+    {
+        SetOrdering(new DisplayOrdering(
+            OrderBy: ColumnName.Source, IsDescending: false, GroupBy: null, IsGroupDescending: false));
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        cut.Find("button.status-bar-sort-remove").Click();
+
+        cut.WaitForAssertion(() =>
+            Assert.Contains(JSInterop.Invocations, invocation =>
+                invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [Fact]
     public void SortedChip_Absent_WhenNoSortActive()
     {
         SetOrdering(new DisplayOrdering(

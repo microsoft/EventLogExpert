@@ -2323,11 +2323,37 @@
   <data name="Table_Aria" xml:space="preserve">
     <value>Event Log Table</value>
   </data>
-  <data name="Table_ToggleSortAria" xml:space="preserve">
-    <value>Toggle sort direction</value>
+  <data name="Table_Announce_SortedAscending" xml:space="preserve">
+    <value>Sorted by {0}, ascending</value>
+    <comment>{0} is the localized column label. Screen-reader announcement when the table sort changes.</comment>
   </data>
-  <data name="Table_ToggleGroupAria" xml:space="preserve">
-    <value>Toggle group sort direction</value>
+  <data name="Table_Announce_SortedDescending" xml:space="preserve">
+    <value>Sorted by {0}, descending</value>
+    <comment>{0} is the localized column label. Screen-reader announcement when the table sort changes.</comment>
+  </data>
+  <data name="Table_Announce_SortCleared" xml:space="preserve">
+    <value>Sort cleared, showing default order</value>
+    <comment>Screen-reader announcement when a custom sort is removed.</comment>
+  </data>
+  <data name="Table_Announce_GroupedAscending" xml:space="preserve">
+    <value>Grouped by {0}, ascending</value>
+    <comment>{0} is the localized column label. Screen-reader announcement when the table grouping changes.</comment>
+  </data>
+  <data name="Table_Announce_GroupedDescending" xml:space="preserve">
+    <value>Grouped by {0}, descending</value>
+    <comment>{0} is the localized column label. Screen-reader announcement when the table grouping changes.</comment>
+  </data>
+  <data name="Table_Announce_GroupCleared" xml:space="preserve">
+    <value>Grouping cleared</value>
+    <comment>Screen-reader announcement when grouping is removed.</comment>
+  </data>
+  <data name="Table_GroupedColumnDescription_Ascending" xml:space="preserve">
+    <value>Grouped, ascending</value>
+    <comment>aria-description on a grouped column header; the column name is already the header's accessible name.</comment>
+  </data>
+  <data name="Table_GroupedColumnDescription_Descending" xml:space="preserve">
+    <value>Grouped, descending</value>
+    <comment>aria-description on a grouped column header; the column name is already the header's accessible name.</comment>
   </data>
   <data name="Table_ColumnHeader_Description" xml:space="preserve">
     <value>Description</value>
