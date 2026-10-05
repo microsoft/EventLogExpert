@@ -51,8 +51,8 @@ internal sealed class OrderedViewState
     private OrderedViewSnapshot _current = OrderedViewSnapshot.Empty;
     private long _generation;
     private bool _holdIngest;
-    private bool _liveIndexInvalidated;
     private ChunkedOrderIndex _index;
+    private bool _liveIndexInvalidated;
     private Func<EventLocator, IEventColumnReader, bool> _predicate = static (_, _) => true;
     private long _publishVersion;
     private SortContext _requestedContext = new(null, false, null, false);
@@ -415,6 +415,7 @@ internal sealed class OrderedViewState
     {
         var runKeys = new List<LogGeneration>(keys.Count);
         var runs = new List<int[]>(keys.Count);
+        var runReaders = new List<IEventColumnReader>(keys.Count);
         long totalSurvivors = 0;
 
         foreach ((LogGeneration key, int covered) in keys)
@@ -426,30 +427,45 @@ internal sealed class OrderedViewState
 
             runKeys.Add(key);
             runs.Add(run);
+            runReaders.Add(reader);
             totalSurvivors += run.Length;
         }
 
+        SortContext context = request.Context;
+        MergeHeadComparison compareHeads = ResolvedEventOrdering.SelectCachedHeadComparer(
+            context.OrderBy, context.IsDescending, context.GroupBy, context.IsGroupDescending);
+
         var merged = new OrderKey[totalSurvivors];
         var cursors = new int[runs.Count];
-        var queue = new PriorityQueue<int, OrderKey>(comparer);
+        var heads = new MergeHead[runs.Count];
+
+        // Compact heap: the run index is both element and priority, and the comparer reads cached heads by ref from the
+        // side array - so no MergeHead is copied through heap sifts, and reader.GetField runs once per head (down from
+        // once per comparison). Each head slot is overwritten only after its run is dequeued (never while enqueued).
+        var queue = new PriorityQueue<int, int>(Comparer<int>.Create((x, y) => compareHeads(in heads[x], in heads[y])));
 
         for (int run = 0; run < runs.Count; run++)
         {
             if ((run & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
-            queue.Enqueue(run, HeadKey(runKeys[run], runs[run], 0));
+            heads[run] = CreateHead(runKeys[run], runs[run], 0, runReaders[run], context);
+            queue.Enqueue(run, run);
         }
 
         int emitted = 0;
 
-        while (queue.TryDequeue(out int run, out OrderKey head))
+        while (queue.TryDequeue(out int run, out _))
         {
             if ((emitted & CancellationCheckMask) == 0) { cancellationToken.ThrowIfCancellationRequested(); }
 
-            merged[emitted++] = head;
+            merged[emitted++] = new OrderKey(heads[run].Locator);
             int next = ++cursors[run];
 
-            if (next < runs[run].Length) { queue.Enqueue(run, HeadKey(runKeys[run], runs[run], next)); }
+            if (next < runs[run].Length)
+            {
+                heads[run] = CreateHead(runKeys[run], runs[run], next, runReaders[run], context);
+                queue.Enqueue(run, run);
+            }
         }
 
         return ChunkedOrderIndex.FromSortedRun(merged, comparer, cancellationToken);
@@ -498,6 +514,10 @@ internal sealed class OrderedViewState
         return keys;
     }
 
+    private static MergeHead CreateHead(LogGeneration key, int[] run, int cursor, IEventColumnReader reader, SortContext context) =>
+        ResolvedEventOrdering.CreateMergeHead(
+            reader, new EventLocator(key.LogId, key.Generation, run[cursor]), context.OrderBy, context.GroupBy);
+
     // Peak estimate. The SoA columns + the whole-pool rank arrays are materialized one log at a time, so their peak is
     // the largest single log; the two coexisting OrderKey[] sets, the permutation, and the survivor lists all live
     // across the whole merge. (Keyword order/group never reaches here - TryBuildBulk routes it to the delegating path.)
@@ -535,9 +555,6 @@ internal sealed class OrderedViewState
             return soaPeak + orderKeyPeak + scratch;
         }
     }
-
-    private static OrderKey HeadKey(LogGeneration key, int[] run, int cursor) =>
-        new(new EventLocator(key.LogId, key.Generation, run[cursor]));
 
     private static bool IsCurrent(in LogGeneration key, IReadOnlyDictionary<EventLogId, int> generation) =>
         generation.TryGetValue(key.LogId, out int current) && key.Generation == current;

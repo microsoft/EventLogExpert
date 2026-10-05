@@ -353,6 +353,51 @@ public sealed class OrderedViewBulkBuildTests
     }
 
     [Fact]
+    public void CombinedBulk_MatchesIncremental_WithNullAndEmptyPooledStringsAcrossLogs()
+    {
+        var first = new List<ResolvedEvent>();
+        var second = new List<ResolvedEvent>();
+        var sid = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+        var baseTime = new DateTime(2026, 3, 3, 0, 0, 0, DateTimeKind.Utc);
+
+        for (int i = 0; i < 90; i++)
+        {
+            first.Add(new ResolvedEvent("LogA", LogPathType.Channel)
+            {
+                RecordId = i % 5 == 0 ? null : i,
+                TimeCreated = baseTime.AddSeconds(i % 11),
+                Id = 1000 + (i % 3),
+                Level = i % 3 == 0 ? "" : "Error",
+                Source = i % 4 == 0 ? "" : $"A.{i % 3}",
+                UserId = i % 2 == 0 ? null : sid
+            });
+
+            second.Add(new ResolvedEvent("LogB", LogPathType.Channel)
+            {
+                RecordId = i % 7 == 0 ? null : i,
+                TimeCreated = baseTime.AddSeconds(i % 11),
+                Id = 1000 + (i % 3),
+                Level = i % 2 == 0 ? "" : "Warning",
+                Source = i % 3 == 0 ? "" : $"B.{i % 4}",
+                UserId = i % 3 == 0 ? null : sid
+            });
+        }
+
+        EventLogId logIdA = EventLogId.Create();
+        EventLogId logIdB = EventLogId.Create();
+        var logs = new[]
+        {
+            (logIdA, EventColumnStore.Build(first, 0, 0).CreateReader(logIdA)),
+            (logIdB, EventColumnStore.Build(second, 0, 0).CreateReader(logIdB))
+        };
+
+        foreach (SortContext context in AllContexts())
+        {
+            AssertCombinedBulkMatchesIncremental(logs, static (_, _) => true, context, $"null-pooled combined {Describe(context)}");
+        }
+    }
+
+    [Fact]
     public void CombinedBulk_MatchesIncremental_WithSparseFiltersAndAnEmptyAndSingleSurvivorLog()
     {
         var sample = new OrderedViewSample(seed: 8123, logCount: 3);
