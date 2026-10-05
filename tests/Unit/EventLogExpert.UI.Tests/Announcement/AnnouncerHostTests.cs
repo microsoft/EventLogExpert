@@ -7,6 +7,7 @@ using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterLibrary;
+using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.UI.Announcement;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.Extensions.DependencyInjection;
@@ -155,6 +156,46 @@ public sealed class AnnouncerHostTests : BunitContext
     }
 
     [Fact]
+    public void AnnouncerHost_TableGroupCleared_RoutesThroughOrderingComposer()
+    {
+        _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TableGroupCleared(), 2));
+
+        var component = Render<AnnouncerHost>();
+
+        Assert.Equal("[[Table_Announce_GroupCleared]]", component.Find("#app-announcer").TextContent);
+    }
+
+    [Fact]
+    public void AnnouncerHost_TableGrouped_RoutesThroughOrderingComposer()
+    {
+        _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TableGrouped(ColumnName.Source, true), 2));
+
+        var component = Render<AnnouncerHost>();
+
+        Assert.Contains("[[Table_Announce_GroupedDescending(", component.Find("#app-announcer").TextContent);
+    }
+
+    [Fact]
+    public void AnnouncerHost_TableSortCleared_RoutesThroughOrderingComposer()
+    {
+        _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TableSortCleared(), 2));
+
+        var component = Render<AnnouncerHost>();
+
+        Assert.Equal("[[Table_Announce_SortCleared]]", component.Find("#app-announcer").TextContent);
+    }
+
+    [Fact]
+    public void AnnouncerHost_TableSorted_RoutesThroughOrderingComposer()
+    {
+        _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TableSorted(ColumnName.Source, false), 2));
+
+        var component = Render<AnnouncerHost>();
+
+        Assert.Contains("[[Table_Announce_SortedAscending(", component.Find("#app-announcer").TextContent);
+    }
+
+    [Fact]
     public void AnnouncerHost_TagRemoved_RoutesThroughImportComposer()
     {
         _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TagRemoved("bug", 2), 2));
@@ -210,5 +251,9 @@ public sealed class AnnouncerHostTests : BunitContext
         leafType == typeof(AnnouncementPayload.FilterImportCompleted) ? new AnnouncementPayload.FilterImportCompleted(new ImportSummary(1, 2, 3, 4, 5)) :
         leafType == typeof(AnnouncementPayload.TagRemoved) ? new AnnouncementPayload.TagRemoved("tag", 2) :
         leafType == typeof(AnnouncementPayload.TagRenamed) ? new AnnouncementPayload.TagRenamed("old", "new", 2) :
+        leafType == typeof(AnnouncementPayload.TableSorted) ? new AnnouncementPayload.TableSorted(ColumnName.Source, false) :
+        leafType == typeof(AnnouncementPayload.TableSortCleared) ? new AnnouncementPayload.TableSortCleared() :
+        leafType == typeof(AnnouncementPayload.TableGrouped) ? new AnnouncementPayload.TableGrouped(ColumnName.Source, false) :
+        leafType == typeof(AnnouncementPayload.TableGroupCleared) ? new AnnouncementPayload.TableGroupCleared() :
         throw new InvalidOperationException($"No test fixture for {leafType.FullName}.");
 }

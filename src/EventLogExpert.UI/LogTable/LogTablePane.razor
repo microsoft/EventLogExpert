@@ -118,21 +118,18 @@
                         _ => string.Empty
                     };
 
+                    var headerText = columnHeader == ColumnName.DateAndTime ? GetDateColumnHeader() : _headerName;
+
                     <th aria-colindex="@(columnIndex + 1)"
+                        aria-description="@(columnGrouped ? TableOrderingTextComposer.GroupedColumnDescription(Localizer, Presentation.Ordering.RequestedIsGroupDescending) : null)"
+                        aria-label="@headerText"
                         aria-sort="@(columnSorted ? Presentation.Ordering.RequestedIsDescending ? "descending" : "ascending" : "none")"
                         class="@(columnHeader.ToString().ToLowerInvariant() + indicatorClass)"
                         data-column="@columnHeader"
                         @key="columnHeader"
                         role="columnheader"
                         style="width: @(width)px">
-                        @if (columnHeader == ColumnName.DateAndTime)
-                        {
-                            <text>@GetDateColumnHeader()</text>
-                        }
-                        else
-                        {
-                            @_headerName
-                        }
+                        @headerText
                         @if (columnSorted || columnGrouped)
                         {
                             <span class="th-indicators">
@@ -142,7 +139,7 @@
                                         IconClass="bi bi-caret-up"
                                         OnClick="ToggleSorting"
                                         StopKeyDownPropagation="true"
-                                        aria-label="@Localizer["Table_ToggleSortAria"]"
+                                        aria-label="@StatusBarTextComposer.SortDirectionAria(Localizer, columnHeader, Presentation.Ordering.RequestedIsDescending)"
                                         data-rotate="@Presentation.Ordering.RequestedIsDescending.ToString().ToLower()" />
                                 }
                                 @if (columnGrouped)
@@ -151,7 +148,7 @@
                                         IconClass="bi bi-chevron-double-up"
                                         OnClick="ToggleGroupSorting"
                                         StopKeyDownPropagation="true"
-                                        aria-label="@Localizer["Table_ToggleGroupAria"]"
+                                        aria-label="@StatusBarTextComposer.GroupDirectionAria(Localizer, columnHeader, Presentation.Ordering.RequestedIsGroupDescending)"
                                         data-rotate="@Presentation.Ordering.RequestedIsGroupDescending.ToString().ToLower()" />
                                 }
                             </span>

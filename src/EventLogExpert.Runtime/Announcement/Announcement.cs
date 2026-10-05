@@ -3,6 +3,7 @@
 
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterLibrary;
+using EventLogExpert.Runtime.LogTable;
 
 namespace EventLogExpert.Runtime.Announcement;
 
@@ -23,4 +24,12 @@ public abstract record Announcement
     public sealed record TagRemoved(string Tag, int Count) : Announcement;
 
     public sealed record TagRenamed(string OldTag, string NewTag, int Count) : Announcement;
+
+    public sealed record TableSorted(ColumnName Column, bool IsDescending) : Announcement;
+
+    public sealed record TableSortCleared : Announcement;
+
+    public sealed record TableGrouped(ColumnName Column, bool IsGroupDescending) : Announcement;
+
+    public sealed record TableGroupCleared : Announcement;
 }
