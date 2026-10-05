@@ -415,7 +415,7 @@ export function focusTableContainer() {
     }
 }
 
-export function scrollToRow(offset) {
+export function scrollToRow(offset, expectedRowCount) {
     const generation = ++scrollToRowGeneration;
 
     const table = document.getElementById("eventTable");
@@ -435,31 +435,56 @@ export function scrollToRow(offset) {
     // whose height can diverge from the 22px data rows and would skew the
     // scroll target, magnified by a deep offset. The [aria-rowindex] filter
     // also skips Virtualize's spacer <tr>s, whose height spans many rows.
-    const applyScroll = () => {
+    const applyScroll = (force) => {
         const bodyRow = table.querySelector("tbody tr[aria-rowindex]");
 
-        if (!bodyRow) {
+        if (!bodyRow || !bodyRow.offsetHeight) {
+            return false;
+        }
+
+        const rowHeight = bodyRow.offsetHeight;
+
+        // expectedRowCount is the caller's aria-rowcount (Virtualize's item count + 1 header row), captured with
+        // `offset`. Virtualize sizes its spacer from the item count; the sticky <thead> adds one more row, and every
+        // <tr> - header included - is 22px (== ItemSize, enforced by CSS and tests), so the content is fully grown
+        // exactly when scrollHeight reaches expectedRowCount * rowHeight. Until then a deep target would cap against
+        // the previous, smaller extent, so wait for the full extent unless forced.
+        if (!force && expectedRowCount > 0 && container.scrollHeight < expectedRowCount * rowHeight) {
+            return false;
+        }
+
+        const viewport = container.clientHeight;
+        const maxScroll = Math.max(0, container.scrollHeight - viewport);
+        const target = Math.max(0, rowHeight * offset - viewport / 3);
+
+        container.scrollTo({ top: Math.min(target, maxScroll), behavior: "auto" });
+
+        return true;
+    };
+
+    // Load-bearing, do not remove: the C# caller fires this scroll from OnAfterRenderAsync in the same cycle as a list
+    // change, and Virtualize reconciles its total scroll height asynchronously afterward, so the first attempt can
+    // still cap a deep target against the previous, smaller item count. Retry per animation frame until the spacer has
+    // grown to the expected extent (above), then scroll once - instant yet reliable. A newer scrollToRow supersedes
+    // this loop via `generation`; on the final attempt, scroll best-effort against the current extent rather than giving up.
+    let attempts = 0;
+    const maxAttempts = 60;
+
+    const settle = () => {
+        if (generation !== scrollToRowGeneration) {
             return;
         }
 
-        container.scrollTo({
-            top: Math.max(0, bodyRow.offsetHeight * offset - container.offsetHeight / 3),
-            behavior: "auto"
-        });
+        const lastChance = ++attempts >= maxAttempts;
+
+        if (applyScroll(lastChance) || lastChance) {
+            return;
+        }
+
+        requestAnimationFrame(settle);
     };
 
-    applyScroll();
-
-    // Load-bearing, do not remove: the C# caller fires this scroll in the same render as the list change (before
-    // the queued Virtualize repaint lands), and Virtualize reconciles its total scroll height asynchronously. So on
-    // the first attempt the container can still cap a deep target against the previous, smaller item count. The
-    // re-apply after the spacer has grown is what actually lands the target (mirrors focusEventTableRow's retry).
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-        // Abort if a newer scrollToRow superseded this call so a stale re-apply can't scroll to an old target.
-        if (generation === scrollToRowGeneration) {
-            applyScroll();
-        }
-    }));
+    settle();
 }
 
 // Returns the PageUp/PageDown jump size in body rows. Derived from the
