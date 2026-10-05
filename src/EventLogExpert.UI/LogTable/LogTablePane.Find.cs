@@ -545,7 +545,7 @@ public sealed partial class LogTablePane
 
         if (_tableModule is not null)
         {
-            await _tableModule.InvokeVoidAsync("scrollToRow", targetRow);
+            await _tableModule.InvokeVoidAsync("scrollToRow", targetRow, GetAriaRowCount());
         }
     }
 

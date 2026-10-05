@@ -1316,7 +1316,7 @@ public sealed partial class LogTablePane
 
         int targetRow = _rowView?.VisibleRowForEvent(index) ?? index;
 
-        if (_tableModule is not null) { await _tableModule.InvokeVoidAsync("scrollToRow", targetRow); }
+        if (_tableModule is not null) { await _tableModule.InvokeVoidAsync("scrollToRow", targetRow, GetAriaRowCount()); }
     }
 
     private void SelectEvent(MouseEventArgs args, DisplayRow row)
@@ -1647,7 +1647,7 @@ public sealed partial class LogTablePane
         if (_tableModule is null) { return false; }
 
         int targetRow = _rowView?.VisibleRowForEvent(index) ?? index;
-        await _tableModule.InvokeVoidAsync("scrollToRow", targetRow);
+        await _tableModule.InvokeVoidAsync("scrollToRow", targetRow, GetAriaRowCount());
 
         return true;
     }
