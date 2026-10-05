@@ -2326,6 +2326,9 @@
   <data name="Table_ToggleSortAria" xml:space="preserve">
     <value>Toggle sort direction</value>
   </data>
+  <data name="Table_ToggleGroupAria" xml:space="preserve">
+    <value>Toggle group sort direction</value>
+  </data>
   <data name="Table_ColumnHeader_Description" xml:space="preserve">
     <value>Description</value>
   </data>

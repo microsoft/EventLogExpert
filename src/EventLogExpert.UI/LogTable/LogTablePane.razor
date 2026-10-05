@@ -108,10 +108,19 @@
                     var columnHeader = _enabledColumns[columnIndex];
                     _headerName = ColumnNameLocalizer.Label(Localizer, columnHeader);
                     var width = GetColumnWidth(columnHeader);
+                    var columnSorted = Presentation.Ordering.RequestedOrderBy == columnHeader;
+                    var columnGrouped = Presentation.Ordering.RequestedGroupBy == columnHeader;
+
+                    var indicatorClass = (columnSorted, columnGrouped) switch
+                    {
+                        (true, true) => " has-indicators-dual",
+                        (true, false) or (false, true) => " has-indicator",
+                        _ => string.Empty
+                    };
 
                     <th aria-colindex="@(columnIndex + 1)"
-                        aria-sort="@(Presentation.Ordering.RequestedOrderBy == columnHeader ? Presentation.Ordering.RequestedIsDescending ? "descending" : "ascending" : "none")"
-                        class="@columnHeader.ToString().ToLowerInvariant()"
+                        aria-sort="@(columnSorted ? Presentation.Ordering.RequestedIsDescending ? "descending" : "ascending" : "none")"
+                        class="@(columnHeader.ToString().ToLowerInvariant() + indicatorClass)"
                         data-column="@columnHeader"
                         @key="columnHeader"
                         role="columnheader"
@@ -124,14 +133,28 @@
                         {
                             @_headerName
                         }
-                        @if (Presentation.Ordering.RequestedOrderBy == columnHeader)
+                        @if (columnSorted || columnGrouped)
                         {
-                            <ChromelessButton CssClass="menu-toggle"
-                                IconClass="bi bi-caret-up"
-                                OnClick="ToggleSorting"
-                                StopKeyDownPropagation="true"
-                                aria-label="@Localizer["Table_ToggleSortAria"]"
-                                data-rotate="@Presentation.Ordering.RequestedIsDescending.ToString().ToLower()" />
+                            <span class="th-indicators">
+                                @if (columnSorted)
+                                {
+                                    <ChromelessButton CssClass="menu-toggle sort-toggle"
+                                        IconClass="bi bi-caret-up"
+                                        OnClick="ToggleSorting"
+                                        StopKeyDownPropagation="true"
+                                        aria-label="@Localizer["Table_ToggleSortAria"]"
+                                        data-rotate="@Presentation.Ordering.RequestedIsDescending.ToString().ToLower()" />
+                                }
+                                @if (columnGrouped)
+                                {
+                                    <ChromelessButton CssClass="menu-toggle group-toggle"
+                                        IconClass="bi bi-chevron-double-up"
+                                        OnClick="ToggleGroupSorting"
+                                        StopKeyDownPropagation="true"
+                                        aria-label="@Localizer["Table_ToggleGroupAria"]"
+                                        data-rotate="@Presentation.Ordering.RequestedIsGroupDescending.ToString().ToLower()" />
+                                }
+                            </span>
                         }
                     </th>
                 }

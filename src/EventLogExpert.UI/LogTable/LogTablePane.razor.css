@@ -73,10 +73,28 @@ th {
     user-select: none;
 }
 
-th ::deep .menu-toggle {
+.th-indicators {
     position: absolute;
-    right: 5px;
+    right: 10px;
+    top: 0;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
 }
+
+/* The header's lone absolute sort caret became a sort+group cluster; keep both buttons as static flex items
+   inside .th-indicators (::deep reaches the button the ChromelessButton child component renders). */
+.th-indicators ::deep .menu-toggle {
+    position: static;
+    right: auto;
+}
+
+/* Reserve right padding so the label ellipsizes before the absolute indicator cluster (em tracks the icon
+   size, the px covers the fixed right offset + gap); dual = both sort and group on one column. */
+th.has-indicator { padding-right: calc(1em + 14px); }
+
+th.has-indicators-dual { padding-right: calc(2em + 16px); }
 
 th, td {
     white-space: nowrap;

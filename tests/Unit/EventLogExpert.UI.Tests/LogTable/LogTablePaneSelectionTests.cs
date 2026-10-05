@@ -186,6 +186,18 @@ public sealed class LogTablePaneSelectionTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void Header_ShowsGroupIndicatorOnlyOnTheGroupedColumn()
+    {
+        var cut = RenderAllColumns(NewEvent(1), groupBy: ColumnName.Source);
+
+        var groupedHeader = cut.Find("th[data-column='Source']");
+        Assert.NotNull(groupedHeader.QuerySelector(".group-toggle"));
+
+        var ungroupedHeader = cut.Find("th[data-column='Level']");
+        Assert.Null(ungroupedHeader.QuerySelector(".group-toggle"));
+    }
+
+    [Fact]
     public void Header_ShowsSortIndicatorOnlyOnTheOrderByColumn()
     {
         var cut = RenderAllColumns(NewEvent(1), orderBy: ColumnName.Source, isDescending: true);
@@ -272,7 +284,8 @@ public sealed class LogTablePaneSelectionTests : CultureSensitiveBunitContext
     }
 
     private IRenderedComponent<LogTablePane> RenderAllColumns(
-        ResolvedEvent displayedEvent, ColumnName? orderBy = null, bool isDescending = false)
+        ResolvedEvent displayedEvent, ColumnName? orderBy = null, bool isDescending = false,
+        ColumnName? groupBy = null, bool isGroupDescending = false)
     {
         ColumnName[] allColumns =
         [
@@ -282,7 +295,8 @@ public sealed class LogTablePaneSelectionTests : CultureSensitiveBunitContext
         ];
 
         _presentation = DisplayViewTestFactory.Presentation(
-            _logId, [displayedEvent], orderBy: orderBy, isDescending: isDescending) with
+            _logId, [displayedEvent], orderBy: orderBy, isDescending: isDescending,
+            groupBy: groupBy, isGroupDescending: isGroupDescending) with
         {
             Columns = allColumns.ToImmutableDictionary(column => column, _ => true),
             ColumnOrder = [.. allColumns]
@@ -295,7 +309,9 @@ public sealed class LogTablePaneSelectionTests : CultureSensitiveBunitContext
             Columns = allColumns.ToImmutableDictionary(column => column, _ => true),
             ColumnOrder = [.. allColumns],
             OrderBy = orderBy,
-            IsDescending = isDescending
+            IsDescending = isDescending,
+            GroupBy = groupBy,
+            IsGroupDescending = isGroupDescending
         });
 
         return Render<LogTablePane>();

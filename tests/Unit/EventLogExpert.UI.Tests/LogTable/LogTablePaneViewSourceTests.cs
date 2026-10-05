@@ -376,6 +376,65 @@ public sealed class LogTablePaneViewSourceTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void GroupIndicator_FollowsTheRequestedGroupColumnAndDirection_Optimistically()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var presentation = new OrderedViewPresentation(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+            _logId,
+            new DisplayOrdering(OrderBy: null, IsDescending: false, GroupBy: null, IsGroupDescending: false)
+            {
+                RequestedGroupBy = ColumnName.Source,
+                RequestedIsGroupDescending = true
+            },
+            PresentationState.Current,
+            Revision: 1)
+        { Columns = s_sourceColumn };
+
+        _viewSource.Current.Returns(presentation);
+
+        var cut = Render<LogTablePane>();
+
+        var header = cut.Find("th[data-column='Source']");
+
+        Assert.Contains("has-indicator", header.GetAttribute("class"));
+
+        var groupToggle = header.QuerySelector(".group-toggle");
+
+        Assert.NotNull(groupToggle);
+        Assert.Equal("true", groupToggle!.GetAttribute("data-rotate"));
+        Assert.NotNull(groupToggle.QuerySelector("i.bi-chevron-double-up"));
+        Assert.False(string.IsNullOrEmpty(groupToggle.GetAttribute("aria-label")));
+        Assert.Null(header.QuerySelector(".sort-toggle"));
+    }
+
+    [Fact]
+    public void GroupIndicator_TogglesGroupSortDirection_WhenClicked()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var presentation = new OrderedViewPresentation(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+            _logId,
+            new DisplayOrdering(OrderBy: null, IsDescending: false, GroupBy: null, IsGroupDescending: false)
+            {
+                RequestedGroupBy = ColumnName.Source
+            },
+            PresentationState.Current,
+            Revision: 1)
+        { Columns = s_sourceColumn };
+
+        _viewSource.Current.Returns(presentation);
+
+        var cut = Render<LogTablePane>();
+
+        cut.Find("th[data-column='Source'] .group-toggle").Click();
+
+        _logTableCommands.Received().ToggleGroupSortDirection();
+    }
+
+    [Fact]
     public void Grouping_FollowsThePresentation_NotTheCommittedColumn()
     {
         SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
@@ -387,6 +446,36 @@ public sealed class LogTablePaneViewSourceTests : CultureSensitiveBunitContext
         Assert.Equal(2, cut.FindAll("tr.group-header-row").Count);
         Assert.Contains("Source", cut.Find("span.group-name").TextContent);
         Assert.Contains("Alpha", cut.FindAll("span.group-value")[0].TextContent);
+    }
+
+    [Fact]
+    public void Header_ShowsBothSortAndGroupIndicators_WhenColumnIsSortedAndGrouped()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var presentation = new OrderedViewPresentation(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+            _logId,
+            new DisplayOrdering(OrderBy: null, IsDescending: false, GroupBy: null, IsGroupDescending: false)
+            {
+                RequestedOrderBy = ColumnName.Source,
+                RequestedIsDescending = true,
+                RequestedGroupBy = ColumnName.Source,
+                RequestedIsGroupDescending = false
+            },
+            PresentationState.Current,
+            Revision: 1)
+        { Columns = s_sourceColumn };
+
+        _viewSource.Current.Returns(presentation);
+
+        var cut = Render<LogTablePane>();
+
+        var header = cut.Find("th[data-column='Source']");
+
+        Assert.Contains("has-indicators-dual", header.GetAttribute("class"));
+        Assert.Equal("true", header.QuerySelector(".sort-toggle")!.GetAttribute("data-rotate"));
+        Assert.Equal("false", header.QuerySelector(".group-toggle")!.GetAttribute("data-rotate"));
     }
 
     [Fact]
