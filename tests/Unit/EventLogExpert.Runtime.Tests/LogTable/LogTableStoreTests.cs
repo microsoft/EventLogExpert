@@ -953,6 +953,23 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
+    public void ReduceToggleGroupSorting_WhenFaulted_IsNoOp()
+    {
+        var seeded = SeedTabled(
+            new List<ResolvedEvent>
+            {
+                FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
+                FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
+            },
+            groupBy: ColumnName.Source);
+        var state = seeded with { OrderedViewDisplayEnabled = false };
+
+        var result = Reducers.ReduceToggleGroupSorting(state);
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
     public void ReduceToggleGroupSorting_WhenGroupedAndAdopted_FlipsCommittedDirection()
     {
         var state = SeedTabled(
@@ -1012,6 +1029,21 @@ public sealed class LogTableStoreTests
 
         Assert.False(result.RequestedIsDescending);
         Assert.True(result.IsDescending);
+    }
+
+    [Fact]
+    public void ReduceToggleSorting_WhenFaulted_IsNoOp()
+    {
+        var seeded = SeedTabled(new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(id: 1, source: "A"),
+            FilterEventBuilder.CreateTestEvent(id: 2, source: "B")
+        });
+        var state = seeded with { OrderedViewDisplayEnabled = false };
+
+        var result = Reducers.ReduceToggleSorting(state);
+
+        Assert.Same(state, result);
     }
 
     private static LogTableState AdoptRequestedOrdering(LogTableState state)

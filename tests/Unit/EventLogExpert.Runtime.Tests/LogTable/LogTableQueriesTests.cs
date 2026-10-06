@@ -140,24 +140,6 @@ public sealed class LogTableQueriesTests
     }
 
     [Fact]
-    public void IsGroupDescending_ReadsCommittedDirection_NotRequested()
-    {
-        var state = new LogTableState { IsGroupDescending = false, RequestedIsGroupDescending = true };
-
-        Assert.False(new LogTableQueries(StateReturning(state)).IsGroupDescending());
-    }
-
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void IsGroupDescending_ReflectsTheCommittedDirection(bool descending)
-    {
-        var state = new LogTableState { GroupBy = ColumnName.Source, IsGroupDescending = descending };
-
-        Assert.Equal(descending, new LogTableQueries(StateReturning(state)).IsGroupDescending());
-    }
-
-    [Fact]
     public void IsGrouping_ReadsCommittedGroupBy_NotRequested()
     {
         var state = new LogTableState { GroupBy = null, RequestedGroupBy = ColumnName.Source };

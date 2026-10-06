@@ -15,6 +15,7 @@ public sealed class OrderedViewBuildPerfTests(ITestOutputHelper output)
     public void BuildIndex_Combined_vs_SingleLog_SameEventCount()
     {
         const int EventCount = 200_000;
+        const int CombinedBudgetMilliseconds = 10_000;
 
         (string Label, SortContext Context)[] contexts =
         [
@@ -31,8 +32,15 @@ public sealed class OrderedViewBuildPerfTests(ITestOutputHelper output)
                 long combinedMs = MeasureBulkBuild(logCount, EventCount, context);
                 double ratio = singleMs == 0 ? double.PositiveInfinity : (double)combinedMs / singleMs;
 
+                // The ratio is a logged diagnostic only; a wall-clock ratio assertion flakes on contended
+                // runners. The absolute budget below is the regression guard, and the combined k-way merge's
+                // correctness is pinned deterministically by the CombinedBulk_MatchesIncremental_* parity tests.
                 _output.WriteLine(
                     $"{label}: single-log {singleMs} ms vs combined k={logCount} {combinedMs} ms ({ratio:F1}x) for {EventCount:N0} events");
+
+                Assert.True(
+                    combinedMs < CombinedBudgetMilliseconds,
+                    $"{label}: combined k={logCount} bulk build took {combinedMs} ms, over the {CombinedBudgetMilliseconds} ms budget");
             }
         }
     }

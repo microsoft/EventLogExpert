@@ -437,7 +437,10 @@ internal sealed class Reducers
     [ReducerMethod(typeof(ToggleGroupSortingAction))]
     public static LogTableState ReduceToggleGroupSorting(LogTableState state)
     {
-        if (state.RequestedGroupBy is null) { return state; }
+        // While faulted the grid shows committed ordering, so a parameterless toggle would flip the
+        // masked failed request the user cannot see; ignore it. The view recovers on a new ingest, a tab
+        // switch, or an absolute SetOrderBy/SetGroupBy that differs from the masked request.
+        if (state.PresentationState == PresentationState.Faulted || state.RequestedGroupBy is null) { return state; }
 
         return RetainServedView(state, state with
         {
@@ -447,10 +450,15 @@ internal sealed class Reducers
 
     [ReducerMethod(typeof(ToggleSortingAction))]
     public static LogTableState ReduceToggleSorting(LogTableState state) =>
-        RetainServedView(state, state with
-        {
-            RequestedIsDescending = !state.RequestedIsDescending
-        });
+        // While faulted the grid shows committed ordering, so a parameterless toggle would flip the
+        // masked failed request the user cannot see; ignore it. The view recovers on a new ingest, a tab
+        // switch, or an absolute SetOrderBy/SetGroupBy that differs from the masked request.
+        state.PresentationState == PresentationState.Faulted ?
+            state :
+            RetainServedView(state, state with
+            {
+                RequestedIsDescending = !state.RequestedIsDescending
+            });
 
     [ReducerMethod]
     public static LogTableState ReduceViewRequestInvalidated(LogTableState state, ViewRequestInvalidatedAction action) =>

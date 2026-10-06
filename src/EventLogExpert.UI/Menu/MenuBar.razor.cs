@@ -62,6 +62,8 @@ public sealed partial class MenuBar
 
     [Inject] private IMenuService MenuService { get; init; } = null!;
 
+    [Inject] private IOrderedViewSource OrderedViewSource { get; init; } = null!;
+
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
     protected override async ValueTask DisposeAsyncCore(bool disposing)
@@ -287,7 +289,11 @@ public sealed partial class MenuBar
         bool isFilterEnabled = FilterPaneQueries.IsEnabled();
         bool isContinuouslyUpdating = EventLogQueries.IsContinuouslyUpdating();
         bool isGrouping = LogTableQueries.IsGrouping();
-        bool isGroupDescending = LogTableQueries.IsGroupDescending();
+        // Group Descending sets the requested group direction, so it tracks the optimistic requested grouping;
+        // Expand/Collapse act on the rows that currently exist, so they stay on committed isGrouping.
+        var requestedOrdering = OrderedViewSource.Current.Ordering;
+        bool isGroupDirectionActive = requestedOrdering.RequestedGroupBy is not null;
+        bool isGroupDescending = requestedOrdering.RequestedIsGroupDescending;
         bool isHistogramVisible = HistogramVisibility.IsVisible;
         bool hasActiveLogs = LogTableQueries.HasActiveLogs();
 
@@ -308,8 +314,8 @@ public sealed partial class MenuBar
                 Localizer["Menu_View_GroupDescending"],
                 Actions.ToggleGroupSortDirection,
                 isChecked: isGroupDescending,
-                isEnabled: isGrouping,
-                disabledReason: isGrouping ? null : GroupDisabledReason),
+                isEnabled: isGroupDirectionActive,
+                disabledReason: isGroupDirectionActive ? null : GroupDisabledReason),
             MenuItem.Item(
                 Localizer["Menu_View_ExpandAllGroups"],
                 () => Actions.SetAllGroupsCollapsed(false),
