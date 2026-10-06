@@ -29,8 +29,6 @@ internal sealed class LogTableQueries(IState<LogTableState> logTableState) : ILo
 
     public bool HasTabGroup(LogTabGroupId groupId) => _logTableState.Value.Groups.Any(group => group.Id == groupId);
 
-    public bool IsGroupDescending() => _logTableState.Value.IsGroupDescending;
-
     public bool IsGrouping() => _logTableState.Value.GroupBy is not null;
 
     public bool IsTabOpen(EventLogId tabId) => _logTableState.Value.EventTables.Any(table => table.Id == tabId);

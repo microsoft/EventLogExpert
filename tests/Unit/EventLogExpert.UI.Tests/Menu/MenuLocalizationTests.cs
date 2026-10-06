@@ -38,6 +38,7 @@ public sealed class MenuLocalizationTests : BunitContext
     private readonly IHistogramVisibilitySource _histogramVisibility = Substitute.For<IHistogramVisibilitySource>();
     private readonly ILogTableQueries _logTableQueries = Substitute.For<ILogTableQueries>();
     private readonly IMenuService _menuService = Substitute.For<IMenuService>();
+    private readonly IOrderedViewSource _orderedViewSource = Substitute.For<IOrderedViewSource>();
     private readonly IChannelReadinessService _readinessService = Substitute.For<IChannelReadinessService>();
     private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
 
@@ -50,9 +51,13 @@ public sealed class MenuLocalizationTests : BunitContext
         Services.AddSingleton(_histogramVisibility);
         Services.AddSingleton(_logTableQueries);
         Services.AddSingleton(_menuService);
+        Services.AddSingleton(_orderedViewSource);
         Services.AddSingleton(_readinessService);
         Services.AddSingleton(_settings);
         Services.AddEventLogLocalization();
+
+        _orderedViewSource.Current.Returns(new OrderedViewPresentation(
+            Substitute.For<IEventColumnView>(), null, default, PresentationState.Current, 0));
 
         JSInterop.Mode = JSRuntimeMode.Loose;
         JSInterop.SetupModule("./_content/EventLogExpert.UI/Menu/MenuAnchor.js")

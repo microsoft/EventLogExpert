@@ -95,7 +95,7 @@
                 }
             </div>
         }
-        <table aria-busy="@(IsGridBusy() ? "true" : null)"
+        <table aria-busy="@(IsGridUpdating() ? "true" : null)"
             aria-label="@Localizer["Table_Aria"]"
             aria-multiselectable="true"
             aria-rowcount="@GetAriaRowCount()"

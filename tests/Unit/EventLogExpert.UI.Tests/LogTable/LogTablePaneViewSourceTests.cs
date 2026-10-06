@@ -358,6 +358,120 @@ public sealed class LogTablePaneViewSourceTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void Grid_AriaBusy_DoesNotLatch_AfterGroupedReorder()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Alpha"));
+
+        OrderedViewPresentation Grouped(PresentationState state, bool stale, long revision) =>
+            new(DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Alpha")], ColumnName.Source),
+                _logId,
+                new DisplayOrdering(OrderBy: null, IsDescending: false, ColumnName.Source, IsGroupDescending: false),
+                state, revision, OrderingIsStale: stale)
+            { Columns = s_sourceColumn };
+
+        _viewSource.Current.Returns(Grouped(PresentationState.Current, stale: false, revision: 1));
+        var cut = Render<LogTablePane>();
+
+        var reprojecting = Grouped(PresentationState.Updating, stale: true, revision: 2);
+        _viewSource.Current.Returns(reprojecting);
+        _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(reprojecting);
+        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find("#eventTable").GetAttribute("aria-busy")));
+
+        var adopted = Grouped(PresentationState.Current, stale: false, revision: 3);
+        _viewSource.Current.Returns(adopted);
+        _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(adopted);
+
+        cut.WaitForAssertion(() => Assert.Null(cut.Find("#eventTable").GetAttribute("aria-busy")));
+    }
+
+    [Fact]
+    public void Grid_AriaBusy_Holds_ThroughUngroupedReorderRefresh()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        OrderedViewPresentation Ungrouped(PresentationState state, bool stale, long revision) =>
+            new(DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+                _logId,
+                new DisplayOrdering(OrderBy: null, IsDescending: false, GroupBy: null, IsGroupDescending: false)
+                {
+                    RequestedOrderBy = ColumnName.Source
+                },
+                state, revision, OrderingIsStale: stale)
+            { Columns = s_sourceColumn };
+
+        _viewSource.Current.Returns(Ungrouped(PresentationState.Current, stale: false, revision: 1));
+        var cut = Render<LogTablePane>();
+
+        var reprojecting = Ungrouped(PresentationState.Updating, stale: true, revision: 2);
+        _viewSource.Current.Returns(reprojecting);
+        _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(reprojecting);
+        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find("#eventTable").GetAttribute("aria-busy")));
+
+        // The wait must outlast the state flip: aria-busy stays true at the adoption paint (stale Virtualize
+        // rows) and clears only after the viewport refreshes. Sampling every render isolates that window, so
+        // deleting the hold makes this fail (aria-busy would already read null at the adoption paint).
+        var busyAfterTheFlip = new List<bool>();
+        void SampleBusy(object? sender, EventArgs args) =>
+            busyAfterTheFlip.Add(cut.Find("#eventTable").GetAttribute("aria-busy") == "true");
+        cut.OnAfterRender += SampleBusy;
+
+        var adopted = Ungrouped(PresentationState.Current, stale: false, revision: 3);
+        _viewSource.Current.Returns(adopted);
+        _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(adopted);
+
+        cut.WaitForAssertion(() => Assert.Null(cut.Find("#eventTable").GetAttribute("aria-busy")));
+        cut.OnAfterRender -= SampleBusy;
+
+        Assert.Contains(true, busyAfterTheFlip);
+        Assert.False(busyAfterTheFlip[^1]);
+    }
+
+    [Fact]
+    public void Grid_IsAriaBusy_WhileReprojectingOptimisticOrdering()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var presentation = new OrderedViewPresentation(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+            _logId,
+            new DisplayOrdering(OrderBy: null, IsDescending: true, GroupBy: null, IsGroupDescending: false)
+            {
+                RequestedOrderBy = ColumnName.Source,
+                RequestedIsDescending = false
+            },
+            PresentationState.Updating,
+            Revision: 1,
+            OrderingIsStale: true)
+        { Columns = s_sourceColumn };
+
+        _viewSource.Current.Returns(presentation);
+
+        var cut = Render<LogTablePane>();
+
+        Assert.Equal("true", cut.Find("#eventTable").GetAttribute("aria-busy"));
+    }
+
+    [Fact]
+    public void Grid_IsNotAriaBusy_WhenOrderingHasSettled()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var presentation = new OrderedViewPresentation(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+            _logId,
+            new DisplayOrdering(ColumnName.Source, IsDescending: false, GroupBy: null, IsGroupDescending: false),
+            PresentationState.Current,
+            Revision: 1)
+        { Columns = s_sourceColumn };
+
+        _viewSource.Current.Returns(presentation);
+
+        var cut = Render<LogTablePane>();
+
+        Assert.Null(cut.Find("#eventTable").GetAttribute("aria-busy"));
+    }
+
+    [Fact]
     public void GroupCollapse_FollowsThePresentation_NotTheCommittedState()
     {
         SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));

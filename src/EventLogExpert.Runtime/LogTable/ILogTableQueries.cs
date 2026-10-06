@@ -17,8 +17,6 @@ public interface ILogTableQueries
 
     bool HasTabGroup(LogTabGroupId groupId);
 
-    bool IsGroupDescending();
-
     bool IsGrouping();
 
     bool IsTabOpen(EventLogId tabId);

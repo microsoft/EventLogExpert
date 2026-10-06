@@ -32,6 +32,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     private readonly IHistogramVisibilitySource _histogramVisibility = Substitute.For<IHistogramVisibilitySource>();
     private readonly ILogTableQueries _logTableQueries = Substitute.For<ILogTableQueries>();
     private readonly IMenuService _menuService = Substitute.For<IMenuService>();
+    private readonly IOrderedViewSource _orderedViewSource = Substitute.For<IOrderedViewSource>();
     private readonly IChannelReadinessService _readinessService = Substitute.For<IChannelReadinessService>();
     private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
     private readonly ICurrentVersionProvider _versionProvider = Substitute.For<ICurrentVersionProvider>();
@@ -45,10 +46,13 @@ public sealed class MenuBarGroupingTests : BunitContext
         Services.AddSingleton(_histogramVisibility);
         Services.AddSingleton(_logTableQueries);
         Services.AddSingleton(_menuService);
+        Services.AddSingleton(_orderedViewSource);
         Services.AddSingleton(_readinessService);
         Services.AddSingleton(_settings);
         Services.AddSingleton(_versionProvider);
         Services.AddEventLogLocalization();
+
+        _orderedViewSource.Current.Returns(ViewPresentation(groupBy: null, descending: false));
 
         JSInterop.Mode = JSRuntimeMode.Loose;
         JSInterop.SetupModule("./_content/EventLogExpert.UI/Menu/MenuAnchor.js")
@@ -249,10 +253,25 @@ public sealed class MenuBarGroupingTests : BunitContext
     }
 
     [Fact]
+    public async Task View_WhenGroupRequestedButNotYetCommitted_DirectionEnabledButExpandCollapseDisabled()
+    {
+        _logTableQueries.IsGrouping().Returns(false);
+        _orderedViewSource.Current.Returns(ViewPresentation(ColumnName.Source, descending: false));
+
+        var items = await OpenViewMenu();
+
+        Assert.False(Item(items, Localizer["Menu_View_ExpandAllGroups"].Value).IsEnabled);
+        Assert.False(Item(items, Localizer["Menu_View_CollapseAllGroups"].Value).IsEnabled);
+
+        var descending = Item(items, Localizer["Menu_View_GroupDescending"].Value);
+        Assert.True(descending.IsEnabled);
+        Assert.False(descending.IsChecked);
+    }
+
+    [Fact]
     public async Task View_WhenGroupingAscending_DescendingEnabledButUnchecked()
     {
-        _logTableQueries.IsGrouping().Returns(true);
-        _logTableQueries.IsGroupDescending().Returns(false);
+        _orderedViewSource.Current.Returns(ViewPresentation(ColumnName.Source, descending: false));
 
         var descending = Item(await OpenViewMenu(), Localizer["Menu_View_GroupDescending"].Value);
 
@@ -264,7 +283,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     public async Task View_WhenGroupingDescending_GroupActionsEnabledAndDescendingChecked()
     {
         _logTableQueries.IsGrouping().Returns(true);
-        _logTableQueries.IsGroupDescending().Returns(true);
+        _orderedViewSource.Current.Returns(ViewPresentation(ColumnName.Source, descending: true));
 
         var items = await OpenViewMenu();
 
@@ -280,6 +299,7 @@ public sealed class MenuBarGroupingTests : BunitContext
     public async Task View_WhenNotGrouping_GroupActionsDisabledWithReason()
     {
         _logTableQueries.IsGrouping().Returns(false);
+        _orderedViewSource.Current.Returns(ViewPresentation(groupBy: null, descending: false));
 
         var items = await OpenViewMenu();
 
@@ -291,6 +311,19 @@ public sealed class MenuBarGroupingTests : BunitContext
         }
     }
 
+    [Fact]
+    public async Task View_WhenUngroupRequestedButStillCommitted_DirectionDisabledButExpandCollapseEnabled()
+    {
+        _logTableQueries.IsGrouping().Returns(true);
+        _orderedViewSource.Current.Returns(ViewPresentation(groupBy: null, descending: false));
+
+        var items = await OpenViewMenu();
+
+        Assert.True(Item(items, Localizer["Menu_View_ExpandAllGroups"].Value).IsEnabled);
+        Assert.True(Item(items, Localizer["Menu_View_CollapseAllGroups"].Value).IsEnabled);
+        Assert.False(Item(items, Localizer["Menu_View_GroupDescending"].Value).IsEnabled);
+    }
+
     private static MenuItem Item(IReadOnlyList<MenuItem> items, string label) =>
         items.Single(item => item.Label == label);
 
@@ -298,6 +331,18 @@ public sealed class MenuBarGroupingTests : BunitContext
     [
         .. channels.Select(channel => new ChannelReadiness(channel, ChannelPresence.Present, ChannelEnablement.Unknown))
     ];
+
+    private static OrderedViewPresentation ViewPresentation(ColumnName? groupBy, bool descending) =>
+        new(
+            Substitute.For<IEventColumnView>(),
+            null,
+            new DisplayOrdering(null, true, null, false)
+            {
+                RequestedGroupBy = groupBy,
+                RequestedIsGroupDescending = descending
+            },
+            PresentationState.Current,
+            0);
 
     private IReadOnlyList<MenuItem> LiveItems(IReadOnlyList<MenuItem> fileItems) =>
         Item(Item(fileItems, Localizer["Menu_File_Open"].Value).Children!, Localizer["Menu_Open_Live"].Value).Children!;

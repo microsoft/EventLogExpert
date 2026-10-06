@@ -42,6 +42,8 @@ public sealed partial class LogTablePane
 
     private IEventColumnView _activeDisplayedEvents = s_emptyView;
     private SavedFilter[] _activeHighlightFilters = [];
+    private bool _ariaBusyAssertedOnLastPaint;
+    private bool _ariaHeldForRefresh;
     private bool _busyAssertedOnLastPaint;
     private bool _busyHeldForRefresh;
     private TableCursor? _cursor;
@@ -183,6 +185,7 @@ public sealed partial class LogTablePane
         _rescrollToSelectedOnRender = false;
 
         _busyAssertedOnLastPaint = IsGridBusy();
+        _ariaBusyAssertedOnLastPaint = IsGridUpdating();
 
         _indicatorState.RecordPaint(_indicator);
 
@@ -245,6 +248,7 @@ public sealed partial class LogTablePane
                 finally
                 {
                     _busyHeldForRefresh = false;
+                    _ariaHeldForRefresh = false;
                     _viewportRenderRequested = true;
 
                     StateHasChanged();
@@ -252,7 +256,19 @@ public sealed partial class LogTablePane
             }
             else
             {
+                bool ariaWasHeld = _ariaHeldForRefresh;
+                _ariaHeldForRefresh = false;
+                bool busyReleaseRendered = _busyHeldForRefresh;
                 ReleaseBusyHeldForRefresh();
+
+                // The grouped/non-virtualized path schedules no refresh render of its own. The gate above
+                // keeps the aria hold off this path, but if a grouped publication ever raced an ungrouped
+                // adoption the hold could land here; force a render so aria-busy can never latch true.
+                if (ariaWasHeld && !busyReleaseRendered)
+                {
+                    _viewportRenderRequested = true;
+                    StateHasChanged();
+                }
             }
         }
 
@@ -523,7 +539,7 @@ public sealed partial class LogTablePane
 
         string columnLabel = ColumnNameLocalizer.Label(Localizer, cellColumn);
 
-        items.Add(Presentation.Ordering.GroupBy.Equals(cellColumn) ?
+        items.Add(Presentation.Ordering.RequestedGroupBy.Equals(cellColumn) ?
             MenuItem.Item(
                 Localizer["LogTable_UnGroupByColumn", columnLabel].Value,
                 () => LogTableCommands.SetGroupBy(null)) :
@@ -568,7 +584,7 @@ public sealed partial class LogTablePane
         {
             MenuItem.Item(Localizer["LogTable_GroupByNone"].Value,
                 () => LogTableCommands.SetGroupBy(null),
-                isChecked: ordering.GroupBy is null)
+                isChecked: ordering.RequestedGroupBy is null)
         };
 
         foreach (var (column, _) in Presentation.Columns)
@@ -580,7 +596,7 @@ public sealed partial class LogTablePane
             items.Add(MenuItem.Item(
                 ColumnNameLocalizer.Label(Localizer, column),
                 () => LogTableCommands.SetGroupBy(capturedColumn),
-                isChecked: ordering.GroupBy.Equals(capturedColumn)));
+                isChecked: ordering.RequestedGroupBy.Equals(capturedColumn)));
         }
 
         return items;
@@ -1029,6 +1045,13 @@ public sealed partial class LogTablePane
     private bool IsGridBusy() =>
         Presentation.IndicatorKind == DisplayIndicatorKind.EmptyPending || _busyHeldForRefresh;
 
+    // aria-busy also covers the reprojection window (where the optimistic ordering indicators lead the
+    // committed rows) and is held across the viewport refresh that follows adoption, so the grid never
+    // reports settled while the reordered rows are not yet painted. This stays separate from IsGridBusy
+    // so the scroll-to-highlight hold timing is unchanged.
+    private bool IsGridUpdating() =>
+        IsGridBusy() || Presentation.IndicatorKind == DisplayIndicatorKind.ReorderPending || _ariaHeldForRefresh;
+
     private bool IsSelectionOutOfSortOrder(IReadOnlyList<SelectionEntry> selection)
     {
         int lastIndex = -1;
@@ -1187,6 +1210,12 @@ public sealed partial class LogTablePane
             _refreshEventViewportOnRender = true;
 
             if (_busyAssertedOnLastPaint) { _busyHeldForRefresh = true; }
+
+            // Hold aria-busy across the deferred viewport refresh an ungrouped optimistic reprojection
+            // triggers, so the grid never reports settled while the reordered rows are not yet painted.
+            // Grouped rows paint synchronously in this same render (RebuildGroupedRowView below), so they
+            // need no hold; arming one there would latch aria-busy because that path forces no re-render.
+            if (_ariaBusyAssertedOnLastPaint && Presentation.Ordering.GroupBy is null) { _ariaHeldForRefresh = true; }
 
             NotifyFindViewChanged();
 
@@ -1459,7 +1488,7 @@ public sealed partial class LogTablePane
             MenuItem.Item(
                 Localizer["LogTable_OrderByDefault"].Value,
                 () => LogTableCommands.SetOrderBy(null),
-                isChecked: ordering.OrderBy is null)
+                isChecked: ordering.RequestedOrderBy is null)
         };
 
         foreach (var (column, _) in columns)
@@ -1468,7 +1497,7 @@ public sealed partial class LogTablePane
             orderItems.Add(MenuItem.Item(
                 ColumnNameLocalizer.Label(Localizer, column),
                 () => LogTableCommands.SetOrderBy(capturedColumn),
-                isChecked: ordering.OrderBy.Equals(capturedColumn)));
+                isChecked: ordering.RequestedOrderBy.Equals(capturedColumn)));
         }
 
         items.Add(MenuItem.SubMenu(Localizer["LogTable_OrderBy"].Value, orderItems));

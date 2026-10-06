@@ -90,6 +90,19 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void CellContextMenu_DirectGroupItem_FollowsRequestedColumn_NotCommitted()
+    {
+        var cut = RenderTableWithRequestedOrdering(
+            committedOrderBy: null, requestedOrderBy: null,
+            committedGroupBy: null, requestedGroupBy: ColumnName.Source,
+            Event(1, "Alpha"));
+
+        OpenMenu(cut, "tbody tr.table-row td:nth-child(1)");
+
+        AssertMenuContains("[[LogTable_UnGroupByColumn([[Column_Source]])]]");
+    }
+
+    [Fact]
     public void CellContextMenu_GroupableCell_IncludesDirectGroupByItemWithoutGroupBySubmenu()
     {
         var cut = RenderTable(
@@ -179,6 +192,21 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void ColumnMenu_GroupByCheck_FollowsRequestedColumn_NotCommitted()
+    {
+        var cut = RenderTableWithRequestedOrdering(
+            committedOrderBy: null, requestedOrderBy: null,
+            committedGroupBy: null, requestedGroupBy: ColumnName.Source,
+            Event(1, "Alpha"));
+
+        OpenMenu(cut, "thead");
+
+        var groupItems = ChildrenOf("[[LogTable_GroupBy]]");
+        Assert.True(groupItems.First(item => item.Label == "[[Column_Source]]").IsChecked);
+        Assert.False(groupItems.First(item => item.Label == "[[LogTable_GroupByNone]]").IsChecked);
+    }
+
+    [Fact]
     public void ColumnMenu_GroupBySubmenu_ContainsOnlyGroupableColumnMarkers()
     {
         var cut = RenderTable(groupBy: null, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, Event(1, "Alpha"));
@@ -192,6 +220,21 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
         Assert.DoesNotContain(groupBy, item => item.Label == "[[Column_DateAndTime]]");
         AssertMenuContains("[[Column_DateAndTime]]");
         AssertMenuContains("[[Column_DateAndTime]]", ChildrenOf("[[LogTable_OrderBy]]"));
+    }
+
+    [Fact]
+    public void ColumnMenu_OrderByCheck_FollowsRequestedColumn_NotCommitted()
+    {
+        var cut = RenderTableWithRequestedOrdering(
+            committedOrderBy: null, requestedOrderBy: ColumnName.Source,
+            committedGroupBy: null, requestedGroupBy: null,
+            Event(1, "Alpha"));
+
+        OpenMenu(cut, "thead");
+
+        var orderItems = ChildrenOf("[[LogTable_OrderBy]]");
+        Assert.True(orderItems.First(item => item.Label == "[[Column_Source]]").IsChecked);
+        Assert.False(orderItems.First(item => item.Label == "[[LogTable_OrderByDefault]]").IsChecked);
     }
 
     [Fact]
@@ -527,6 +570,36 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
             OrderBy = orderBy,
             GroupBy = groupBy,
             GroupCollapseOverrides = collapsed
+        });
+
+        return Render<LogTablePane>();
+    }
+
+    private IRenderedComponent<LogTablePane> RenderTableWithRequestedOrdering(
+        ColumnName? committedOrderBy,
+        ColumnName? requestedOrderBy,
+        ColumnName? committedGroupBy,
+        ColumnName? requestedGroupBy,
+        params ResolvedEvent[] events)
+    {
+        var columns = ImmutableList.Create(ColumnName.Source, ColumnName.DateAndTime);
+        _columnDefaults.ColumnOrder.Returns(columns);
+
+        var served = DisplayViewTestFactory.Presentation(
+            _logId, events, committedOrderBy, isDescending: false, committedGroupBy, revision: ++_presentationRevision);
+        _presentation = served with
+        {
+            Ordering = served.Ordering with { RequestedOrderBy = requestedOrderBy, RequestedGroupBy = requestedGroupBy }
+        };
+
+        _logTableState.Value.Returns(new LogTableState
+        {
+            ActiveEventLogId = _logId,
+            EventTables = ImmutableList.Create(new LogView(_logId) { LogName = LogName }),
+            Columns = columns.ToImmutableDictionary(column => column, _ => true),
+            ColumnOrder = columns,
+            OrderBy = committedOrderBy,
+            GroupBy = committedGroupBy
         });
 
         return Render<LogTablePane>();
