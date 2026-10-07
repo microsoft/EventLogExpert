@@ -358,6 +358,48 @@ public sealed class LogTablePaneViewSourceTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void Grid_AriaBusy_DoesNotHold_WhenReorderFaultsThenUnrelatedRefresh()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var served = DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]);
+
+        OrderedViewPresentation Ungrouped(IEventColumnView view, PresentationState state, bool stale, long revision) =>
+            new(view, _logId,
+                new DisplayOrdering(OrderBy: null, IsDescending: false, GroupBy: null, IsGroupDescending: false),
+                state, revision, OrderingIsStale: stale)
+            { Columns = s_sourceColumn };
+
+        _viewSource.Current.Returns(Ungrouped(served, PresentationState.Current, stale: false, revision: 1));
+        var cut = Render<LogTablePane>();
+
+        var busySamples = new List<bool>();
+        void SampleBusy(object? sender, EventArgs args) =>
+            busySamples.Add(cut.Find("#eventTable").GetAttribute("aria-busy") == "true");
+        cut.OnAfterRender += SampleBusy;
+
+        // A reorder is requested (receipt latched) but the reproject faults, retaining the SAME served view, so the
+        // adopting render sees no view-reference change and must consume - not leak - the receipt.
+        _viewSource.Current.Returns(Ungrouped(served, PresentationState.Faulted, stale: false, revision: 2));
+        _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(
+            Ungrouped(served, PresentationState.Updating, stale: true, revision: 2));
+        cut.WaitForAssertion(() => Assert.Null(cut.Find("#eventTable").GetAttribute("aria-busy")));
+
+        // An unrelated ungrouped refresh (new events) changes the view reference; a leaked receipt would arm the
+        // hold and report aria-busy here, but with the receipt already consumed it must stay settled.
+        var refreshed = Ungrouped(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta"), Event(3, "Gamma")]),
+            PresentationState.Current, stale: false, revision: 3);
+        _viewSource.Current.Returns(refreshed);
+        _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(refreshed);
+
+        cut.WaitForAssertion(() => Assert.Equal("4", cut.Find("#eventTable").GetAttribute("aria-rowcount")));
+        cut.OnAfterRender -= SampleBusy;
+
+        Assert.DoesNotContain(true, busySamples);
+    }
+
+    [Fact]
     public void Grid_AriaBusy_DoesNotLatch_AfterGroupedReorder()
     {
         SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Alpha"));
@@ -417,6 +459,101 @@ public sealed class LogTablePaneViewSourceTests : CultureSensitiveBunitContext
 
         var adopted = Ungrouped(PresentationState.Current, stale: false, revision: 3);
         _viewSource.Current.Returns(adopted);
+        _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(adopted);
+
+        cut.WaitForAssertion(() => Assert.Null(cut.Find("#eventTable").GetAttribute("aria-busy")));
+        cut.OnAfterRender -= SampleBusy;
+
+        Assert.Contains(true, busyAfterTheFlip);
+        Assert.False(busyAfterTheFlip[^1]);
+    }
+
+    [Fact]
+    public void Grid_AriaBusy_Holds_WhenAnInterveningRenderPrecedesTheCoalescedReorderAdoption()
+    {
+        // The receipt is a revision stamp, not a bare flag, precisely so an intervening pre-adoption render cannot
+        // steal it. A ReorderPending publication latches the stamp (revision 2) while Current still serves the
+        // pre-reorder view (revision 1); an unrelated selection-driven render then runs RebuildRowMaps at revision 1.
+        // A bare flag would be consumed by that render and the later adoption would fail to arm the hold; the stamp
+        // (1 < 2) must survive it and arm only once revision 3 actually adopts the reorder.
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var preReorderView = DisplayViewTestFactory.IdentityFor(_logId, [Event(1, "Alpha"), Event(2, "Beta")]);
+        var reorderedView = DisplayViewTestFactory.IdentityFor(_logId, [Event(2, "Beta"), Event(1, "Alpha")]);
+
+        OrderedViewPresentation Ungrouped(IEventColumnView view, PresentationState state, bool stale, long revision) =>
+            new(view, _logId,
+                new DisplayOrdering(OrderBy: null, IsDescending: false, GroupBy: null, IsGroupDescending: false)
+                {
+                    RequestedOrderBy = ColumnName.Source
+                },
+                state, revision, OrderingIsStale: stale)
+            { Columns = s_sourceColumn };
+
+        _viewSource.Current.Returns(Ungrouped(preReorderView, PresentationState.Current, stale: false, revision: 1));
+        var cut = Render<LogTablePane>();
+
+        // The reorder is requested: the ReorderPending publication latches the receipt at revision 2, but Current still
+        // serves revision 1 so the dispatched adopt is a no-op render that never paints the pending state.
+        var reorderPending = Ungrouped(preReorderView, PresentationState.Updating, stale: true, revision: 2);
+        cut.InvokeAsync(() => _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(reorderPending));
+
+        // An unrelated selection change renders at revision 1 (< the stamp) and runs RebuildRowMaps. The stamp must
+        // survive: no hold arms here (the served view is unchanged), and crucially the receipt is not consumed.
+        _selectedEvents.Current.Returns(ImmutableList.Create(EntryFor(Event(1, "Alpha"))));
+        cut.InvokeAsync(() => _selectedEvents.Changed += Raise.Event<Action>());
+        cut.WaitForAssertion(() => Assert.Equal("true", RowSelected(cut, 0)));
+        Assert.Null(cut.Find("#eventTable").GetAttribute("aria-busy"));
+
+        var busyAfterTheFlip = new List<bool>();
+        void SampleBusy(object? sender, EventArgs args) =>
+            busyAfterTheFlip.Add(cut.Find("#eventTable").GetAttribute("aria-busy") == "true");
+        cut.OnAfterRender += SampleBusy;
+
+        // The reorder is adopted at revision 3 with the reordered view. Revision 3 >= the surviving stamp, so the hold
+        // arms over the still-stale Virtualize rows; a stolen receipt would leave this adoption paint settled.
+        var adopted = Ungrouped(reorderedView, PresentationState.Current, stale: false, revision: 3);
+        _viewSource.Current.Returns(adopted);
+        cut.InvokeAsync(() => _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(adopted));
+
+        cut.WaitForAssertion(() => Assert.Null(cut.Find("#eventTable").GetAttribute("aria-busy")));
+        cut.OnAfterRender -= SampleBusy;
+
+        Assert.Contains(true, busyAfterTheFlip);
+        Assert.False(busyAfterTheFlip[^1]);
+    }
+
+    [Fact]
+    public void Grid_AriaBusy_Holds_WhenUngroupedReorderPaintCoalesces()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        OrderedViewPresentation Ungrouped(PresentationState state, bool stale, long revision) =>
+            new(DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+                _logId,
+                new DisplayOrdering(OrderBy: null, IsDescending: false, GroupBy: null, IsGroupDescending: false)
+                {
+                    RequestedOrderBy = ColumnName.Source
+                },
+                state, revision, OrderingIsStale: stale)
+            { Columns = s_sourceColumn };
+
+        _viewSource.Current.Returns(Ungrouped(PresentationState.Current, stale: false, revision: 1));
+        var cut = Render<LogTablePane>();
+
+        var busyAfterTheFlip = new List<bool>();
+        void SampleBusy(object? sender, EventArgs args) =>
+            busyAfterTheFlip.Add(cut.Find("#eventTable").GetAttribute("aria-busy") == "true");
+        cut.OnAfterRender += SampleBusy;
+
+        // Simulate the coalesced path: the ReorderPending publication is received (latching the pending receipt)
+        // but Current already holds the adopted view, so the dispatch adopts it without ever painting the pending
+        // state. Without the receipt latch the hold would not arm (the last paint showed settled) and aria-busy
+        // would read null over the still-stale Virtualize rows.
+        var reprojecting = Ungrouped(PresentationState.Updating, stale: true, revision: 2);
+        var adopted = Ungrouped(PresentationState.Current, stale: false, revision: 3);
+        _viewSource.Current.Returns(adopted);
+        _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(reprojecting);
         _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(adopted);
 
         cut.WaitForAssertion(() => Assert.Null(cut.Find("#eventTable").GetAttribute("aria-busy")));

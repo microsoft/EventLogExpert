@@ -62,6 +62,7 @@ public sealed partial class LogTablePane
     private DisplayIndicatorState _indicatorState = null!;
     private IEventColumnView? _lastIndexedDisplayedEvents;
     private int _pageSize = DefaultPageSize;
+    private long _pendingReorderReceipt;
     private ColumnName[] _previousEnabledColumns = [];
     private bool _refreshEventViewportOnRender;
     private long _renderedPresentationRevision = -1;
@@ -395,6 +396,17 @@ public sealed partial class LogTablePane
 
         _rescrolledForView = Presentation.View;
         _rescrollToSelectedOnRender = true;
+    }
+
+    protected override void OnPresentationPublished(OrderedViewPresentation presentation)
+    {
+        if (presentation.IndicatorKind == DisplayIndicatorKind.ReorderPending)
+        {
+            // Stamp the pending reorder with its publication revision rather than a bare flag: an intervening render
+            // that has not yet adopted this reorder (Presentation.Revision < stamp) must leave it alone, or the
+            // coalesced adopting render would lose the signal. Consumed at the top of RebuildRowMaps once it adopts.
+            Interlocked.Exchange(ref _pendingReorderReceipt, presentation.Revision);
+        }
     }
 
     protected override bool ShouldRender()
@@ -1191,6 +1203,16 @@ public sealed partial class LogTablePane
         var displayedEvents = ResolveActiveDisplayedEvents();
         _activeDisplayedEvents = displayedEvents;
 
+        // Consume the reorder receipt once this render has adopted a view at least as new as the pending reorder
+        // (Presentation.Revision >= stamp): a reorder that ends without a new view (a fault retains the served view;
+        // a revert settles on it) still carries a newer revision, so the stamp clears and cannot arm a later
+        // unrelated refresh - while an intervening pre-adoption render (Revision < stamp) leaves it for the adopting
+        // render. The coalesced adopting render arms via this receipt; the non-coalesced path via _ariaBusyAssertedOnLastPaint.
+        long reorderStamp = Interlocked.Read(ref _pendingReorderReceipt);
+        bool reorderReceipt = reorderStamp != 0 && Presentation.Revision >= reorderStamp;
+
+        if (reorderReceipt) { Interlocked.CompareExchange(ref _pendingReorderReceipt, 0, reorderStamp); }
+
         PruneFindGroupOwnershipOnContextChange();
 
         var currentTableId = Presentation.ActiveTabId;
@@ -1211,11 +1233,7 @@ public sealed partial class LogTablePane
 
             if (_busyAssertedOnLastPaint) { _busyHeldForRefresh = true; }
 
-            // Hold aria-busy across the deferred viewport refresh an ungrouped optimistic reprojection
-            // triggers, so the grid never reports settled while the reordered rows are not yet painted.
-            // Grouped rows paint synchronously in this same render (RebuildGroupedRowView below), so they
-            // need no hold; arming one there would latch aria-busy because that path forces no re-render.
-            if (_ariaBusyAssertedOnLastPaint && Presentation.Ordering.GroupBy is null) { _ariaHeldForRefresh = true; }
+            if ((_ariaBusyAssertedOnLastPaint || reorderReceipt) && Presentation.Ordering.GroupBy is null) { _ariaHeldForRefresh = true; }
 
             NotifyFindViewChanged();
 
@@ -1622,7 +1640,7 @@ public sealed partial class LogTablePane
             MenuItem.Item(Localizer["LogTable_SelectGroup"].Value, () => SelectGroupByKey(group.Key)),
         };
 
-        if (ordering.GroupBy is { } groupBy)
+        if (ordering.RequestedGroupBy is { } groupBy)
         {
             items.Add(MenuItem.Separator());
             items.Add(MenuItem.Item(

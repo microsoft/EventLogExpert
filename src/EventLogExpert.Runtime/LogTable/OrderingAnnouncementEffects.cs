@@ -19,7 +19,9 @@ namespace EventLogExpert.Runtime.LogTable;
 ///     fields (verified by searching every assignment). A future reducer that writes those fields must be routed through
 ///     here as well, or <see cref="_lastAnnounced" /> drifts and the next real change mis-announces. The snapshot is
 ///     deliberately requested-only: the committed ordering fields adopt the engine result later via a different action
-///     this effect does not observe, so including them would reintroduce that drift.
+///     this effect does not observe, so keying off them would reintroduce that drift. While faulted the effect stays
+///     silent (the requested reorder is not taking effect) but still advances <see cref="_lastAnnounced" /> to the
+///     requested ordering, so when the reproject recovers and adopts it the next real change still diffs on one axis.
 /// </remarks>
 internal sealed class OrderingAnnouncementEffects(IState<LogTableState> logTableState, IAnnouncementService announcementService)
 {
@@ -64,10 +66,22 @@ internal sealed class OrderingAnnouncementEffects(IState<LogTableState> logTable
 
     private Task AnnounceIfChanged()
     {
-        AnnouncedOrdering current = Snapshot(_logTableState.Value);
+        var state = _logTableState.Value;
+        AnnouncedOrdering current = Snapshot(state);
 
-        // At most one of these fires per action: each handled reducer changes the sort dimension XOR the group dimension,
-        // so the single-slot announcer never has to carry two messages from one gesture.
+        // While faulted the requested reorder is not taking effect (the served view shows committed), so stay silent -
+        // but keep tracking the requested ordering as the baseline. When the reproject recovers it adopts exactly this
+        // requested ordering, so the next real change still diffs on a single axis; announcing here (a committed delta
+        // the user never requested) or resyncing to committed (which desyncs the post-recovery diff) would both misfire.
+        if (state.PresentationState == PresentationState.Faulted)
+        {
+            _lastAnnounced = current;
+
+            return Task.CompletedTask;
+        }
+
+        // On the normal path each handled reducer changes the sort dimension XOR the group dimension, so at most one of
+        // these fires and the single-slot announcer never has to carry two messages from one gesture.
         if (SortChanged(_lastAnnounced, current))
         {
             _announcementService.Announce(current.SortColumn is { } sortColumn ?
