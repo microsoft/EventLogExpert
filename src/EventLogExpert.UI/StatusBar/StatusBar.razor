@@ -103,7 +103,7 @@
                 </button>
                 <button aria-label="@StatusBarTextComposer.ClearSortAria(Localizer, sortColumn)"
                     class="status-bar-order-remove status-bar-sort-remove"
-                    @onclick="ClearSort"
+                    @onclick="() => ClearSort(sortColumn)"
                     type="button">
                     <i aria-hidden="true" class="bi bi-x-lg"></i>
                 </button>
@@ -126,7 +126,7 @@
                 </button>
                 <button aria-label="@StatusBarTextComposer.ClearGroupAria(Localizer, groupColumn)"
                     class="status-bar-group-remove status-bar-order-remove"
-                    @onclick="ClearGroup"
+                    @onclick="() => ClearGroup(groupColumn)"
                     type="button">
                     <i aria-hidden="true" class="bi bi-x-lg"></i>
                 </button>

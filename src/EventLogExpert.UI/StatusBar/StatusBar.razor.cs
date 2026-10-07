@@ -18,19 +18,16 @@ public sealed partial class StatusBar
 {
     private ElementReference _groupDirButton;
     private DisplayIndicatorState _indicatorState = null!;
-
-    private ChipFocusTarget _pendingChipFocus = ChipFocusTarget.None;
-
+    private ColumnName? _pendingChipColumn;
+    private PendingChipFocus _pendingChipFocus = PendingChipFocus.None;
     private ElementReference _sortDirButton;
-
     private ElementReference _statsButton;
 
-    private enum ChipFocusTarget
+    private enum PendingChipFocus
     {
         None,
-        SortDirection,
-        GroupDirection,
-        Stats
+        SortCleared,
+        GroupCleared
     }
 
     [Inject] private IEventLogCommands EventLogCommands { get; init; } = null!;
@@ -63,25 +60,40 @@ public sealed partial class StatusBar
         await base.DisposeAsyncCore(disposing);
     }
 
-    // Clearing a chip unmounts the button that had focus; without this, focus falls to <body>. Move it to the sibling
-    // ordering chip's direction toggle when one remains, otherwise to the always-present stats button (WAI-ARIA APG
-    // guidance for removing a focused item from a set). The pending target is set only by the chip [x] handlers.
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_pendingChipFocus != ChipFocusTarget.None)
+        if (_pendingChipFocus != PendingChipFocus.None)
         {
-            ElementReference target = _pendingChipFocus switch
-            {
-                ChipFocusTarget.GroupDirection => _groupDirButton,
-                ChipFocusTarget.SortDirection => _sortDirButton,
-                _ => _statsButton
-            };
+            var ordering = Presentation.Ordering;
 
-            _pendingChipFocus = ChipFocusTarget.None;
+            ColumnName? clearedAxisColumn = _pendingChipFocus == PendingChipFocus.SortCleared ?
+                ordering.RequestedOrderBy :
+                ordering.RequestedGroupBy;
 
-            if (!string.IsNullOrEmpty(target.Id))
+            bool supersededByDifferentColumn = Presentation.State != PresentationState.Faulted &&
+                clearedAxisColumn is { } boundColumn &&
+                boundColumn != _pendingChipColumn;
+
+            bool clearedChipGone = clearedAxisColumn is null;
+
+            if (supersededByDifferentColumn)
             {
-                await ElementFocus.TrySafelyAsync(target, preventScroll: true);
+                _pendingChipFocus = PendingChipFocus.None;
+                _pendingChipColumn = null;
+            }
+            else if (clearedChipGone)
+            {
+                ElementReference target = _pendingChipFocus == PendingChipFocus.SortCleared ?
+                    (ordering.RequestedGroupBy is not null ? _groupDirButton : _statsButton) :
+                    (ordering.RequestedOrderBy is not null ? _sortDirButton : _statsButton);
+
+                _pendingChipFocus = PendingChipFocus.None;
+                _pendingChipColumn = null;
+
+                if (!string.IsNullOrEmpty(target.Id))
+                {
+                    await ElementFocus.TrySafelyAsync(target, preventScroll: true);
+                }
             }
         }
 
@@ -100,20 +112,18 @@ public sealed partial class StatusBar
         base.OnInitialized();
     }
 
-    private void ClearGroup()
+    private void ClearGroup(ColumnName column)
     {
-        _pendingChipFocus = Presentation.Ordering.RequestedOrderBy is not null ?
-            ChipFocusTarget.SortDirection :
-            ChipFocusTarget.Stats;
+        _pendingChipColumn = column;
+        _pendingChipFocus = PendingChipFocus.GroupCleared;
 
         LogTableCommands.SetGroupBy(null);
     }
 
-    private void ClearSort()
+    private void ClearSort(ColumnName column)
     {
-        _pendingChipFocus = Presentation.Ordering.RequestedGroupBy is not null ?
-            ChipFocusTarget.GroupDirection :
-            ChipFocusTarget.Stats;
+        _pendingChipColumn = column;
+        _pendingChipFocus = PendingChipFocus.SortCleared;
 
         LogTableCommands.SetOrderBy(null);
     }

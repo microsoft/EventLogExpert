@@ -16,11 +16,13 @@ using EventLogExpert.Runtime.StatusBar;
 using EventLogExpert.UI.LogTable.Resolution;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Reflection;
 
 namespace EventLogExpert.UI.Tests.StatusBar;
 
@@ -67,6 +69,13 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         var emptyPresentation = PresentationWithCount(0, EventLogId.Create());
 
         _viewSource.Current.Returns(emptyPresentation);
+    }
+
+    private enum FocusTarget
+    {
+        SortDirButton,
+        GroupDirButton,
+        StatsButton
     }
 
     private static Filter Filtered => new(new DateFilter { IsEnabled = true }, []);
@@ -264,6 +273,37 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void GroupRemoveButton_Click_RestoresFocus_ToSortDirection_WhenSortChipRemains()
+    {
+        SetOrdering(new DisplayOrdering(
+            OrderBy: ColumnName.Source, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false));
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        cut.Find("button.status-bar-group-remove").Click();
+
+        // Focus restores once the cleared group chip actually unmounts (the clear adopts); the sort chip remains.
+        PublishOrdering(cut, new DisplayOrdering(
+            OrderBy: ColumnName.Source, IsDescending: false, GroupBy: null, IsGroupDescending: false));
+
+        AssertFocusMovedTo(cut, FocusTarget.SortDirButton);
+    }
+
+    [Fact]
+    public void GroupRemoveButton_Click_RestoresFocus_ToStats_WhenOnlyChip()
+    {
+        SetOrdering(new DisplayOrdering(
+            OrderBy: null, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false));
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        cut.Find("button.status-bar-group-remove").Click();
+
+        PublishOrdering(cut, new DisplayOrdering(
+            OrderBy: null, IsDescending: false, GroupBy: null, IsGroupDescending: false));
+
+        AssertFocusMovedTo(cut, FocusTarget.StatsButton);
+    }
+
+    [Fact]
     public void GroupRemoveButton_Click_Ungroups()
     {
         SetOrdering(new DisplayOrdering(
@@ -275,6 +315,79 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         _logTableCommands.Received(1).SetGroupBy(null);
         _logTableCommands.DidNotReceive().ToggleGroupSortDirection();
         _logTableCommands.DidNotReceive().SetOrderBy(Arg.Any<ColumnName?>());
+    }
+
+    [Fact]
+    public void GroupRemoveButton_Click_WhileFaulted_DoesNotMoveFocus()
+    {
+        // A faulted presentation masks Requested* back to committed, so SetGroupBy(null) leaves the chip on
+        // screen; moving focus off the [x] the user just pressed while it is still rendered is wrong.
+        SetOrdering(
+            new DisplayOrdering(OrderBy: null, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false),
+            state: PresentationState.Faulted);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        cut.Find("button.status-bar-group-remove").Click();
+
+        _logTableCommands.Received(1).SetGroupBy(null);
+        // The chip is still rendered (the mask kept it), so the no-focus assertion is meaningful, not vacuous.
+        Assert.NotNull(cut.Find("button.status-bar-group-remove"));
+        Assert.DoesNotContain(JSInterop.Invocations, invocation =>
+            invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void GroupRemoveButton_Click_WhileFaulted_DropsRestore_WhenRegroupedToDifferentColumn()
+    {
+        // Arm the restore by clearing the group chip while faulted (the mask keeps the chip mounted). If the user then
+        // regroups to a different column before recovery - the header regroup menu is not fault-gated - the recovered
+        // presentation shows the new column, so the clear this restore was armed for never happens. The stale arm must
+        // be dropped; otherwise it fires on the next, unrelated clear and steals focus to the status bar.
+        SetOrdering(
+            new DisplayOrdering(OrderBy: ColumnName.DateAndTime, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false),
+            state: PresentationState.Faulted);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        cut.Find("button.status-bar-group-remove").Click();
+
+        // Recovery adopts a DIFFERENT group column (the user regrouped during the fault), superseding the clear.
+        PublishOrdering(cut, new DisplayOrdering(
+            OrderBy: ColumnName.DateAndTime, IsDescending: false, GroupBy: ColumnName.Source, IsGroupDescending: false));
+
+        // A later, unrelated clear (e.g. the header menu removing the group) publishes a null group axis. The chip
+        // unmounts, but because the superseded restore was already dropped no focus is moved. Without the
+        // supersede-disarm the arm survives step 3, trips clearedChipGone on this null publication, and yanks focus to
+        // the sort chip - the user-visible symptom this test pins.
+        PublishOrdering(cut, new DisplayOrdering(
+            OrderBy: ColumnName.DateAndTime, IsDescending: false, GroupBy: null, IsGroupDescending: false));
+
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("button.status-bar-group-remove")));
+
+        Assert.DoesNotContain(JSInterop.Invocations, invocation =>
+            invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void GroupRemoveButton_Click_WhileFaulted_RestoresFocus_OnceRecovered()
+    {
+        // While faulted the mask keeps the chip mounted so focus stays put; when the reproject recovers and the chip
+        // finally unmounts, the deferred restore fires rather than leaving focus on the document body.
+        SetOrdering(
+            new DisplayOrdering(OrderBy: ColumnName.Source, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false),
+            state: PresentationState.Faulted);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        cut.Find("button.status-bar-group-remove").Click();
+
+        // Still faulted: the group chip is masked-present, so no focus move yet.
+        Assert.DoesNotContain(JSInterop.Invocations, invocation =>
+            invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase));
+
+        // Recovery adopts the clear; the group chip unmounts and the deferred restore moves focus to the sort chip.
+        PublishOrdering(cut, new DisplayOrdering(
+            OrderBy: ColumnName.Source, IsDescending: false, GroupBy: null, IsGroupDescending: false));
+
+        AssertFocusMovedTo(cut, FocusTarget.SortDirButton);
     }
 
     [Fact]
@@ -741,7 +854,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
     }
 
     [Fact]
-    public void SortRemoveButton_Click_RestoresFocus_WhenGroupChipRemains()
+    public void SortRemoveButton_Click_RestoresFocus_ToGroupDirection_WhenGroupChipRemains()
     {
         SetOrdering(new DisplayOrdering(
             OrderBy: ColumnName.Source, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false));
@@ -749,14 +862,16 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         var cut = Render<UI.StatusBar.StatusBar>();
         cut.Find("button.status-bar-sort-remove").Click();
 
-        // The removed chip's [x] would otherwise leave focus on <body>; the handler moves it (a FocusAsync JS call).
-        cut.WaitForAssertion(() =>
-            Assert.Contains(JSInterop.Invocations, invocation =>
-                invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase)));
+        // The removed chip's [x] would otherwise leave focus on <body>; once the cleared sort chip unmounts the
+        // handler moves focus to the surviving group chip's direction button.
+        PublishOrdering(cut, new DisplayOrdering(
+            OrderBy: null, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false));
+
+        AssertFocusMovedTo(cut, FocusTarget.GroupDirButton);
     }
 
     [Fact]
-    public void SortRemoveButton_Click_RestoresFocus_WhenOnlyChip()
+    public void SortRemoveButton_Click_RestoresFocus_ToStats_WhenOnlyChip()
     {
         SetOrdering(new DisplayOrdering(
             OrderBy: ColumnName.Source, IsDescending: false, GroupBy: null, IsGroupDescending: false));
@@ -764,9 +879,10 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         var cut = Render<UI.StatusBar.StatusBar>();
         cut.Find("button.status-bar-sort-remove").Click();
 
-        cut.WaitForAssertion(() =>
-            Assert.Contains(JSInterop.Invocations, invocation =>
-                invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase)));
+        PublishOrdering(cut, new DisplayOrdering(
+            OrderBy: null, IsDescending: false, GroupBy: null, IsGroupDescending: false));
+
+        AssertFocusMovedTo(cut, FocusTarget.StatsButton);
     }
 
     [Fact]
@@ -892,6 +1008,49 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
             Revision: 1);
     }
 
+    private void AssertFocusMovedTo(IRenderedComponent<UI.StatusBar.StatusBar> cut, FocusTarget target)
+    {
+        // bUnit does not reliably expose an element's captured ElementReference after a re-render (the
+        // blazor:elementReference markup attribute is dropped), so verify the exact target by matching the focused
+        // reference id to the component's captured @ref field for that button rather than to the DOM element.
+        string expectedField = target switch
+        {
+            FocusTarget.SortDirButton => "_sortDirButton",
+            FocusTarget.GroupDirButton => "_groupDirButton",
+            FocusTarget.StatsButton => "_statsButton",
+            _ => throw new ArgumentOutOfRangeException(nameof(target), target, null)
+        };
+
+        cut.WaitForAssertion(() =>
+        {
+            var focusCall = Assert.Single(JSInterop.Invocations, invocation =>
+                invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase));
+            var focusedId = ((ElementReference)focusCall.Arguments[0]!).Id;
+
+            var field = typeof(UI.StatusBar.StatusBar).GetField(expectedField, BindingFlags.NonPublic | BindingFlags.Instance);
+            var expectedId = ((ElementReference)field!.GetValue(cut.Instance)!).Id;
+
+            Assert.False(string.IsNullOrEmpty(focusedId));
+            Assert.Equal(expectedId, focusedId);
+        });
+    }
+
+    private void PublishOrdering(IRenderedComponent<UI.StatusBar.StatusBar> cut, DisplayOrdering ordering)
+    {
+        var view = Substitute.For<IEventColumnView>();
+        view.Count.Returns(10);
+
+        var presentation = new OrderedViewPresentation(view, _activeLogId, ordering, PresentationState.Current, Revision: 2);
+        _viewSource.Current.Returns(presentation);
+
+        // Drain each publish's render dispatch (adoption + OnAfterRenderAsync) before the caller overwrites
+        // _viewSource.Current for the next publish. The render path reads ViewSource.Current - not the raised
+        // argument - and coalesces, so without this a rapid second publish can drop the intermediate presentation
+        // that a supersede test must observe.
+        cut.InvokeAsync(() => _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(presentation))
+            .GetAwaiter().GetResult();
+    }
+
     private void SetActiveLog(int total, int shown, Filter filter, int selected)
     {
         var id = EventLogId.Create();
@@ -927,7 +1086,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         };
     }
 
-    private void SetOrdering(DisplayOrdering ordering, bool withActiveTab = true)
+    private void SetOrdering(DisplayOrdering ordering, bool withActiveTab = true, PresentationState state = PresentationState.Current)
     {
         var id = EventLogId.Create();
         _activeLogId = id;
@@ -936,7 +1095,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         view.Count.Returns(10);
 
         _viewSource.Current.Returns(new OrderedViewPresentation(
-            view, withActiveTab ? id : null, ordering, PresentationState.Current, Revision: 1));
+            view, withActiveTab ? id : null, ordering, state, Revision: 1));
 
         _status = new StatusBarPresentation
         {

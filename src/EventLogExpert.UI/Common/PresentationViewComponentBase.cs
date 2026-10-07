@@ -38,6 +38,13 @@ public abstract class PresentationViewComponentBase : AppStateComponentBase
 
     protected virtual void OnPresentationChanged() { }
 
+    /// <remarks>
+    ///     Runs on the publishing thread for every publication, before render coalescing, so an override can observe a
+    ///     transient state (e.g. a reorder-pending view) the coalesced paint may skip. It MUST be thread-safe and MUST NOT
+    ///     render or read <see cref="Presentation" /> - use <see cref="OnPresentationChanged" /> for that.
+    /// </remarks>
+    protected virtual void OnPresentationPublished(OrderedViewPresentation presentation) { }
+
     private void AdoptLatestPresentation()
     {
         Volatile.Write(ref _hasPendingRenderDispatch, 0);
@@ -57,6 +64,8 @@ public abstract class PresentationViewComponentBase : AppStateComponentBase
 
     private void OnViewUpdated(OrderedViewPresentation presentation)
     {
+        OnPresentationPublished(presentation);
+
         if (Interlocked.Exchange(ref _hasPendingRenderDispatch, 1) != 0) { return; }
 
         _ = DispatchRenderAsync();

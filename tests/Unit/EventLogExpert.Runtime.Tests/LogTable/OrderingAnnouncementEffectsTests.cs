@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.LogTable;
 using Fluxor;
@@ -113,6 +114,44 @@ public sealed class OrderingAnnouncementEffectsTests
     }
 
     [Fact]
+    public async Task RequestWhileFaulted_AfterAnnouncedOrdering_StaysSilentOnBothAxes()
+    {
+        // A prior sort+group was announced optimistically; the reproject then faulted back to committed (null, null).
+        // A further request while faulted must stay silent - re-announcing committed would both narrate a change that
+        // did not happen AND, because the mask now diffs both axes at once, drop one message through the single slot.
+        _state.Value.Returns(State(orderBy: ColumnName.Source, groupBy: ColumnName.Level));
+        var sut = CreateSut();
+        _state.Value.Returns(FaultedState(requestedGroupBy: ColumnName.DateAndTime));
+
+        await sut.HandleSetGroupBy(_dispatcher);
+
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+    }
+
+    // A faulted presentation requires an active table plus OrderedViewDisplayEnabled=false; committed grouping stays
+    // null so the mask the effect mirrors reports "no grouping" while the request carries the pending column.
+    [Fact]
+    public async Task RequestWhileFaulted_ThenRecovery_NextChangeAnnouncesOnlyTheChangedAxis()
+    {
+        // The faulted baseline tracks the REQUESTED ordering, so when recovery adopts it, a later single-axis change
+        // announces only that axis - not a stale committed delta on both axes through the single announcer slot.
+        _state.Value.Returns(State(orderBy: ColumnName.Source));
+        var sut = CreateSut();
+
+        // Fault; user requests group Level (silent, but the baseline now tracks requested Source + Level).
+        _state.Value.Returns(FaultedState(requestedGroupBy: ColumnName.Level, requestedOrderBy: ColumnName.Source));
+        await sut.HandleSetGroupBy(_dispatcher);
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+
+        // Recovery adopted the requested ordering; the user now clears the sort.
+        _state.Value.Returns(State(groupBy: ColumnName.Level));
+        await sut.HandleSetOrderBy(_dispatcher);
+
+        _announcer.Received(1).Announce(Arg.Any<AnnouncementPayload.TableSortCleared>());
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableGrouped>());
+    }
+
+    [Fact]
     public async Task SetGroupBy_AnnouncesGrouped()
     {
         var sut = CreateSut();
@@ -122,6 +161,20 @@ public sealed class OrderingAnnouncementEffectsTests
 
         _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableGrouped>(
             payload => payload.Column == ColumnName.Level && !payload.IsGroupDescending));
+    }
+
+    [Fact]
+    public async Task SetGroupBy_WhileFaulted_StaysSilent_BecauseServedViewRevertsToCommitted()
+    {
+        // While faulted the served view masks Requested* back to committed (OrderedViewSource), so the effect must
+        // mirror that mask: announcing "grouped by Level" when the chip, header, and menus still show the committed
+        // (ungrouped) order would assert a reorder no visible surface reflects.
+        var sut = CreateSut();
+        _state.Value.Returns(FaultedState(requestedGroupBy: ColumnName.Level));
+
+        await sut.HandleSetGroupBy(_dispatcher);
+
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
     }
 
     [Fact]
@@ -210,6 +263,20 @@ public sealed class OrderingAnnouncementEffectsTests
         await sut.HandleToggleSorting(_dispatcher);
 
         _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+    }
+
+    private static LogTableState FaultedState(ColumnName? requestedGroupBy, ColumnName? requestedOrderBy = null)
+    {
+        var id = EventLogId.Create();
+
+        return new LogTableState
+        {
+            ActiveEventLogId = id,
+            EventTables = [new LogView(id)],
+            OrderedViewDisplayEnabled = false,
+            RequestedOrderBy = requestedOrderBy,
+            RequestedGroupBy = requestedGroupBy
+        };
     }
 
     private static LogTableState State(

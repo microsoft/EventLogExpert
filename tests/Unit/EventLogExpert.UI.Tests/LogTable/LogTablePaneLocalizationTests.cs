@@ -433,6 +433,28 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public async Task GroupContextMenu_Ungroup_WhenRegroupPending_LabelsTheRequestedColumn()
+    {
+        // Mid-regroup the chip and header already show the requested column; the group-header ungroup item must
+        // agree so every grouping-identity surface reads one source, and the click cancels the pending request.
+        var cut = RenderTableWithRequestedOrdering(
+            committedOrderBy: null,
+            requestedOrderBy: null,
+            committedGroupBy: ColumnName.Source,
+            requestedGroupBy: ColumnName.DateAndTime,
+            Event(1, "Alpha"));
+
+        OpenMenu(cut, "tr.group-header-row");
+        _logTableCommands.ClearReceivedCalls();
+        var item = _capturedMenu!.Single(menuItem => menuItem.Label.StartsWith("[[LogTable_UnGroupByColumn(", StringComparison.Ordinal));
+        Assert.Equal("[[LogTable_UnGroupByColumn([[Column_DateAndTime]])]]", item.Label);
+
+        await item.OnClickAsync!();
+
+        _logTableCommands.Received().SetGroupBy(null);
+    }
+
+    [Fact]
     public void GroupHeader_WhenGroupValueIsEmpty_RoutesPlaceholderThroughMarkerLocalizer()
     {
         var cut = RenderTable(ColumnName.Source, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, Event(1, string.Empty));
