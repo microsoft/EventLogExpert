@@ -69,10 +69,12 @@ internal sealed class ViewRequestIssuer
         }
     }
 
-    public long? TryIssue(ViewIdentity identity)
+    public long? TryIssue(ViewIdentity identity, bool forceReissue = false)
     {
         lock (_gate)
         {
+            if (forceReissue) { _lastIssuedIdentity = null; }
+
             if (_lastIssuedIdentity == identity) { return null; }
 
             _lastIssuedIdentity = identity;
