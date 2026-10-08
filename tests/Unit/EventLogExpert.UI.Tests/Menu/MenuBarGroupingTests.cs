@@ -254,6 +254,32 @@ public sealed class MenuBarGroupingTests : BunitContext
     }
 
     [Fact]
+    public async Task View_WhenCurrentChangesBetweenReads_BuildsGroupDescendingFromOneSnapshot()
+    {
+        // A background publication can swap OrderedViewSource.Current between reads, so BuildView must capture it once:
+        // otherwise the Group Descending item could combine an active direction with a later faulted state, rendering
+        // an active-but-disabled toggle that persists until the menu is reopened. Asserting a single read pins that
+        // invariant directly; the property assertions confirm the one captured snapshot drives the item.
+        _logTableQueries.IsGrouping().Returns(true);
+        var active = ViewPresentation(ColumnName.Source, descending: true);
+        var faulted = new OrderedViewPresentation(
+            Substitute.For<IEventColumnView>(),
+            EventLogId.Create(),
+            new DisplayOrdering(null, true, ColumnName.Source, false),
+            PresentationState.Faulted,
+            1);
+        int currentReads = 0;
+        _orderedViewSource.Current.Returns(_ => ++currentReads == 1 ? active : faulted);
+
+        var descending = Item(await OpenViewMenu(), Localizer["Menu_View_GroupDescending"].Value);
+
+        Assert.Equal(1, currentReads);
+        Assert.True(descending.IsEnabled);
+        Assert.True(descending.IsChecked);
+        Assert.Null(descending.DisabledReason);
+    }
+
+    [Fact]
     public async Task View_WhenGroupRequestedButNotYetCommitted_DirectionEnabledButExpandCollapseDisabled()
     {
         _logTableQueries.IsGrouping().Returns(false);
