@@ -19,6 +19,7 @@ using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
+using Microsoft.JSInterop;
 using NSubstitute;
 using System.Collections.Immutable;
 using System.Globalization;
@@ -420,6 +421,64 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
             OrderBy: ColumnName.Source, IsDescending: false, GroupBy: null, IsGroupDescending: false));
 
         AssertFocusMovedTo(cut, FocusTarget.SortDirButton);
+    }
+
+    [Fact]
+    public void GroupRemoveButton_Click_WhileFaulted_RoutesDeferredRestoreThroughOrphanGuard()
+    {
+        // The deferred restore must go through the orphan-guarded focus primitive (focusIfNotElsewhere), never a bare
+        // ElementReference.FocusAsync: the guard is what keeps the restore from stealing focus the user moved elsewhere
+        // during the fault. bUnit cannot execute the module's suppress-when-elsewhere decision (that is pinned in
+        // statusBarFocus.test.js); here we pin that the component routes the restore through that guard at the exact
+        // module path - verifying on the path-specific handler so a C#-only path rename cannot silently fall back.
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/StatusBar/statusBarFocus.js");
+
+        SetOrdering(
+            new DisplayOrdering(OrderBy: ColumnName.Source, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false),
+            state: PresentationState.Faulted);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        cut.Find("button.status-bar-group-remove").Click();
+
+        PublishOrdering(cut, new DisplayOrdering(
+            OrderBy: ColumnName.Source, IsDescending: false, GroupBy: null, IsGroupDescending: false));
+
+        cut.WaitForAssertion(() => focusModule.VerifyInvoke("focusIfNotElsewhere"));
+    }
+
+    [Fact]
+    public void GroupRemoveButton_Click_WhileFaulted_WhenOrphanGuardUnavailable_FallsBackToUnconditionalRestore()
+    {
+        // If the orphan-guard round trip fails (JS disconnected or the module unavailable), the restore must still fire
+        // so a keyboard user is never stranded on the document body - the deliberate fail-safe. The guard throws, so
+        // the component falls back to a bare ElementReference.FocusAsync on the sibling sort chip.
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/StatusBar/statusBarFocus.js");
+        focusModule.Setup<bool>("focusIfNotElsewhere", _ => true)
+            .SetException(new JSDisconnectedException("Circuit disconnected."));
+
+        SetOrdering(
+            new DisplayOrdering(OrderBy: ColumnName.Source, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false),
+            state: PresentationState.Faulted);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        cut.Find("button.status-bar-group-remove").Click();
+
+        PublishOrdering(cut, new DisplayOrdering(
+            OrderBy: ColumnName.Source, IsDescending: false, GroupBy: null, IsGroupDescending: false));
+
+        // The guard threw, so the unconditional fallback focus fired (a separate focus invocation from the guard call)
+        // and landed on the sibling sort chip rather than leaving focus stranded on the document body.
+        cut.WaitForAssertion(() =>
+        {
+            var fallbackFocus = Assert.Single(JSInterop.Invocations, invocation =>
+                invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase) &&
+                !invocation.Identifier.Equals("focusIfNotElsewhere", StringComparison.Ordinal));
+
+            var field = typeof(UI.StatusBar.StatusBar).GetField("_sortDirButton", BindingFlags.NonPublic | BindingFlags.Instance);
+            var expectedId = ((ElementReference)field!.GetValue(cut.Instance)!).Id;
+
+            Assert.Equal(expectedId, ((ElementReference)fallbackFocus.Arguments[0]!).Id);
+        });
     }
 
     [Fact]
