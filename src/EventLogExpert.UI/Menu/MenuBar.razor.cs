@@ -291,12 +291,16 @@ public sealed partial class MenuBar
         bool isFilterEnabled = FilterPaneQueries.IsEnabled();
         bool isContinuouslyUpdating = EventLogQueries.IsContinuouslyUpdating();
         bool isGrouping = LogTableQueries.IsGrouping();
-        // Group Descending sets the requested group direction, so it tracks the optimistic requested grouping;
-        // Expand/Collapse act on the rows that currently exist, so they stay on committed isGrouping.
-        var requestedOrdering = OrderedViewSource.Current.Ordering;
+        // Capture the published presentation once: Current locks and returns the latest snapshot on every read, so
+        // reading the ordering and the fault state separately could combine two presentations (for example an active
+        // direction with a later faulted state, rendering an active-but-disabled toggle). Group Descending tracks the
+        // optimistic requested grouping; Expand/Collapse act on the rows that currently exist, so they stay on
+        // committed isGrouping.
+        var presentation = OrderedViewSource.Current;
+        var requestedOrdering = presentation.Ordering;
         bool isGroupDirectionActive = requestedOrdering.RequestedGroupBy is not null;
         bool isGroupDescending = requestedOrdering.RequestedIsGroupDescending;
-        bool isOrderingFaulted = OrderedViewSource.Current.State == PresentationState.Faulted;
+        bool isOrderingFaulted = presentation.State == PresentationState.Faulted;
         bool isHistogramVisible = HistogramVisibility.IsVisible;
         bool hasActiveLogs = LogTableQueries.HasActiveLogs();
 
