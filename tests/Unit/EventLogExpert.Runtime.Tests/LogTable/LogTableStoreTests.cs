@@ -868,6 +868,45 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
+    public void ReduceSetOrderBy_ReselectingCommittedColumnBehindPendingClear_RestoresCommittedDirection()
+    {
+        // Committed sort is Source ascending, but a pending clear left the requested direction at the descending
+        // default (e.g. the clear's reproject faulted and the user re-picks the column still visible behind the mask).
+        // Re-selecting the committed column must restore the ascending direction the user sees, not the stale default.
+        var state = new LogTableState
+        {
+            OrderBy = ColumnName.Source,
+            IsDescending = false,
+            RequestedOrderBy = null,
+            RequestedIsDescending = true
+        };
+
+        var result = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.Source));
+
+        Assert.Equal(ColumnName.Source, result.RequestedOrderBy);
+        Assert.False(result.RequestedIsDescending);
+    }
+
+    [Fact]
+    public void ReduceSetOrderBy_SelectingDifferentColumn_KeepsPendingRequestedDirection()
+    {
+        // A different column is not a committed re-select, so it keeps the current requested direction rather than
+        // adopting the committed column's direction - the committed-direction restore is scoped to the re-select case.
+        var state = new LogTableState
+        {
+            OrderBy = ColumnName.Source,
+            IsDescending = false,
+            RequestedOrderBy = ColumnName.Source,
+            RequestedIsDescending = true
+        };
+
+        var result = Reducers.ReduceSetOrderBy(state, new SetOrderByAction(ColumnName.Level));
+
+        Assert.Equal(ColumnName.Level, result.RequestedOrderBy);
+        Assert.True(result.RequestedIsDescending);
+    }
+
+    [Fact]
     public void ReduceSetOrderBy_WhenAlreadyDefaultAndDefaultSelected_IsNoOp()
     {
         var state = new LogTableState { RequestedOrderBy = null, RequestedIsDescending = true };

@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.LogTable.OrderedView;
+using NSubstitute;
 using System.Security.Principal;
 
 namespace EventLogExpert.Runtime.Tests.LogTable.OrderedView;
@@ -414,6 +415,24 @@ public sealed class OrderedViewBulkBuildTests
         {
             AssertCombinedBulkMatchesIncremental(logs, Predicate, context, $"combined-sparse {Describe(context)}");
         }
+    }
+
+    [Theory]
+    [InlineData(ColumnName.Source, ColumnName.Source, 4)] // group == within: the shared column is read once, + Date tie-break, RecordId, OwningLog
+    [InlineData(null, ColumnName.RecordId, 2)]            // within == RecordId: reuses the always-read RecordId, + OwningLog
+    [InlineData(null, null, 3)]                           // ungrouped default: Date, RecordId, OwningLog
+    [InlineData(null, ColumnName.Source, 3)]              // ungrouped ordered: within, RecordId, OwningLog
+    public void CreateMergeHead_ReadsEachFieldAtMostOncePerHead(ColumnName? groupBy, ColumnName? orderBy, int expectedReads)
+    {
+        // The combined-merge head caches sort-relevant fields once per survivor; aliased roles (group == within,
+        // order == RecordId, the DateAndTime within + date tie-break) must share a single reader lookup rather than
+        // re-reading the same field, so the k-way merge's per-head cost stays minimal.
+        var reader = Substitute.For<IEventColumnReader>();
+        var locator = new EventLocator(EventLogId.Create(), 0, 0);
+
+        ResolvedEventOrdering.CreateMergeHead(reader, locator, orderBy, groupBy);
+
+        reader.Received(expectedReads).GetField(locator, Arg.Any<EventFieldId>());
     }
 
     [Theory]

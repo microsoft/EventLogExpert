@@ -12,6 +12,7 @@
 
     var ordering = Presentation.Ordering;
     var hasActiveTab = Presentation.ActiveTabId is not null;
+    var orderingFaulted = Presentation.State == PresentationState.Faulted;
 
     var loadingSummary = StatusBarTextComposer.Loading(Localizer, status.LoadingActivities);
 
@@ -95,6 +96,7 @@
             <span class="status-bar-order-chip status-bar-sort-chip">
                 <span class="status-bar-order-label" data-tooltip="@sortedLabel" data-tooltip-overflow>@sortedLabel</span>
                 <button aria-label="@StatusBarTextComposer.SortDirectionAria(Localizer, sortColumn, ordering.RequestedIsDescending)"
+                    aria-disabled="@(orderingFaulted ? "true" : null)"
                     class="status-bar-order-dir status-bar-sort-dir"
                     @onclick="ToggleSort"
                     @ref="_sortDirButton"
@@ -118,6 +120,7 @@
             <span class="status-bar-group-chip status-bar-order-chip">
                 <span class="status-bar-order-label" data-tooltip="@groupedLabel" data-tooltip-overflow>@groupedLabel</span>
                 <button aria-label="@StatusBarTextComposer.GroupDirectionAria(Localizer, groupColumn, ordering.RequestedIsGroupDescending)"
+                    aria-disabled="@(orderingFaulted ? "true" : null)"
                     class="status-bar-group-dir status-bar-order-dir"
                     @onclick="ToggleGroup"
                     @ref="_groupDirButton"

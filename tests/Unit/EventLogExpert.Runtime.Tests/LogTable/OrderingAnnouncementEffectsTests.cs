@@ -114,11 +114,50 @@ public sealed class OrderingAnnouncementEffectsTests
     }
 
     [Fact]
+    public async Task OrderedViewUpdated_WhenRequestedOrderingNotYetCommitted_DoesNotFlush()
+    {
+        // A fault-deferred request must not be announced by an OrderedViewUpdatedAction that did not actually adopt it
+        // (a rejected/stale update, an OrderedViewCleared invalidation, or a fault that cleared because the view went
+        // away). committed != requested proves the reorder has not landed, so the deferral stays pending.
+        _state.Value.Returns(State(orderBy: ColumnName.Source));
+        var sut = CreateSut();
+
+        _state.Value.Returns(FaultedState(requestedGroupBy: ColumnName.Level, requestedOrderBy: ColumnName.Source));
+        await sut.HandleSetGroupBy(_dispatcher);
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+
+        // An OrderedViewUpdatedAction fires but the requested grouping is not committed (committed GroupBy still null).
+        _state.Value.Returns(new LogTableState
+        {
+            OrderBy = ColumnName.Source,
+            RequestedOrderBy = ColumnName.Source,
+            GroupBy = null,
+            RequestedGroupBy = ColumnName.Level
+        });
+        await sut.HandleOrderedViewUpdated(_dispatcher);
+
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+    }
+
+    [Fact]
+    public async Task OrderedViewUpdated_WithNoDeferredChange_StaysSilent()
+    {
+        // The adopt signal fires on every view update (new events, tab switches); with committed == requested the gate
+        // opens, but the baseline already matches the requested ordering, so it must not re-announce the current ordering.
+        _state.Value.Returns(AdoptedState(orderBy: ColumnName.Source, isDescending: false));
+        var sut = CreateSut();
+
+        await sut.HandleOrderedViewUpdated(_dispatcher);
+
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+    }
+
+    [Fact]
     public async Task RequestWhileFaulted_AfterAnnouncedOrdering_StaysSilentOnBothAxes()
     {
-        // A prior sort+group was announced optimistically; the reproject then faulted back to committed (null, null).
-        // A further request while faulted must stay silent - re-announcing committed would both narrate a change that
-        // did not happen AND, because the mask now diffs both axes at once, drop one message through the single slot.
+        // A prior sort+group was announced optimistically; the reproject then faulted. A further request while faulted
+        // must stay silent - the served view still shows committed, so narrating the requested change would assert a
+        // reorder no visible surface reflects. The change is deferred to the adopt flush, not announced here.
         _state.Value.Returns(State(orderBy: ColumnName.Source, groupBy: ColumnName.Level));
         var sut = CreateSut();
         _state.Value.Returns(FaultedState(requestedGroupBy: ColumnName.DateAndTime));
@@ -131,24 +170,29 @@ public sealed class OrderingAnnouncementEffectsTests
     // A faulted presentation requires an active table plus OrderedViewDisplayEnabled=false; committed grouping stays
     // null so the mask the effect mirrors reports "no grouping" while the request carries the pending column.
     [Fact]
-    public async Task RequestWhileFaulted_ThenRecovery_NextChangeAnnouncesOnlyTheChangedAxis()
+    public async Task RequestWhileFaulted_ThenRecoveryAdopts_AnnouncesTheDeferredChange()
     {
-        // The faulted baseline tracks the REQUESTED ordering, so when recovery adopts it, a later single-axis change
-        // announces only that axis - not a stale committed delta on both axes through the single announcer slot.
+        // A reorder requested while faulted stays silent (the served view still shows committed), but the baseline is
+        // left untouched so the change is deferred rather than dropped. When OrderedViewUpdatedAction adopts the
+        // recovered ordering, the pending diff narrates exactly the axis that changed - here the deferred grouping, not
+        // the sort that was already announced before the fault.
         _state.Value.Returns(State(orderBy: ColumnName.Source));
         var sut = CreateSut();
 
-        // Fault; user requests group Level (silent, but the baseline now tracks requested Source + Level).
+        // Fault; user requests group Level - silent, baseline stays at the announced {Source sort, no group}.
         _state.Value.Returns(FaultedState(requestedGroupBy: ColumnName.Level, requestedOrderBy: ColumnName.Source));
         await sut.HandleSetGroupBy(_dispatcher);
         _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
 
-        // Recovery adopted the requested ordering; the user now clears the sort.
-        _state.Value.Returns(State(groupBy: ColumnName.Level));
-        await sut.HandleSetOrderBy(_dispatcher);
+        // Recovery adopts the requested Source sort + Level group (committed now equals requested); the adopt flush
+        // announces only the grouping.
+        _state.Value.Returns(AdoptedState(orderBy: ColumnName.Source, groupBy: ColumnName.Level));
+        await sut.HandleOrderedViewUpdated(_dispatcher);
 
-        _announcer.Received(1).Announce(Arg.Any<AnnouncementPayload.TableSortCleared>());
-        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableGrouped>());
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableGrouped>(
+            payload => payload.Column == ColumnName.Level && !payload.IsGroupDescending));
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableSorted>());
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableSortCleared>());
     }
 
     [Fact]
@@ -264,6 +308,23 @@ public sealed class OrderingAnnouncementEffectsTests
 
         _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
     }
+
+    private static LogTableState AdoptedState(
+        ColumnName? orderBy = null,
+        bool isDescending = true,
+        ColumnName? groupBy = null,
+        bool isGroupDescending = false) =>
+        new()
+        {
+            OrderBy = orderBy,
+            IsDescending = isDescending,
+            GroupBy = groupBy,
+            IsGroupDescending = isGroupDescending,
+            RequestedOrderBy = orderBy,
+            RequestedIsDescending = isDescending,
+            RequestedGroupBy = groupBy,
+            RequestedIsGroupDescending = isGroupDescending
+        };
 
     private static LogTableState FaultedState(ColumnName? requestedGroupBy, ColumnName? requestedOrderBy = null)
     {

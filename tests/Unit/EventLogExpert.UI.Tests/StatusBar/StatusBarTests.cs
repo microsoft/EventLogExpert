@@ -214,6 +214,38 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void DirectionButtons_Disabled_WhileFaulted_ButClearButtonsStayEnabled()
+    {
+        // While faulted the reducers no-op the direction toggles. They render aria-disabled (not native disabled, which
+        // would drop keyboard focus from the toggle the user just pressed to fault the view) and stay focusable; the
+        // reducer no-op makes the press inert. The clear [x] buttons stay interactive: an absolute clear can recover the fault.
+        SetOrdering(
+            new DisplayOrdering(OrderBy: ColumnName.Source, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false),
+            state: PresentationState.Faulted);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Equal("true", cut.Find("button.status-bar-sort-dir").GetAttribute("aria-disabled"));
+        Assert.Equal("true", cut.Find("button.status-bar-group-dir").GetAttribute("aria-disabled"));
+        Assert.False(cut.Find("button.status-bar-sort-dir").HasAttribute("disabled"));
+        Assert.False(cut.Find("button.status-bar-group-dir").HasAttribute("disabled"));
+        Assert.NotEqual("true", cut.Find("button.status-bar-sort-remove").GetAttribute("aria-disabled"));
+        Assert.NotEqual("true", cut.Find("button.status-bar-group-remove").GetAttribute("aria-disabled"));
+    }
+
+    [Fact]
+    public void DirectionButtons_Enabled_WhenNotFaulted()
+    {
+        SetOrdering(new DisplayOrdering(
+            OrderBy: ColumnName.Source, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false));
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.NotEqual("true", cut.Find("button.status-bar-sort-dir").GetAttribute("aria-disabled"));
+        Assert.NotEqual("true", cut.Find("button.status-bar-group-dir").GetAttribute("aria-disabled"));
+    }
+
+    [Fact]
     public async Task Disposal_UnsubscribesFromTheSource()
     {
         SetActiveLog(total: 500, shown: 500, filter: Unfiltered, selected: 0);
@@ -886,6 +918,52 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void SortRemoveButton_Click_ThenActiveTabCloses_DisarmsRestore_WithoutStealingFocus()
+    {
+        // Arm the sort-clear restore, then the active tab closes before the clear adopts. Ordering state is global, so
+        // the masked column can still be non-null and the chip unmounts purely because there is no active tab. The arm
+        // must disarm here - driven by chip presence, not ordering state - so it cannot survive to steal focus later.
+        SetOrdering(new DisplayOrdering(
+            OrderBy: ColumnName.Source, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false));
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        cut.Find("button.status-bar-sort-remove").Click();
+
+        PublishOrderingOnTab(cut, new DisplayOrdering(
+            OrderBy: ColumnName.Source, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false), tabId: null);
+
+        // No focus was stolen on the tab close...
+        Assert.DoesNotContain(JSInterop.Invocations, invocation =>
+            invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase));
+
+        // ...and the arm is actually disarmed, so a later unrelated clear cannot resurrect it.
+        var field = typeof(UI.StatusBar.StatusBar).GetField("_pendingChipFocus", BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.Equal("None", field!.GetValue(cut.Instance)!.ToString());
+    }
+
+    [Fact]
+    public void SortRemoveButton_Click_ThenActiveTabSwitches_DisarmsRestore_WithoutStealingFocus()
+    {
+        // Arm the sort-clear restore, then the active tab auto-switches to a DIFFERENT (non-null) tab - e.g. closing the
+        // active tab selects a sibling. Ordering is global, so fault masking can keep a chip mounted across the switch;
+        // the arm belonged to the original tab and must disarm without stealing focus to the new tab's status bar.
+        SetOrdering(new DisplayOrdering(
+            OrderBy: ColumnName.Source, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false));
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        cut.Find("button.status-bar-sort-remove").Click();
+
+        PublishOrderingOnTab(cut, new DisplayOrdering(
+            OrderBy: ColumnName.Source, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false), tabId: EventLogId.Create());
+
+        Assert.DoesNotContain(JSInterop.Invocations, invocation =>
+            invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase));
+
+        var field = typeof(UI.StatusBar.StatusBar).GetField("_pendingChipFocus", BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.Equal("None", field!.GetValue(cut.Instance)!.ToString());
+    }
+
+    [Fact]
     public void SortedChip_Absent_WhenNoSortActive()
     {
         SetOrdering(new DisplayOrdering(
@@ -1047,6 +1125,21 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         // _viewSource.Current for the next publish. The render path reads ViewSource.Current - not the raised
         // argument - and coalesces, so without this a rapid second publish can drop the intermediate presentation
         // that a supersede test must observe.
+        cut.InvokeAsync(() => _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(presentation))
+            .GetAwaiter().GetResult();
+    }
+
+    private void PublishOrderingOnTab(IRenderedComponent<UI.StatusBar.StatusBar> cut, DisplayOrdering ordering, EventLogId? tabId)
+    {
+        var view = Substitute.For<IEventColumnView>();
+        view.Count.Returns(10);
+
+        // A null tabId models the active tab closing; a different non-null tabId models the active tab auto-switching to
+        // a sibling. Either way the chip the arm was raised on leaves the user's context even if the global ordering
+        // column is still masked-non-null.
+        var presentation = new OrderedViewPresentation(view, tabId, ordering, PresentationState.Current, Revision: 2);
+        _viewSource.Current.Returns(presentation);
+
         cut.InvokeAsync(() => _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(presentation))
             .GetAwaiter().GetResult();
     }

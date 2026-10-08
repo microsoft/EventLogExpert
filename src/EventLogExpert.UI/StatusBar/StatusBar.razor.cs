@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
@@ -20,6 +21,7 @@ public sealed partial class StatusBar
     private DisplayIndicatorState _indicatorState = null!;
     private ColumnName? _pendingChipColumn;
     private PendingChipFocus _pendingChipFocus = PendingChipFocus.None;
+    private EventLogId? _pendingChipTabId;
     private ElementReference _sortDirButton;
     private ElementReference _statsButton;
 
@@ -66,29 +68,50 @@ public sealed partial class StatusBar
         {
             var ordering = Presentation.Ordering;
 
+            // Mirror the markup's chip-visibility gate exactly (hasActiveTab && RequestedX is not null): the arm must be
+            // driven by whether the CHIP is in the DOM, not by ordering state alone. When the active tab closes the chip
+            // unmounts even though the (masked) ordering column can still be non-null - treating that as "gone" disarms
+            // here instead of leaving a live arm that would later steal focus on an unrelated clear.
+            bool hasActiveTab = Presentation.ActiveTabId is not null;
+            bool sortChipPresent = hasActiveTab && ordering.RequestedOrderBy is not null;
+            bool groupChipPresent = hasActiveTab && ordering.RequestedGroupBy is not null;
+
             ColumnName? clearedAxisColumn = _pendingChipFocus == PendingChipFocus.SortCleared ?
                 ordering.RequestedOrderBy :
                 ordering.RequestedGroupBy;
 
+            bool clearedChipPresent = _pendingChipFocus == PendingChipFocus.SortCleared ? sortChipPresent : groupChipPresent;
+
             bool supersededByDifferentColumn = Presentation.State != PresentationState.Faulted &&
-                clearedAxisColumn is { } boundColumn &&
-                boundColumn != _pendingChipColumn;
+                clearedChipPresent &&
+                clearedAxisColumn != _pendingChipColumn;
 
-            bool clearedChipGone = clearedAxisColumn is null;
+            bool clearedChipGone = !clearedChipPresent;
 
-            if (supersededByDifferentColumn)
+            // The arm belongs to the tab it was raised on; ordering state is global, so if the active tab changes
+            // (closes, or auto-switches to a sibling) the chip the user cleared is no longer in their context.
+            bool tabContextChanged = Presentation.ActiveTabId != _pendingChipTabId;
+
+            if (supersededByDifferentColumn || tabContextChanged)
             {
+                // Superseded by a different column, or the active tab changed while the arm was live: disarm without
+                // moving focus - the clear's context is gone, and stealing focus to the status bar from wherever the
+                // user has since moved is exactly the misfire this guards against.
                 _pendingChipFocus = PendingChipFocus.None;
                 _pendingChipColumn = null;
+                _pendingChipTabId = null;
             }
             else if (clearedChipGone)
             {
+                // Same tab, the cleared chip unmounted because the clear adopted; restore focus to the sibling
+                // direction chip, or the stats button when this was the only chip.
                 ElementReference target = _pendingChipFocus == PendingChipFocus.SortCleared ?
-                    (ordering.RequestedGroupBy is not null ? _groupDirButton : _statsButton) :
-                    (ordering.RequestedOrderBy is not null ? _sortDirButton : _statsButton);
+                    (groupChipPresent ? _groupDirButton : _statsButton) :
+                    (sortChipPresent ? _sortDirButton : _statsButton);
 
                 _pendingChipFocus = PendingChipFocus.None;
                 _pendingChipColumn = null;
+                _pendingChipTabId = null;
 
                 if (!string.IsNullOrEmpty(target.Id))
                 {
@@ -115,6 +138,7 @@ public sealed partial class StatusBar
     private void ClearGroup(ColumnName column)
     {
         _pendingChipColumn = column;
+        _pendingChipTabId = Presentation.ActiveTabId;
         _pendingChipFocus = PendingChipFocus.GroupCleared;
 
         LogTableCommands.SetGroupBy(null);
@@ -123,6 +147,7 @@ public sealed partial class StatusBar
     private void ClearSort(ColumnName column)
     {
         _pendingChipColumn = column;
+        _pendingChipTabId = Presentation.ActiveTabId;
         _pendingChipFocus = PendingChipFocus.SortCleared;
 
         LogTableCommands.SetOrderBy(null);

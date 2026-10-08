@@ -81,8 +81,13 @@
     cursor: pointer;
 }
 
-.status-bar-order-dir:hover,
+.status-bar-order-dir:hover:not([aria-disabled="true"]),
 .status-bar-order-remove:hover { background: color-mix(in srgb, var(--clr-white) 18%, transparent); }
+
+.status-bar-order-dir[aria-disabled="true"] {
+    cursor: default;
+    opacity: 0.75;
+}
 
 .status-bar-order-dir:focus-visible,
 .status-bar-order-remove:focus-visible {

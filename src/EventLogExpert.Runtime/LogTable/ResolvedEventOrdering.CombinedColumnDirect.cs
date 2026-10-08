@@ -25,17 +25,45 @@ internal static partial class ResolvedEventOrdering
         return CompareFieldValues(readerA.GetField(a, field), readerB.GetField(b, field), column);
     }
 
-    // Reads the sort-relevant fields for one combined-merge head ONCE (the union every SelectCrossColumnComparer branch
-    // can touch: group, order/within, DateAndTime, RecordId, OwningLog), so the k-way merge compares cached values
-    // instead of calling reader.GetField on every comparison.
-    internal static MergeHead CreateMergeHead(IEventColumnReader reader, EventLocator locator, ColumnName? orderBy, ColumnName? groupBy) =>
-        new(
-            locator,
-            groupBy is { } groupColumn ? reader.GetField(locator, ColumnDescriptors.GetFieldId(groupColumn)) : default,
-            reader.GetField(locator, ColumnDescriptors.GetFieldId(orderBy ?? ColumnName.DateAndTime)),
-            reader.GetField(locator, ColumnDescriptors.GetFieldId(ColumnName.DateAndTime)),
-            reader.GetField(locator, EventFieldId.RecordId),
-            reader.GetField(locator, EventFieldId.OwningLog));
+    // Read each EventFieldId at most once per head, then assign it to every MergeHead role that aliases to it, so a
+    // config like GroupBy==OrderBy, OrderBy==RecordId, or the default DateAndTime within+date tie-break issues a single
+    // reader lookup instead of two. Only fields the comparer SelectCachedHeadComparer picks for this (orderBy, groupBy)
+    // shape can consume are read at all (grouped: group+within+date-when-within!=DateAndTime; ungrouped-ordered: within;
+    // ungrouped-default: date), so the k-way merge compares cached values instead of calling reader.GetField per compare.
+    internal static MergeHead CreateMergeHead(IEventColumnReader reader, EventLocator locator, ColumnName? orderBy, ColumnName? groupBy)
+    {
+        EventFieldValue recordId = reader.GetField(locator, EventFieldId.RecordId);
+        EventFieldValue owningLog = reader.GetField(locator, EventFieldId.OwningLog);
+
+        ColumnName withinColumn = orderBy ?? ColumnName.DateAndTime;
+        EventFieldId withinFieldId = ColumnDescriptors.GetFieldId(withinColumn);
+        EventFieldId dateFieldId = ColumnDescriptors.GetFieldId(ColumnName.DateAndTime);
+        bool grouped = groupBy is not null;
+
+        bool readsWithin = grouped || orderBy is not null;
+        EventFieldValue within = readsWithin ? ReadField(withinFieldId) : default;
+
+        bool readsDate = (grouped && withinColumn != ColumnName.DateAndTime) || (!grouped && orderBy is null);
+        EventFieldValue date = readsDate ?
+            (readsWithin && withinFieldId == dateFieldId ? within : ReadField(dateFieldId)) :
+            default;
+
+        EventFieldValue group = default;
+
+        if (groupBy is { } groupColumn)
+        {
+            EventFieldId groupFieldId = ColumnDescriptors.GetFieldId(groupColumn);
+            group = readsWithin && groupFieldId == withinFieldId ? within :
+                readsDate && groupFieldId == dateFieldId ? date :
+                ReadField(groupFieldId);
+        }
+
+        return new(locator, group, within, date, recordId, owningLog);
+
+        EventFieldValue ReadField(EventFieldId field) =>
+            field == EventFieldId.RecordId ? recordId :
+            reader.GetField(locator, field);
+    }
 
     // Cached-head mirror of SelectCrossColumnComparer + DelegatingOrderKeyComparer's identity tie-break: identical chain
     // and inversion rules (grouped negates; ungrouped argument-swaps; the identity tie-break stays ascending) over the
