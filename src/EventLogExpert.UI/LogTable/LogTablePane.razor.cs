@@ -66,6 +66,7 @@ public sealed partial class LogTablePane
     private ColumnName[] _previousEnabledColumns = [];
     private bool _refreshEventViewportOnRender;
     private long _renderedPresentationRevision = -1;
+    private bool _reorderAdopted;
     private bool _rescrollToSelectedOnRender;
     private IEventColumnView? _rescrolledForView;
     private bool _resortSelectionOnNextRender;
@@ -392,6 +393,17 @@ public sealed partial class LogTablePane
 
     protected override void OnPresentationChanged()
     {
+        // Evaluate the reorder receipt on every adoption - this runs unconditionally in AdoptLatestPresentation, unlike
+        // RebuildRowMaps which ShouldRender can skip. Accumulate (rather than overwrite) whether an adoption has reached
+        // the pending reorder's revision, and clear the stamp on the one that does, so a reorder whose adopting render is
+        // coalesced behind a later publication still arms aria-busy; RebuildRowMaps clears the latch when it consumes it.
+        // A later unrelated refresh that merely out-revisions an already-cleared stamp cannot inherit the hold.
+        long reorderStamp = Interlocked.Read(ref _pendingReorderReceipt);
+        bool reachedStampNow = reorderStamp != 0 && Presentation.Revision >= reorderStamp;
+        _reorderAdopted |= reachedStampNow;
+
+        if (reachedStampNow) { Interlocked.CompareExchange(ref _pendingReorderReceipt, 0, reorderStamp); }
+
         if (ReferenceEquals(Presentation.View, _rescrolledForView)) { return; }
 
         _rescrolledForView = Presentation.View;
@@ -404,7 +416,8 @@ public sealed partial class LogTablePane
         {
             // Stamp the pending reorder with its publication revision rather than a bare flag: an intervening render
             // that has not yet adopted this reorder (Presentation.Revision < stamp) must leave it alone, or the
-            // coalesced adopting render would lose the signal. Consumed at the top of RebuildRowMaps once it adopts.
+            // coalesced adopting render would lose the signal. Consumed in OnPresentationChanged on the adoption that
+            // first reaches this revision.
             Interlocked.Exchange(ref _pendingReorderReceipt, presentation.Revision);
         }
     }
@@ -1203,15 +1216,10 @@ public sealed partial class LogTablePane
         var displayedEvents = ResolveActiveDisplayedEvents();
         _activeDisplayedEvents = displayedEvents;
 
-        // Consume the reorder receipt once this render has adopted a view at least as new as the pending reorder
-        // (Presentation.Revision >= stamp): a reorder that ends without a new view (a fault retains the served view;
-        // a revert settles on it) still carries a newer revision, so the stamp clears and cannot arm a later
-        // unrelated refresh - while an intervening pre-adoption render (Revision < stamp) leaves it for the adopting
-        // render. The coalesced adopting render arms via this receipt; the non-coalesced path via _ariaBusyAssertedOnLastPaint.
-        long reorderStamp = Interlocked.Read(ref _pendingReorderReceipt);
-        bool reorderReceipt = reorderStamp != 0 && Presentation.Revision >= reorderStamp;
-
-        if (reorderReceipt) { Interlocked.CompareExchange(ref _pendingReorderReceipt, 0, reorderStamp); }
+        // The reorder receipt is evaluated once per adoption in OnPresentationChanged (which ShouldRender cannot skip);
+        // here we only read the latch it set for THIS adopting render and clear it so a later render cannot reuse it.
+        bool reorderReceipt = _reorderAdopted;
+        _reorderAdopted = false;
 
         PruneFindGroupOwnershipOnContextChange();
 

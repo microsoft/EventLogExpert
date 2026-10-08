@@ -700,6 +700,33 @@ public sealed class LogTablePaneViewSourceTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void Header_DirectionToggles_Disabled_WhileFaulted()
+    {
+        // While faulted the direction reducers no-op, so the header sort/group toggles render aria-disabled (not native
+        // disabled, which would drop keyboard focus) and stay focusable; the reducer no-op makes the press inert.
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var presentation = new OrderedViewPresentation(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+            _logId,
+            new DisplayOrdering(OrderBy: ColumnName.Source, IsDescending: true, GroupBy: ColumnName.Source, IsGroupDescending: false),
+            PresentationState.Faulted,
+            Revision: 1)
+        { Columns = s_sourceColumn };
+
+        _viewSource.Current.Returns(presentation);
+
+        var cut = Render<LogTablePane>();
+
+        var header = cut.Find("th[data-column='Source']");
+
+        Assert.Equal("true", header.QuerySelector(".sort-toggle")!.GetAttribute("aria-disabled"));
+        Assert.Equal("true", header.QuerySelector(".group-toggle")!.GetAttribute("aria-disabled"));
+        Assert.False(header.QuerySelector(".sort-toggle")!.HasAttribute("disabled"));
+        Assert.False(header.QuerySelector(".group-toggle")!.HasAttribute("disabled"));
+    }
+
+    [Fact]
     public void Header_ShowsBothSortAndGroupIndicators_WhenColumnIsSortedAndGrouped()
     {
         SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));

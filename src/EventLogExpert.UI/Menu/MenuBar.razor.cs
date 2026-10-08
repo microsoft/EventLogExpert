@@ -64,6 +64,8 @@ public sealed partial class MenuBar
 
     [Inject] private IOrderedViewSource OrderedViewSource { get; init; } = null!;
 
+    private string OrderingUnavailableReason => Localizer["Menu_OrderingUnavailableReason"];
+
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
     protected override async ValueTask DisposeAsyncCore(bool disposing)
@@ -294,6 +296,7 @@ public sealed partial class MenuBar
         var requestedOrdering = OrderedViewSource.Current.Ordering;
         bool isGroupDirectionActive = requestedOrdering.RequestedGroupBy is not null;
         bool isGroupDescending = requestedOrdering.RequestedIsGroupDescending;
+        bool isOrderingFaulted = OrderedViewSource.Current.State == PresentationState.Faulted;
         bool isHistogramVisible = HistogramVisibility.IsVisible;
         bool hasActiveLogs = LogTableQueries.HasActiveLogs();
 
@@ -314,8 +317,8 @@ public sealed partial class MenuBar
                 Localizer["Menu_View_GroupDescending"],
                 Actions.ToggleGroupSortDirection,
                 isChecked: isGroupDescending,
-                isEnabled: isGroupDirectionActive,
-                disabledReason: isGroupDirectionActive ? null : GroupDisabledReason),
+                isEnabled: isGroupDirectionActive && !isOrderingFaulted,
+                disabledReason: !isGroupDirectionActive ? GroupDisabledReason : isOrderingFaulted ? OrderingUnavailableReason : null),
             MenuItem.Item(
                 Localizer["Menu_View_ExpandAllGroups"],
                 () => Actions.SetAllGroupsCollapsed(false),

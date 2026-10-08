@@ -3,6 +3,7 @@
 
 using Bunit;
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
@@ -277,6 +278,25 @@ public sealed class MenuBarGroupingTests : BunitContext
 
         Assert.True(descending.IsEnabled);
         Assert.False(descending.IsChecked);
+    }
+
+    [Fact]
+    public async Task View_WhenGroupingButFaulted_DescendingDisabledWithOrderingUnavailableReason()
+    {
+        // While the presentation is faulted the direction reducers no-op, so the Group Descending toggle must render
+        // disabled (not focusable-but-inert) with a reason explaining the ordering is temporarily unavailable.
+        _logTableQueries.IsGrouping().Returns(true);
+        _orderedViewSource.Current.Returns(new OrderedViewPresentation(
+            Substitute.For<IEventColumnView>(),
+            EventLogId.Create(),
+            new DisplayOrdering(null, true, ColumnName.Source, false),
+            PresentationState.Faulted,
+            0));
+
+        var descending = Item(await OpenViewMenu(), Localizer["Menu_View_GroupDescending"].Value);
+
+        Assert.False(descending.IsEnabled);
+        Assert.Equal(Localizer["Menu_OrderingUnavailableReason"].Value, descending.DisabledReason);
     }
 
     [Fact]

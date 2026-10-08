@@ -15,13 +15,19 @@ namespace EventLogExpert.Runtime.LogTable;
 ///     re-selects and no-op clears/toggles stay silent and only a real change speaks.
 /// </summary>
 /// <remarks>
-///     INVARIANT: the five actions handled below are the ONLY writers of the <c>LogTableState.Requested*</c> ordering
-///     fields (verified by searching every assignment). A future reducer that writes those fields must be routed through
-///     here as well, or <see cref="_lastAnnounced" /> drifts and the next real change mis-announces. The snapshot is
-///     deliberately requested-only: the committed ordering fields adopt the engine result later via a different action
-///     this effect does not observe, so keying off them would reintroduce that drift. While faulted the effect stays
-///     silent (the requested reorder is not taking effect) but still advances <see cref="_lastAnnounced" /> to the
-///     requested ordering, so when the reproject recovers and adopts it the next real change still diffs on one axis.
+///     INVARIANT: the five request actions handled below (SetGroupBy, SetOrderBy, ToggleGroupSorting, ToggleSorting,
+///     LoadColumnsCompleted) are the ONLY writers of the <c>LogTableState.Requested*</c> ordering fields (verified by
+///     searching every assignment). A future reducer that writes those fields must be routed through here as well, or
+///     <see cref="_lastAnnounced" /> drifts and the next real change mis-announces.
+///     <see cref="OrderedViewUpdatedAction" /> is additionally observed - not as a writer, but as the adopt signal that
+///     flushes an announcement deferred while faulted. The snapshot is deliberately requested-only: the committed ordering
+///     fields adopt the engine result later via that same action, so keying off them would reintroduce that drift. While
+///     faulted the effect stays silent (the requested reorder is not taking effect) and leaves
+///     <see cref="_lastAnnounced" /> untouched, so the deferred change is not dropped: when the reproject recovers and
+///     adopts the requested ordering, the still-pending baseline diff narrates it once, on the axis that actually changed.
+///     The announcer holds a single slot, so the rare case of two different-axis changes accumulated across ONE persistent
+///     fault flushes both messages together on recovery and only the last (group) survives - an accepted trade-off that
+///     still beats the prior total silence.
 /// </remarks>
 internal sealed class OrderingAnnouncementEffects(IState<LogTableState> logTableState, IAnnouncementService announcementService)
 {
@@ -34,6 +40,16 @@ internal sealed class OrderingAnnouncementEffects(IState<LogTableState> logTable
     // routing it here announces that automatic clear and keeps the snapshot synced so a later ordering action is correct.
     [EffectMethod(typeof(LoadColumnsCompletedAction))]
     public Task HandleLoadColumnsCompleted(IDispatcher dispatcher) => AnnounceIfChanged();
+
+    // The committed ordering adopts the requested reorder via this action. On the normal path the request was already
+    // announced (baseline advanced), so re-diffing here is a no-op; after a fault - where the request stayed silent and
+    // left the baseline untouched - this flushes the deferred announcement. Gate on the committed ordering actually
+    // matching the requested one: a rejected/stale update, an OrderedViewCleared invalidation, or a fault that cleared
+    // because the view went away (the last tab closed) rather than because the reorder landed, leaves committed !=
+    // requested and must not narrate an ordering no view ever adopted.
+    [EffectMethod(typeof(OrderedViewUpdatedAction))]
+    public Task HandleOrderedViewUpdated(IDispatcher dispatcher) =>
+        _logTableState.Value.HasPendingSortChange ? Task.CompletedTask : AnnounceIfChanged();
 
     [EffectMethod(typeof(SetGroupByAction))]
     public Task HandleSetGroupBy(IDispatcher dispatcher) => AnnounceIfChanged();
@@ -69,14 +85,13 @@ internal sealed class OrderingAnnouncementEffects(IState<LogTableState> logTable
         var state = _logTableState.Value;
         AnnouncedOrdering current = Snapshot(state);
 
-        // While faulted the requested reorder is not taking effect (the served view shows committed), so stay silent -
-        // but keep tracking the requested ordering as the baseline. When the reproject recovers it adopts exactly this
-        // requested ordering, so the next real change still diffs on a single axis; announcing here (a committed delta
-        // the user never requested) or resyncing to committed (which desyncs the post-recovery diff) would both misfire.
+        // While faulted the requested reorder is not taking effect (the served view shows committed), so stay silent
+        // AND leave the baseline untouched: the change is deferred, not dropped. When the reproject recovers,
+        // OrderedViewUpdatedAction re-enters AnnounceIfChanged with the adopted ordering and the still-pending baseline
+        // diff narrates the change exactly once, on the axis that actually changed. Advancing the baseline here would
+        // drop it; announcing here would narrate a change no visible surface reflects yet.
         if (state.PresentationState == PresentationState.Faulted)
         {
-            _lastAnnounced = current;
-
             return Task.CompletedTask;
         }
 

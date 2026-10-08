@@ -139,6 +139,7 @@
                                         IconClass="bi bi-caret-up"
                                         OnClick="ToggleSorting"
                                         StopKeyDownPropagation="true"
+                                        aria-disabled="@(Presentation.State == PresentationState.Faulted ? "true" : null)"
                                         aria-label="@StatusBarTextComposer.SortDirectionAria(Localizer, columnHeader, Presentation.Ordering.RequestedIsDescending)"
                                         data-rotate="@Presentation.Ordering.RequestedIsDescending.ToString().ToLower()" />
                                 }
@@ -148,6 +149,7 @@
                                         IconClass="bi bi-chevron-double-up"
                                         OnClick="ToggleGroupSorting"
                                         StopKeyDownPropagation="true"
+                                        aria-disabled="@(Presentation.State == PresentationState.Faulted ? "true" : null)"
                                         aria-label="@StatusBarTextComposer.GroupDirectionAria(Localizer, columnHeader, Presentation.Ordering.RequestedIsGroupDescending)"
                                         data-rotate="@Presentation.Ordering.RequestedIsGroupDescending.ToString().ToLower()" />
                                 }

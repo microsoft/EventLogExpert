@@ -402,7 +402,15 @@ internal sealed class Reducers
 
         return state.RequestedOrderBy.Equals(action.OrderBy) ?
             state :
-            RetainServedView(state, state with { RequestedOrderBy = action.OrderBy });
+            RetainServedView(state, state with
+            {
+                RequestedOrderBy = action.OrderBy,
+                // Reached only when the requested sort column has diverged from the one being selected (the guard above
+                // returns early otherwise). Re-selecting the committed column then restores its committed direction, so
+                // re-picking the column still visible behind a faulted/pending clear keeps the direction the user sees;
+                // selecting a different column keeps the pending requested direction.
+                RequestedIsDescending = action.OrderBy == state.OrderBy ? state.IsDescending : state.RequestedIsDescending
+            });
     }
 
     [ReducerMethod]

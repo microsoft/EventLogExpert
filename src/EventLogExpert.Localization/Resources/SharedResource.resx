@@ -1300,6 +1300,10 @@
     <value>Group events first (column header &gt; Group By)</value>
     <comment>'&gt;' is a UI breadcrumb meaning 'then'; 'column header' and 'Group By' are UI navigation labels.</comment>
   </data>
+  <data name="Menu_OrderingUnavailableReason" xml:space="preserve">
+    <value>Sorting and grouping are temporarily unavailable</value>
+    <comment>Tooltip on a disabled sort/group direction menu item while the view is recovering from a failed reorder.</comment>
+  </data>
   <data name="Menu_ResolutionCoverageDisabledReason" xml:space="preserve">
     <value>Open a log to view resolution coverage.</value>
   </data>
