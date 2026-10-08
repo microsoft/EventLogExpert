@@ -516,6 +516,94 @@ public sealed class OrderedViewShadowTests
     }
 
     [Fact]
+    public async Task HandleSetGroupBy_WhileFaulted_ForcesReissueSoTheSameClearCanRetry()
+    {
+        // Sibling of the sort case: a fault caused by clearing grouping already issued this identity and left
+        // RequestedGroupBy null, so the remounted group clear chip's x re-dispatches an absolute SetGroupBy with the
+        // SAME ViewIdentity. The forced re-issue while faulted must re-attempt the build past the issuer de-dup.
+        EventLogId logId = EventLogId.Create();
+        List<ResolvedEvent> events = Rows("Log", (1, 50), (2, 10), (3, 60), (4, 20), (5, 40));
+
+        await using var harness = new OrderedViewShadowHarness();
+
+        var (served, raw, eventLog, _) = SingleLog(logId, events, descending: true);
+
+        // Realistic clear-caused fault: the committed grouping is still Source while the requested grouping is cleared,
+        // so HasPendingSortChange is true and the remounted group clear x is clickable.
+        LogTableState faulted = served with { GroupBy = ColumnName.Source, OrderedViewDisplayEnabled = false };
+        Assert.Equal(PresentationState.Faulted, faulted.PresentationState);
+        Assert.True(faulted.HasPendingSortChange);
+        harness.SetState(faulted, raw, eventLog);
+
+        Assert.NotNull(harness.Issuer.TryIssue(faulted.ViewIdentity));
+        Assert.Null(harness.Issuer.TryIssue(faulted.ViewIdentity));
+
+        await harness.Effects.HandleSetGroupBy(new SetGroupByAction(null), harness.Dispatcher);
+
+        var ready = Assert.IsType<OrderedViewReady>(await DrainToUpdateAsync(harness, TestContext.Current.CancellationToken));
+        Assert.Equal(events.Count, ready.View.Count);
+    }
+
+    [Fact]
+    public async Task HandleSetOrderBy_WhenNotFaulted_DoesNotForceReissueForAnUnchangedRequest()
+    {
+        // The force is gated on Faulted: a non-faulted re-selection of the already-issued ordering must still de-dup,
+        // so an absolute action does not trigger a redundant rebuild on every click (pins the Faulted gate).
+        EventLogId logId = EventLogId.Create();
+        List<ResolvedEvent> events = Rows("Log", (1, 50), (2, 10), (3, 60));
+
+        await using var harness = new OrderedViewShadowHarness();
+
+        var (served, raw, eventLog, _) = SingleLog(logId, events, descending: true);
+        Assert.NotEqual(PresentationState.Faulted, served.PresentationState);
+        harness.SetState(served, raw, eventLog);
+
+        // The current ordering was already issued; while not faulted a re-selection of the same ordering must de-dup.
+        Assert.NotNull(harness.Issuer.TryIssue(served.ViewIdentity));
+        harness.Dispatcher.ClearReceivedCalls();
+
+        await harness.Effects.HandleSetOrderBy(new SetOrderByAction(null), harness.Dispatcher);
+
+        // The gate leaves the de-duped identity intact, so no view request is dispatched. LastFault stays null confirms
+        // the effect did not instead early-return via a swallowed Shadow exception (which would also pass the first assert).
+        harness.Dispatcher.DidNotReceive().Dispatch(Arg.Any<ViewRequestInvalidatedAction>());
+        Assert.Null(harness.Issuer.LastFault);
+    }
+
+    [Fact]
+    public async Task HandleSetOrderBy_WhileFaulted_ForcesReissueSoTheSameClearCanRetry()
+    {
+        // A fault CAUSED BY clearing the sort already issued this identity, and the clear left RequestedOrderBy null, so
+        // clicking the remounted clear chip's x re-dispatches an absolute SetOrderBy with the SAME ViewIdentity. The
+        // issuer de-dups that failed identity, so the retry reaches the writer only if the absolute action forces a
+        // re-issue while faulted.
+        EventLogId logId = EventLogId.Create();
+        List<ResolvedEvent> events = Rows("Log", (1, 50), (2, 10), (3, 60), (4, 20), (5, 40));
+
+        await using var harness = new OrderedViewShadowHarness();
+
+        var (served, raw, eventLog, _) = SingleLog(logId, events, descending: true);
+
+        // Realistic clear-caused fault: the committed column is still Source (the chip remounts on it) while the
+        // requested ordering is the cleared default, so HasPendingSortChange is true and the clear x is clickable.
+        LogTableState faulted = served with { OrderBy = ColumnName.Source, OrderedViewDisplayEnabled = false };
+        Assert.Equal(PresentationState.Faulted, faulted.PresentationState);
+        Assert.True(faulted.HasPendingSortChange);
+        harness.SetState(faulted, raw, eventLog);
+
+        // The clear that caused the fault already issued this identity; a plain retry de-dups (returns no sequence).
+        Assert.NotNull(harness.Issuer.TryIssue(faulted.ViewIdentity));
+        Assert.Null(harness.Issuer.TryIssue(faulted.ViewIdentity));
+
+        await harness.Effects.HandleSetOrderBy(new SetOrderByAction(null), harness.Dispatcher);
+
+        // The forced re-issue rebuilds. Without the fix the issuer de-dups and the writer gets no view request, so
+        // DrainToUpdateAsync does not produce an OrderedViewReady and the test fails.
+        var ready = Assert.IsType<OrderedViewReady>(await DrainToUpdateAsync(harness, TestContext.Current.CancellationToken));
+        Assert.Equal(events.Count, ready.View.Count);
+    }
+
+    [Fact]
     public async Task InitialLoad_ShadowMatchesLiveDefaultDescendingOrder()
     {
         var sample = new OrderedViewSample(seed: 7, logCount: 1);

@@ -128,13 +128,13 @@ internal sealed class OrderedViewShadowEffects(
     public Task HandleSetActiveTable(IDispatcher dispatcher) => Shadow(Sync);
 
     [EffectMethod]
-    public Task HandleSetGroupBy(SetGroupByAction action, IDispatcher dispatcher) => Shadow(Sync);
+    public Task HandleSetGroupBy(SetGroupByAction action, IDispatcher dispatcher) => Shadow(SyncAbsoluteOrdering);
 
     [EffectMethod]
     public Task HandleSetHistogramVisible(SetHistogramVisibleAction action, IDispatcher dispatcher) => Shadow(Sync);
 
     [EffectMethod]
-    public Task HandleSetOrderBy(SetOrderByAction action, IDispatcher dispatcher) => Shadow(Sync);
+    public Task HandleSetOrderBy(SetOrderByAction action, IDispatcher dispatcher) => Shadow(SyncAbsoluteOrdering);
 
     [EffectMethod(typeof(SetTabGroupCollapsedAction))]
     public Task HandleSetTabGroupCollapsed(IDispatcher dispatcher) => Shadow(Sync);
@@ -192,7 +192,9 @@ internal sealed class OrderedViewShadowEffects(
         return Task.CompletedTask;
     }
 
-    private void Sync()
+    private void Sync() => Sync(forceReissueWhenFaulted: false);
+
+    private void Sync(bool forceReissueWhenFaulted)
     {
         LogTableState state = _logTableState.Value;
         ViewIdentity identity = state.ViewIdentity;
@@ -203,7 +205,17 @@ internal sealed class OrderedViewShadowEffects(
             return;
         }
 
-        if (_issuer.TryIssue(identity) is not { } sequence) { return; }
+        // SetOrderBy/SetGroupBy are absolute ordering requests and the user's manual recovery path while faulted
+        // (parameterless toggles stay inert). When such a request equals the already-masked requested value - most
+        // often clicking a remounted clear chip's x after a clear CAUSED the fault, where the requested column is
+        // already null - the ViewIdentity is unchanged and the issuer would de-dup the failed identity, so the retry
+        // would never reach the writer. While faulted, re-trust the engine (EnqueueClearFault) and force the re-issue
+        // atomically past the de-dup; when the request differs the force is harmless (the new identity issues anyway).
+        bool forceReissue = forceReissueWhenFaulted && state.PresentationState == PresentationState.Faulted;
+
+        if (forceReissue) { _writer.EnqueueClearFault(); }
+
+        if (_issuer.TryIssue(identity, forceReissue) is not { } sequence) { return; }
 
         Func<IEventColumnReader, EventLocator, bool> survives =
             XmlFilterGate.BuildSurvivorPredicate(filter, _concurrencyState, _matchCache);
@@ -220,6 +232,8 @@ internal sealed class OrderedViewShadowEffects(
                 filter,
                 (locator, reader) => survives(reader, locator)));
     }
+
+    private void SyncAbsoluteOrdering() => Sync(forceReissueWhenFaulted: true);
 
     private bool XmlDeferred() =>
         XmlFilterGate.IsDeferred(

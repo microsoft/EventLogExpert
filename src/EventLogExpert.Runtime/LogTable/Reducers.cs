@@ -447,7 +447,7 @@ internal sealed class Reducers
     {
         // While faulted the grid shows committed ordering, so a parameterless toggle would flip the
         // masked failed request the user cannot see; ignore it. The view recovers on a new ingest, a tab
-        // switch, or an absolute SetOrderBy/SetGroupBy that differs from the masked request.
+        // switch, or any absolute SetOrderBy/SetGroupBy (which re-attempts the build even when unchanged).
         if (state.PresentationState == PresentationState.Faulted || state.RequestedGroupBy is null) { return state; }
 
         return RetainServedView(state, state with
@@ -460,7 +460,7 @@ internal sealed class Reducers
     public static LogTableState ReduceToggleSorting(LogTableState state) =>
         // While faulted the grid shows committed ordering, so a parameterless toggle would flip the
         // masked failed request the user cannot see; ignore it. The view recovers on a new ingest, a tab
-        // switch, or an absolute SetOrderBy/SetGroupBy that differs from the masked request.
+        // switch, or any absolute SetOrderBy/SetGroupBy (which re-attempts the build even when unchanged).
         state.PresentationState == PresentationState.Faulted ?
             state :
             RetainServedView(state, state with
