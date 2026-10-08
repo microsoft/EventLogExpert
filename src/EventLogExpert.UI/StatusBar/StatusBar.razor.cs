@@ -8,15 +8,18 @@ using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Stats;
 using EventLogExpert.Runtime.StatusBar;
+using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.Focus;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Localization;
+using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.StatusBar;
 
 public sealed partial class StatusBar
 {
+    private IJSObjectReference? _focusModule;
     private ElementReference _groupDirButton;
     private DisplayIndicatorState _indicatorState = null!;
     private ColumnName? _pendingChipColumn;
@@ -38,6 +41,8 @@ public sealed partial class StatusBar
 
     [Inject] private DisplayIndicatorGate IndicatorGate { get; init; } = null!;
 
+    [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
     [Inject] private IFilterLensSource LensSource { get; init; } = null!;
 
     [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
@@ -58,6 +63,9 @@ public sealed partial class StatusBar
         {
             _indicatorState?.Dispose();
         }
+
+        await JsModuleInterop.DisposeModuleSafelyAsync(_focusModule);
+        _focusModule = null;
 
         await base.DisposeAsyncCore(disposing);
     }
@@ -104,7 +112,12 @@ public sealed partial class StatusBar
             else if (clearedChipGone)
             {
                 // Same tab, the cleared chip unmounted because the clear adopted; restore focus to the sibling
-                // direction chip, or the stats button when this was the only chip.
+                // direction chip, or the stats button when this was the only chip. But a fault can defer the clear for
+                // an arbitrary time while the chip stays masked-present; if the user tabbed or clicked to another control
+                // in the meantime, the unmount did not orphan their focus, so restoring would steal it. The restore
+                // guards on that inside a single JS round trip (focusIfNotElsewhere): it moves focus only when focus
+                // currently rests on the document root - no real control holds it, whatever put it there - rather than
+                // when the user has since landed on another control.
                 ElementReference target = _pendingChipFocus == PendingChipFocus.SortCleared ?
                     (groupChipPresent ? _groupDirButton : _statsButton) :
                     (sortChipPresent ? _sortDirButton : _statsButton);
@@ -115,7 +128,7 @@ public sealed partial class StatusBar
 
                 if (!string.IsNullOrEmpty(target.Id))
                 {
-                    await ElementFocus.TrySafelyAsync(target, preventScroll: true);
+                    await RestoreClearedChipFocusAsync(target, preventScroll: true);
                 }
             }
         }
@@ -166,6 +179,26 @@ public sealed partial class StatusBar
         _indicatorState.RecordPaint(shown);
 
         return shown.Sentence;
+    }
+
+    private async ValueTask RestoreClearedChipFocusAsync(ElementReference target, bool preventScroll)
+    {
+        try
+        {
+            _focusModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/EventLogExpert.UI/StatusBar/statusBarFocus.js");
+
+            await _focusModule.InvokeAsync<bool>("focusIfNotElsewhere", target, preventScroll);
+
+            return;
+        }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { }
+        catch (ObjectDisposedException) { }
+        catch (TaskCanceledException) { }
+
+        await ElementFocus.TrySafelyAsync(target, preventScroll);
     }
 
     private void ToggleGroup() => LogTableCommands.ToggleGroupSortDirection();
