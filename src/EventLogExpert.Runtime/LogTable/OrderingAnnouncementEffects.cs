@@ -26,8 +26,8 @@ namespace EventLogExpert.Runtime.LogTable;
 ///     <see cref="_lastAnnounced" /> untouched, so the deferred change is not dropped: when the reproject recovers and
 ///     adopts the requested ordering, the still-pending baseline diff narrates it once, on the axis that actually changed.
 ///     The announcer holds a single slot, so the rare case of two different-axis changes accumulated across ONE persistent
-///     fault flushes both messages together on recovery and only the last (group) survives - an accepted trade-off that
-///     still beats the prior total silence.
+///     fault is flushed on recovery as a single combined TableSortAndGroupChanged announcement that narrates both axes,
+///     rather than two messages where the second (group) would overwrite the first (sort) before the live region reads it.
 /// </remarks>
 internal sealed class OrderingAnnouncementEffects(IState<LogTableState> logTableState, IAnnouncementService announcementService)
 {
@@ -96,19 +96,38 @@ internal sealed class OrderingAnnouncementEffects(IState<LogTableState> logTable
         }
 
         // On the normal path each handled reducer changes the sort dimension XOR the group dimension, so at most one of
-        // these fires and the single-slot announcer never has to carry two messages from one gesture.
-        if (SortChanged(_lastAnnounced, current))
-        {
-            _announcementService.Announce(current.SortColumn is { } sortColumn ?
-                new AnnouncementPayload.TableSorted(sortColumn, current.SortDescending) :
-                new AnnouncementPayload.TableSortCleared());
-        }
+        // the single-axis branches fires (none when the request was a no-op). The combined branch engages only when a
+        // single flush carries a change on BOTH axes - a persistent fault that accumulated a sort change and a group
+        // change, then recovered: the single-slot announcer renders one message, so two separate announcements would
+        // let the second overwrite the first before the live region reads it. One combined announcement narrates both.
+        bool sortChanged = SortChanged(_lastAnnounced, current);
+        bool groupChanged = GroupChanged(_lastAnnounced, current);
 
-        if (GroupChanged(_lastAnnounced, current))
+        switch (sortChanged)
         {
-            _announcementService.Announce(current.GroupColumn is { } groupColumn ?
-                new AnnouncementPayload.TableGrouped(groupColumn, current.GroupDescending) :
-                new AnnouncementPayload.TableGroupCleared());
+            case true when groupChanged:
+                _announcementService.Announce(new AnnouncementPayload.TableSortAndGroupChanged(
+                    current.SortColumn,
+                    current.SortDescending,
+                    current.GroupColumn,
+                    current.GroupDescending));
+
+                break;
+            case true:
+                _announcementService.Announce(current.SortColumn is { } sortColumn ?
+                    new AnnouncementPayload.TableSorted(sortColumn, current.SortDescending) :
+                    new AnnouncementPayload.TableSortCleared());
+
+                break;
+            default:
+                if (groupChanged)
+                {
+                    _announcementService.Announce(current.GroupColumn is { } groupColumn ?
+                        new AnnouncementPayload.TableGrouped(groupColumn, current.GroupDescending) :
+                        new AnnouncementPayload.TableGroupCleared());
+                }
+
+                break;
         }
 
         _lastAnnounced = current;

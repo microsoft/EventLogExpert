@@ -176,6 +176,37 @@ public sealed class AnnouncerHostTests : BunitContext
     }
 
     [Fact]
+    public void AnnouncerHost_TableSortAndGroupChanged_RoutesThroughOrderingComposer()
+    {
+        // The combined payload (a fault that accumulated both a sort and a group change) renders ONE string composing
+        // the localized sort fragment and the localized group fragment, so the single-slot live region narrates both.
+        _announcementService.Current.Returns(new CurrentAnnouncement(
+            new AnnouncementPayload.TableSortAndGroupChanged(ColumnName.Source, false, ColumnName.Level, true), 2));
+
+        var component = Render<AnnouncerHost>();
+
+        var text = component.Find("#app-announcer").TextContent;
+        Assert.Contains("[[Table_Announce_SortedAndGrouped(", text);
+        Assert.Contains("[[Table_Announce_SortedAscending(", text);
+        Assert.Contains("[[Table_Announce_GroupedDescending(", text);
+    }
+
+    [Fact]
+    public void AnnouncerHost_TableSortAndGroupChanged_WhenBothCleared_ComposesClearedFragments()
+    {
+        // Null sort/group columns compose the cleared fragments (both axes cleared in one flush).
+        _announcementService.Current.Returns(new CurrentAnnouncement(
+            new AnnouncementPayload.TableSortAndGroupChanged(null, false, null, false), 2));
+
+        var component = Render<AnnouncerHost>();
+
+        var text = component.Find("#app-announcer").TextContent;
+        Assert.Contains("[[Table_Announce_SortedAndGrouped(", text);
+        Assert.Contains("[[Table_Announce_SortCleared]]", text);
+        Assert.Contains("[[Table_Announce_GroupCleared]]", text);
+    }
+
+    [Fact]
     public void AnnouncerHost_TableSortCleared_RoutesThroughOrderingComposer()
     {
         _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TableSortCleared(), 2));
@@ -255,5 +286,6 @@ public sealed class AnnouncerHostTests : BunitContext
         leafType == typeof(AnnouncementPayload.TableSortCleared) ? new AnnouncementPayload.TableSortCleared() :
         leafType == typeof(AnnouncementPayload.TableGrouped) ? new AnnouncementPayload.TableGrouped(ColumnName.Source, false) :
         leafType == typeof(AnnouncementPayload.TableGroupCleared) ? new AnnouncementPayload.TableGroupCleared() :
+        leafType == typeof(AnnouncementPayload.TableSortAndGroupChanged) ? new AnnouncementPayload.TableSortAndGroupChanged(ColumnName.Source, false, ColumnName.Level, false) :
         throw new InvalidOperationException($"No test fixture for {leafType.FullName}.");
 }
