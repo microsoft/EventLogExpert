@@ -153,6 +153,33 @@ public sealed class OrderingAnnouncementEffectsTests
     }
 
     [Fact]
+    public async Task RecoveryAfterFaultAccumulatedBothAxes_AnnouncesOneCombinedSortAndGroup()
+    {
+        // A persistent fault accumulates a sort change AND a group change (each deferred and silent). The single adopt
+        // flush sees both axes differ from the announced baseline; it must narrate them in ONE combined announcement so
+        // the single-slot live region does not drop the sort (two messages would let group overwrite sort unread).
+        _state.Value.Returns(State());
+        var sut = CreateSut();
+
+        // Fault; user requests sort Source then group Level - both silent, baseline stays at {no sort, no group}.
+        _state.Value.Returns(FaultedState(requestedGroupBy: null, requestedOrderBy: ColumnName.Source));
+        await sut.HandleSetOrderBy(_dispatcher);
+        _state.Value.Returns(FaultedState(requestedGroupBy: ColumnName.Level, requestedOrderBy: ColumnName.Source));
+        await sut.HandleSetGroupBy(_dispatcher);
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+
+        // Recovery adopts both (committed == requested); one combined flush narrates both axes, not two messages.
+        _state.Value.Returns(AdoptedState(orderBy: ColumnName.Source, groupBy: ColumnName.Level, isGroupDescending: false));
+        await sut.HandleOrderedViewUpdated(_dispatcher);
+
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableSortAndGroupChanged>(
+            payload => payload.SortColumn == ColumnName.Source && payload.SortDescending
+                && payload.GroupColumn == ColumnName.Level && !payload.GroupDescending));
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableSorted>());
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableGrouped>());
+    }
+
+    [Fact]
     public async Task RequestWhileFaulted_AfterAnnouncedOrdering_StaysSilentOnBothAxes()
     {
         // A prior sort+group was announced optimistically; the reproject then faulted. A further request while faulted

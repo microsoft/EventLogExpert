@@ -2351,6 +2351,10 @@
     <value>Grouping cleared</value>
     <comment>Screen-reader announcement when grouping is removed.</comment>
   </data>
+  <data name="Table_Announce_SortedAndGrouped" xml:space="preserve">
+    <value>{0}. {1}</value>
+    <comment>Screen-reader announcement composing a simultaneous sort change ({0}) and group change ({1}) into one message; both placeholders are already-localized sort and group phrases.</comment>
+  </data>
   <data name="Table_GroupedColumnDescription_Ascending" xml:space="preserve">
     <value>Grouped, ascending</value>
     <comment>aria-description on a grouped column header; the column name is already the header's accessible name.</comment>

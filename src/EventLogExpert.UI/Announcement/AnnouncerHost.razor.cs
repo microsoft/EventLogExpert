@@ -55,6 +55,8 @@ public sealed partial class AnnouncerHost : ComponentBase, IDisposable
                 TableOrderingTextComposer.GroupAnnouncement(Localizer, column, isGroupDescending),
             AnnouncementPayload.TableGroupCleared _ =>
                 TableOrderingTextComposer.GroupClearedAnnouncement(Localizer),
+            AnnouncementPayload.TableSortAndGroupChanged(var sortColumn, var sortDescending, var groupColumn, var groupDescending) =>
+                TableOrderingTextComposer.SortAndGroupAnnouncement(Localizer, sortColumn, sortDescending, groupColumn, groupDescending),
             _ => throw new ArgumentOutOfRangeException(nameof(current.Payload), current.Payload, null)
         };
 

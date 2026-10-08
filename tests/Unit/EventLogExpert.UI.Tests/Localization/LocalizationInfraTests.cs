@@ -1036,6 +1036,36 @@ public sealed class LocalizationInfraTests
     }
 
     [Fact]
+    public void NeutralTableOrderingAnnounceValues_HaveExpectedPlaceholderArity()
+    {
+        // MarkerLocalizer echoes keys without reading the resx, so the render tests never exercise these format
+        // templates. This pins each sort/group announcement's placeholder count against the real neutral value - in
+        // particular the combined Table_Announce_SortedAndGrouped must stay at arity 2, or a "{0}"/"{1}" edit would
+        // silently drop one axis (reinstating the dropped-sort defect) and a "{2}" edit would throw at render time.
+        var neutralValues = ResxValues();
+        (string Key, int Arity)[] expected =
+        [
+            ("Table_Announce_GroupCleared", 0),
+            ("Table_Announce_GroupedAscending", 1),
+            ("Table_Announce_GroupedDescending", 1),
+            ("Table_Announce_SortCleared", 0),
+            ("Table_Announce_SortedAndGrouped", 2),
+            ("Table_Announce_SortedAscending", 1),
+            ("Table_Announce_SortedDescending", 1)
+        ];
+
+        foreach ((string key, int arity) in expected)
+        {
+            Assert.True(neutralValues.TryGetValue(key, out string? neutral), $"Missing neutral RESX value for {key}.");
+            Assert.Equal(arity, PlaceholderArity(neutral));
+        }
+
+        Assert.Equal(
+            expected.Select(entry => entry.Key).OrderBy(key => key, StringComparer.Ordinal),
+            neutralValues.Keys.Where(key => key.StartsWith("Table_Announce_", StringComparison.Ordinal)).OrderBy(key => key, StringComparer.Ordinal));
+    }
+
+    [Fact]
     public void NoLegacyPluralMechanismsRemain()
     {
         string deletedCountWrapperToken = "Localized" + "Count";

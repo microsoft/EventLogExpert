@@ -32,4 +32,10 @@ public abstract record Announcement
     public sealed record TableGrouped(ColumnName Column, bool IsGroupDescending) : Announcement;
 
     public sealed record TableGroupCleared : Announcement;
+
+    public sealed record TableSortAndGroupChanged(
+        ColumnName? SortColumn,
+        bool SortDescending,
+        ColumnName? GroupColumn,
+        bool GroupDescending) : Announcement;
 }
