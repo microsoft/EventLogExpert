@@ -19,7 +19,11 @@ internal static class NeighborFocus
         ArgumentNullException.ThrowIfNull(itemsBeforeRemoval);
         ArgumentNullException.ThrowIfNull(isFocusable);
 
-        for (int forward = Math.Max(removedIndex + 1, 0); forward < itemsBeforeRemoval.Count; forward++)
+        // Clamp before the +/-1 offsets so an out-of-range index (including int.MaxValue) cannot overflow and wrap the
+        // forward start back to zero: -1 scans forward from the first item, Count scans backward from the last.
+        int clampedIndex = Math.Clamp(removedIndex, -1, itemsBeforeRemoval.Count);
+
+        for (int forward = clampedIndex + 1; forward < itemsBeforeRemoval.Count; forward++)
         {
             if (isFocusable(itemsBeforeRemoval[forward]))
             {
@@ -29,7 +33,7 @@ internal static class NeighborFocus
             }
         }
 
-        for (int backward = Math.Min(removedIndex - 1, itemsBeforeRemoval.Count - 1); backward >= 0; backward--)
+        for (int backward = clampedIndex - 1; backward >= 0; backward--)
         {
             if (isFocusable(itemsBeforeRemoval[backward]))
             {
