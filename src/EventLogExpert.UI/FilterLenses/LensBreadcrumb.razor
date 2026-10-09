@@ -24,7 +24,8 @@
                 <span class="lens-chip-label" data-tooltip="@label" data-tooltip-overflow>@label</span>
                 <button aria-label="@Localizer["FilterLens_SaveAria", label].Value"
                     class="lens-chip-keep"
-                    @onclick="@(() => Commands.PromoteLens(lensId))"
+                    @onclick="@(() => PromoteLensWithFocus(lensId))"
+                    @ref="_keepRefs[lensId]"
                     type="button">
                     <i aria-hidden="true" class="bi bi-floppy"></i>
                 </button>
@@ -38,7 +39,7 @@
             </span>
         }
 
-        <button class="lens-action" @onclick="SaveAll" type="button">@Localizer["FilterLens_SaveAll"]</button>
+        <button class="lens-action" @onclick="SaveAllWithFocus" type="button">@Localizer["FilterLens_SaveAll"]</button>
         <button aria-describedby="@SaveAsGroupHintRef"
             aria-disabled="@SaveAsGroupAriaDisabled"
             class="lens-action"
@@ -51,6 +52,6 @@
         {
             <span class="visually-hidden" id="@_saveAsGroupHintId">@Localizer["FilterLens_SaveAsGroup_DisabledTitle"].Value</span>
         }
-        <button class="lens-clear" @onclick="Commands.ClearLenses" type="button">@Localizer["FilterLens_ClearAll"]</button>
+        <button class="lens-clear" @onclick="ClearLensesWithFocus" type="button">@Localizer["FilterLens_ClearAll"]</button>
     </div>
 }

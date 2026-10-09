@@ -7,11 +7,9 @@ namespace EventLogExpert.UI.Focus;
 
 internal static class NeighborFocus
 {
-    // Picks the neighbor to focus after the item at removedIndex is removed from a list: walk forward from the next
-    // item, then backward from the previous, returning the first that isFocusable. Operates on the PRE-removal list so
-    // the returned identity stays valid for the caller's ref lookup across the re-render. Try pattern so value-type
-    // keys (e.g. FilterLensId) avoid the default(T)-wraps-to-a-non-null-Nullable trap - the bool gates usage, not the
-    // out value. removedIndex out of range is tolerated (both walks clamp into range).
+    // Neighbor to focus after removing the item at removedIndex: walk forward then backward for the first isFocusable
+    // item, over the PRE-removal list so the identity survives the re-render. Try pattern so value-type keys avoid the
+    // default(T)-wraps-to-non-null-Nullable trap; removedIndex out of range is clamped.
     public static bool TryGetNeighborAfterRemove<T>(
         IReadOnlyList<T> itemsBeforeRemoval,
         int removedIndex,

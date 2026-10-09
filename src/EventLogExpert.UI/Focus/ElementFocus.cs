@@ -6,9 +6,8 @@ using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.Focus;
 
-// Focus helpers that swallow the transient interop failures a best-effort focus restore can hit (teardown, circuit
-// loss, cancellation) plus InvalidOperationException, which ElementReference.FocusAsync throws for a default or
-// never-captured reference - every caller treats a failed restore as "do nothing".
+// Best-effort focus helpers: swallow the transient interop failures a restore can hit (teardown, circuit loss,
+// cancellation) plus InvalidOperationException from a default/never-captured ElementReference.
 internal static class ElementFocus
 {
     public static async ValueTask SafelyAsync(ElementReference target, bool preventScroll = false)
