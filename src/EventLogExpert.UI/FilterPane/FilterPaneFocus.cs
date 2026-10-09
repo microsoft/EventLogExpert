@@ -7,10 +7,9 @@ using EventLogExpert.UI.Focus;
 namespace EventLogExpert.UI.FilterPane;
 
 /// <summary>
-///     Pure helpers for picking the next filter row to focus after a remove or pending-discard event. Extracted from
-///     <see cref="FilterPane" /> so the logic is unit-testable without needing <c>InternalsVisibleTo</c> seams on the
-///     component itself. Callers supply an <c>isFocusable</c> predicate that decides whether a candidate row can accept
-///     focus (typically: a live row whose component reference exists and is not mid-edit).
+///     Pure, unit-testable helpers for picking the next filter row to focus after a remove or pending-discard.
+///     Callers supply an <c>isFocusable</c> predicate (typically a live row whose component ref exists and is not
+///     mid-edit).
 /// </summary>
 public static class FilterPaneFocus
 {
@@ -25,8 +24,7 @@ public static class FilterPaneFocus
         ArgumentNullException.ThrowIfNull(savedFilters);
         ArgumentNullException.ThrowIfNull(isFocusable);
 
-        // Pass removedIndex = Count so the forward walk no-ops and the backward walk starts at the last saved filter -
-        // the pending-discard "walk backward from the end" semantics expressed through the shared neighbor helper.
+        // removedIndex = Count makes the forward walk no-op and the backward walk start at the last filter.
         return NeighborFocus.TryGetNeighborAfterRemove(
             savedFilters, savedFilters.Count, saved => isFocusable(saved.Id), out var target) ?
                 target.Id : null;

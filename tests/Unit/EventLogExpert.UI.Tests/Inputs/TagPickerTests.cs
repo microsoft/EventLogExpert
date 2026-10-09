@@ -22,8 +22,7 @@ public sealed class TagPickerTests : BunitContext
     [Fact]
     public void Backspace_WithMultipleTags_DoesNotArmFocusRestore()
     {
-        // Backspace from the input removes the last tag but focus is already in the surviving input - it must NOT arm
-        // a neighbor restore (that would yank focus onto a chip mid-typing).
+        // Backspace removes the last tag but focus is already in the surviving input, so it must NOT arm a restore.
         var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
 
         var cut = Render<TagPicker>(parameters => parameters
@@ -80,8 +79,8 @@ public sealed class TagPickerTests : BunitContext
     [Fact]
     public void DuplicateTagsInValue_RenderWithoutThrowing_AsDistinctChips()
     {
-        // @key keys on the tag value; duplicates (only reachable via a corrupt/pre-normalizer source) must not throw a
-        // Blazor duplicate-key exception - the render projection dedupes to distinct chips.
+        // @key keys on the tag value; duplicates (only via a corrupt/pre-normalizer source) must not throw - the render
+        // projection dedupes to distinct chips.
         var cut = Render<TagPicker>(parameters => parameters
             .Add(p => p.Value, ImmutableList.Create("alpha", "beta", "alpha"))
             .Add(p => p.SuggestionSource, []));
@@ -215,8 +214,7 @@ public sealed class TagPickerTests : BunitContext
     [Fact]
     public void RemoveChip_GuardUnavailable_FailsClosed_NoBareFocus()
     {
-        // TagPicker removal is deferred (the user may have moved focus), so if the guard module throws, the restore
-        // must fail CLOSED - no bare FocusAsync fallback that could steal focus.
+        // Deferred removal: if the guard module throws, fail CLOSED - no bare FocusAsync fallback that could steal focus.
         var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
         focusModule.Setup<bool>("focusIfNotElsewhere", _ => true).SetException(new JSException("boom"));
 
@@ -234,9 +232,8 @@ public sealed class TagPickerTests : BunitContext
     [Fact]
     public void RemoveChip_RestoreIsSingleShot_AcrossHostRepublishedValues()
     {
-        // TagPicker optimistically writes Value locally, so the guarded restore fires once on the post-click render. A
-        // host that later re-publishes the value (the pre-removal list, then the authoritative removal - as the async,
-        // failable LibraryEntryRow persist does) must NOT trigger a second restore: the arm is single-shot.
+        // The guarded restore fires once on the post-click render; a host that later re-publishes the value (old list,
+        // then the authoritative removal) must NOT trigger a second restore - the arm is single-shot.
         var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
 
         var cut = Render<TagPicker>(parameters => parameters
@@ -255,9 +252,8 @@ public sealed class TagPickerTests : BunitContext
     [Fact]
     public void RemoveChip_SyncHost_RestoresFocusToForwardNeighborChip()
     {
-        // A synchronous host (e.g. LibrarySavedTabHeader: _draftTags = tags) leaves the local removal in place, so the
-        // removed tag is absent on the next render and the restore fires - routed through the orphan guard to the
-        // FORWARD neighbor chip's remove button, never a bare FocusAsync and never the wrong element.
+        // Synchronous host (e.g. LibrarySavedTabHeader): the removed tag is absent next render and the restore routes
+        // through the orphan guard to the FORWARD neighbor chip's remove button, never a bare FocusAsync.
         var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
 
         var cut = Render<TagPicker>(parameters => parameters
@@ -274,8 +270,8 @@ public sealed class TagPickerTests : BunitContext
     [Fact]
     public void RemoveSoleChip_GuardDeclines_DoesNotStrandDropdownSuppression()
     {
-        // When the guard declines (focus already moved) the input is not focused, so OnInputFocus never consumes the
-        // flag; it must be cleared so the user's next genuine input focus still opens the listbox.
+        // When the guard declines (focus moved) the input is not focused, so the suppress flag must be cleared or the
+        // user's next genuine input focus would not open the listbox.
         var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
         focusModule.Setup<bool>("focusIfNotElsewhere", _ => true).SetResult(false);
 
@@ -293,8 +289,8 @@ public sealed class TagPickerTests : BunitContext
     [Fact]
     public void RemoveSoleChip_GuardMovesFocusToInput_SuppressesTheNextDropdownOpen()
     {
-        // Removing the only chip restores focus to the always-present input. The suggestion listbox must NOT reopen on
-        // that programmatic focus (the just-removed tag would be the active suggestion), but a later genuine focus must.
+        // Removing the only chip restores focus to the input; the listbox must NOT reopen on that programmatic focus
+        // (the just-removed tag would be the active suggestion), but a later genuine focus must.
         var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
         focusModule.Setup<bool>("focusIfNotElsewhere", _ => true).SetResult(true);
 

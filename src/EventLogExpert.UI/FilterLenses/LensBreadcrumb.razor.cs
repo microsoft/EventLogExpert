@@ -10,22 +10,26 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterLenses;
 
 public sealed partial class LensBreadcrumb
 {
+    // Filters-pane focus-restore landmark; the class + attribute disambiguate it from the breadcrumb's own
+    // data-pane="filters" region regardless of DOM order. Pinned by FilterPaneTests.
+    private const string FilterPaneFocusSelector = ".filter-pane[data-pane='filters']";
+
+    private readonly Dictionary<FilterLensId, ElementReference> _keepRefs = [];
     private readonly Dictionary<FilterLensId, ElementReference> _removeRefs = [];
 
-    // "Save as group" stays keyboard-focusable while unavailable (aria-disabled instead of the native
-    // disabled attribute, which drops focusability), so screen-reader users can reach it and hear the
-    // reason via aria-describedby. The click/keyboard handler still guards the action (SaveAsGroupAsync).
+    // aria-disabled (not the native disabled attribute, which drops focusability) keeps this reachable for
+    // screen-reader users; the handler still guards the action.
     private readonly string _saveAsGroupHintId = $"lens-save-as-group-hint-{Guid.NewGuid():N}";
 
     private IJSObjectReference? _focusModule;
-    private bool _pendingEscapeGuard;
-    private FilterLensId? _pendingRemovedLensId;
-    private FilterLensId? _pendingTargetLensId;
+    private ImmutableHashSet<FilterLensId> _pendingGroupClearIds = [];
+    private PendingFocusRestore? _pendingRestore;
     private HashSet<FilterLensId> _renderedLensIds = [];
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
@@ -54,29 +58,41 @@ public sealed partial class LensBreadcrumb
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        PruneRemoveRefs();
+        PruneChipRefs();
 
-        // Consume the arm only once the removal has propagated (the removed lens is gone from the live source), so a
-        // pre-removal render never fires it. Clearing it unconditionally here keeps it single-shot.
-        if (_pendingRemovedLensId is { } removedId && LensSource.Lenses.All(lens => lens.Id != removedId))
+        var lenses = LensSource.Lenses;
+
+        // Consume the immediate arm once removal propagates (single-lens: id gone; bulk: list empty). A bulk arm that
+        // did not empty is a synchronous no-op, so disarm it; single-lens arms are retained until their id is gone.
+        if (_pendingRestore is { } arm)
         {
-            bool escapeGuard = _pendingEscapeGuard;
-            FilterLensId? targetId = _pendingTargetLensId;
+            bool propagated = arm.RemovedId is { } removedId ?
+                lenses.All(lens => lens.Id != removedId) :
+                lenses.IsEmpty;
 
-            _pendingRemovedLensId = null;
-            _pendingTargetLensId = null;
-            _pendingEscapeGuard = false;
-
-            if (targetId is { } id && _removeRefs.TryGetValue(id, out var targetRef))
+            if (propagated)
             {
-                if (escapeGuard)
-                {
-                    await RestoreFocusIfOrphanedAsync(targetRef);
-                }
-                else
-                {
-                    await ElementFocus.SafelyAsync(targetRef, preventScroll: true);
-                }
+                _pendingRestore = null;
+
+                await RestoreImmediateFocusAsync(arm);
+            }
+            else if (arm.RemovedId is null)
+            {
+                _pendingRestore = null;
+            }
+        }
+
+        // Deferred group-clear (the async persist clears only property lenses): drain per id against the RENDERED set
+        // (the live source can lead the DOM), guarded, after the immediate arm so its focus has already landed.
+        if (!_pendingGroupClearIds.IsEmpty)
+        {
+            var cleared = _pendingGroupClearIds.Where(id => !_renderedLensIds.Contains(id)).ToImmutableArray();
+
+            if (cleared.Length > 0)
+            {
+                _pendingGroupClearIds = _pendingGroupClearIds.Except(cleared);
+
+                await RestoreFilterPaneFocusIfOrphanedAsync();
             }
         }
 
@@ -86,12 +102,14 @@ public sealed partial class LensBreadcrumb
     protected override void OnInitialized()
     {
         ObserveSource(LensSource);
+
         base.OnInitialized();
     }
 
-    // Snapshots the lenses BEFORE removal and records the surviving neighbor chip to focus once the removal propagates.
-    // Must run before Commands.RemoveLens, whose reducer updates the source synchronously.
-    private void ArmNeighborFocus(FilterLensId removedId, bool escapeGuard)
+    // Arm the neighbor chip to focus once a single-lens removal propagates; run before the synchronous Commands
+    // dispatch. Guard by region SURVIVAL, not neighbor-ref presence (a surviving region may hold focus; a full unmount
+    // is provably orphaned, so fail open).
+    private void ArmChipRemovalFocus(FilterLensId removedId, bool guardedOrigin, bool keepButtonTarget)
     {
         var lenses = LensSource.Lenses;
 
@@ -104,12 +122,30 @@ public sealed partial class LensBreadcrumb
 
         if (removedIndex < 0) { return; }
 
-        _pendingRemovedLensId = removedId;
-        _pendingEscapeGuard = escapeGuard;
-        _pendingTargetLensId = NeighborFocus.TryGetNeighborAfterRemove(
-            lenses, removedIndex, lens => _removeRefs.ContainsKey(lens.Id), out var neighbor) ?
-                neighbor.Id :
-                null;
+        var refs = keepButtonTarget ? _keepRefs : _removeRefs;
+        bool regionSurvives = lenses.Count > 1;
+
+        FilterLensId? targetId = NeighborFocus.TryGetNeighborAfterRemove(
+            lenses, removedIndex, lens => refs.ContainsKey(lens.Id), out var neighbor) ?
+                neighbor.Id : null;
+
+        _pendingRestore = new PendingFocusRestore(
+            RemovedId: removedId,
+            TargetId: targetId,
+            TargetIsKeepButton: keepButtonTarget,
+            Guarded: guardedOrigin && regionSurvives);
+    }
+
+    // Save all / Clear all unmount the whole region (provably orphaned, fail open); no removed id, so the arm consumes
+    // when the list empties.
+    private void ArmSynchronousBulkFocus() =>
+        _pendingRestore = new PendingFocusRestore(
+            RemovedId: null, TargetId: null, TargetIsKeepButton: false, Guarded: false);
+
+    private void ClearLensesWithFocus()
+    {
+        ArmSynchronousBulkFocus();
+        Commands.ClearLenses();
     }
 
     private void HandleKeyDown(KeyboardEventArgs args)
@@ -120,44 +156,81 @@ public sealed partial class LensBreadcrumb
 
         if (lenses.IsEmpty) { return; }
 
-        // Escape removes the LAST lens wherever focus sits; arm the previous chip but restore it only if the removal
-        // orphaned focus (the guard), so Escape pressed from the region or an action button never steals focus.
+        // Escape removes the last lens; guard the restore since the focus origin is unknown.
         FilterLensId removedId = lenses[^1].Id;
-        ArmNeighborFocus(removedId, escapeGuard: true);
+        ArmChipRemovalFocus(removedId, guardedOrigin: true, keepButtonTarget: false);
         Commands.RemoveLens(removedId);
     }
 
-    // Drops refs for chips no longer rendered: captures never re-run, so a stale entry would survive TryGetValue and
-    // throw on focus instead of falling through. Pruned against the set captured at render time (the live source can
-    // lag the render).
-    private void PruneRemoveRefs()
+    private ValueTask<IJSObjectReference> ImportFocusModuleAsync() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/EventLogExpert.UI/Common/focusGuard.js");
+
+    private void PromoteLensWithFocus(FilterLensId lensId)
     {
-        if (_removeRefs.Count == 0) { return; }
+        // Keep promotes and removes this chip; target the neighbor's KEEP button so the next Enter never lands on a
+        // delete control.
+        ArmChipRemovalFocus(lensId, guardedOrigin: false, keepButtonTarget: true);
+        Commands.PromoteLens(lensId);
+    }
 
-        List<FilterLensId> stale = [.. _removeRefs.Keys.Where(id => !_renderedLensIds.Contains(id))];
+    // Drop refs for unrendered chips (captures never re-run, so a stale entry throws on focus); prune against the
+    // render-time set, which the live source can lag.
+    private void PruneChipRefs()
+    {
+        PruneRefs(_removeRefs);
+        PruneRefs(_keepRefs);
+    }
 
-        foreach (var id in stale) { _removeRefs.Remove(id); }
+    private void PruneRefs(Dictionary<FilterLensId, ElementReference> refs)
+    {
+        if (refs.Count == 0) { return; }
+
+        List<FilterLensId> stale = [.. refs.Keys.Where(id => !_renderedLensIds.Contains(id))];
+
+        foreach (var id in stale) { refs.Remove(id); }
     }
 
     private void RemoveLensWithFocus(FilterLensId lensId)
     {
-        // The clicked chip's button holds focus and is about to unmount, so focus is provably orphaned - restore the
-        // neighbor directly (no guard needed on this path).
-        ArmNeighborFocus(lensId, escapeGuard: false);
+        ArmChipRemovalFocus(lensId, guardedOrigin: false, keepButtonTarget: false);
         Commands.RemoveLens(lensId);
     }
 
-    // Escape removes the last lens wherever focus sits; restore the previous chip ONLY when focus fell to the document
-    // root. If the guard module is unavailable, do NOT restore - focus may rest on the surviving region or an action
-    // button, and an unconditional restore would steal it.
+    // Unguarded filters-pane restore for the synchronous region-unmount paths (provably orphaned).
+    private async ValueTask RestoreFilterPaneFocusAsync()
+    {
+        try
+        {
+            _focusModule ??= await ImportFocusModuleAsync();
+            await _focusModule.InvokeAsync<bool>("focusSelector", FilterPaneFocusSelector, true);
+        }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { }
+        catch (ObjectDisposedException) { }
+        catch (TaskCanceledException) { }
+    }
+
+    // Guarded filters-pane restore (Escape/keep fallback + deferred clear): focus may rest on a survivor or have moved.
+    private async ValueTask RestoreFilterPaneFocusIfOrphanedAsync()
+    {
+        try
+        {
+            _focusModule ??= await ImportFocusModuleAsync();
+            await _focusModule.InvokeAsync<bool>("focusSelectorIfNotElsewhere", FilterPaneFocusSelector, true);
+        }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { }
+        catch (ObjectDisposedException) { }
+        catch (TaskCanceledException) { }
+    }
+
+    // Guarded neighbor-chip restore (Escape path): if the module is unavailable, do NOT restore (focus may rest on a
+    // survivor).
     private async ValueTask RestoreFocusIfOrphanedAsync(ElementReference target)
     {
         try
         {
-            _focusModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
-                "import",
-                "./_content/EventLogExpert.UI/Common/focusGuard.js");
-
+            _focusModule ??= await ImportFocusModuleAsync();
             await _focusModule.InvokeAsync<bool>("focusIfNotElsewhere", target, true);
         }
         catch (JSDisconnectedException) { }
@@ -166,7 +239,29 @@ public sealed partial class LensBreadcrumb
         catch (TaskCanceledException) { }
     }
 
-    private void SaveAll() => Commands.PromoteAllLenses();
+    private async ValueTask RestoreImmediateFocusAsync(PendingFocusRestore arm)
+    {
+        var refs = arm.TargetIsKeepButton ? _keepRefs : _removeRefs;
+
+        if (arm.TargetId is { } id && refs.TryGetValue(id, out var targetRef))
+        {
+            if (arm.Guarded) { await RestoreFocusIfOrphanedAsync(targetRef); }
+            else { await ElementFocus.SafelyAsync(targetRef, preventScroll: true); }
+
+            return;
+        }
+
+        // Sole-lens / bulk / missing ref: fall back to the filters pane, NEVER the opposite-kind button (a keep removal
+        // must not land on a delete).
+        if (arm.Guarded) { await RestoreFilterPaneFocusIfOrphanedAsync(); }
+        else { await RestoreFilterPaneFocusAsync(); }
+    }
+
+    private void SaveAllWithFocus()
+    {
+        ArmSynchronousBulkFocus();
+        Commands.PromoteAllLenses();
+    }
 
     private async Task SaveAsGroupAsync()
     {
@@ -184,9 +279,28 @@ public sealed partial class LensBreadcrumb
         if (outcome.Choice == PromptChoice.Cancel || string.IsNullOrWhiteSpace(outcome.Value)) { return; }
 
         string name = outcome.Value.Trim();
+        bool clearAfterSave = outcome.Choice == PromptChoice.Secondary;
 
-        // Save and clear (Secondary) defers the clear to the persist-success effect, so a failed save leaves the active
-        // lenses intact instead of discarding them.
-        Commands.SaveLensesAsGroup(name, clearAfterSave: outcome.Choice == PromptChoice.Secondary);
+        if (clearAfterSave)
+        {
+            // The clear is deferred to the persist-success effect and removes only contributing (property) lenses
+            // (Kind == Property mirrors its Where(!ExcludeFilters.IsEmpty)). Union their ids (overlap-safe) so the
+            // deferred restore fires per id as each leaves the rendered set.
+            var contributing =
+                LensSource.Lenses.Where(lens => lens.Kind == LensKind.Property).Select(lens => lens.Id).ToImmutableArray();
+
+            if (!contributing.IsEmpty)
+            {
+                _pendingGroupClearIds = _pendingGroupClearIds.Union(contributing);
+            }
+        }
+
+        Commands.SaveLensesAsGroup(name, clearAfterSave: clearAfterSave);
     }
+
+    private readonly record struct PendingFocusRestore(
+        FilterLensId? RemovedId,
+        FilterLensId? TargetId,
+        bool TargetIsKeepButton,
+        bool Guarded);
 }

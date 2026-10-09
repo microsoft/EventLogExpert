@@ -20,6 +20,7 @@ using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Scenarios.Catalog;
 using EventLogExpert.UI.FilterEditor;
+using EventLogExpert.UI.FilterLenses;
 using EventLogExpert.UI.FilterPane;
 using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Modal;
@@ -451,6 +452,23 @@ public sealed class FilterPaneTests : BunitContext
         Assert.DoesNotContain(
             component.FindAll("button"),
             b => b.GetAttribute("aria-label")?.StartsWith("Edit ", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public void FilterPaneRoot_IsAFocusableFiltersLandmark()
+    {
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        // LensBreadcrumb restores focus here by selector when the breadcrumb unmounts, so the root must match that shared
+        // selector and be programmatically focusable (tabindex="-1"). Reflecting the production constant reddens a rename.
+        var selector = (string)typeof(LensBreadcrumb)
+            .GetField("FilterPaneFocusSelector", BindingFlags.NonPublic | BindingFlags.Static)!
+            .GetRawConstantValue()!;
+
+        var root = component.Find(selector);
+
+        Assert.Equal("region", root.GetAttribute("role"));
+        Assert.Equal("-1", root.GetAttribute("tabindex"));
     }
 
     [Fact]

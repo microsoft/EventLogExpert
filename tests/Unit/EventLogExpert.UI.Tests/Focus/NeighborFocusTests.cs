@@ -119,8 +119,7 @@ public sealed class NeighborFocusTests
     [Fact]
     public void TryGetNeighborAfterRemove_ValueTypeKeys_SignalsAbsenceViaBoolNotDefault()
     {
-        // A value-type T must not be mistaken for a found neighbor: the bool return is the only signal. Guid.Empty is
-        // the default out value, yet "not found" stays false rather than surfacing default(Guid) as a hit.
+        // Value-type T: the bool return is the only signal - "not found" must stay false, not surface default(Guid).
         var items = new[] { Guid.NewGuid() };
 
         bool found = NeighborFocus.TryGetNeighborAfterRemove(items, removedIndex: 0, _ => true, out var neighbor);

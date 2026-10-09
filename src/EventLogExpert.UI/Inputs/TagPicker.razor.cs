@@ -61,9 +61,8 @@ public sealed partial class TagPicker : ComponentBase, IAsyncDisposable
     {
         PruneRemoveButtons();
 
-        // The host binds Value to authoritative (async, failable) state that can re-publish the removed tag before the
-        // removal persists, so consume the arm only once the tag is actually gone from Value. Clearing it here keeps it
-        // single-shot; a stale arm whose persist failed dies when the edit session unmounts the picker.
+        // The host can re-publish the removed tag before the async persist lands, so consume the arm only once the tag
+        // is actually gone from Value (single-shot; a stale arm whose persist failed dies when the picker unmounts).
         if (_pendingRemovedTag is { } removedTag && !Value.Contains(removedTag, StringComparer.Ordinal))
         {
             string? targetTag = _pendingTargetTag;
@@ -79,9 +78,8 @@ public sealed partial class TagPicker : ComponentBase, IAsyncDisposable
             }
             else if (focusInput)
             {
-                // Set the suppress flag BEFORE the await: on success the real focusin reaches OnInputFocus (which
-                // consumes the flag) before the interop result returns. If the guard declines (focus moved) or is
-                // unavailable, the input is never focused, so clear the flag to avoid stranding it onto a later focus.
+                // Set the flag BEFORE the await so the real focusin reaches OnInputFocus (which consumes it) first; if
+                // the guard declines or is unavailable the input is never focused, so clear it to avoid stranding it.
                 _suppressDropdownOnNextFocus = true;
 
                 if (!await RestoreFocusIfOrphanedAsync(_inputRef))
@@ -100,8 +98,8 @@ public sealed partial class TagPicker : ComponentBase, IAsyncDisposable
         ClampActiveIndex();
     }
 
-    // Snapshots the rendered (deduped) tags BEFORE removal and records the surviving neighbor chip - or the input when
-    // the removed chip was the only one - to focus once the removal propagates.
+    // Snapshots the deduped tags BEFORE removal and records the surviving neighbor chip (or the input, when the removed
+    // chip was the only one) to focus once the removal propagates.
     private void ArmNeighborFocus(string removedTag)
     {
         int removedIndex = _renderedTags.IndexOf(removedTag);
@@ -262,8 +260,8 @@ public sealed partial class TagPicker : ComponentBase, IAsyncDisposable
 
         if (_suppressDropdownOnNextFocus)
         {
-            // A programmatic focus restore after removing the sole chip: keep the input focused but do NOT reopen the
-            // suggestion listbox - the just-removed tag would surface as the active suggestion and Enter would re-add it.
+            // Restoring focus to the input after removing the sole chip: do NOT reopen the listbox, or the just-removed
+            // tag surfaces as the active suggestion and Enter re-adds it.
             _suppressDropdownOnNextFocus = false;
 
             return;
@@ -281,8 +279,7 @@ public sealed partial class TagPicker : ComponentBase, IAsyncDisposable
 
     private string OptionId(int index) => $"{_listboxId}-opt-{index}";
 
-    // Drops refs for chips no longer rendered: captures never re-run, so a stale entry would survive TryGetValue and
-    // throw on focus instead of falling through.
+    // Drops refs for chips no longer rendered (captures never re-run, so a stale entry throws on focus).
     private void PruneRemoveButtons()
     {
         if (_removeButtons.Count == 0) { return; }
@@ -322,9 +319,9 @@ public sealed partial class TagPicker : ComponentBase, IAsyncDisposable
         _activeOptionIndex = -1;
     }
 
-    // Removal is deferred behind the host's async persist, so by the time it propagates the user may have moved focus;
-    // restore only when focus fell to the document root. If the guard module is unavailable, do NOT restore (fail
-    // closed) rather than risk stealing focus the user has since placed elsewhere. Returns whether focus was moved.
+    // Removal is deferred behind the host's async persist, so by the time it propagates the user may have moved focus:
+    // restore only if focus fell to the document root, and fail closed if the module is unavailable. Returns whether
+    // focus moved.
     private async ValueTask<bool> RestoreFocusIfOrphanedAsync(ElementReference target)
     {
         try
