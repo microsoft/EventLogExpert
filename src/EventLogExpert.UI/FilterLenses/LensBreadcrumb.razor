@@ -2,6 +2,7 @@
 
 @{
     var lenses = LensSource.Lenses;
+    _renderedLensIds = [.. lenses.Select(lens => lens.Id)];
 }
 
 @if (!lenses.IsEmpty)
@@ -19,7 +20,7 @@
         {
             var lensId = lens.Id;
             var label = FilterLensLabelFormatter.Format(Localizer, lens.Label);
-            <span class="lens-chip">
+            <span class="lens-chip" @key="lensId">
                 <span class="lens-chip-label" data-tooltip="@label" data-tooltip-overflow>@label</span>
                 <button aria-label="@Localizer["FilterLens_SaveAria", label].Value"
                     class="lens-chip-keep"
@@ -29,7 +30,8 @@
                 </button>
                 <button aria-label="@Localizer["FilterLens_RemoveAria", label].Value"
                     class="lens-chip-remove"
-                    @onclick="@(() => Commands.RemoveLens(lensId))"
+                    @onclick="@(() => RemoveLensWithFocus(lensId))"
+                    @ref="_removeRefs[lensId]"
                     type="button">
                     &times;
                 </button>

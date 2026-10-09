@@ -1,4 +1,4 @@
-// Unit tests for the focus-restoration guard extracted from wwwroot/StatusBar/statusBarFocus.js. Run with Node's
+// Unit tests for the focus-restoration guard extracted from wwwroot/Common/focusGuard.js. Run with Node's
 // built-in test runner: `node --test tests/JsUnit`.
 //
 // There is no DOM here, so a minimal HTMLElement/document are stubbed. These tests lock the branch logic the C# side
@@ -11,9 +11,9 @@ import assert from "node:assert/strict";
 import {
     isActiveElementElsewhere,
     focusIfNotElsewhere,
-} from "../../src/EventLogExpert.UI/wwwroot/StatusBar/statusBarFocus.js";
+} from "../../src/EventLogExpert.UI/wwwroot/Common/focusGuard.js";
 
-// statusBarFocus.js uses `instanceof HTMLElement`; Node has no DOM, so define a minimal class and make every stub node
+// focusGuard.js uses `instanceof HTMLElement`; Node has no DOM, so define a minimal class and make every stub node
 // an instance of it. The module reads HTMLElement from the global scope at call time.
 class HTMLElement {}
 globalThis.HTMLElement = HTMLElement;

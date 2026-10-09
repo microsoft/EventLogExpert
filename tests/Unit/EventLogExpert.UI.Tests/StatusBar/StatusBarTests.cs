@@ -429,9 +429,9 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         // The deferred restore must go through the orphan-guarded focus primitive (focusIfNotElsewhere), never a bare
         // ElementReference.FocusAsync: the guard is what keeps the restore from stealing focus the user moved elsewhere
         // during the fault. bUnit cannot execute the module's suppress-when-elsewhere decision (that is pinned in
-        // statusBarFocus.test.js); here we pin that the component routes the restore through that guard at the exact
+        // focusGuard.test.js); here we pin that the component routes the restore through that guard at the exact
         // module path - verifying on the path-specific handler so a C#-only path rename cannot silently fall back.
-        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/StatusBar/statusBarFocus.js");
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
 
         SetOrdering(
             new DisplayOrdering(OrderBy: ColumnName.Source, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false),
@@ -452,7 +452,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         // If the orphan-guard round trip fails (JS disconnected or the module unavailable), the restore must still fire
         // so a keyboard user is never stranded on the document body - the deliberate fail-safe. The guard throws, so
         // the component falls back to a bare ElementReference.FocusAsync on the sibling sort chip.
-        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/StatusBar/statusBarFocus.js");
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
         focusModule.Setup<bool>("focusIfNotElsewhere", _ => true)
             .SetException(new JSDisconnectedException("Circuit disconnected."));
 

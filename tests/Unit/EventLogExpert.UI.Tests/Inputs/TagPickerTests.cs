@@ -4,12 +4,38 @@
 using Bunit;
 using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.JSInterop;
 using System.Collections.Immutable;
+using System.Reflection;
 
 namespace EventLogExpert.UI.Tests.Inputs;
 
 public sealed class TagPickerTests : BunitContext
 {
+    public TagPickerTests()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+    }
+
+    [Fact]
+    public void Backspace_WithMultipleTags_DoesNotArmFocusRestore()
+    {
+        // Backspace from the input removes the last tag but focus is already in the surviving input - it must NOT arm
+        // a neighbor restore (that would yank focus onto a chip mid-typing).
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+
+        var cut = Render<TagPicker>(parameters => parameters
+            .Add(p => p.Value, ImmutableList.Create("alpha", "beta"))
+            .Add(p => p.SuggestionSource, [])
+            .Add(p => p.ValueChanged, EventCallback.Factory.Create<ImmutableList<string>>(this, _ => { })));
+
+        cut.Find(".tag-picker-input").KeyDown(new KeyboardEventArgs { Key = "Backspace" });
+
+        Assert.DoesNotContain(focusModule.Invocations, invocation => invocation.Identifier == "focusIfNotElsewhere");
+    }
+
     [Fact]
     public void ChipRemoveButton_HasAccessibleLabel()
     {
@@ -49,6 +75,18 @@ public sealed class TagPickerTests : BunitContext
             .Add(p => p.SuggestionSource, ["alpha", "beta"]));
 
         Assert.Empty(component.FindAll(".tag-picker-listbox"));
+    }
+
+    [Fact]
+    public void DuplicateTagsInValue_RenderWithoutThrowing_AsDistinctChips()
+    {
+        // @key keys on the tag value; duplicates (only reachable via a corrupt/pre-normalizer source) must not throw a
+        // Blazor duplicate-key exception - the render projection dedupes to distinct chips.
+        var cut = Render<TagPicker>(parameters => parameters
+            .Add(p => p.Value, ImmutableList.Create("alpha", "beta", "alpha"))
+            .Add(p => p.SuggestionSource, []));
+
+        Assert.Equal(2, cut.FindAll(".tag-picker-chip").Count);
     }
 
     [Fact]
@@ -175,6 +213,109 @@ public sealed class TagPickerTests : BunitContext
     }
 
     [Fact]
+    public void RemoveChip_GuardUnavailable_FailsClosed_NoBareFocus()
+    {
+        // TagPicker removal is deferred (the user may have moved focus), so if the guard module throws, the restore
+        // must fail CLOSED - no bare FocusAsync fallback that could steal focus.
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+        focusModule.Setup<bool>("focusIfNotElsewhere", _ => true).SetException(new JSException("boom"));
+
+        var cut = Render<TagPicker>(parameters => parameters
+            .Add(p => p.Value, ImmutableList.Create("alpha", "beta", "gamma"))
+            .Add(p => p.SuggestionSource, [])
+            .Add(p => p.ValueChanged, EventCallback.Factory.Create<ImmutableList<string>>(this, _ => { })));
+
+        cut.FindAll(".tag-picker-chip-remove")[1].Click();
+
+        Assert.DoesNotContain(JSInterop.Invocations, invocation =>
+            invocation.Identifier.Contains("domWrapper.focus", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void RemoveChip_RestoreIsSingleShot_AcrossHostRepublishedValues()
+    {
+        // TagPicker optimistically writes Value locally, so the guarded restore fires once on the post-click render. A
+        // host that later re-publishes the value (the pre-removal list, then the authoritative removal - as the async,
+        // failable LibraryEntryRow persist does) must NOT trigger a second restore: the arm is single-shot.
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+
+        var cut = Render<TagPicker>(parameters => parameters
+            .Add(p => p.Value, ImmutableList.Create("alpha", "beta", "gamma"))
+            .Add(p => p.SuggestionSource, [])
+            .Add(p => p.ValueChanged, EventCallback.Factory.Create<ImmutableList<string>>(this, _ => { })));
+
+        cut.FindAll(".tag-picker-chip-remove")[1].Click();
+
+        cut.Render(parameters => parameters.Add(p => p.Value, ImmutableList.Create("alpha", "beta", "gamma")));
+        cut.Render(parameters => parameters.Add(p => p.Value, ImmutableList.Create("alpha", "gamma")));
+
+        Assert.Single(focusModule.Invocations, invocation => invocation.Identifier == "focusIfNotElsewhere");
+    }
+
+    [Fact]
+    public void RemoveChip_SyncHost_RestoresFocusToForwardNeighborChip()
+    {
+        // A synchronous host (e.g. LibrarySavedTabHeader: _draftTags = tags) leaves the local removal in place, so the
+        // removed tag is absent on the next render and the restore fires - routed through the orphan guard to the
+        // FORWARD neighbor chip's remove button, never a bare FocusAsync and never the wrong element.
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+
+        var cut = Render<TagPicker>(parameters => parameters
+            .Add(p => p.Value, ImmutableList.Create("alpha", "beta", "gamma"))
+            .Add(p => p.SuggestionSource, [])
+            .Add(p => p.ValueChanged, EventCallback.Factory.Create<ImmutableList<string>>(this, _ => { })));
+
+        cut.FindAll(".tag-picker-chip-remove")[1].Click();
+
+        cut.WaitForAssertion(() => focusModule.VerifyInvoke("focusIfNotElsewhere"));
+        AssertGuardedFocusTargets(focusModule, RemoveButtonElement(cut, "gamma"));
+    }
+
+    [Fact]
+    public void RemoveSoleChip_GuardDeclines_DoesNotStrandDropdownSuppression()
+    {
+        // When the guard declines (focus already moved) the input is not focused, so OnInputFocus never consumes the
+        // flag; it must be cleared so the user's next genuine input focus still opens the listbox.
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+        focusModule.Setup<bool>("focusIfNotElsewhere", _ => true).SetResult(false);
+
+        var cut = Render<TagPicker>(parameters => parameters
+            .Add(p => p.Value, ImmutableList.Create("only"))
+            .Add(p => p.SuggestionSource, ["suggestion"])
+            .Add(p => p.ValueChanged, EventCallback.Factory.Create<ImmutableList<string>>(this, _ => { })));
+
+        cut.Find(".tag-picker-chip-remove").Click();
+
+        cut.Find(".tag-picker-input").Focus();
+        Assert.NotEmpty(cut.FindAll(".tag-picker-listbox"));
+    }
+
+    [Fact]
+    public void RemoveSoleChip_GuardMovesFocusToInput_SuppressesTheNextDropdownOpen()
+    {
+        // Removing the only chip restores focus to the always-present input. The suggestion listbox must NOT reopen on
+        // that programmatic focus (the just-removed tag would be the active suggestion), but a later genuine focus must.
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+        focusModule.Setup<bool>("focusIfNotElsewhere", _ => true).SetResult(true);
+
+        var cut = Render<TagPicker>(parameters => parameters
+            .Add(p => p.Value, ImmutableList.Create("only"))
+            .Add(p => p.SuggestionSource, ["suggestion"])
+            .Add(p => p.ValueChanged, EventCallback.Factory.Create<ImmutableList<string>>(this, _ => { })));
+
+        cut.Find(".tag-picker-chip-remove").Click();
+        AssertGuardedFocusTargets(focusModule, InputElement(cut));
+
+        // The restored (programmatic) focus landing on the input keeps the listbox closed...
+        cut.Find(".tag-picker-input").Focus();
+        Assert.Empty(cut.FindAll(".tag-picker-listbox"));
+
+        // ...but the user's next genuine focus opens it (the one-shot suppression was consumed).
+        cut.Find(".tag-picker-input").Focus();
+        Assert.NotEmpty(cut.FindAll(".tag-picker-listbox"));
+    }
+
+    [Fact]
     public void RemoveTagAriaLabelFormat_WhenProvided_FormatsChipAriaPerTag()
     {
         var component = Render<TagPicker>(parameters => parameters
@@ -232,5 +373,25 @@ public sealed class TagPickerTests : BunitContext
         Assert.Equal(2, options.Count);
         Assert.Contains(options, o => o.TextContent.Trim() == "alpha");
         Assert.Contains(options, o => o.TextContent.Trim() == "alphabet");
+    }
+
+    private static ElementReference InputElement(IRenderedComponent<TagPicker> cut) =>
+        (ElementReference)typeof(TagPicker)
+            .GetField("_inputRef", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(cut.Instance)!;
+
+    private static ElementReference RemoveButtonElement(IRenderedComponent<TagPicker> cut, string tag)
+    {
+        var buttons = (Dictionary<string, ChromelessButton?>)typeof(TagPicker)
+            .GetField("_removeButtons", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(cut.Instance)!;
+
+        return buttons[tag]!.Element;
+    }
+
+    private void AssertGuardedFocusTargets(BunitJSModuleInterop module, ElementReference expected)
+    {
+        var call = module.Invocations.Last(invocation => invocation.Identifier == "focusIfNotElsewhere");
+        Assert.Equal(expected.Id, ((ElementReference)call.Arguments[0]!).Id);
     }
 }

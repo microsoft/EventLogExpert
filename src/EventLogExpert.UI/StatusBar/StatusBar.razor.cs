@@ -187,7 +187,7 @@ public sealed partial class StatusBar
         {
             _focusModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
                 "import",
-                "./_content/EventLogExpert.UI/StatusBar/statusBarFocus.js");
+                "./_content/EventLogExpert.UI/Common/focusGuard.js");
 
             await _focusModule.InvokeAsync<bool>("focusIfNotElsewhere", target, preventScroll);
 
