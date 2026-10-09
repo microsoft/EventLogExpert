@@ -106,9 +106,9 @@ public sealed partial class LensBreadcrumb
         base.OnInitialized();
     }
 
-    // Arm the neighbor chip to focus once a single-lens removal propagates; run before the synchronous Commands
-    // dispatch. Guard by region SURVIVAL, not neighbor-ref presence (a surviving region may hold focus; a full unmount
-    // is provably orphaned, so fail open).
+    // Arm the surviving neighbor chip (or the always-guarded filters-pane fallback when none survives) to focus once a
+    // single-lens removal propagates; run before the synchronous Commands dispatch. Guarded governs the neighbor-chip
+    // restore only: Escape guards it (origin unknown), x/keep fail open to the neighbor (the clicked control unmounts).
     private void ArmChipRemovalFocus(FilterLensId removedId, bool guardedOrigin, bool keepButtonTarget)
     {
         var lenses = LensSource.Lenses;
@@ -123,7 +123,6 @@ public sealed partial class LensBreadcrumb
         if (removedIndex < 0) { return; }
 
         var refs = keepButtonTarget ? _keepRefs : _removeRefs;
-        bool regionSurvives = lenses.Count > 1;
 
         FilterLensId? targetId = NeighborFocus.TryGetNeighborAfterRemove(
             lenses, removedIndex, lens => refs.ContainsKey(lens.Id), out var neighbor) ?
@@ -133,11 +132,11 @@ public sealed partial class LensBreadcrumb
             RemovedId: removedId,
             TargetId: targetId,
             TargetIsKeepButton: keepButtonTarget,
-            Guarded: guardedOrigin && regionSurvives);
+            Guarded: guardedOrigin);
     }
 
-    // Save all / Clear all unmount the whole region (provably orphaned, fail open); no removed id, so the arm consumes
-    // when the list empties.
+    // Save all / Clear all unmount the whole region; no removed id, so the arm consumes when the list empties and takes
+    // the always-guarded pane fallback (Guarded is moot here: there is no chip target).
     private void ArmSynchronousBulkFocus() =>
         _pendingRestore = new PendingFocusRestore(
             RemovedId: null, TargetId: null, TargetIsKeepButton: false, Guarded: false);
@@ -196,21 +195,8 @@ public sealed partial class LensBreadcrumb
         Commands.RemoveLens(lensId);
     }
 
-    // Unguarded filters-pane restore for the synchronous region-unmount paths (provably orphaned).
-    private async ValueTask RestoreFilterPaneFocusAsync()
-    {
-        try
-        {
-            _focusModule ??= await ImportFocusModuleAsync();
-            await _focusModule.InvokeAsync<bool>("focusSelector", FilterPaneFocusSelector, true);
-        }
-        catch (JSDisconnectedException) { }
-        catch (JSException) { }
-        catch (ObjectDisposedException) { }
-        catch (TaskCanceledException) { }
-    }
-
-    // Guarded filters-pane restore (Escape/keep fallback + deferred clear): focus may rest on a survivor or have moved.
+    // Guarded filters-pane restore (every pane fallback): focus may rest on a survivor or have moved during the module
+    // import, so decline rather than steal.
     private async ValueTask RestoreFilterPaneFocusIfOrphanedAsync()
     {
         try
@@ -252,9 +238,9 @@ public sealed partial class LensBreadcrumb
         }
 
         // Sole-lens / bulk / missing ref: fall back to the filters pane, NEVER the opposite-kind button (a keep removal
-        // must not land on a delete).
-        if (arm.Guarded) { await RestoreFilterPaneFocusIfOrphanedAsync(); }
-        else { await RestoreFilterPaneFocusAsync(); }
+        // must not land on a delete). Always guarded: the pane is reachable only through the module, so an unguarded
+        // restore buys no fail-open resilience and only risks stealing focus that moved during the import await.
+        await RestoreFilterPaneFocusIfOrphanedAsync();
     }
 
     private void SaveAllWithFocus()

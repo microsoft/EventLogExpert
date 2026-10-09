@@ -6,14 +6,12 @@ import assert from "node:assert/strict";
 import {
     isActiveElementElsewhere,
     focusIfNotElsewhere,
-    focusSelector,
     focusSelectorIfNotElsewhere,
 } from "../../src/EventLogExpert.UI/wwwroot/Common/focusGuard.js";
 
-// focusGuard.js uses `instanceof HTMLElement`; Node has no DOM, so define a minimal class and make every stub node
-// an instance of it. The module reads HTMLElement from the global scope at call time.
+// Node has no DOM, so stub a minimal class to create distinct stand-ins for the document roots and focus targets.
+// isActiveElementElsewhere compares by identity: null and the two roots are "not elsewhere", any other node is.
 class HTMLElement {}
-globalThis.HTMLElement = HTMLElement;
 
 const body = new HTMLElement();
 const documentElement = new HTMLElement();
@@ -38,10 +36,10 @@ test("isActiveElementElsewhere: a real control somewhere else is elsewhere (rest
     assert.equal(isActiveElementElsewhere(control, body, documentElement), true);
 });
 
-test("isActiveElementElsewhere: a non-HTMLElement node (e.g. SVG or text) is not elsewhere", () => {
-    const svgNode = { nodeName: "svg" };
+test("isActiveElementElsewhere: a focused SVG element is elsewhere (a guarded restore must not steal it)", () => {
+    const svgElement = { nodeName: "svg" };
 
-    assert.equal(isActiveElementElsewhere(svgNode, body, documentElement), false);
+    assert.equal(isActiveElementElsewhere(svgElement, body, documentElement), true);
 });
 
 // --- focusIfNotElsewhere: the DOM wrapper that checks and focuses in one call ---
@@ -83,35 +81,7 @@ test("focusIfNotElsewhere: reports false when focus() silently no-ops (hidden/no
     assert.equal(moved, false);
 });
 
-// --- focusSelector: unguarded, selector-addressed focus for a sibling landmark (the filters pane) ---
-
-test("focusSelector: focuses the matched element and reports it landed", () => {
-    const target = new HTMLElement();
-    let focusedWith;
-    const activeDocument = {
-        activeElement: body,
-        body,
-        documentElement,
-        querySelector: (selector) => selector === "[data-pane='filters']" ? target : null,
-    };
-    target.focus = (options) => { focusedWith = options; activeDocument.activeElement = target; };
-    globalThis.document = activeDocument;
-
-    const moved = focusSelector("[data-pane='filters']", true);
-
-    assert.equal(moved, true);
-    assert.deepEqual(focusedWith, { preventScroll: true });
-});
-
-test("focusSelector: returns false without throwing when the selector matches nothing (pane unmounted)", () => {
-    globalThis.document = { activeElement: body, body, documentElement, querySelector: () => null };
-
-    const moved = focusSelector("[data-pane='filters']", true);
-
-    assert.equal(moved, false);
-});
-
-// --- focusSelectorIfNotElsewhere: the guarded selector focus for the deferred group-clear restore ---
+// --- focusSelectorIfNotElsewhere: the guarded selector focus for the filters-pane fallback ---
 
 test("focusSelectorIfNotElsewhere: declines when focus already rests on a control elsewhere", () => {
     const target = new HTMLElement();

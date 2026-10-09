@@ -82,7 +82,7 @@ public sealed class LensBreadcrumbTests : BunitContext
         _commands.Received(1).ClearLenses();
 
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".lens-breadcrumb")));
-        AssertFilterPaneRestore(focusModule, guarded: false);
+        AssertFilterPaneRestore(focusModule);
     }
 
     [Fact]
@@ -140,8 +140,9 @@ public sealed class LensBreadcrumbTests : BunitContext
         _source.Lenses.Returns(ImmutableList<FilterLensSummary>.Empty);
         _source.Changed += Raise.Event<Action>();
 
-        // An Escape that empties the region is provably orphaned (nothing survives to steal from) - fail OPEN, unguarded.
-        AssertFilterPaneRestore(focusModule, guarded: false);
+        // All Escape restores fail CLOSED: the module import await is a window for focus to move, and the filters pane
+        // is only reachable through the guard module, so an unguarded restore has no fail-open benefit, only steal risk.
+        AssertFilterPaneRestore(focusModule);
     }
 
     [Fact]
@@ -173,8 +174,8 @@ public sealed class LensBreadcrumbTests : BunitContext
         _source.Lenses.Returns(ImmutableList<FilterLensSummary>.Empty);
         _source.Changed += Raise.Event<Action>();
 
-        // Sole-lens keep unmounts the region; fail open to the filters pane, never a (now gone) remove button.
-        AssertFilterPaneRestore(focusModule, guarded: false);
+        // Sole-lens keep unmounts the region; restore (guarded) to the filters pane, never a (now gone) remove button.
+        AssertFilterPaneRestore(focusModule);
     }
 
     [Fact]
@@ -236,12 +237,12 @@ public sealed class LensBreadcrumbTests : BunitContext
         cut.Find(".lens-chip-remove").Click();
         _commands.Received(1).RemoveLens(only.Id);
 
-        // Removal propagates to empty: the region unmounts (provably orphaned), so restore unguarded to the filters pane.
+        // Removal propagates to empty: the region unmounts, so restore (guarded) to the filters pane.
         _source.Lenses.Returns(ImmutableList<FilterLensSummary>.Empty);
         _source.Changed += Raise.Event<Action>();
 
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".lens-breadcrumb")));
-        AssertFilterPaneRestore(focusModule, guarded: false);
+        AssertFilterPaneRestore(focusModule);
     }
 
     [Fact]
@@ -300,7 +301,7 @@ public sealed class LensBreadcrumbTests : BunitContext
         _commands.Received(1).PromoteAllLenses();
 
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".lens-breadcrumb")));
-        AssertFilterPaneRestore(focusModule, guarded: false);
+        AssertFilterPaneRestore(focusModule);
     }
 
     [Fact]
@@ -320,7 +321,7 @@ public sealed class LensBreadcrumbTests : BunitContext
         _source.Changed += Raise.Event<Action>();
 
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".lens-breadcrumb")));
-        Assert.Empty(focusModule.Invocations["focusSelector"]);
+        Assert.Empty(focusModule.Invocations["focusSelectorIfNotElsewhere"]);
     }
 
     [Fact]
@@ -511,7 +512,7 @@ public sealed class LensBreadcrumbTests : BunitContext
         _source.Changed += Raise.Event<Action>();
 
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".lens-breadcrumb")));
-        AssertFilterPaneRestore(focusModule, guarded: true);
+        AssertFilterPaneRestore(focusModule);
     }
 
     [Fact]
@@ -532,9 +533,7 @@ public sealed class LensBreadcrumbTests : BunitContext
         _source.Changed += Raise.Event<Action>();
 
         cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".lens-chip")));
-        AssertFilterPaneRestore(focusModule, guarded: true);
-        // Never the UNGUARDED variant while the region survives.
-        Assert.Empty(focusModule.Invocations["focusSelector"]);
+        AssertFilterPaneRestore(focusModule);
     }
 
     [Fact]
@@ -580,10 +579,9 @@ public sealed class LensBreadcrumbTests : BunitContext
         _commands.Received(1).RemoveLens(lens.Id);
     }
 
-    private static void AssertFilterPaneRestore(BunitJSModuleInterop focusModule, bool guarded)
+    private static void AssertFilterPaneRestore(BunitJSModuleInterop focusModule)
     {
-        string identifier = guarded ? "focusSelectorIfNotElsewhere" : "focusSelector";
-        var invocation = Assert.Single(focusModule.Invocations[identifier]);
+        var invocation = Assert.Single(focusModule.Invocations["focusSelectorIfNotElsewhere"]);
         Assert.Equal(FilterPaneSelector, invocation.Arguments[0]);
     }
 
