@@ -7,9 +7,13 @@ namespace EventLogExpert.UI.Focus;
 
 internal static class NeighborFocus
 {
-    // Neighbor to focus after removing the item at removedIndex: walk forward then backward for the first isFocusable
-    // item, over the PRE-removal list so the identity survives the re-render. Try pattern so value-type keys avoid the
-    // default(T)-wraps-to-non-null-Nullable trap; removedIndex out of range is clamped.
+    public static IReadOnlyList<T> GetFallbackNeighbors<T>(IReadOnlyList<T> itemsBeforeRemoval, int removedIndex)
+    {
+        ArgumentNullException.ThrowIfNull(itemsBeforeRemoval);
+
+        return [.. FallbackNeighbors(itemsBeforeRemoval, removedIndex)];
+    }
+
     public static bool TryGetNeighborAfterRemove<T>(
         IReadOnlyList<T> itemsBeforeRemoval,
         int removedIndex,
@@ -19,25 +23,11 @@ internal static class NeighborFocus
         ArgumentNullException.ThrowIfNull(itemsBeforeRemoval);
         ArgumentNullException.ThrowIfNull(isFocusable);
 
-        // Clamp before the +/-1 offsets so an out-of-range index (including int.MaxValue) cannot overflow and wrap the
-        // forward start back to zero: -1 scans forward from the first item, Count scans backward from the last.
-        int clampedIndex = Math.Clamp(removedIndex, -1, itemsBeforeRemoval.Count);
-
-        for (int forward = clampedIndex + 1; forward < itemsBeforeRemoval.Count; forward++)
+        foreach (var candidate in FallbackNeighbors(itemsBeforeRemoval, removedIndex))
         {
-            if (isFocusable(itemsBeforeRemoval[forward]))
+            if (isFocusable(candidate))
             {
-                neighbor = itemsBeforeRemoval[forward];
-
-                return true;
-            }
-        }
-
-        for (int backward = clampedIndex - 1; backward >= 0; backward--)
-        {
-            if (isFocusable(itemsBeforeRemoval[backward]))
-            {
-                neighbor = itemsBeforeRemoval[backward];
+                neighbor = candidate;
 
                 return true;
             }
@@ -46,5 +36,20 @@ internal static class NeighborFocus
         neighbor = default;
 
         return false;
+    }
+
+    private static IEnumerable<T> FallbackNeighbors<T>(IReadOnlyList<T> itemsBeforeRemoval, int removedIndex)
+    {
+        int clampedIndex = Math.Clamp(removedIndex, -1, itemsBeforeRemoval.Count);
+
+        for (int forward = clampedIndex + 1; forward < itemsBeforeRemoval.Count; forward++)
+        {
+            yield return itemsBeforeRemoval[forward];
+        }
+
+        for (int backward = clampedIndex - 1; backward >= 0; backward--)
+        {
+            yield return itemsBeforeRemoval[backward];
+        }
     }
 }

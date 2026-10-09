@@ -25,9 +25,8 @@ public sealed partial class TagPicker : ComponentBase, IAsyncDisposable
     private string _inputText = string.Empty;
     private bool _isDropdownOpen;
     private bool _isInputFocused;
-    private bool _pendingFocusInput;
     private string? _pendingRemovedTag;
-    private string? _pendingTargetTag;
+    private IReadOnlyList<string>? _pendingTargetTags;
     private List<string> _renderedTags = [];
     private bool _suppressDropdownOnNextFocus;
 
@@ -65,28 +64,12 @@ public sealed partial class TagPicker : ComponentBase, IAsyncDisposable
         // is actually gone from Value (single-shot; a stale arm whose persist failed dies when the picker unmounts).
         if (_pendingRemovedTag is { } removedTag && !Value.Contains(removedTag, StringComparer.Ordinal))
         {
-            string? targetTag = _pendingTargetTag;
-            bool focusInput = _pendingFocusInput;
+            var targetTags = _pendingTargetTags;
 
             _pendingRemovedTag = null;
-            _pendingTargetTag = null;
-            _pendingFocusInput = false;
+            _pendingTargetTags = null;
 
-            if (targetTag != null && _removeButtons.TryGetValue(targetTag, out var button) && button is not null)
-            {
-                await RestoreFocusIfOrphanedAsync(button.Element);
-            }
-            else if (focusInput)
-            {
-                // Set the flag BEFORE the await so the real focusin reaches OnInputFocus (which consumes it) first; if
-                // the guard declines or is unavailable the input is never focused, so clear it to avoid stranding it.
-                _suppressDropdownOnNextFocus = true;
-
-                if (!await RestoreFocusIfOrphanedAsync(_inputRef))
-                {
-                    _suppressDropdownOnNextFocus = false;
-                }
-            }
+            await RestoreNeighborOrInputFocusAsync(targetTags);
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -98,8 +81,10 @@ public sealed partial class TagPicker : ComponentBase, IAsyncDisposable
         ClampActiveIndex();
     }
 
-    // Snapshots the deduped tags BEFORE removal and records the surviving neighbor chip (or the input, when the removed
-    // chip was the only one) to focus once the removal propagates.
+    // Snapshots the deduped tags BEFORE removal and records the ordered fallback chips (nearest forward, then nearest
+    // backward) to focus once the removal propagates. Records the whole ordered set, not just the nearest, so an
+    // overlapping async removal that deletes the nearest candidate before the arm consumes still lands on a surviving
+    // chip (or the input when none remain), never the document body.
     private void ArmNeighborFocus(string removedTag)
     {
         int removedIndex = _renderedTags.IndexOf(removedTag);
@@ -107,18 +92,7 @@ public sealed partial class TagPicker : ComponentBase, IAsyncDisposable
         if (removedIndex < 0) { return; }
 
         _pendingRemovedTag = removedTag;
-
-        if (NeighborFocus.TryGetNeighborAfterRemove(
-            _renderedTags, removedIndex, tag => _removeButtons.ContainsKey(tag), out var neighbor))
-        {
-            _pendingTargetTag = neighbor;
-            _pendingFocusInput = false;
-        }
-        else
-        {
-            _pendingTargetTag = null;
-            _pendingFocusInput = true;
-        }
+        _pendingTargetTags = NeighborFocus.GetFallbackNeighbors(_renderedTags, removedIndex);
     }
 
     private void ClampActiveIndex()
@@ -336,5 +310,32 @@ public sealed partial class TagPicker : ComponentBase, IAsyncDisposable
         catch (JSException) { return false; }
         catch (ObjectDisposedException) { return false; }
         catch (TaskCanceledException) { return false; }
+    }
+
+    // Focus the first recorded fallback chip still rendered; overlapping async removals can delete the nearest recorded
+    // candidate before this consumes, so walk the ordered list. If none survive, focus the input instead of stranding.
+    private async Task RestoreNeighborOrInputFocusAsync(IReadOnlyList<string>? targetTags)
+    {
+        if (targetTags is not null)
+        {
+            foreach (var tag in targetTags)
+            {
+                if (_removeButtons.TryGetValue(tag, out var button) && button is not null)
+                {
+                    await RestoreFocusIfOrphanedAsync(button.Element);
+
+                    return;
+                }
+            }
+        }
+
+        // Set the flag BEFORE the await so the real focusin reaches OnInputFocus (which consumes it) first; if the guard
+        // declines or is unavailable the input is never focused, so clear it to avoid stranding it.
+        _suppressDropdownOnNextFocus = true;
+
+        if (!await RestoreFocusIfOrphanedAsync(_inputRef))
+        {
+            _suppressDropdownOnNextFocus = false;
+        }
     }
 }

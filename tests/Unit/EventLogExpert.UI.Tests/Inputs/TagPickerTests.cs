@@ -212,6 +212,51 @@ public sealed class TagPickerTests : BunitContext
     }
 
     [Fact]
+    public void RemoveChip_ArmedNeighborPrunedBeforeConsume_WalksToNextSurvivingChip()
+    {
+        // The overlapping-removal state the synchronous click path cannot produce (the async host defers the consume):
+        // armed while [alpha,beta,gamma] were rendered, but two queued persists then leave only alpha. The recorded
+        // nearest candidate (gamma) is pruned, so the walk must skip it and land on alpha, never the document body.
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+        focusModule.Setup<bool>("focusIfNotElsewhere", _ => true).SetResult(true);
+
+        var cut = Render<TagPicker>(parameters => parameters
+            .Add(p => p.Value, ImmutableList.Create("alpha", "beta", "gamma"))
+            .Add(p => p.SuggestionSource, [])
+            .Add(p => p.ValueChanged, EventCallback.Factory.Create<ImmutableList<string>>(this, _ => { })));
+
+        SetField(cut.Instance, "_pendingRemovedTag", "beta");
+        SetField(cut.Instance, "_pendingTargetTags", new[] { "gamma", "alpha" });
+
+        cut.Render(parameters => parameters.Add(p => p.Value, ImmutableList.Create("alpha")));
+
+        cut.WaitForAssertion(() => focusModule.VerifyInvoke("focusIfNotElsewhere"));
+        AssertGuardedFocusTargets(focusModule, RemoveButtonElement(cut, "alpha"));
+    }
+
+    [Fact]
+    public void RemoveChip_EveryArmedCandidatePrunedBeforeConsume_FallsBackToInput()
+    {
+        // Every recorded fallback chip is gone by consume time but the list is not empty (the host replaced the tags):
+        // the unconditional input fallback must still fire so focus is never stranded on the document body.
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+        focusModule.Setup<bool>("focusIfNotElsewhere", _ => true).SetResult(true);
+
+        var cut = Render<TagPicker>(parameters => parameters
+            .Add(p => p.Value, ImmutableList.Create("alpha", "beta", "gamma"))
+            .Add(p => p.SuggestionSource, [])
+            .Add(p => p.ValueChanged, EventCallback.Factory.Create<ImmutableList<string>>(this, _ => { })));
+
+        SetField(cut.Instance, "_pendingRemovedTag", "alpha");
+        SetField(cut.Instance, "_pendingTargetTags", new[] { "beta", "gamma" });
+
+        cut.Render(parameters => parameters.Add(p => p.Value, ImmutableList.Create("delta")));
+
+        cut.WaitForAssertion(() => focusModule.VerifyInvoke("focusIfNotElsewhere"));
+        AssertGuardedFocusTargets(focusModule, InputElement(cut));
+    }
+
+    [Fact]
     public void RemoveChip_GuardUnavailable_FailsClosed_NoBareFocus()
     {
         // Deferred removal: if the guard module throws, fail CLOSED - no bare FocusAsync fallback that could steal focus.
@@ -384,6 +429,11 @@ public sealed class TagPickerTests : BunitContext
 
         return buttons[tag]!.Element;
     }
+
+    private static void SetField(object target, string name, object? value) =>
+        typeof(TagPicker)
+            .GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(target, value);
 
     private void AssertGuardedFocusTargets(BunitJSModuleInterop module, ElementReference expected)
     {
