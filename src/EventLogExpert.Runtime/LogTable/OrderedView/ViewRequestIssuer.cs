@@ -8,6 +8,7 @@ internal sealed class ViewRequestIssuer
     private readonly Lock _gate = new();
 
     private volatile bool _enabled = true;
+    private bool _forcePending;
     private Exception? _lastFault;
     private ViewIdentity? _lastIssuedIdentity;
 
@@ -24,11 +25,11 @@ internal sealed class ViewRequestIssuer
 
     public Exception? LastFault => Volatile.Read(ref _lastFault);
 
-    public void ForceReissue()
+    public void ArmForce()
     {
         lock (_gate)
         {
-            _lastIssuedIdentity = null;
+            _forcePending = true;
         }
     }
 
@@ -39,6 +40,7 @@ internal sealed class ViewRequestIssuer
         lock (_gate)
         {
             _lastIssuedIdentity = null;
+            _forcePending = false;
 
             return ++_sequence;
         }
@@ -49,6 +51,7 @@ internal sealed class ViewRequestIssuer
         lock (_gate)
         {
             _lastIssuedIdentity = null;
+            _forcePending = false;
             _recoveringIdentity = null;
             _recoveringWatermark = 0;
 
@@ -73,7 +76,11 @@ internal sealed class ViewRequestIssuer
     {
         lock (_gate)
         {
-            if (forceReissue) { _lastIssuedIdentity = null; }
+            if (forceReissue || _forcePending)
+            {
+                _lastIssuedIdentity = null;
+                _forcePending = false;
+            }
 
             if (_lastIssuedIdentity == identity) { return null; }
 
