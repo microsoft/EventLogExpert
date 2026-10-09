@@ -1,16 +1,18 @@
+@{
+    _renderedTags = [.. Value.Distinct(StringComparer.Ordinal)];
+}
+
 <div class="tag-picker">
     <div class="tag-picker-chips" role="list">
-        @for (int i = 0; i < Value.Count; i++)
+        @foreach (var tag in _renderedTags)
         {
-            var index = i;
-            var tag = Value[i];
-
-            <span class="tag-picker-chip" role="listitem">
+            <span class="tag-picker-chip" @key="tag" role="listitem">
                 <span class="tag-picker-chip-label">@tag</span>
                 <ChromelessButton CssClass="tag-picker-chip-remove"
                     IconClass="bi bi-x-circle"
-                    OnClick="@(() => RemoveTagAsync(index))"
-                    aria-label="@RemoveTagAriaLabel(tag)" />
+                    OnClick="@(() => RemoveTagAsync(tag, restoreFocus: true))"
+                    aria-label="@RemoveTagAriaLabel(tag)"
+                    @ref="_removeButtons[tag]" />
             </span>
         }
 

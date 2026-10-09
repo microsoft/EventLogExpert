@@ -9,11 +9,14 @@ using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.UI.FilterLenses;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
+using Microsoft.JSInterop;
 using NSubstitute;
 using System.Collections.Immutable;
+using System.Reflection;
 
 namespace EventLogExpert.UI.Tests.FilterLenses;
 
@@ -63,6 +66,47 @@ public sealed class LensBreadcrumbTests : BunitContext
     }
 
     [Fact]
+    public void Escape_GuardUnavailable_FailsClosed_MovesNoFocus()
+    {
+        var older = Summary("older");
+        var top = Summary("top");
+        _source.Lenses.Returns(ImmutableList.Create(older, top));
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+        focusModule.Setup<bool>("focusIfNotElsewhere", _ => true).SetException(new JSException("boom"));
+
+        var cut = Render<LensBreadcrumb>();
+        cut.Find(".lens-breadcrumb").KeyDown(new KeyboardEventArgs { Key = "Escape" });
+
+        _source.Lenses.Returns(ImmutableList.Create(older));
+        _source.Changed += Raise.Event<Action>();
+
+        // The guard threw: Escape must fail CLOSED - no bare FocusAsync fallback that could steal focus from the region.
+        cut.WaitForAssertion(() => focusModule.VerifyInvoke("focusIfNotElsewhere"));
+        Assert.DoesNotContain(JSInterop.Invocations, invocation =>
+            invocation.Identifier.Contains("domWrapper.focus", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Escape_PopsTopLens_RestoresPreviousChipThroughOrphanGuard()
+    {
+        var older = Summary("older");
+        var top = Summary("top");
+        _source.Lenses.Returns(ImmutableList.Create(older, top));
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+
+        var cut = Render<LensBreadcrumb>();
+        cut.Find(".lens-breadcrumb").KeyDown(new KeyboardEventArgs { Key = "Escape" });
+        _commands.Received(1).RemoveLens(top.Id);
+
+        // Removal propagates: Escape's restore must route through the orphan guard (never a bare FocusAsync) so a
+        // surviving-control focus is never stolen. The guard's suppress/restore decision is unit-tested in focusGuard.test.js.
+        _source.Lenses.Returns(ImmutableList.Create(older));
+        _source.Changed += Raise.Event<Action>();
+
+        cut.WaitForAssertion(() => focusModule.VerifyInvoke("focusIfNotElsewhere"));
+    }
+
+    [Fact]
     public void Escape_WithinBreadcrumb_PopsTopLens()
     {
         var older = Summary("older");
@@ -100,6 +144,51 @@ public sealed class LensBreadcrumbTests : BunitContext
         var cut = Render<LensBreadcrumb>();
 
         Assert.Empty(cut.FindAll(".lens-breadcrumb"));
+    }
+
+    [Fact]
+    public void RemoveChip_Click_RemovingOnlyLens_MovesNoFocus_AndRegionUnmounts()
+    {
+        var only = Summary("only");
+        _source.Lenses.Returns(ImmutableList.Create(only));
+
+        var cut = Render<LensBreadcrumb>();
+
+        cut.Find(".lens-chip-remove").Click();
+        _commands.Received(1).RemoveLens(only.Id);
+
+        // Removal propagates to empty: the whole breadcrumb unmounts and there is no neighbor to restore.
+        _source.Lenses.Returns(ImmutableList<FilterLensSummary>.Empty);
+        _source.Changed += Raise.Event<Action>();
+
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".lens-breadcrumb")));
+        Assert.DoesNotContain(JSInterop.Invocations, invocation =>
+            invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void RemoveChip_Click_RestoresFocusToNeighbor_OnceRemovalPropagates()
+    {
+        var a = Summary("a");
+        var b = Summary("b");
+        var c = Summary("c");
+        _source.Lenses.Returns(ImmutableList.Create(a, b, c));
+
+        var cut = Render<LensBreadcrumb>();
+
+        // Remove the middle chip (b); its button holds focus and will unmount once the removal propagates.
+        cut.FindAll(".lens-chip-remove")[1].Click();
+        _commands.Received(1).RemoveLens(b.Id);
+
+        // The source has not changed yet (removal in flight): the arm must NOT fire while the chip is still present.
+        Assert.DoesNotContain(JSInterop.Invocations, invocation =>
+            invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase));
+
+        // Removal propagates: b is gone. The deferred restore fires once, moving focus to the forward neighbor (c).
+        _source.Lenses.Returns(ImmutableList.Create(a, c));
+        _source.Changed += Raise.Event<Action>();
+
+        cut.WaitForAssertion(() => AssertFocusRestoredTo(cut, c.Id));
     }
 
     [Fact]
@@ -313,4 +402,18 @@ public sealed class LensBreadcrumbTests : BunitContext
 
     private static FilterLensSummary TimeSummary() =>
         new(FilterLensId.Create(), new FilterLensLabel.TimeWindow(DateTime.Now, TimeSpan.FromHours(1)), LensKind.TimeWindow);
+
+    private void AssertFocusRestoredTo(IRenderedComponent<LensBreadcrumb> cut, FilterLensId expectedLensId)
+    {
+        var focusCall = Assert.Single(JSInterop.Invocations, invocation =>
+            invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase));
+        var focusedId = ((ElementReference)focusCall.Arguments[0]!).Id;
+
+        var field = typeof(LensBreadcrumb).GetField("_removeRefs", BindingFlags.NonPublic | BindingFlags.Instance);
+        var refs = (Dictionary<FilterLensId, ElementReference>)field!.GetValue(cut.Instance)!;
+
+        Assert.True(refs.TryGetValue(expectedLensId, out var expectedRef));
+        Assert.False(string.IsNullOrEmpty(focusedId));
+        Assert.Equal(expectedRef.Id, focusedId);
+    }
 }

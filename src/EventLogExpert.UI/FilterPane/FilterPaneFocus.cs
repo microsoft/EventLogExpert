@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.UI.Focus;
 
 namespace EventLogExpert.UI.FilterPane;
 
@@ -24,9 +25,11 @@ public static class FilterPaneFocus
         ArgumentNullException.ThrowIfNull(savedFilters);
         ArgumentNullException.ThrowIfNull(isFocusable);
 
-        if (TryPick(savedFilters, savedFilters.Count - 1, -1, isFocusable, out var target)) { return target; }
-
-        return null;
+        // Pass removedIndex = Count so the forward walk no-ops and the backward walk starts at the last saved filter -
+        // the pending-discard "walk backward from the end" semantics expressed through the shared neighbor helper.
+        return NeighborFocus.TryGetNeighborAfterRemove(
+            savedFilters, savedFilters.Count, saved => isFocusable(saved.Id), out var target) ?
+                target.Id : null;
     }
 
     /// <summary>
@@ -49,38 +52,19 @@ public static class FilterPaneFocus
             if (savedFilters[i].Id == removedId)
             {
                 removedIndex = i;
+
                 break;
             }
         }
 
         if (removedIndex < 0) { return null; }
 
-        if (TryPick(savedFilters, removedIndex + 1, +1, isFocusable, out var next)) { return next; }
-
-        if (TryPick(savedFilters, removedIndex - 1, -1, isFocusable, out var prev)) { return prev; }
-
-        return null;
-    }
-
-    private static bool TryPick(
-        IReadOnlyList<SavedFilter> saved,
-        int startIndex,
-        int step,
-        Func<FilterId, bool> isFocusable,
-        out FilterId target)
-    {
-        for (int i = startIndex; i >= 0 && i < saved.Count; i += step)
-        {
-            var candidateId = saved[i].Id;
-
-            if (isFocusable(candidateId))
-            {
-                target = candidateId;
-                return true;
-            }
-        }
-
-        target = default;
-        return false;
+        return NeighborFocus.TryGetNeighborAfterRemove(
+            savedFilters,
+            removedIndex,
+            saved => isFocusable(saved.Id),
+            out var target) ?
+            target.Id : null;
     }
 }
+
