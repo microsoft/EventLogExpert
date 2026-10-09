@@ -63,6 +63,30 @@ public sealed class NeighborFocusTests
     }
 
     [Fact]
+    public void TryGetNeighborAfterRemove_RemovedIndexIntMaxValue_WalksBackwardFromTheLastItem()
+    {
+        // int.MaxValue is past the end: removedIndex + 1 would overflow to int.MinValue and wrongly scan forward from
+        // the first item, so the clamp must still select the last item via the backward walk.
+        var items = new[] { "a", "b", "c" };
+
+        bool found = NeighborFocus.TryGetNeighborAfterRemove(items, int.MaxValue, Always, out var neighbor);
+
+        Assert.True(found);
+        Assert.Equal("c", neighbor);
+    }
+
+    [Fact]
+    public void TryGetNeighborAfterRemove_RemovedIndexIntMinValue_WalksForwardFromTheFirstItem()
+    {
+        var items = new[] { "a", "b", "c" };
+
+        bool found = NeighborFocus.TryGetNeighborAfterRemove(items, int.MinValue, Always, out var neighbor);
+
+        Assert.True(found);
+        Assert.Equal("a", neighbor);
+    }
+
+    [Fact]
     public void TryGetNeighborAfterRemove_RemovedIndexPastEnd_WalksBackwardFromTheLastItem()
     {
         var items = new[] { "a", "b", "c" };
