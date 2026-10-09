@@ -1151,11 +1151,70 @@ public sealed class OrderedViewShadowTests
     }
 
     [Fact]
+    public async Task XmlFilter_MatchReadyWhileAnOutOfScopeLogDefersTheGate_StillRebuildsOnceItReopens()
+    {
+        // Regression: XmlFilterGate.IsDeferred scans every open log, but ViewIdentity covers only the active scope. An
+        // out-of-scope Channel that is not yet loaded with XML holds the gate deferred, so the forced Always re-issue
+        // from XmlFilterMatchReady (for the active File log's grown store) drops before TryIssue. The Channel then
+        // readies via MarkLoadedWithXml - no identity change and no fresh match-ready dispatch - so the force must
+        // survive the deferred gate or the active log's grown rows stay stranded behind the issuer's de-dup.
+        const string fileName = "FileLog";
+        const string readyChannelName = "ReadyChannel";
+        const string latecomerName = "Latecomer";
+        EventLogId fileId = EventLogId.Create();
+        EventLogId readyChannelId = EventLogId.Create();
+        EventLogId latecomerId = EventLogId.Create();
+        var filter = new Filter(null, [SavedFilter.TryCreate("Xml.Contains(\"x\")") ??
+            throw new InvalidOperationException("XML filter failed to compile.")]);
+
+        await using var harness = new OrderedViewShadowHarness();
+
+        // Two tabs already display (DisplayedLogCount > 1), so opening the latecomer later does not flip the identity's
+        // multi-log flag. The ready Channel is loaded with XML, so the gate is satisfied and the File partial adopts I.
+        harness.ConcurrencyState.MarkLoadedWithXml(readyChannelId);
+
+        List<ResolvedEvent> partial = SourcedRows(fileName, (1, 0, "A"), (2, 10, "B"), (3, 20, "C"));
+        EventColumnStore partialStore = EventColumnStore.Build(partial, generation: 0, contentVersion: 0);
+        StampMatch(harness, filter, fileId, partialStore);
+        harness.SetState(
+            XmlFilteredMultiTab(fileId, filter, readyChannelId),
+            StoreOf(fileId, partialStore),
+            OpenFileAndChannels(fileId, fileName, filter, (readyChannelId, readyChannelName)));
+
+        await harness.Effects.HandleLoadEvents(
+            new LoadEventsAction(new EventLogData(fileName, LogPathType.File) { Id = fileId }, partial), harness.Dispatcher);
+
+        Assert.Equal(partial.Count, (await harness.Writer.DrainAsync()).Count);
+
+        // The latecomer Channel opens out of scope and is not yet loaded with XML, deferring the gate. The File store
+        // grows and its match becomes ready; XmlFilterMatchReady fires WHILE deferred, so Sync(Always) drops early.
+        List<ResolvedEvent> all = SourcedRows(fileName, (1, 0, "A"), (2, 10, "B"), (3, 20, "C"), (4, 30, "D"), (5, 40, "E"));
+        EventColumnStore terminalStore = partialStore.Append([.. all.Skip(partial.Count)]);
+        StampMatch(harness, filter, fileId, terminalStore);
+        harness.SetState(
+            XmlFilteredMultiTab(fileId, filter, readyChannelId, latecomerId),
+            StoreOf(fileId, terminalStore),
+            OpenFileAndChannels(fileId, fileName, filter, (readyChannelId, readyChannelName), (latecomerId, latecomerName)));
+
+        await harness.Effects.HandleXmlFilterMatchReady(harness.Dispatcher);
+
+        // The latecomer finishes loading with XML (no identity change, no match-ready dispatch). The gate reopens; the
+        // next Sync must force past the de-dup and rebuild over the grown store rather than strand the partial view.
+        harness.ConcurrencyState.MarkLoadedWithXml(latecomerId);
+
+        await harness.Effects.HandleLoadEvents(
+            new LoadEventsAction(new EventLogData(latecomerName, LogPathType.Channel) { Id = latecomerId }, []), harness.Dispatcher);
+
+        Assert.Equal(all.Count, (await harness.Writer.DrainAsync()).Count);
+        Assert.Null(harness.Issuer.LastFault);
+    }
+
+    [Fact]
     public async Task XmlFilter_MidLoadApplyThenTerminalLoad_ForcesReissueRebuildingToTheGrownStore()
     {
         // Scenario X regression: an XML view issued over a mid-load PARTIAL store must, when match becomes ready,
         // force a fresh full re-issue and rebuild over the GROWN store. ViewIdentity excludes the store stamp, so a
-        // same-identity Sync would be deduped by the issuer - without ForceReissue the terminal rows are dropped, and
+        // same-identity Sync would be deduped by the issuer - without the forced re-issue the terminal rows are dropped, and
         // without a content-aware rebuild the writer would restamp the stale partial reader.
         const string logName = "FileLog";
         EventLogId logId = EventLogId.Create();
@@ -1324,6 +1383,20 @@ public sealed class OrderedViewShadowTests
 
     private static EventLogData LogData(EventLogId logId) => new("Log0", LogPathType.Channel) { Id = logId };
 
+    private static EventLogState OpenFileAndChannels(
+        EventLogId fileId, string fileName, Filter filter, params (EventLogId Id, string Name)[] channels)
+    {
+        ImmutableDictionary<string, OpenLogInfo> openLogs = ImmutableDictionary<string, OpenLogInfo>.Empty
+            .Add(fileName, new OpenLogInfo(fileId, LogPathType.File));
+
+        foreach ((EventLogId id, string name) in channels)
+        {
+            openLogs = openLogs.Add(name, new OpenLogInfo(id, LogPathType.Channel));
+        }
+
+        return new EventLogState { OpenLogs = openLogs, AppliedFilter = filter };
+    }
+
     private static EventLogState OpenFileLog(EventLogId logId, string logName, Filter filter) =>
         new()
         {
@@ -1485,6 +1558,21 @@ public sealed class OrderedViewShadowTests
             RequestedIsDescending = true,
             AppliedFilter = filter
         };
+
+    private static LogTableState XmlFilteredMultiTab(EventLogId activeId, Filter filter, params EventLogId[] otherTabIds)
+    {
+        var tables = new List<LogView> { new(activeId) };
+        tables.AddRange(otherTabIds.Select(id => new LogView(id)));
+
+        return new LogTableState
+        {
+            ActiveEventLogId = activeId,
+            EventTables = [.. tables],
+            IsDescending = true,
+            RequestedIsDescending = true,
+            AppliedFilter = filter
+        };
+    }
 
     private sealed record RoutedSetup(
         LogTableState Routed,
