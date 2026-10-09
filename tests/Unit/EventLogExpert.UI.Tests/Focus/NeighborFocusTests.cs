@@ -10,6 +10,36 @@ public sealed class NeighborFocusTests
     private static readonly Func<string, bool> Always = _ => true;
 
     [Fact]
+    public void GetFallbackNeighbors_OrdersNearestForwardThenNearestBackward()
+    {
+        var items = new[] { "a", "b", "c", "d" };
+
+        var neighbors = NeighborFocus.GetFallbackNeighbors(items, removedIndex: 1);
+
+        Assert.Equal(["c", "d", "a"], neighbors);
+    }
+
+    [Fact]
+    public void GetFallbackNeighbors_RemovedIndexPastEnd_ReturnsBackwardFromTheLastItem()
+    {
+        // The deferred/async caller records these before the removal propagates, so int.MaxValue (past the end) must
+        // clamp rather than overflow: no forward candidates, backward from the last item.
+        var items = new[] { "a", "b", "c" };
+
+        var neighbors = NeighborFocus.GetFallbackNeighbors(items, int.MaxValue);
+
+        Assert.Equal(["c", "b", "a"], neighbors);
+    }
+
+    [Fact]
+    public void GetFallbackNeighbors_SoleItem_ReturnsEmpty()
+    {
+        var neighbors = NeighborFocus.GetFallbackNeighbors(new[] { "only" }, removedIndex: 0);
+
+        Assert.Empty(neighbors);
+    }
+
+    [Fact]
     public void TryGetNeighborAfterRemove_EmptyList_ReturnsFalse()
     {
         bool found = NeighborFocus.TryGetNeighborAfterRemove(Array.Empty<string>(), removedIndex: 0, Always, out _);
