@@ -22,7 +22,7 @@ public sealed partial class StatusBar
     private IJSObjectReference? _focusModule;
     private ElementReference _groupDirButton;
     private DisplayIndicatorState _indicatorState = null!;
-    private ColumnName? _pendingChipColumn;
+    private bool _pendingChipFaulted;
     private PendingChipFocus _pendingChipFocus = PendingChipFocus.None;
     private EventLogId? _pendingChipTabId;
     private ElementReference _sortDirButton;
@@ -84,15 +84,21 @@ public sealed partial class StatusBar
             bool sortChipPresent = hasActiveTab && ordering.RequestedOrderBy is not null;
             bool groupChipPresent = hasActiveTab && ordering.RequestedGroupBy is not null;
 
-            ColumnName? clearedAxisColumn = _pendingChipFocus == PendingChipFocus.SortCleared ?
-                ordering.RequestedOrderBy :
-                ordering.RequestedGroupBy;
-
             bool clearedChipPresent = _pendingChipFocus == PendingChipFocus.SortCleared ? sortChipPresent : groupChipPresent;
 
-            bool supersededByDifferentColumn = Presentation.State != PresentationState.Faulted &&
-                clearedChipPresent &&
-                clearedAxisColumn != _pendingChipColumn;
+            // The clear can fault (the reproject that would unmount the chip fails), masking the chip present until the
+            // reproject recovers; latch that so the recovery can tell a real removal from a re-add.
+            bool faulted = Presentation.State == PresentationState.Faulted;
+
+            if (faulted) { _pendingChipFaulted = true; }
+
+            // The reproject recovered with the cleared chip still mounted: the clear never unmounted it. Either a
+            // different column superseded it (regroup during the fault), or the SAME column was re-added (a faulted
+            // re-add resolving to the same identity). Keying only on a DIFFERENT column stranded the same-identity
+            // re-add; gating on "recovered from the fault with the chip still present" disarms both without moving
+            // focus. Before any fault the chip is only transiently present while the optimistic clear propagates, so a
+            // still-mounted column there is not yet a supersede and the arm must wait for the real unmount.
+            bool clearSupersededOnRecovery = !faulted && clearedChipPresent && _pendingChipFaulted;
 
             bool clearedChipGone = !clearedChipPresent;
 
@@ -100,14 +106,14 @@ public sealed partial class StatusBar
             // (closes, or auto-switches to a sibling) the chip the user cleared is no longer in their context.
             bool tabContextChanged = Presentation.ActiveTabId != _pendingChipTabId;
 
-            if (supersededByDifferentColumn || tabContextChanged)
+            if (clearSupersededOnRecovery || tabContextChanged)
             {
-                // Superseded by a different column, or the active tab changed while the arm was live: disarm without
-                // moving focus - the clear's context is gone, and stealing focus to the status bar from wherever the
-                // user has since moved is exactly the misfire this guards against.
+                // Superseded on recovery (a different column, or the same column re-added), or the active tab changed
+                // while the arm was live: disarm without moving focus - the clear's context is gone, and stealing focus
+                // to the status bar from wherever the user has since moved is exactly the misfire this guards against.
                 _pendingChipFocus = PendingChipFocus.None;
-                _pendingChipColumn = null;
                 _pendingChipTabId = null;
+                _pendingChipFaulted = false;
             }
             else if (clearedChipGone)
             {
@@ -123,8 +129,8 @@ public sealed partial class StatusBar
                     (sortChipPresent ? _sortDirButton : _statsButton);
 
                 _pendingChipFocus = PendingChipFocus.None;
-                _pendingChipColumn = null;
                 _pendingChipTabId = null;
+                _pendingChipFaulted = false;
 
                 if (!string.IsNullOrEmpty(target.Id))
                 {
@@ -148,20 +154,20 @@ public sealed partial class StatusBar
         base.OnInitialized();
     }
 
-    private void ClearGroup(ColumnName column)
+    private void ClearGroup()
     {
-        _pendingChipColumn = column;
         _pendingChipTabId = Presentation.ActiveTabId;
         _pendingChipFocus = PendingChipFocus.GroupCleared;
+        _pendingChipFaulted = false;
 
         LogTableCommands.SetGroupBy(null);
     }
 
-    private void ClearSort(ColumnName column)
+    private void ClearSort()
     {
-        _pendingChipColumn = column;
         _pendingChipTabId = Presentation.ActiveTabId;
         _pendingChipFocus = PendingChipFocus.SortCleared;
+        _pendingChipFaulted = false;
 
         LogTableCommands.SetOrderBy(null);
     }

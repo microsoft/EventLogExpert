@@ -317,6 +317,14 @@ public sealed partial class MenuBar
                 () => Actions.SetContinuouslyUpdate(!isContinuouslyUpdating),
                 isChecked: isContinuouslyUpdating),
             MenuItem.Separator(),
+            MenuItem.SubMenu(
+                Localizer["LogTable_GroupBy"].Value,
+                OrderingMenuItems.BuildGroupBy(
+                    Localizer,
+                    presentation.Columns,
+                    requestedOrdering.RequestedGroupBy,
+                    column => Actions.SetGroupBy(column)),
+                isEnabled: hasActiveLogs),
             MenuItem.Item(
                 Localizer["Menu_View_GroupDescending"],
                 Actions.ToggleGroupSortDirection,

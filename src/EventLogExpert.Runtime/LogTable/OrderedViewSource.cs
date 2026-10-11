@@ -84,12 +84,33 @@ internal sealed class OrderedViewSource : IOrderedViewSource, IDisposable
         var presentationState = state.PresentationState;
         var showCommittedOrdering = presentationState == PresentationState.Faulted;
 
+        ColumnName? displayedOrderBy = showCommittedOrdering ? state.OrderBy : state.RequestedOrderBy;
+        bool displayedIsDescending = showCommittedOrdering ? state.IsDescending : state.RequestedIsDescending;
+        ColumnName? displayedGroupBy = showCommittedOrdering ? state.GroupBy : state.RequestedGroupBy;
+        bool displayedIsGroupDescending = showCommittedOrdering ? state.IsGroupDescending : state.RequestedIsGroupDescending;
+
+        // Resolve the effective order column so the header reports the real default direction. While faulted the grid
+        // shows the committed view, whose effective order was captured at adoption; recomputing from live
+        // DisplayedLogCount/TimelineVisible would name a column the retained rows are not ordered by (a timeline toggle
+        // or tab open/close mid-fault). The non-faulted path resolves the requested order from current state. Either
+        // null means the single-log default, which falls back to RecordId unless grouping holds the primary key.
+        ColumnName? effectiveOrderBy = showCommittedOrdering ?
+            state.CommittedEffectiveOrderBy :
+            ResolvedEventOrdering.ResolveDefaultOrderBy(
+                displayedOrderBy, displayedGroupBy, state.DisplayedLogCount, state.TimelineVisible);
+
+        if (effectiveOrderBy is null && displayedGroupBy is null)
+        {
+            effectiveOrderBy = ColumnName.RecordId;
+        }
+
         var ordering = new DisplayOrdering(state.OrderBy, state.IsDescending, state.GroupBy, state.IsGroupDescending)
         {
-            RequestedOrderBy = showCommittedOrdering ? state.OrderBy : state.RequestedOrderBy,
-            RequestedIsDescending = showCommittedOrdering ? state.IsDescending : state.RequestedIsDescending,
-            RequestedGroupBy = showCommittedOrdering ? state.GroupBy : state.RequestedGroupBy,
-            RequestedIsGroupDescending = showCommittedOrdering ? state.IsGroupDescending : state.RequestedIsGroupDescending
+            RequestedOrderBy = displayedOrderBy,
+            RequestedIsDescending = displayedIsDescending,
+            RequestedGroupBy = displayedGroupBy,
+            RequestedIsGroupDescending = displayedIsGroupDescending,
+            EffectiveOrderBy = effectiveOrderBy
         };
 
         return new OrderedViewPresentation(

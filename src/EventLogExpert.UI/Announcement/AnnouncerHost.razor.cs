@@ -51,12 +51,27 @@ public sealed partial class AnnouncerHost : ComponentBase, IDisposable
                 TableOrderingTextComposer.SortAnnouncement(Localizer, column, isDescending),
             AnnouncementPayload.TableSortCleared _ =>
                 TableOrderingTextComposer.SortClearedAnnouncement(Localizer),
-            AnnouncementPayload.TableGrouped(var column, var isGroupDescending) =>
-                TableOrderingTextComposer.GroupAnnouncement(Localizer, column, isGroupDescending),
+            AnnouncementPayload.TableDefaultOrderReversed(var isDescending) =>
+                TableOrderingTextComposer.DefaultOrderReversedAnnouncement(Localizer, isDescending),
+            AnnouncementPayload.TableGrouped(var column, var isGroupDescending, var groupCount) =>
+                TableOrderingTextComposer.GroupAnnouncement(Localizer, column, isGroupDescending, groupCount),
             AnnouncementPayload.TableGroupCleared _ =>
                 TableOrderingTextComposer.GroupClearedAnnouncement(Localizer),
-            AnnouncementPayload.TableSortAndGroupChanged(var sortColumn, var sortDescending, var groupColumn, var groupDescending) =>
-                TableOrderingTextComposer.SortAndGroupAnnouncement(Localizer, sortColumn, sortDescending, groupColumn, groupDescending),
+            AnnouncementPayload.TableSortAndGroupChanged(var sortColumn, var sortDescending, var groupColumn, var
+                groupDescending, var groupCount) =>
+                TableOrderingTextComposer.SortAndGroupAnnouncement(Localizer,
+                    sortColumn,
+                    sortDescending,
+                    groupColumn,
+                    groupDescending,
+                    groupCount),
+            AnnouncementPayload.TableReorderUnavailable(var committedOrderBy, var committedIsDescending, var
+                committedGroupBy, var committedIsGroupDescending) =>
+                TableOrderingTextComposer.ReorderUnavailableAnnouncement(Localizer,
+                    committedOrderBy,
+                    committedIsDescending,
+                    committedGroupBy,
+                    committedIsGroupDescending),
             _ => throw new ArgumentOutOfRangeException(nameof(current.Payload), current.Payload, null)
         };
 

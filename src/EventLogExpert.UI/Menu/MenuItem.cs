@@ -3,6 +3,13 @@
 
 namespace EventLogExpert.UI.Menu;
 
+public enum MenuItemSelection
+{
+    None,
+    Checkbox,
+    Radio
+}
+
 public sealed record MenuItem
 {
     public string Label { get; init; } = string.Empty;
@@ -18,6 +25,9 @@ public sealed record MenuItem
     public Func<Task<IReadOnlyList<MenuItem>>>? ChildrenLoader { get; init; }
 
     public bool? IsChecked { get; init; }
+
+    // Distinguishes a mutually-exclusive radio item from a toggle checkbox; the renderer maps it to the ARIA role.
+    public MenuItemSelection Selection { get; init; } = MenuItemSelection.None;
 
     public bool IsSeparator { get; init; }
 
@@ -48,11 +58,34 @@ public sealed record MenuItem
             OnClickAsync = onClickAsync,
             Shortcut = shortcut,
             IsChecked = isChecked,
+            Selection = isChecked is null ? MenuItemSelection.None : MenuItemSelection.Checkbox,
             IsEnabled = isEnabled,
             IsDanger = isDanger,
             DisabledReason = disabledReason,
             StatusText = statusText,
         };
+
+    // A mutually-exclusive selection within a group (Order By / Group By columns), rendered as role="menuitemradio".
+    public static MenuItem Radio(
+        string label,
+        Func<Task> onClickAsync,
+        bool isChecked,
+        bool isEnabled = true) =>
+        new()
+        {
+            Label = label,
+            OnClickAsync = onClickAsync,
+            IsChecked = isChecked,
+            Selection = MenuItemSelection.Radio,
+            IsEnabled = isEnabled,
+        };
+
+    public static MenuItem Radio(
+        string label,
+        Action onClick,
+        bool isChecked,
+        bool isEnabled = true) =>
+        Radio(label, () => { onClick(); return Task.CompletedTask; }, isChecked, isEnabled);
 
     public static MenuItem Item(
         string label,

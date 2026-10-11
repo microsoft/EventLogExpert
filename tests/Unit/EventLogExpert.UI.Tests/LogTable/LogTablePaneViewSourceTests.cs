@@ -340,6 +340,41 @@ public sealed class LogTablePaneViewSourceTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void AriaSort_ReflectsEffectiveDefaultColumn_WhenNoExplicitSortIsSet()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var columns = ImmutableDictionary<ColumnName, bool>.Empty
+            .Add(ColumnName.DateAndTime, true)
+            .Add(ColumnName.Source, true);
+
+        var presentation = new OrderedViewPresentation(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+            _logId,
+            new DisplayOrdering(OrderBy: null, IsDescending: true, GroupBy: null, IsGroupDescending: false)
+            {
+                EffectiveOrderBy = ColumnName.DateAndTime
+            },
+            PresentationState.Current,
+            Revision: 1)
+        {
+            Columns = columns,
+            ColumnOrder = ImmutableList.Create(ColumnName.DateAndTime, ColumnName.Source)
+        };
+
+        _viewSource.Current.Returns(presentation);
+
+        var cut = Render<LogTablePane>();
+
+        // The effective-default column reports its real direction; every other column stays "none".
+        Assert.Equal("descending", cut.Find("th[data-column='DateAndTime']").GetAttribute("aria-sort"));
+        Assert.Equal("none", cut.Find("th[data-column='Source']").GetAttribute("aria-sort"));
+
+        // The visible sort caret stays bound to an explicit sort, so the default column has none.
+        Assert.Empty(cut.FindAll("th[data-column='DateAndTime'] .sort-toggle"));
+    }
+
+    [Fact]
     public void ColumnWidth_FollowsThePresentation_NotTheCommittedState()
     {
         SetCommittedState(_logId, [_logId], Event(1, "Alpha"));

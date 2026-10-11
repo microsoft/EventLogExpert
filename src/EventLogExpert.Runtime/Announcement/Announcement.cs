@@ -29,7 +29,10 @@ public abstract record Announcement
 
     public sealed record TableSortCleared : Announcement;
 
-    public sealed record TableGrouped(ColumnName Column, bool IsGroupDescending) : Announcement;
+    // Reversing the default time/record order while no sort column is set; IsDescending is the new effective direction.
+    public sealed record TableDefaultOrderReversed(bool IsDescending) : Announcement;
+
+    public sealed record TableGrouped(ColumnName Column, bool IsGroupDescending, int GroupCount) : Announcement;
 
     public sealed record TableGroupCleared : Announcement;
 
@@ -37,5 +40,13 @@ public abstract record Announcement
         ColumnName? SortColumn,
         bool SortDescending,
         ColumnName? GroupColumn,
-        bool GroupDescending) : Announcement;
+        bool GroupDescending,
+        int GroupCount) : Announcement;
+
+    // A reprojection faulted and the view reverted to the committed ordering; narrates what is now shown.
+    public sealed record TableReorderUnavailable(
+        ColumnName? CommittedOrderBy,
+        bool CommittedIsDescending,
+        ColumnName? CommittedGroupBy,
+        bool CommittedIsGroupDescending) : Announcement;
 }

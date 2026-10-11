@@ -95,8 +95,8 @@
             <span aria-hidden="true" class="status-bar-sep">|</span>
             <span class="status-bar-order-chip status-bar-sort-chip">
                 <span class="status-bar-order-label" data-tooltip="@sortedLabel" data-tooltip-overflow>@sortedLabel</span>
-                <button aria-label="@StatusBarTextComposer.SortDirectionAria(Localizer, sortColumn, ordering.RequestedIsDescending)"
-                    aria-disabled="@(orderingFaulted ? "true" : null)"
+                <button aria-disabled="@(orderingFaulted ? "true" : null)"
+                    aria-label="@StatusBarTextComposer.SortDirectionAria(Localizer, sortColumn, ordering.RequestedIsDescending)"
                     class="status-bar-order-dir status-bar-sort-dir"
                     @onclick="ToggleSort"
                     @ref="_sortDirButton"
@@ -105,7 +105,7 @@
                 </button>
                 <button aria-label="@StatusBarTextComposer.ClearSortAria(Localizer, sortColumn)"
                     class="status-bar-order-remove status-bar-sort-remove"
-                    @onclick="() => ClearSort(sortColumn)"
+                    @onclick="ClearSort"
                     type="button">
                     <i aria-hidden="true" class="bi bi-x-lg"></i>
                 </button>
@@ -119,8 +119,8 @@
             <span aria-hidden="true" class="status-bar-sep">|</span>
             <span class="status-bar-group-chip status-bar-order-chip">
                 <span class="status-bar-order-label" data-tooltip="@groupedLabel" data-tooltip-overflow>@groupedLabel</span>
-                <button aria-label="@StatusBarTextComposer.GroupDirectionAria(Localizer, groupColumn, ordering.RequestedIsGroupDescending)"
-                    aria-disabled="@(orderingFaulted ? "true" : null)"
+                <button aria-disabled="@(orderingFaulted ? "true" : null)"
+                    aria-label="@StatusBarTextComposer.GroupDirectionAria(Localizer, groupColumn, ordering.RequestedIsGroupDescending)"
                     class="status-bar-group-dir status-bar-order-dir"
                     @onclick="ToggleGroup"
                     @ref="_groupDirButton"
@@ -129,7 +129,7 @@
                 </button>
                 <button aria-label="@StatusBarTextComposer.ClearGroupAria(Localizer, groupColumn)"
                     class="status-bar-group-remove status-bar-order-remove"
-                    @onclick="() => ClearGroup(groupColumn)"
+                    @onclick="ClearGroup"
                     type="button">
                     <i aria-hidden="true" class="bi bi-x-lg"></i>
                 </button>

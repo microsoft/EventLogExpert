@@ -110,6 +110,11 @@
                     var width = GetColumnWidth(columnHeader);
                     var columnSorted = Presentation.Ordering.RequestedOrderBy == columnHeader;
                     var columnGrouped = Presentation.Ordering.RequestedGroupBy == columnHeader;
+                    // aria-sort reflects the effective order column (the resolved default when no explicit sort is set),
+                    // so a screen reader hears the real direction; the visible caret stays bound to the explicit sort.
+                    // EffectiveOrderBy is resolved by the view source; falling back to the requested sort keeps parity
+                    // when it is unresolved (it equals the requested column whenever an explicit sort is set).
+                    var columnEffectivelySorted = (Presentation.Ordering.EffectiveOrderBy ?? Presentation.Ordering.RequestedOrderBy) == columnHeader;
 
                     var indicatorClass = (columnSorted, columnGrouped) switch
                     {
@@ -123,7 +128,7 @@
                     <th aria-colindex="@(columnIndex + 1)"
                         aria-description="@(columnGrouped ? TableOrderingTextComposer.GroupedColumnDescription(Localizer, Presentation.Ordering.RequestedIsGroupDescending) : null)"
                         aria-label="@headerText"
-                        aria-sort="@(columnSorted ? Presentation.Ordering.RequestedIsDescending ? "descending" : "ascending" : "none")"
+                        aria-sort="@(columnEffectivelySorted ? Presentation.Ordering.RequestedIsDescending ? "descending" : "ascending" : "none")"
                         class="@(columnHeader.ToString().ToLowerInvariant() + indicatorClass)"
                         data-column="@columnHeader"
                         @key="columnHeader"

@@ -199,7 +199,11 @@ public sealed class OrderedViewSourceTests
 
         Assert.Equal(publishedBefore + 1, harness.Published.Count);
         Assert.True(harness.Published[^1].OrderingIsStale);
-        Assert.Equal(orderingBefore, harness.Published[^1].Ordering);
+
+        // Showing the timeline flips the effective default column (RecordId -> DateAndTime) optimistically, like the
+        // requested indicators; the explicit ordering fields have not moved, so only EffectiveOrderBy differs.
+        Assert.Equal(ColumnName.RecordId, orderingBefore.EffectiveOrderBy);
+        Assert.Equal(orderingBefore with { EffectiveOrderBy = ColumnName.DateAndTime }, harness.Published[^1].Ordering);
     }
 
     [Fact]
@@ -258,6 +262,58 @@ public sealed class OrderedViewSourceTests
         harness.OpenLogWithEvents(Event(1, "Alpha"));
 
         Assert.Empty(seen);
+    }
+
+    [Fact]
+    public void EffectiveOrderBy_ForSingleLogDefault_FallsBackToRecordId()
+    {
+        var harness = new Harness();
+        harness.OpenLogWithEvents(Event(1, "Alpha"));
+
+        Assert.Equal(ColumnName.RecordId, harness.Source.Current.Ordering.EffectiveOrderBy);
+    }
+
+    [Fact]
+    public void EffectiveOrderBy_WhenExplicitSortSet_IsThatColumn()
+    {
+        var harness = new Harness();
+        harness.OpenLogWithEvents(Event(1, "Alpha"));
+        harness.SetRequestedOrdering(ColumnName.Source, isDescending: false, groupBy: null, isGroupDescending: false);
+
+        Assert.Equal(ColumnName.Source, harness.Source.Current.Ordering.EffectiveOrderBy);
+    }
+
+    [Fact]
+    public void EffectiveOrderBy_WhenGroupedWithoutExplicitSort_IsNull()
+    {
+        var harness = new Harness();
+        harness.OpenLogWithEvents(Event(1, "Alpha"));
+        harness.SetRequestedOrdering(orderBy: null, isDescending: true, ColumnName.Level, isGroupDescending: false);
+
+        Assert.Null(harness.Source.Current.Ordering.EffectiveOrderBy);
+    }
+
+    [Fact]
+    public void EffectiveOrderBy_WhenTimelineVisible_IsDateAndTime()
+    {
+        var harness = new Harness();
+        harness.OpenLogWithEvents(Event(1, "Alpha"));
+        harness.Apply(state => state with { TimelineVisible = true });
+
+        Assert.Equal(ColumnName.DateAndTime, harness.Source.Current.Ordering.EffectiveOrderBy);
+    }
+
+    [Fact]
+    public void EffectiveOrderBy_WhileFaulted_UsesCommittedOrder_NotLiveState()
+    {
+        // A fault that coincides with enabling the timeline must report the committed view's effective order (RecordId
+        // for the single-log committed view), not the live-timeline default the retained rows are not ordered by.
+        var harness = new Harness();
+        harness.OpenLogWithEvents(Event(1, "Alpha"));
+        harness.Apply(state => state with { TimelineVisible = true });
+        harness.SetDisplayEnabled(false);
+
+        Assert.Equal(ColumnName.RecordId, harness.Source.Current.Ordering.EffectiveOrderBy);
     }
 
     [Fact]

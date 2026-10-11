@@ -601,31 +601,12 @@ public sealed partial class LogTablePane
         }
     }
 
-    private IReadOnlyList<MenuItem> BuildGroupByMenuItems()
-    {
-        var ordering = Presentation.Ordering;
-
-        var items = new List<MenuItem>
-        {
-            MenuItem.Item(Localizer["LogTable_GroupByNone"].Value,
-                () => LogTableCommands.SetGroupBy(null),
-                isChecked: ordering.RequestedGroupBy is null)
-        };
-
-        foreach (var (column, _) in Presentation.Columns)
-        {
-            if (!ColumnDescriptors.IsGroupable(column)) { continue; }
-
-            var capturedColumn = column;
-            
-            items.Add(MenuItem.Item(
-                ColumnNameLocalizer.Label(Localizer, column),
-                () => LogTableCommands.SetGroupBy(capturedColumn),
-                isChecked: ordering.RequestedGroupBy.Equals(capturedColumn)));
-        }
-
-        return items;
-    }
+    private IReadOnlyList<MenuItem> BuildGroupByMenuItems() =>
+        OrderingMenuItems.BuildGroupBy(
+            Localizer,
+            Presentation.Columns,
+            Presentation.Ordering.RequestedGroupBy,
+            column => LogTableCommands.SetGroupBy(column));
 
     private IReadOnlyList<SelectionEntry> BuildRange(EventLocator anchor, EventLocator selected)
     {
@@ -1511,7 +1492,7 @@ public sealed partial class LogTablePane
 
         var orderItems = new List<MenuItem>
         {
-            MenuItem.Item(
+            MenuItem.Radio(
                 Localizer["LogTable_OrderByDefault"].Value,
                 () => LogTableCommands.SetOrderBy(null),
                 isChecked: ordering.RequestedOrderBy is null)
@@ -1520,7 +1501,7 @@ public sealed partial class LogTablePane
         foreach (var (column, _) in columns)
         {
             var capturedColumn = column;
-            orderItems.Add(MenuItem.Item(
+            orderItems.Add(MenuItem.Radio(
                 ColumnNameLocalizer.Label(Localizer, column),
                 () => LogTableCommands.SetOrderBy(capturedColumn),
                 isChecked: ordering.RequestedOrderBy.Equals(capturedColumn)));

@@ -2351,6 +2351,26 @@
     <value>Grouping cleared</value>
     <comment>Screen-reader announcement when grouping is removed.</comment>
   </data>
+  <data name="Table_Announce_GroupCount" xml:space="preserve">
+    <value>{count, plural, one {{count:N0} group} other {{count:N0} groups}}</value>
+    <comment>Group-count fragment of the grouping announcement; count is the number of groups the view produced.</comment>
+  </data>
+  <data name="Table_Announce_GroupedWithCount" xml:space="preserve">
+    <value>{0}, {1}</value>
+    <comment>Screen-reader grouping announcement composing the grouped-by phrase ({0}) and the group-count phrase ({1}); both placeholders are already-localized fragments.</comment>
+  </data>
+  <data name="Table_Announce_DefaultOrderNewest" xml:space="preserve">
+    <value>Default order, newest first</value>
+    <comment>Screen-reader announcement when the default (unsorted) order is reversed to newest-first.</comment>
+  </data>
+  <data name="Table_Announce_DefaultOrderOldest" xml:space="preserve">
+    <value>Default order, oldest first</value>
+    <comment>Screen-reader announcement when the default (unsorted) order is reversed to oldest-first.</comment>
+  </data>
+  <data name="Table_Announce_ReorderUnavailable" xml:space="preserve">
+    <value>Sort unavailable, showing {0}</value>
+    <comment>{0} is the already-localized committed-order phrase. Screen-reader announcement when a reorder faults and the table reverts to its committed order.</comment>
+  </data>
   <data name="Table_Announce_SortedAndGrouped" xml:space="preserve">
     <value>{0}. {1}</value>
     <comment>Screen-reader announcement composing a simultaneous sort change ({0}) and group change ({1}) into one message; both placeholders are already-localized sort and group phrases.</comment>

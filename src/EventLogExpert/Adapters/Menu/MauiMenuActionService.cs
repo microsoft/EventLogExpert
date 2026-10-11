@@ -289,6 +289,8 @@ public sealed class MauiMenuActionService(
     public void SetContinuouslyUpdate(bool value) =>
         _eventLogCommands.SetContinuouslyUpdate(value);
 
+    public void SetGroupBy(ColumnName? groupBy) => _logTableCommands.SetGroupBy(groupBy);
+
     public void SetHistogramVisible(bool value) => _histogramCommands.SetVisible(value);
 
     public Task ShowDebugLogsAsync() =>

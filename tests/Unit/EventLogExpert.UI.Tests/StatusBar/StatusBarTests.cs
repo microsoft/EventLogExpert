@@ -401,6 +401,35 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void GroupRemoveButton_Click_WhileFaulted_DropsRestore_WhenRegroupedToSameColumn()
+    {
+        // Arm the restore by clearing the group chip while faulted (the mask keeps the chip mounted). If the user then
+        // re-adds the SAME group column before recovery - a faulted re-add that resolves to the same identity - the chip
+        // never unmounts, so the clear this restore was armed for never happens. Keying the disarm only on a DIFFERENT
+        // column stranded the arm; it must drop here too, or it fires on the next unrelated clear and steals focus.
+        SetOrdering(
+            new DisplayOrdering(OrderBy: ColumnName.DateAndTime, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false),
+            state: PresentationState.Faulted);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        cut.Find("button.status-bar-group-remove").Click();
+
+        // Recovery adopts the SAME group column (the user re-added Level during the fault); the chip never unmounted.
+        PublishOrdering(cut, new DisplayOrdering(
+            OrderBy: ColumnName.DateAndTime, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: false));
+
+        // A later, unrelated clear publishes a null group axis and the chip finally unmounts. Because the stranded arm
+        // was dropped at the same-column recovery, no focus is moved - without the fix the arm survives and yanks focus.
+        PublishOrdering(cut, new DisplayOrdering(
+            OrderBy: ColumnName.DateAndTime, IsDescending: false, GroupBy: null, IsGroupDescending: false));
+
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("button.status-bar-group-remove")));
+
+        Assert.DoesNotContain(JSInterop.Invocations, invocation =>
+            invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void GroupRemoveButton_Click_WhileFaulted_RestoresFocus_OnceRecovered()
     {
         // While faulted the mask keeps the chip mounted so focus stays put; when the reproject recovers and the chip

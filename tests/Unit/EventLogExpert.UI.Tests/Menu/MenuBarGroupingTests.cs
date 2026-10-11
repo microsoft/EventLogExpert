@@ -204,6 +204,53 @@ public sealed class MenuBarGroupingTests : BunitContext
     }
 
     [Fact]
+    public async Task View_GroupBy_BuildsRadioColumnPicker_CheckingTheCurrentGroup()
+    {
+        // The View menu offers a keyboard-reachable Group By picker reusing the column-header builder: groupable
+        // columns only, rendered as radios, with the active group checked and clicking one routed to SetGroupBy.
+        _logTableQueries.HasActiveLogs().Returns(true);
+        _orderedViewSource.Current.Returns(ViewPresentationWithColumns(ColumnName.Source));
+
+        var groupBy = Item(await OpenViewMenu(), Localizer["LogTable_GroupBy"].Value);
+
+        Assert.True(groupBy.IsEnabled);
+
+        var children = groupBy.Children!;
+        Assert.Equal(3, children.Count);
+        Assert.All(children, child => Assert.Equal(MenuItemSelection.Radio, child.Selection));
+
+        var checkedItem = children.Single(child => child.IsChecked == true);
+        await checkedItem.OnClickAsync!();
+        _actions.Received(1).SetGroupBy(ColumnName.Source);
+    }
+
+    [Fact]
+    public async Task View_GroupBy_DisabledWhenNoActiveLogs()
+    {
+        _logTableQueries.HasActiveLogs().Returns(false);
+        _orderedViewSource.Current.Returns(ViewPresentationWithColumns(requestedGroupBy: null));
+
+        var groupBy = Item(await OpenViewMenu(), Localizer["LogTable_GroupBy"].Value);
+
+        Assert.False(groupBy.IsEnabled);
+    }
+
+    [Fact]
+    public async Task View_GroupBy_NoneItem_ClearsGrouping()
+    {
+        _logTableQueries.HasActiveLogs().Returns(true);
+        _orderedViewSource.Current.Returns(ViewPresentationWithColumns(ColumnName.Source));
+
+        var groupBy = Item(await OpenViewMenu(), Localizer["LogTable_GroupBy"].Value);
+        var none = groupBy.Children![0];
+
+        Assert.False(none.IsChecked);
+        await none.OnClickAsync!();
+
+        _actions.Received(1).SetGroupBy(null);
+    }
+
+    [Fact]
     public async Task View_ReadsQueriesAtEachOpen_NotCachedAtInitialization()
     {
         IReadOnlyList<MenuItem>? items = null;
@@ -389,6 +436,22 @@ public sealed class MenuBarGroupingTests : BunitContext
             },
             PresentationState.Current,
             0);
+
+    private static OrderedViewPresentation ViewPresentationWithColumns(ColumnName? requestedGroupBy) =>
+        new(
+            Substitute.For<IEventColumnView>(),
+            null,
+            new DisplayOrdering(null, true, null, false) { RequestedGroupBy = requestedGroupBy },
+            PresentationState.Current,
+            0)
+        {
+            Columns = ImmutableDictionary.CreateRange(
+            [
+                KeyValuePair.Create(ColumnName.Source, true),
+                KeyValuePair.Create(ColumnName.Level, true),
+                KeyValuePair.Create(ColumnName.DateAndTime, true)
+            ])
+        };
 
     private IReadOnlyList<MenuItem> LiveItems(IReadOnlyList<MenuItem> fileItems) =>
         Item(Item(fileItems, Localizer["Menu_File_Open"].Value).Children!, Localizer["Menu_Open_Live"].Value).Children!;
