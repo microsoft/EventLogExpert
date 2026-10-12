@@ -1052,6 +1052,7 @@ public sealed class LocalizationInfraTests
             ("Table_Announce_GroupedAscending", 1),
             ("Table_Announce_GroupedDescending", 1),
             ("Table_Announce_GroupedWithCount", 2),
+            ("Table_Announce_GroupedWithWithinGroupOrder", 2),
             ("Table_Announce_ReorderUnavailable", 1),
             ("Table_Announce_SortCleared", 0),
             ("Table_Announce_SortedAndGrouped", 2),

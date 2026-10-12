@@ -165,12 +165,16 @@ internal sealed class OrderingAnnouncementEffects(IState<LogTableState> logTable
         bool groupByDeferred = groupChanged && current.GroupColumn is not null && state.HasPendingSortChange;
         bool announceGroup = groupChanged && !groupByDeferred;
 
-        // Toggling direction with no sort column reverses the effective default time/record order but changes no column,
-        // so the column diff above stays silent; announce that reversal explicitly. When grouped, the reversal applies
-        // within each group (ToggleSorting reorders within-group rows), so it still announces, with within-group wording.
-        bool defaultOrderReversed = !sortChanged && !groupChanged &&
+        // Direction flipped with no sort column. Detected even mid group change so a reversal toggled during a
+        // deferred group adoption is not lost.
+        bool defaultOrderReversed = !sortChanged &&
             current.SortColumn is null &&
             current.SortDescending != _lastAnnounced.SortDescending;
+
+        // A concurrent group-BY adoption carries the reversal in one combined announcement, since the single
+        // live-region slot would otherwise overwrite a standalone reversal and leave the within-group reorder silent.
+        bool announceStandaloneReversal = defaultOrderReversed && !groupChanged;
+        bool composeReversalWithGroup = defaultOrderReversed && announceGroup && current.GroupColumn is not null;
 
         switch (sortChanged)
         {
@@ -191,15 +195,22 @@ internal sealed class OrderingAnnouncementEffects(IState<LogTableState> logTable
 
                 break;
             default:
-                if (announceGroup)
+                if (announceGroup && current.GroupColumn is { } groupColumn)
                 {
-                    _announcementService.Announce(current.GroupColumn is { } groupColumn ?
-                        new AnnouncementPayload.TableGrouped(groupColumn,
+                    int groupCount = GroupCountForDisplayedView(state, groupColumn);
+
+                    _announcementService.Announce(composeReversalWithGroup ?
+                        new AnnouncementPayload.TableGroupedWithDefaultOrderReversed(groupColumn,
                             current.GroupDescending,
-                            GroupCountForDisplayedView(state, groupColumn)) :
-                        new AnnouncementPayload.TableGroupCleared());
+                            groupCount,
+                            current.SortDescending) :
+                        new AnnouncementPayload.TableGrouped(groupColumn, current.GroupDescending, groupCount));
                 }
-                else if (defaultOrderReversed)
+                else if (announceGroup)
+                {
+                    _announcementService.Announce(new AnnouncementPayload.TableGroupCleared());
+                }
+                else if (announceStandaloneReversal)
                 {
                     _announcementService.Announce(
                         new AnnouncementPayload.TableDefaultOrderReversed(current.SortDescending, current.GroupColumn is not null));
@@ -208,10 +219,17 @@ internal sealed class OrderingAnnouncementEffects(IState<LogTableState> logTable
                 break;
         }
 
-        // Advance the baseline, but hold the group axis at its prior value while a group-BY announcement is deferred so
-        // the adopt flush still sees the change and narrates it with the real count.
+        // Hold an axis whose change is not yet announced so the adopt flush still sees it. HasPendingSortChange gates
+        // the reversal hold to a pending flush; without it, a reversal coinciding with a group CLEAR (nothing to
+        // adopt) would hold forever, desyncing the baseline and silencing the next toggle.
+        bool reversalHeld = defaultOrderReversed &&
+            !announceStandaloneReversal &&
+            !composeReversalWithGroup &&
+            state.HasPendingSortChange;
+
         _lastAnnounced = current with
         {
+            SortDescending = reversalHeld ? _lastAnnounced.SortDescending : current.SortDescending,
             GroupColumn = announceGroup ? current.GroupColumn : _lastAnnounced.GroupColumn,
             GroupDescending = announceGroup ? current.GroupDescending : _lastAnnounced.GroupDescending,
         };

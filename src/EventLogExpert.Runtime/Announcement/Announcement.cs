@@ -42,6 +42,14 @@ public abstract record Announcement
         bool GroupDescending,
         int GroupCount) : Announcement;
 
+    // Combines a group adoption with a within-group reversal toggled before adoption, so the single live region does
+    // not drop the reversal behind the grouping.
+    public sealed record TableGroupedWithDefaultOrderReversed(
+        ColumnName Column,
+        bool IsGroupDescending,
+        int GroupCount,
+        bool IsDescending) : Announcement;
+
     // A reprojection faulted and the view reverted to the committed ordering; narrates what is now shown.
     public sealed record TableReorderUnavailable(
         ColumnName? CommittedOrderBy,

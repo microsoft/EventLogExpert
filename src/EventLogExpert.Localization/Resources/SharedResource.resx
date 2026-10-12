@@ -2359,6 +2359,10 @@
     <value>{0}, {1}</value>
     <comment>Screen-reader grouping announcement composing the grouped-by phrase ({0}) and the group-count phrase ({1}); both placeholders are already-localized fragments.</comment>
   </data>
+  <data name="Table_Announce_GroupedWithWithinGroupOrder" xml:space="preserve">
+    <value>{0}. {1}</value>
+    <comment>Screen-reader announcement composing a grouping phrase ({0}) with a within-group default-order reversal phrase ({1}) when both land together at adoption; both placeholders are already-localized fragments.</comment>
+  </data>
   <data name="Table_Announce_DefaultOrderNewest" xml:space="preserve">
     <value>Default order, newest first</value>
     <comment>Screen-reader announcement when the default (unsorted) order is reversed to newest-first.</comment>

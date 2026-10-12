@@ -55,6 +55,13 @@ public sealed partial class AnnouncerHost : ComponentBase, IDisposable
                 TableOrderingTextComposer.DefaultOrderReversedAnnouncement(Localizer, isDescending, withinGroups),
             AnnouncementPayload.TableGrouped(var column, var isGroupDescending, var groupCount) =>
                 TableOrderingTextComposer.GroupAnnouncement(Localizer, column, isGroupDescending, groupCount),
+            AnnouncementPayload.TableGroupedWithDefaultOrderReversed(var column, var isGroupDescending, var groupCount, var
+                isDescending) =>
+                TableOrderingTextComposer.GroupedWithWithinGroupOrderAnnouncement(Localizer,
+                    column,
+                    isGroupDescending,
+                    groupCount,
+                    isDescending),
             AnnouncementPayload.TableGroupCleared _ =>
                 TableOrderingTextComposer.GroupClearedAnnouncement(Localizer),
             AnnouncementPayload.TableSortAndGroupChanged(var sortColumn, var sortDescending, var groupColumn, var

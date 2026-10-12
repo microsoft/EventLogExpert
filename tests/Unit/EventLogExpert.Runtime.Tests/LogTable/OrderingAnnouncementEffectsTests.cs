@@ -56,6 +56,26 @@ public sealed class OrderingAnnouncementEffectsTests
     }
 
     [Fact]
+    public async Task ClearingAGroupWhileTheDefaultDirectionAlsoFlips_AdvancesTheBaselineSoTheNextToggleStillSpeaks()
+    {
+        // A group clear with a direction flip is not deferred, so no adopt flush arrives to release a held reversal.
+        // The baseline must advance, or it desyncs and the next toggle is silently lost.
+        _state.Value.Returns(AdoptedState(groupBy: ColumnName.Level, isDescending: true));
+        var sut = CreateSut();
+
+        _state.Value.Returns(AdoptedState(isDescending: false));
+        await sut.HandleSetGroupBy(_dispatcher);
+        _announcer.Received(1).Announce(Arg.Any<AnnouncementPayload.TableGroupCleared>());
+
+        _announcer.ClearReceivedCalls();
+        _state.Value.Returns(AdoptedState(isDescending: true));
+        await sut.HandleToggleSorting(_dispatcher);
+
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableDefaultOrderReversed>(
+            payload => payload.IsDescending && !payload.WithinGroups));
+    }
+
+    [Fact]
     public async Task Effect_IsDiscoveredByFluxor_AnnouncesThroughARealStore()
     {
         // Wires a minimal real store (the LogTable feature + its reducers + this effect) to prove Fluxor discovers the
@@ -463,6 +483,64 @@ public sealed class OrderingAnnouncementEffectsTests
         _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableDefaultOrderReversed>(
             payload => payload.IsDescending && !payload.WithinGroups));
         _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableSorted>());
+    }
+
+    [Fact]
+    public async Task TogglingDefaultDirectionTwice_WhileGroupByAwaitsAdoption_AnnouncesTheGroupAlone()
+    {
+        // Two direction toggles during the deferred group net to zero, so the adopt flush announces the group alone.
+        _state.Value.Returns(State(isDescending: false));
+        var sut = CreateSut();
+
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: false));
+        await sut.HandleSetGroupBy(_dispatcher);
+
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: true));
+        await sut.HandleToggleSorting(_dispatcher);
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: false));
+        await sut.HandleToggleSorting(_dispatcher);
+
+        var served = GroupedViewState(ColumnName.Level, isGroupDescending: false, ["A", "B"], isDescending: false);
+        _state.Value.Returns(served);
+        await sut.HandleOrderedViewUpdated(_dispatcher);
+
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableGrouped>(
+            payload => payload.Column == ColumnName.Level && payload.GroupCount == 2));
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableGroupedWithDefaultOrderReversed>());
+    }
+
+    [Fact]
+    public async Task TogglingDefaultDirection_WhileGroupByAwaitsAdoption_ComposesTheReversalIntoTheGroupAnnouncement()
+    {
+        // Group-by is deferred (HasPendingSortChange), so a direction toggle silently reverses the future within-group
+        // order. The adopt flush must compose that reversal with the group, or the within-group reorder is never spoken.
+        _state.Value.Returns(State(isDescending: false));
+        var sut = CreateSut();
+
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: false));
+        await sut.HandleSetGroupBy(_dispatcher);
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: true));
+        await sut.HandleToggleSorting(_dispatcher);
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+
+        var served = GroupedViewState(ColumnName.Level, isGroupDescending: false, ["A", "B"], isDescending: true);
+        _state.Value.Returns(served);
+        await sut.HandleOrderedViewUpdated(_dispatcher);
+
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableGroupedWithDefaultOrderReversed>(
+            payload => payload.Column == ColumnName.Level && !payload.IsGroupDescending && payload.GroupCount == 2 && payload.IsDescending));
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableGrouped>());
+
+        // Adoption released the hold and re-synced the baseline, so a further toggle still announces. An unconditional
+        // hold would never re-sync and silently swallow it.
+        _announcer.ClearReceivedCalls();
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: false));
+        await sut.HandleToggleSorting(_dispatcher);
+
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableDefaultOrderReversed>(
+            payload => !payload.IsDescending && payload.WithinGroups));
     }
 
     private static LogTableState AdoptedState(

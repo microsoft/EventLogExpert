@@ -41,6 +41,18 @@ internal static class TableOrderingTextComposer
             "Table_GroupedColumnDescription_Descending" :
             "Table_GroupedColumnDescription_Ascending"];
 
+    // Composes the grouping phrase with the within-group reversal phrase so both land in the single live-region slot.
+    internal static string GroupedWithWithinGroupOrderAnnouncement(
+        IStringLocalizer<SharedResource> localizer,
+        ColumnName column,
+        bool isGroupDescending,
+        int groupCount,
+        bool isDescending) =>
+        localizer[
+            "Table_Announce_GroupedWithWithinGroupOrder",
+            GroupAnnouncement(localizer, column, isGroupDescending, groupCount),
+            DefaultOrderReversedAnnouncement(localizer, isDescending, withinGroups: true)];
+
     // A reproject faulted and the grid reverted to the committed ordering; narrate what the user now sees using the
     // committed fields, NOT the requested ones (which the grid no longer reflects).
     internal static string ReorderUnavailableAnnouncement(
