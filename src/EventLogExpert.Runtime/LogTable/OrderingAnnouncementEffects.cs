@@ -165,10 +165,11 @@ internal sealed class OrderingAnnouncementEffects(IState<LogTableState> logTable
         bool groupByDeferred = groupChanged && current.GroupColumn is not null && state.HasPendingSortChange;
         bool announceGroup = groupChanged && !groupByDeferred;
 
-        // Toggling direction with no sort column AND no grouping reverses the effective default time/record order but
-        // changes no column, so the column diff above stays silent; announce that reversal explicitly.
+        // Toggling direction with no sort column reverses the effective default time/record order but changes no column,
+        // so the column diff above stays silent; announce that reversal explicitly. When grouped, the reversal applies
+        // within each group (ToggleSorting reorders within-group rows), so it still announces, with within-group wording.
         bool defaultOrderReversed = !sortChanged && !groupChanged &&
-            current.SortColumn is null && current.GroupColumn is null &&
+            current.SortColumn is null &&
             current.SortDescending != _lastAnnounced.SortDescending;
 
         switch (sortChanged)
@@ -201,7 +202,7 @@ internal sealed class OrderingAnnouncementEffects(IState<LogTableState> logTable
                 else if (defaultOrderReversed)
                 {
                     _announcementService.Announce(
-                        new AnnouncementPayload.TableDefaultOrderReversed(current.SortDescending));
+                        new AnnouncementPayload.TableDefaultOrderReversed(current.SortDescending, current.GroupColumn is not null));
                 }
 
                 break;

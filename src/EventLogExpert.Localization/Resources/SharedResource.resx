@@ -2367,6 +2367,14 @@
     <value>Default order, oldest first</value>
     <comment>Screen-reader announcement when the default (unsorted) order is reversed to oldest-first.</comment>
   </data>
+  <data name="Table_Announce_WithinGroupOrderNewest" xml:space="preserve">
+    <value>Within groups, newest first</value>
+    <comment>Screen-reader announcement when the default (unsorted) order within each group is reversed to newest-first.</comment>
+  </data>
+  <data name="Table_Announce_WithinGroupOrderOldest" xml:space="preserve">
+    <value>Within groups, oldest first</value>
+    <comment>Screen-reader announcement when the default (unsorted) order within each group is reversed to oldest-first.</comment>
+  </data>
   <data name="Table_Announce_ReorderUnavailable" xml:space="preserve">
     <value>Sort unavailable, showing {0}</value>
     <comment>{0} is the already-localized committed-order phrase. Screen-reader announcement when a reorder faults and the table reverts to its committed order.</comment>

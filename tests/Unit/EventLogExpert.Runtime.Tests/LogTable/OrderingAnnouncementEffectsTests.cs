@@ -415,17 +415,38 @@ public sealed class OrderingAnnouncementEffectsTests
     }
 
     [Fact]
-    public async Task ToggleSorting_WhenGrouped_DoesNotAnnounceDefaultOrderReversed()
+    public async Task ToggleSorting_WhenGroupedButUnsorted_AnnouncesWithinGroupReversal()
     {
-        // Toggling the sort direction while grouped reverses the within-group order, not the default order; the
-        // default-order reversal announcement is reserved for the ungrouped, unsorted case.
+        // Toggling the sort direction while grouped-but-unsorted reverses the default time/record order WITHIN each
+        // group, so it announces a default-order reversal flagged WithinGroups for the dedicated within-group wording.
+        // It must NOT emit a group announcement (the single live-region slot would clobber the reversal), the adopt
+        // flush must then stay silent (no late grouping overwrites it), and a second toggle must re-announce the flip.
         _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: false));
         var sut = CreateSut();
         _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: true));
 
         await sut.HandleToggleSorting(_dispatcher);
 
-        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableDefaultOrderReversed>());
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableDefaultOrderReversed>(
+            payload => payload.IsDescending && payload.WithinGroups));
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableSorted>());
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableGrouped>());
+
+        // The adopt flush re-enters with the grouping already in the baseline, so it must narrate nothing: a late
+        // TableGrouped here would overwrite the within-group reversal in the single-slot live region.
+        _announcer.ClearReceivedCalls();
+        _state.Value.Returns(AdoptedState(groupBy: ColumnName.Level, isDescending: true));
+        await sut.HandleOrderedViewUpdated(_dispatcher);
+
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+
+        // The baseline advanced on the sort axis, so a second toggle re-announces the opposite within-group direction.
+        _announcer.ClearReceivedCalls();
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: false));
+        await sut.HandleToggleSorting(_dispatcher);
+
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableDefaultOrderReversed>(
+            payload => !payload.IsDescending && payload.WithinGroups));
     }
 
     [Fact]
@@ -439,7 +460,8 @@ public sealed class OrderingAnnouncementEffectsTests
 
         await sut.HandleToggleSorting(_dispatcher);
 
-        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableDefaultOrderReversed>(payload => payload.IsDescending));
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableDefaultOrderReversed>(
+            payload => payload.IsDescending && !payload.WithinGroups));
         _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableSorted>());
     }
 

@@ -1056,7 +1056,9 @@ public sealed class LocalizationInfraTests
             ("Table_Announce_SortCleared", 0),
             ("Table_Announce_SortedAndGrouped", 2),
             ("Table_Announce_SortedAscending", 1),
-            ("Table_Announce_SortedDescending", 1)
+            ("Table_Announce_SortedDescending", 1),
+            ("Table_Announce_WithinGroupOrderNewest", 0),
+            ("Table_Announce_WithinGroupOrderOldest", 0)
         ];
 
         foreach ((string key, int arity) in expected)

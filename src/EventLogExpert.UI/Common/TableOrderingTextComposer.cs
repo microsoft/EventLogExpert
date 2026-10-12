@@ -9,10 +9,17 @@ namespace EventLogExpert.UI.Common;
 
 internal static class TableOrderingTextComposer
 {
-    // Reversing the effective default time/record order while no sort column is set. The default is chronological for
-    // both the DateAndTime and the RecordId effective columns, so the direction alone names oldest-first vs newest-first.
-    internal static string DefaultOrderReversedAnnouncement(IStringLocalizer<SharedResource> localizer, bool isDescending) =>
-        localizer[isDescending ? "Table_Announce_DefaultOrderNewest" : "Table_Announce_DefaultOrderOldest"];
+    internal static string DefaultOrderReversedAnnouncement(
+        IStringLocalizer<SharedResource> localizer,
+        bool isDescending,
+        bool withinGroups) =>
+        localizer[(withinGroups, isDescending) switch
+        {
+            (true, true) => "Table_Announce_WithinGroupOrderNewest",
+            (true, false) => "Table_Announce_WithinGroupOrderOldest",
+            (false, true) => "Table_Announce_DefaultOrderNewest",
+            (false, false) => "Table_Announce_DefaultOrderOldest",
+        }];
 
     internal static string GroupAnnouncement(
         IStringLocalizer<SharedResource> localizer,
@@ -88,7 +95,7 @@ internal static class TableOrderingTextComposer
             return localizer["Table_Announce_SortedAndGrouped", sortPhrase, groupPhrase];
         }
 
-        return groupPhrase ?? sortPhrase ?? DefaultOrderReversedAnnouncement(localizer, isDescending);
+        return groupPhrase ?? sortPhrase ?? DefaultOrderReversedAnnouncement(localizer, isDescending, withinGroups: false);
     }
 
     private static string GroupDirectionPhrase(

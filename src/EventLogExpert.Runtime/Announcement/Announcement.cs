@@ -29,8 +29,7 @@ public abstract record Announcement
 
     public sealed record TableSortCleared : Announcement;
 
-    // Reversing the default time/record order while no sort column is set; IsDescending is the new effective direction.
-    public sealed record TableDefaultOrderReversed(bool IsDescending) : Announcement;
+    public sealed record TableDefaultOrderReversed(bool IsDescending, bool WithinGroups) : Announcement;
 
     public sealed record TableGrouped(ColumnName Column, bool IsGroupDescending, int GroupCount) : Announcement;
 

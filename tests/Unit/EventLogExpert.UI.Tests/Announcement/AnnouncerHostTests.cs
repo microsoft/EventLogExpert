@@ -158,11 +158,21 @@ public sealed class AnnouncerHostTests : BunitContext
     [Fact]
     public void AnnouncerHost_TableDefaultOrderReversed_RoutesThroughOrderingComposer()
     {
-        _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TableDefaultOrderReversed(true), 2));
+        _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TableDefaultOrderReversed(true, false), 2));
 
         var component = Render<AnnouncerHost>();
 
         Assert.Equal("[[Table_Announce_DefaultOrderNewest]]", component.Find("#app-announcer").TextContent);
+    }
+
+    [Fact]
+    public void AnnouncerHost_TableDefaultOrderReversed_WithinGroups_RoutesThroughWithinGroupText()
+    {
+        _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TableDefaultOrderReversed(true, true), 2));
+
+        var component = Render<AnnouncerHost>();
+
+        Assert.Equal("[[Table_Announce_WithinGroupOrderNewest]]", component.Find("#app-announcer").TextContent);
     }
 
     [Fact]
@@ -307,7 +317,7 @@ public sealed class AnnouncerHostTests : BunitContext
         leafType == typeof(AnnouncementPayload.TagRenamed) ? new AnnouncementPayload.TagRenamed("old", "new", 2) :
         leafType == typeof(AnnouncementPayload.TableSorted) ? new AnnouncementPayload.TableSorted(ColumnName.Source, false) :
         leafType == typeof(AnnouncementPayload.TableSortCleared) ? new AnnouncementPayload.TableSortCleared() :
-        leafType == typeof(AnnouncementPayload.TableDefaultOrderReversed) ? new AnnouncementPayload.TableDefaultOrderReversed(true) :
+        leafType == typeof(AnnouncementPayload.TableDefaultOrderReversed) ? new AnnouncementPayload.TableDefaultOrderReversed(true, false) :
         leafType == typeof(AnnouncementPayload.TableGrouped) ? new AnnouncementPayload.TableGrouped(ColumnName.Source, false, 2) :
         leafType == typeof(AnnouncementPayload.TableGroupCleared) ? new AnnouncementPayload.TableGroupCleared() :
         leafType == typeof(AnnouncementPayload.TableSortAndGroupChanged) ? new AnnouncementPayload.TableSortAndGroupChanged(ColumnName.Source, false, ColumnName.Level, false, 2) :
