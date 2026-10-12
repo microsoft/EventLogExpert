@@ -328,6 +328,23 @@ public sealed class OrderedViewFaultRecoveryTests
     }
 
     [Fact]
+    public void ArmingTheStickyForce_ReissuesOnceThenClears_SoItIsNotAPermanentForce()
+    {
+        var issuer = new ViewRequestIssuer();
+        ViewIdentity identity = StateWith(EventLogId.Create()).ViewIdentity;
+
+        Assert.NotNull(issuer.TryIssue(identity));
+        Assert.Null(issuer.TryIssue(identity));
+
+        issuer.ArmForce();
+
+        // The armed force re-issues the already-issued identity past the de-dup, then clears: the next issue de-dups
+        // again. Without the one-shot clear this would force forever (an unbounded rebuild storm).
+        Assert.NotNull(issuer.TryIssue(identity));
+        Assert.Null(issuer.TryIssue(identity));
+    }
+
+    [Fact]
     public async Task ChangingTheDisplayAfterAFault_EarnsAFreshAttempt()
     {
         await using var harness = new OrderedViewShadowHarness();

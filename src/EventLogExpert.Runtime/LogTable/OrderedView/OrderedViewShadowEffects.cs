@@ -197,8 +197,8 @@ internal sealed class OrderedViewShadowEffects(
 
         // Arm the sticky force BEFORE the gate check: the gate scans every open log but the ViewIdentity covers only the
         // active scope, so an out-of-scope log can reopen the gate and let a racing Sync consume the de-dup before a
-        // post-gate arm runs. Arming first lets that racing (or next) TryIssue force past the de-dup; a non-deferred
-        // Always consumes it immediately via forceReissue. WhenFaulted is deliberately not armed (pre-existing, tracked).
+        // post-gate arm runs. A non-deferred Always consumes the flag inside its own TryIssue (not a direct force, which
+        // would double-issue when the race lands). WhenFaulted is deliberately not armed (pre-existing, tracked).
         if (force == ReissueForce.Always) { _issuer.ArmForce(); }
 
         if (XmlFilterGate.IsDeferred(filter, _eventLogState.Value, _rawEventStore.Value, _concurrencyState, _matchCache))
@@ -211,14 +211,13 @@ internal sealed class OrderedViewShadowEffects(
         // often clicking a remounted clear chip's x after a clear CAUSED the fault, where the requested column is
         // already null - the ViewIdentity is unchanged and the issuer would de-dup the failed identity, so the retry
         // would never reach the writer. WhenFaulted re-trusts the engine (EnqueueClearFault) and forces the re-issue
-        // atomically past the de-dup; Always forces unconditionally (XmlFilterMatchReady: the store/match stamp changed
-        // under an unchanged identity) without clearing the fault.
+        // directly past the de-dup. Always does NOT force here: it armed the sticky force before the gate, so TryIssue
+        // consumes that; forcing again would double-issue when a concurrent Sync consumes the sticky force first.
         bool clearFault = force == ReissueForce.WhenFaulted && state.PresentationState == PresentationState.Faulted;
-        bool forceReissue = force == ReissueForce.Always || clearFault;
 
         if (clearFault) { _writer.EnqueueClearFault(); }
 
-        if (_issuer.TryIssue(identity, forceReissue) is not { } sequence) { return; }
+        if (_issuer.TryIssue(identity, clearFault) is not { } sequence) { return; }
 
         Func<IEventColumnReader, EventLocator, bool> survives =
             XmlFilterGate.BuildSurvivorPredicate(filter, _concurrencyState, _matchCache);
