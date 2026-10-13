@@ -47,7 +47,12 @@
                     @onclick:stopPropagation
                     @onmouseenter="() => OnItemHover(item, capturedIndex)"
                     @ref="_itemElements[capturedIndex]"
-                    role="@(item.IsChecked is null ? "menuitem" : "menuitemcheckbox")"
+                    role="@(item.Selection switch
+                          {
+                              MenuItemSelection.Radio => "menuitemradio",
+                              MenuItemSelection.Checkbox => "menuitemcheckbox",
+                              _ => "menuitem"
+                          })"
                     tabindex="@(isFocused && item.IsFocusable ? 0 : -1)">
 
                     <span class="menu-label">@item.Label</span>

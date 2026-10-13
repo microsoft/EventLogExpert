@@ -123,6 +123,33 @@ public sealed class MenuRendererTests : BunitContext
     }
 
     [Fact]
+    public void MenuRenderer_RadioItem_RendersMenuitemradioRole_WhileCheckboxAndPlainKeepTheirRoles()
+    {
+        // Order By / Group By items are mutually exclusive and must map to role="menuitemradio" (with aria-checked),
+        // while toggle checkboxes and plain items keep their existing roles.
+        var items = new[]
+        {
+            MenuItem.Radio("Selected", () => { }, isChecked: true),
+            MenuItem.Radio("Unselected", () => { }, isChecked: false),
+            MenuItem.Item("Toggle", () => { }, isChecked: true),
+            MenuItem.Item("Plain", () => { }),
+        };
+
+        var component = Render<MenuRenderer>(parameters => parameters.Add(p => p.Items, items));
+
+        var listItems = component.FindAll("li.menu-item");
+
+        Assert.Equal("menuitemradio", listItems[0].GetAttribute("role"));
+        Assert.Equal("true", listItems[0].GetAttribute("aria-checked"));
+        Assert.Equal("menuitemradio", listItems[1].GetAttribute("role"));
+        Assert.Equal("false", listItems[1].GetAttribute("aria-checked"));
+        Assert.Equal("menuitemcheckbox", listItems[2].GetAttribute("role"));
+        Assert.Equal("true", listItems[2].GetAttribute("aria-checked"));
+        Assert.Equal("menuitem", listItems[3].GetAttribute("role"));
+        Assert.Null(listItems[3].GetAttribute("aria-checked"));
+    }
+
+    [Fact]
     public async Task MenuRenderer_WithAllItemsDisabled_RendersNoFocusableItemAndDoesNotThrow()
     {
         var items = new[]

@@ -1045,13 +1045,21 @@ public sealed class LocalizationInfraTests
         var neutralValues = ResxValues();
         (string Key, int Arity)[] expected =
         [
+            ("Table_Announce_DefaultOrderNewest", 0),
+            ("Table_Announce_DefaultOrderOldest", 0),
             ("Table_Announce_GroupCleared", 0),
+            ("Table_Announce_GroupCount", 0),
             ("Table_Announce_GroupedAscending", 1),
             ("Table_Announce_GroupedDescending", 1),
+            ("Table_Announce_GroupedWithCount", 2),
+            ("Table_Announce_GroupedWithWithinGroupOrder", 2),
+            ("Table_Announce_ReorderUnavailable", 1),
             ("Table_Announce_SortCleared", 0),
             ("Table_Announce_SortedAndGrouped", 2),
             ("Table_Announce_SortedAscending", 1),
-            ("Table_Announce_SortedDescending", 1)
+            ("Table_Announce_SortedDescending", 1),
+            ("Table_Announce_WithinGroupOrderNewest", 0),
+            ("Table_Announce_WithinGroupOrderOldest", 0)
         ];
 
         foreach ((string key, int arity) in expected)

@@ -23,7 +23,7 @@ See [Performance](Performance.md) for how the virtualized table, the segmented s
 
 - A toggle per column (checked = visible). The available columns are `Level`, `Date and Time`, `Activity ID`, `Log`, `Computer Name`, `Source`, `Event ID`, `Task Category`, `Keywords`, `Process ID`, `Thread ID`, and `User`. The `Description` column is fixed and always rightmost.
 - An `Order By` submenu pinned to the same set of columns, with `(default)` at the top. The checked item is the current sort key; `(default)` clears a custom sort and returns to the default order. Re-picking the column you are already sorted by does nothing - clearing the sort is always explicit (the `(default)` item or the status-bar chip's `×`).
-- A `Group By` submenu pinned to the groupable columns, with `(none)` at the top - see [Grouping](#grouping).
+- A `Group By` submenu pinned to the groupable columns, with `(none)` at the top. The same picker is on the `View` menu - see [Grouping](#grouping).
 - `Reset Column Defaults` restores the default column visibility, order, and widths. A custom sort is left in place; grouping is kept unless restoring the defaults hides the grouped column (for example `Activity ID`), which turns grouping off.
 
 The sorted column header shows a caret; click it (or press Enter or Space while it is focused) to flip between ascending and descending. A `Sorted by {column}` chip also appears in the status bar - its caret flips the direction and its `×` clears the sort back to the default order. Screen readers announce each change (for example, "Sorted by Source, ascending" or "Sort cleared, showing default order").
@@ -49,11 +49,11 @@ The `User` column shows the best-available account identity, resolved offline (n
 
 Group the table by any column except `Description`, `Record ID`, and `Date and Time` so related events fold under a shared header row. Grouping is most useful for an identifier such as `Activity ID`, but works for every column in the `Group By` submenu.
 
-**Turning grouping on.** Pick a column from the `Group By` submenu on a column-header right-click, or use the direct `Group by <column>` item on a groupable cell. Groups are ordered by the grouped value, and events within each group keep the current `Order By` sort. Each header row shows the column name, the group value (or `(none)` when that value is empty), and the event count - for example `Activity ID: {guid} (42)`. The grouped column's header gains a second indicator (a double-chevron) alongside any sort caret, and a `Grouped by {column}` chip appears in the status bar. Screen readers announce the change (for example, "Grouped by Activity ID, ascending").
+**Turning grouping on.** Pick a column from the `Group By` submenu (on a column-header right-click or the `View` menu), or use the direct `Group by <column>` item on a groupable cell. Groups are ordered by the grouped value, and events within each group keep the current `Order By` sort. Each header row shows the column name, the group value (or `(none)` when that value is empty), and the event count - for example `Activity ID: {guid} (42)`. The grouped column's header gains a second indicator (a double-chevron) alongside any sort caret, and a `Grouped by {column}` chip appears in the status bar. Screen readers announce the change with the group count (for example, "Grouped by Activity ID, ascending, 42 groups").
 
 **Group direction.** Flip the order of the groups themselves (ascending or descending) from any of three places: the double-chevron indicator on the grouped column header, the caret on the status-bar `Grouped by {column}` chip, or `Group Descending` on the `View` menu. This is independent of the per-event `Order By` direction.
 
-**Turning grouping off.** Use the `×` on the status-bar `Grouped by {column}` chip, `Remove grouping by <column>` on the group header's (or the grouped cell's) right-click menu, or `Group By -> (none)` on the column menu. Screen readers announce "Grouping cleared".
+**Turning grouping off.** Use the `×` on the status-bar `Grouped by {column}` chip, `Remove grouping by <column>` on the group header's (or the grouped cell's) right-click menu, or `Group By -> (none)` on the column-header or `View` menu. Screen readers announce "Grouping cleared".
 
 **Expanding and collapsing.**
 

@@ -29,7 +29,9 @@ public abstract record Announcement
 
     public sealed record TableSortCleared : Announcement;
 
-    public sealed record TableGrouped(ColumnName Column, bool IsGroupDescending) : Announcement;
+    public sealed record TableDefaultOrderReversed(bool IsDescending, bool WithinGroups) : Announcement;
+
+    public sealed record TableGrouped(ColumnName Column, bool IsGroupDescending, int GroupCount) : Announcement;
 
     public sealed record TableGroupCleared : Announcement;
 
@@ -37,5 +39,21 @@ public abstract record Announcement
         ColumnName? SortColumn,
         bool SortDescending,
         ColumnName? GroupColumn,
-        bool GroupDescending) : Announcement;
+        bool GroupDescending,
+        int GroupCount) : Announcement;
+
+    // Combines a group adoption with a within-group reversal toggled before adoption, so the single live region does
+    // not drop the reversal behind the grouping.
+    public sealed record TableGroupedWithDefaultOrderReversed(
+        ColumnName Column,
+        bool IsGroupDescending,
+        int GroupCount,
+        bool IsDescending) : Announcement;
+
+    // A reprojection faulted and the view reverted to the committed ordering; narrates what is now shown.
+    public sealed record TableReorderUnavailable(
+        ColumnName? CommittedOrderBy,
+        bool CommittedIsDescending,
+        ColumnName? CommittedGroupBy,
+        bool CommittedIsGroupDescending) : Announcement;
 }

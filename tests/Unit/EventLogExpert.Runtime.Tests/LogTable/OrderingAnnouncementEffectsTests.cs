@@ -2,8 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.LogTable.OrderedView;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -54,11 +56,31 @@ public sealed class OrderingAnnouncementEffectsTests
     }
 
     [Fact]
+    public async Task ClearingAGroupWhileTheDefaultDirectionAlsoFlips_AdvancesTheBaselineSoTheNextToggleStillSpeaks()
+    {
+        // A group clear with a direction flip is not deferred, so no adopt flush arrives to release a held reversal.
+        // The baseline must advance, or it desyncs and the next toggle is silently lost.
+        _state.Value.Returns(AdoptedState(groupBy: ColumnName.Level, isDescending: true));
+        var sut = CreateSut();
+
+        _state.Value.Returns(AdoptedState(isDescending: false));
+        await sut.HandleSetGroupBy(_dispatcher);
+        _announcer.Received(1).Announce(Arg.Any<AnnouncementPayload.TableGroupCleared>());
+
+        _announcer.ClearReceivedCalls();
+        _state.Value.Returns(AdoptedState(isDescending: true));
+        await sut.HandleToggleSorting(_dispatcher);
+
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableDefaultOrderReversed>(
+            payload => payload.IsDescending && !payload.WithinGroups));
+    }
+
+    [Fact]
     public async Task Effect_IsDiscoveredByFluxor_AnnouncesThroughARealStore()
     {
         // Wires a minimal real store (the LogTable feature + its reducers + this effect) to prove Fluxor discovers the
         // [EffectMethod]s and runs them AFTER the reducer, so a dispatched ordering action actually announces - and that
-        // toggling direction while unsorted stays silent end to end.
+        // toggling direction while unsorted announces the default-order reversal end to end.
         var announcer = Substitute.For<IAnnouncementService>();
 
         using ServiceProvider provider = new ServiceCollection()
@@ -79,7 +101,7 @@ public sealed class OrderingAnnouncementEffectsTests
 
         announcer.ClearReceivedCalls();
         dispatcher.Dispatch(new ToggleSortingAction());
-        announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+        announcer.Received(1).Announce(Arg.Any<AnnouncementPayload.TableDefaultOrderReversed>());
     }
 
     [Fact]
@@ -109,6 +131,79 @@ public sealed class OrderingAnnouncementEffectsTests
         var sut = CreateSut();
 
         await sut.HandleLoadColumnsCompleted(_dispatcher);
+
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+    }
+
+    [Fact]
+    public async Task OrderedViewDisplayFaulted_AnnouncesReorderUnavailableWithCommittedOrder()
+    {
+        // A reproject faults and the grid reverts to the committed ordering; the correction narrates the committed
+        // fields the user now sees (here an explicit Source sort), not the requested ones.
+        _state.Value.Returns(FaultedCommittedState(committedOrderBy: ColumnName.Source, committedIsDescending: true));
+        var sut = CreateSut();
+
+        await sut.HandleOrderedViewDisplayFaulted(new OrderedViewDisplayFaultedAction(new InvalidOperationException("boom")), _dispatcher);
+
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableReorderUnavailable>(
+            payload => payload.CommittedOrderBy == ColumnName.Source && payload.CommittedIsDescending));
+    }
+
+    [Fact]
+    public async Task OrderedViewDisplayFaulted_NonOrderingFault_StaysSilent()
+    {
+        // The action also fires for non-ordering faults (ingest, close, tab switch) where requested == committed, so
+        // there is no reorder to revert; asserting "sort unavailable" the user never requested would be wrong.
+        _state.Value.Returns(FaultedCommittedState(committedOrderBy: ColumnName.Source, requestedOrderBy: ColumnName.Source));
+        var sut = CreateSut();
+
+        await sut.HandleOrderedViewDisplayFaulted(new OrderedViewDisplayFaultedAction(new InvalidOperationException("boom")), _dispatcher);
+
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+    }
+
+    [Fact]
+    public async Task OrderedViewDisplayFaulted_StaleFaultForASupersededIdentity_StaysSilent()
+    {
+        // A late fault from a superseded request (identity no longer current, which the reducer also rejects) must not
+        // narrate a revert of the recovery now in flight, even though the view is still faulted from the earlier failure.
+        var superseded = FaultedCommittedState(requestedOrderBy: ColumnName.Level);
+        _state.Value.Returns(FaultedCommittedState(requestedOrderBy: ColumnName.Source));
+        var sut = CreateSut();
+
+        await sut.HandleOrderedViewDisplayFaulted(
+            new OrderedViewDisplayFaultedAction(new InvalidOperationException("boom"), superseded.ViewIdentity), _dispatcher);
+
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+    }
+
+    [Fact]
+    public async Task OrderedViewDisplayFaulted_ThenRecoveryAdoptsRequested_ReannouncesTheAdoptedSort()
+    {
+        // The fault re-baselines to the committed (shown) order, so when recovery adopts the requested sort the
+        // baseline diff narrates it - the correction is not self-suppressed.
+        _state.Value.Returns(State(orderBy: ColumnName.Source));
+        var sut = CreateSut();
+
+        _state.Value.Returns(FaultedCommittedState(requestedOrderBy: ColumnName.Source));
+        await sut.HandleOrderedViewDisplayFaulted(new OrderedViewDisplayFaultedAction(new InvalidOperationException("boom")), _dispatcher);
+        _announcer.Received(1).Announce(Arg.Any<AnnouncementPayload.TableReorderUnavailable>());
+
+        _announcer.ClearReceivedCalls();
+        _state.Value.Returns(AdoptedState(orderBy: ColumnName.Source));
+        await sut.HandleOrderedViewUpdated(_dispatcher);
+
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableSorted>(payload => payload.Column == ColumnName.Source));
+    }
+
+    [Fact]
+    public async Task OrderedViewDisplayFaulted_WhenNotActuallyFaulted_StaysSilent()
+    {
+        // A stale/mismatched fault that left the presentation non-faulted must not assert a revert no surface reflects.
+        _state.Value.Returns(State(orderBy: ColumnName.Source));
+        var sut = CreateSut();
+
+        await sut.HandleOrderedViewDisplayFaulted(new OrderedViewDisplayFaultedAction(new InvalidOperationException("boom")), _dispatcher);
 
         _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
     }
@@ -223,15 +318,22 @@ public sealed class OrderingAnnouncementEffectsTests
     }
 
     [Fact]
-    public async Task SetGroupBy_AnnouncesGrouped()
+    public async Task SetGroupBy_DefersUntilServedView_ThenAnnouncesGroupedWithServedCount()
     {
+        // A group-by announcement carries the served group count, which only exists once the view reflects the
+        // grouping. The request stays silent (HasPendingSortChange); the adopt flush narrates it with the real count.
         var sut = CreateSut();
-        _state.Value.Returns(State(groupBy: ColumnName.Level, isGroupDescending: false));
 
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isGroupDescending: false));
         await sut.HandleSetGroupBy(_dispatcher);
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+
+        var served = GroupedViewState(ColumnName.Level, isGroupDescending: false, ["A", "A", "B", "C", "C"]);
+        _state.Value.Returns(served);
+        await sut.HandleOrderedViewUpdated(_dispatcher);
 
         _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableGrouped>(
-            payload => payload.Column == ColumnName.Level && !payload.IsGroupDescending));
+            payload => payload.Column == ColumnName.Level && !payload.IsGroupDescending && payload.GroupCount == 3));
     }
 
     [Fact]
@@ -272,26 +374,36 @@ public sealed class OrderingAnnouncementEffectsTests
     }
 
     [Fact]
-    public async Task ToggleGroupSorting_FlipsDirection_AnnouncesNewGroupDirection()
+    public async Task ToggleGroupSorting_FlipsDirection_AnnouncesNewGroupDirectionOnAdoption()
     {
-        _state.Value.Returns(State(groupBy: ColumnName.Level, isGroupDescending: false));
+        // The toggle flips the requested direction while the committed view lags, so the announcement defers to the
+        // adopt flush, which narrates the new direction with the served group count.
+        var baseline = GroupedViewState(ColumnName.Level, isGroupDescending: false, ["A", "B"]);
+        _state.Value.Returns(baseline);
         var sut = CreateSut();
-        _state.Value.Returns(State(groupBy: ColumnName.Level, isGroupDescending: true));
 
+        _state.Value.Returns(PendingGroupState(ColumnName.Level, committedIsGroupDescending: false, requestedIsGroupDescending: true));
         await sut.HandleToggleGroupSorting(_dispatcher);
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+
+        var served = GroupedViewState(ColumnName.Level, isGroupDescending: true, ["A", "B"]);
+        _state.Value.Returns(served);
+        await sut.HandleOrderedViewUpdated(_dispatcher);
 
         _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableGrouped>(
-            payload => payload.Column == ColumnName.Level && payload.IsGroupDescending));
+            payload => payload.Column == ColumnName.Level && payload.IsGroupDescending && payload.GroupCount == 2));
     }
 
     [Fact]
-    public async Task ToggleGroupSorting_WhenAlsoSorted_AnnouncesGroupNotSort()
+    public async Task ToggleGroupSorting_WhenAlsoSorted_AnnouncesGroupNotSortOnAdoption()
     {
-        _state.Value.Returns(State(orderBy: ColumnName.Source, isDescending: true, groupBy: ColumnName.Level, isGroupDescending: false));
+        var baseline = GroupedViewState(ColumnName.Level, isGroupDescending: false, ["A", "B"], ColumnName.Source, isDescending: true);
+        _state.Value.Returns(baseline);
         var sut = CreateSut();
-        _state.Value.Returns(State(orderBy: ColumnName.Source, isDescending: true, groupBy: ColumnName.Level, isGroupDescending: true));
 
-        await sut.HandleToggleGroupSorting(_dispatcher);
+        var served = GroupedViewState(ColumnName.Level, isGroupDescending: true, ["A", "B"], ColumnName.Source, isDescending: true);
+        _state.Value.Returns(served);
+        await sut.HandleOrderedViewUpdated(_dispatcher);
 
         _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableGrouped>(
             payload => payload.Column == ColumnName.Level && payload.IsGroupDescending));
@@ -323,17 +435,112 @@ public sealed class OrderingAnnouncementEffectsTests
     }
 
     [Fact]
-    public async Task ToggleSorting_WhenUnsorted_DoesNotAnnounce()
+    public async Task ToggleSorting_WhenGroupedButUnsorted_AnnouncesWithinGroupReversal()
     {
-        // The reducer flips the hidden default-order direction without a sort column; nothing is announced because no
-        // column is sorted, so reversing the default order stays silent.
+        // Toggling the sort direction while grouped-but-unsorted reverses the default time/record order WITHIN each
+        // group, so it announces a default-order reversal flagged WithinGroups for the dedicated within-group wording.
+        // It must NOT emit a group announcement (the single live-region slot would clobber the reversal), the adopt
+        // flush must then stay silent (no late grouping overwrites it), and a second toggle must re-announce the flip.
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: false));
+        var sut = CreateSut();
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: true));
+
+        await sut.HandleToggleSorting(_dispatcher);
+
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableDefaultOrderReversed>(
+            payload => payload.IsDescending && payload.WithinGroups));
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableSorted>());
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableGrouped>());
+
+        // The adopt flush re-enters with the grouping already in the baseline, so it must narrate nothing: a late
+        // TableGrouped here would overwrite the within-group reversal in the single-slot live region.
+        _announcer.ClearReceivedCalls();
+        _state.Value.Returns(AdoptedState(groupBy: ColumnName.Level, isDescending: true));
+        await sut.HandleOrderedViewUpdated(_dispatcher);
+
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+
+        // The baseline advanced on the sort axis, so a second toggle re-announces the opposite within-group direction.
+        _announcer.ClearReceivedCalls();
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: false));
+        await sut.HandleToggleSorting(_dispatcher);
+
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableDefaultOrderReversed>(
+            payload => !payload.IsDescending && payload.WithinGroups));
+    }
+
+    [Fact]
+    public async Task ToggleSorting_WhenUnsorted_AnnouncesDefaultOrderReversed()
+    {
+        // The reducer flips the hidden default-order direction without a sort column; the effective time/record order
+        // reverses, so it is announced as a default-order reversal (no column-sort announcement, because none is set).
         _state.Value.Returns(State(isDescending: false));
         var sut = CreateSut();
         _state.Value.Returns(State(isDescending: true));
 
         await sut.HandleToggleSorting(_dispatcher);
 
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableDefaultOrderReversed>(
+            payload => payload.IsDescending && !payload.WithinGroups));
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableSorted>());
+    }
+
+    [Fact]
+    public async Task TogglingDefaultDirectionTwice_WhileGroupByAwaitsAdoption_AnnouncesTheGroupAlone()
+    {
+        // Two direction toggles during the deferred group net to zero, so the adopt flush announces the group alone.
+        _state.Value.Returns(State(isDescending: false));
+        var sut = CreateSut();
+
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: false));
+        await sut.HandleSetGroupBy(_dispatcher);
+
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: true));
+        await sut.HandleToggleSorting(_dispatcher);
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: false));
+        await sut.HandleToggleSorting(_dispatcher);
+
+        var served = GroupedViewState(ColumnName.Level, isGroupDescending: false, ["A", "B"], isDescending: false);
+        _state.Value.Returns(served);
+        await sut.HandleOrderedViewUpdated(_dispatcher);
+
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableGrouped>(
+            payload => payload.Column == ColumnName.Level && payload.GroupCount == 2));
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableGroupedWithDefaultOrderReversed>());
+    }
+
+    [Fact]
+    public async Task TogglingDefaultDirection_WhileGroupByAwaitsAdoption_ComposesTheReversalIntoTheGroupAnnouncement()
+    {
+        // Group-by is deferred (HasPendingSortChange), so a direction toggle silently reverses the future within-group
+        // order. The adopt flush must compose that reversal with the group, or the within-group reorder is never spoken.
+        _state.Value.Returns(State(isDescending: false));
+        var sut = CreateSut();
+
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: false));
+        await sut.HandleSetGroupBy(_dispatcher);
         _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: true));
+        await sut.HandleToggleSorting(_dispatcher);
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
+
+        var served = GroupedViewState(ColumnName.Level, isGroupDescending: false, ["A", "B"], isDescending: true);
+        _state.Value.Returns(served);
+        await sut.HandleOrderedViewUpdated(_dispatcher);
+
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableGroupedWithDefaultOrderReversed>(
+            payload => payload.Column == ColumnName.Level && !payload.IsGroupDescending && payload.GroupCount == 2 && payload.IsDescending));
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload.TableGrouped>());
+
+        // Adoption released the hold and re-synced the baseline, so a further toggle still announces. An unconditional
+        // hold would never re-sync and silently swallow it.
+        _announcer.ClearReceivedCalls();
+        _state.Value.Returns(State(groupBy: ColumnName.Level, isDescending: false));
+        await sut.HandleToggleSorting(_dispatcher);
+
+        _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableDefaultOrderReversed>(
+            payload => !payload.IsDescending && payload.WithinGroups));
     }
 
     private static LogTableState AdoptedState(
@@ -353,6 +560,36 @@ public sealed class OrderingAnnouncementEffectsTests
             RequestedIsGroupDescending = isGroupDescending
         };
 
+    // Faulted presentation (active table, display disabled) with committed and requested ordering set independently, so
+    // the revert correction and the later recovery diff can be exercised.
+    private static LogTableState FaultedCommittedState(
+        ColumnName? committedOrderBy = null,
+        bool committedIsDescending = true,
+        ColumnName? committedGroupBy = null,
+        bool committedIsGroupDescending = false,
+        ColumnName? requestedOrderBy = null,
+        bool requestedIsDescending = true,
+        ColumnName? requestedGroupBy = null,
+        bool requestedIsGroupDescending = false)
+    {
+        var id = EventLogId.Create();
+
+        return new LogTableState
+        {
+            ActiveEventLogId = id,
+            EventTables = [new LogView(id)],
+            OrderedViewDisplayEnabled = false,
+            OrderBy = committedOrderBy,
+            IsDescending = committedIsDescending,
+            GroupBy = committedGroupBy,
+            IsGroupDescending = committedIsGroupDescending,
+            RequestedOrderBy = requestedOrderBy,
+            RequestedIsDescending = requestedIsDescending,
+            RequestedGroupBy = requestedGroupBy,
+            RequestedIsGroupDescending = requestedIsGroupDescending
+        };
+    }
+
     private static LogTableState FaultedState(ColumnName? requestedGroupBy, ColumnName? requestedOrderBy = null)
     {
         var id = EventLogId.Create();
@@ -366,6 +603,61 @@ public sealed class OrderingAnnouncementEffectsTests
             RequestedGroupBy = requestedGroupBy
         };
     }
+
+    // An adopted (committed == requested) ordered view whose served column view yields the given contiguous group keys,
+    // so the effect can count groups off the served view exactly as the live walk does.
+    private static LogTableState GroupedViewState(
+        ColumnName groupBy,
+        bool isGroupDescending,
+        string[] groupKeys,
+        ColumnName? orderBy = null,
+        bool isDescending = true)
+    {
+        var view = Substitute.For<IEventColumnView>();
+        view.Count.Returns(groupKeys.Length);
+        view.GroupKeyAt(Arg.Any<EventLocator>(), groupBy).Returns(groupKeys[0], [.. groupKeys.Skip(1)]);
+
+        var logId = EventLogId.Create();
+
+        var served = new OrderedViewReady(
+            SnapshotVersion: 0,
+            Identity: null,
+            Sequence: 0,
+            SingleLogId: logId,
+            InScope: [],
+            View: view,
+            Config: new SortContext(orderBy, isDescending, groupBy, isGroupDescending),
+            Filter: new Filter(null, []));
+
+        return new LogTableState
+        {
+            ActiveEventLogId = logId,
+            EventTables = [new LogView(logId)],
+            OrderBy = orderBy,
+            IsDescending = isDescending,
+            GroupBy = groupBy,
+            IsGroupDescending = isGroupDescending,
+            RequestedOrderBy = orderBy,
+            RequestedIsDescending = isDescending,
+            RequestedGroupBy = groupBy,
+            RequestedIsGroupDescending = isGroupDescending,
+            ActiveOrderedView = served
+        };
+    }
+
+    // Grouping whose requested direction has diverged from the committed one (HasPendingSortChange), modelling the gap
+    // between a group-direction toggle and the adopt flush.
+    private static LogTableState PendingGroupState(
+        ColumnName groupBy,
+        bool committedIsGroupDescending,
+        bool requestedIsGroupDescending) =>
+        new()
+        {
+            GroupBy = groupBy,
+            IsGroupDescending = committedIsGroupDescending,
+            RequestedGroupBy = groupBy,
+            RequestedIsGroupDescending = requestedIsGroupDescending
+        };
 
     private static LogTableState State(
         ColumnName? orderBy = null,

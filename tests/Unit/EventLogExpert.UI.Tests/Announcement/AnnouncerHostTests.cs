@@ -156,6 +156,26 @@ public sealed class AnnouncerHostTests : BunitContext
     }
 
     [Fact]
+    public void AnnouncerHost_TableDefaultOrderReversed_RoutesThroughOrderingComposer()
+    {
+        _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TableDefaultOrderReversed(true, false), 2));
+
+        var component = Render<AnnouncerHost>();
+
+        Assert.Equal("[[Table_Announce_DefaultOrderNewest]]", component.Find("#app-announcer").TextContent);
+    }
+
+    [Fact]
+    public void AnnouncerHost_TableDefaultOrderReversed_WithinGroups_RoutesThroughWithinGroupText()
+    {
+        _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TableDefaultOrderReversed(true, true), 2));
+
+        var component = Render<AnnouncerHost>();
+
+        Assert.Equal("[[Table_Announce_WithinGroupOrderNewest]]", component.Find("#app-announcer").TextContent);
+    }
+
+    [Fact]
     public void AnnouncerHost_TableGroupCleared_RoutesThroughOrderingComposer()
     {
         _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TableGroupCleared(), 2));
@@ -166,13 +186,39 @@ public sealed class AnnouncerHostTests : BunitContext
     }
 
     [Fact]
+    public void AnnouncerHost_TableGroupedWithDefaultOrderReversed_ComposesGroupAndWithinGroupOrder()
+    {
+        _announcementService.Current.Returns(new CurrentAnnouncement(
+            new AnnouncementPayload.TableGroupedWithDefaultOrderReversed(ColumnName.Level, false, 2, true), 2));
+
+        var component = Render<AnnouncerHost>();
+
+        var text = component.Find("#app-announcer").TextContent;
+        Assert.Contains("[[Table_Announce_GroupedWithWithinGroupOrder(", text);
+        Assert.Contains("[[Table_Announce_WithinGroupOrderNewest]]", text);
+    }
+
+    [Fact]
     public void AnnouncerHost_TableGrouped_RoutesThroughOrderingComposer()
     {
-        _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TableGrouped(ColumnName.Source, true), 2));
+        _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.TableGrouped(ColumnName.Source, true, 3), 2));
 
         var component = Render<AnnouncerHost>();
 
         Assert.Contains("[[Table_Announce_GroupedDescending(", component.Find("#app-announcer").TextContent);
+    }
+
+    [Fact]
+    public void AnnouncerHost_TableReorderUnavailable_RoutesThroughOrderingComposer()
+    {
+        _announcementService.Current.Returns(new CurrentAnnouncement(
+            new AnnouncementPayload.TableReorderUnavailable(ColumnName.Source, true, null, false), 2));
+
+        var component = Render<AnnouncerHost>();
+
+        var text = component.Find("#app-announcer").TextContent;
+        Assert.Contains("[[Table_Announce_ReorderUnavailable(", text);
+        Assert.Contains("[[Table_Announce_SortedDescending(", text);
     }
 
     [Fact]
@@ -181,7 +227,7 @@ public sealed class AnnouncerHostTests : BunitContext
         // The combined payload (a fault that accumulated both a sort and a group change) renders ONE string composing
         // the localized sort fragment and the localized group fragment, so the single-slot live region narrates both.
         _announcementService.Current.Returns(new CurrentAnnouncement(
-            new AnnouncementPayload.TableSortAndGroupChanged(ColumnName.Source, false, ColumnName.Level, true), 2));
+            new AnnouncementPayload.TableSortAndGroupChanged(ColumnName.Source, false, ColumnName.Level, true, 2), 2));
 
         var component = Render<AnnouncerHost>();
 
@@ -196,7 +242,7 @@ public sealed class AnnouncerHostTests : BunitContext
     {
         // Null sort/group columns compose the cleared fragments (both axes cleared in one flush).
         _announcementService.Current.Returns(new CurrentAnnouncement(
-            new AnnouncementPayload.TableSortAndGroupChanged(null, false, null, false), 2));
+            new AnnouncementPayload.TableSortAndGroupChanged(null, false, null, false, 0), 2));
 
         var component = Render<AnnouncerHost>();
 
@@ -284,8 +330,11 @@ public sealed class AnnouncerHostTests : BunitContext
         leafType == typeof(AnnouncementPayload.TagRenamed) ? new AnnouncementPayload.TagRenamed("old", "new", 2) :
         leafType == typeof(AnnouncementPayload.TableSorted) ? new AnnouncementPayload.TableSorted(ColumnName.Source, false) :
         leafType == typeof(AnnouncementPayload.TableSortCleared) ? new AnnouncementPayload.TableSortCleared() :
-        leafType == typeof(AnnouncementPayload.TableGrouped) ? new AnnouncementPayload.TableGrouped(ColumnName.Source, false) :
+        leafType == typeof(AnnouncementPayload.TableDefaultOrderReversed) ? new AnnouncementPayload.TableDefaultOrderReversed(true, false) :
+        leafType == typeof(AnnouncementPayload.TableGrouped) ? new AnnouncementPayload.TableGrouped(ColumnName.Source, false, 2) :
+        leafType == typeof(AnnouncementPayload.TableGroupedWithDefaultOrderReversed) ? new AnnouncementPayload.TableGroupedWithDefaultOrderReversed(ColumnName.Level, false, 2, true) :
         leafType == typeof(AnnouncementPayload.TableGroupCleared) ? new AnnouncementPayload.TableGroupCleared() :
-        leafType == typeof(AnnouncementPayload.TableSortAndGroupChanged) ? new AnnouncementPayload.TableSortAndGroupChanged(ColumnName.Source, false, ColumnName.Level, false) :
+        leafType == typeof(AnnouncementPayload.TableSortAndGroupChanged) ? new AnnouncementPayload.TableSortAndGroupChanged(ColumnName.Source, false, ColumnName.Level, false, 2) :
+        leafType == typeof(AnnouncementPayload.TableReorderUnavailable) ? new AnnouncementPayload.TableReorderUnavailable(ColumnName.Source, true, null, false) :
         throw new InvalidOperationException($"No test fixture for {leafType.FullName}.");
 }

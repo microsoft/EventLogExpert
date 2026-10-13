@@ -16,4 +16,8 @@ public readonly record struct DisplayOrdering(
     public ColumnName? RequestedGroupBy { get; init; } = GroupBy;
 
     public bool RequestedIsGroupDescending { get; init; } = IsGroupDescending;
+
+    // The column that actually orders the displayed rows, resolving the implicit default (DateAndTime for a combined or
+    // timeline view, else RecordId) when no explicit sort is set, so a header can report aria-sort instead of "none".
+    public ColumnName? EffectiveOrderBy { get; init; } = OrderBy;
 }

@@ -3,6 +3,7 @@
 
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Export;
+using EventLogExpert.Runtime.LogTable;
 
 namespace EventLogExpert.Runtime.Menu;
 
@@ -53,6 +54,8 @@ public interface IMenuActionService
     void SetAllGroupsCollapsed(bool collapsed);
 
     void SetContinuouslyUpdate(bool value);
+
+    void SetGroupBy(ColumnName? groupBy);
 
     void SetHistogramVisible(bool value);
 
