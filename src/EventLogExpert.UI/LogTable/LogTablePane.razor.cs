@@ -994,6 +994,20 @@ public sealed partial class LogTablePane
         }
     }
 
+    // The effective order column can fall outside the visible headers (the common single-log default orders by the
+    // hidden Record ID column). No <th> then carries aria-sort, so every header reads "none" and a screen reader hears
+    // no sort at all; surface the effective order as a table-level accessible description in that case.
+    private string? HiddenEffectiveSortDescription()
+    {
+        if ((Presentation.Ordering.EffectiveOrderBy ?? Presentation.Ordering.RequestedOrderBy) is not { } effectiveColumn ||
+            Array.IndexOf(_enabledColumns, effectiveColumn) >= 0)
+        {
+            return null;
+        }
+
+        return TableOrderingTextComposer.SortAnnouncement(Localizer, effectiveColumn, Presentation.Ordering.RequestedIsDescending);
+    }
+
     private string? IndicatorSentence() =>
         _indicator.Sentence switch
         {

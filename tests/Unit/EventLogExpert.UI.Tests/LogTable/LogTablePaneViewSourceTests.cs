@@ -340,6 +340,73 @@ public sealed class LogTablePaneViewSourceTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void AriaDescription_SurfacesEffectiveSort_WhenTheEffectiveColumnIsHidden()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var columns = ImmutableDictionary<ColumnName, bool>.Empty
+            .Add(ColumnName.DateAndTime, true)
+            .Add(ColumnName.Source, true);
+
+        var presentation = new OrderedViewPresentation(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+            _logId,
+            new DisplayOrdering(OrderBy: null, IsDescending: true, GroupBy: null, IsGroupDescending: false)
+            {
+                EffectiveOrderBy = ColumnName.RecordId
+            },
+            PresentationState.Current,
+            Revision: 1)
+        {
+            Columns = columns,
+            ColumnOrder = ImmutableList.Create(ColumnName.DateAndTime, ColumnName.Source)
+        };
+
+        _viewSource.Current.Returns(presentation);
+
+        var cut = Render<LogTablePane>();
+
+        // Record ID is the effective order but not a visible header, so no th can carry aria-sort; the table-level
+        // description conveys the sort instead of every header silently reading "none".
+        Assert.Equal("Sorted by Record ID, descending", cut.Find("#eventTable").GetAttribute("aria-description"));
+        Assert.Equal("none", cut.Find("th[data-column='DateAndTime']").GetAttribute("aria-sort"));
+        Assert.Equal("none", cut.Find("th[data-column='Source']").GetAttribute("aria-sort"));
+    }
+
+    [Fact]
+    public void AriaDescription_SurfacesExplicitSort_WhenTheSortedColumnIsHidden()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var columns = ImmutableDictionary<ColumnName, bool>.Empty
+            .Add(ColumnName.DateAndTime, true)
+            .Add(ColumnName.Source, true);
+
+        // An explicit ascending sort on Record ID while that column is hidden: RequestedOrderBy is non-null and the
+        // sorted header is not rendered, so the table description must still carry the sort (and its real direction).
+        var presentation = new OrderedViewPresentation(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+            _logId,
+            new DisplayOrdering(OrderBy: ColumnName.RecordId, IsDescending: false, GroupBy: null, IsGroupDescending: false)
+            {
+                EffectiveOrderBy = ColumnName.RecordId
+            },
+            PresentationState.Current,
+            Revision: 1)
+        {
+            Columns = columns,
+            ColumnOrder = ImmutableList.Create(ColumnName.DateAndTime, ColumnName.Source)
+        };
+
+        _viewSource.Current.Returns(presentation);
+
+        var cut = Render<LogTablePane>();
+
+        Assert.Equal("Sorted by Record ID, ascending", cut.Find("#eventTable").GetAttribute("aria-description"));
+        Assert.Equal("none", cut.Find("th[data-column='Source']").GetAttribute("aria-sort"));
+    }
+
+    [Fact]
     public void AriaSort_ReflectsEffectiveDefaultColumn_WhenNoExplicitSortIsSet()
     {
         SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
@@ -369,6 +436,9 @@ public sealed class LogTablePaneViewSourceTests : CultureSensitiveBunitContext
         // The effective-default column reports its real direction; every other column stays "none".
         Assert.Equal("descending", cut.Find("th[data-column='DateAndTime']").GetAttribute("aria-sort"));
         Assert.Equal("none", cut.Find("th[data-column='Source']").GetAttribute("aria-sort"));
+
+        // The effective column is visible, so its header carries the sort and the table needs no fallback description.
+        Assert.Null(cut.Find("#eventTable").GetAttribute("aria-description"));
 
         // The visible sort caret stays bound to an explicit sort, so the default column has none.
         Assert.Empty(cut.FindAll("th[data-column='DateAndTime'] .sort-toggle"));
