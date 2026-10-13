@@ -33,6 +33,8 @@ internal sealed class OrderedViewShadowEffects(
     private readonly IState<RawEventStoreState> _rawEventStore = rawEventStore;
     private readonly OrderedViewWriter _writer = writer;
 
+    private enum ReissueForce { None, WhenFaulted, Always }
+
     [EffectMethod(typeof(AddTableAction))]
     public Task HandleAddTable(IDispatcher dispatcher) => Shadow(Sync);
 
@@ -146,14 +148,7 @@ internal sealed class OrderedViewShadowEffects(
     public Task HandleToggleSorting(IDispatcher dispatcher) => Shadow(Sync);
 
     [EffectMethod(typeof(XmlFilterMatchReadyAction))]
-    public Task HandleXmlFilterMatchReady(IDispatcher dispatcher) =>
-        Shadow(() =>
-        {
-            // ViewIdentity excludes the store/match stamp, so a same-identity Sync would be
-            // deduplicated by the issuer. Force a fresh issue to rebuild over the current readers.
-            _issuer.ForceReissue();
-            Sync();
-        });
+    public Task HandleXmlFilterMatchReady(IDispatcher dispatcher) => Shadow(() => Sync(ReissueForce.Always));
 
     private void Reconcile(EventLogId logId, bool isReplace)
     {
@@ -192,13 +187,19 @@ internal sealed class OrderedViewShadowEffects(
         return Task.CompletedTask;
     }
 
-    private void Sync() => Sync(forceReissueWhenFaulted: false);
+    private void Sync() => Sync(ReissueForce.None);
 
-    private void Sync(bool forceReissueWhenFaulted)
+    private void Sync(ReissueForce force)
     {
         LogTableState state = _logTableState.Value;
         ViewIdentity identity = state.ViewIdentity;
         Filter filter = identity.Filter;
+
+        // Arm the sticky force BEFORE the gate check: the gate scans every open log but the ViewIdentity covers only the
+        // active scope, so an out-of-scope log can reopen the gate and let a racing Sync consume the de-dup before a
+        // post-gate arm runs. A non-deferred Always consumes the flag inside its own TryIssue (not a direct force, which
+        // would double-issue when the race lands). WhenFaulted is deliberately not armed (pre-existing, tracked).
+        if (force == ReissueForce.Always) { _issuer.ArmForce(); }
 
         if (XmlFilterGate.IsDeferred(filter, _eventLogState.Value, _rawEventStore.Value, _concurrencyState, _matchCache))
         {
@@ -209,13 +210,14 @@ internal sealed class OrderedViewShadowEffects(
         // (parameterless toggles stay inert). When such a request equals the already-masked requested value - most
         // often clicking a remounted clear chip's x after a clear CAUSED the fault, where the requested column is
         // already null - the ViewIdentity is unchanged and the issuer would de-dup the failed identity, so the retry
-        // would never reach the writer. While faulted, re-trust the engine (EnqueueClearFault) and force the re-issue
-        // atomically past the de-dup; when the request differs the force is harmless (the new identity issues anyway).
-        bool forceReissue = forceReissueWhenFaulted && state.PresentationState == PresentationState.Faulted;
+        // would never reach the writer. WhenFaulted re-trusts the engine (EnqueueClearFault) and forces the re-issue
+        // directly past the de-dup. Always does NOT force here: it armed the sticky force before the gate, so TryIssue
+        // consumes that; forcing again would double-issue when a concurrent Sync consumes the sticky force first.
+        bool clearFault = force == ReissueForce.WhenFaulted && state.PresentationState == PresentationState.Faulted;
 
-        if (forceReissue) { _writer.EnqueueClearFault(); }
+        if (clearFault) { _writer.EnqueueClearFault(); }
 
-        if (_issuer.TryIssue(identity, forceReissue) is not { } sequence) { return; }
+        if (_issuer.TryIssue(identity, clearFault) is not { } sequence) { return; }
 
         Func<IEventColumnReader, EventLocator, bool> survives =
             XmlFilterGate.BuildSurvivorPredicate(filter, _concurrencyState, _matchCache);
@@ -233,7 +235,7 @@ internal sealed class OrderedViewShadowEffects(
                 (locator, reader) => survives(reader, locator)));
     }
 
-    private void SyncAbsoluteOrdering() => Sync(forceReissueWhenFaulted: true);
+    private void SyncAbsoluteOrdering() => Sync(ReissueForce.WhenFaulted);
 
     private bool XmlDeferred() =>
         XmlFilterGate.IsDeferred(
