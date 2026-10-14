@@ -19,7 +19,8 @@ internal sealed record RebuildRequest(
     IReaderResolver BeginResolver,
     FrozenScope Scope,
     long ScopeVersion,
-    EventLogId? SingleLog);
+    EventLogId? SingleLog,
+    IReadOnlyDictionary<LogGeneration, long> ReplaceStampAtCapture);
 
 internal enum AdoptOutcome
 {
@@ -40,6 +41,8 @@ internal sealed class OrderedViewState
     private const int BulkSoaLaneBytesPerRow = 17;
 
     private readonly Dictionary<EventLogId, int> _activeGeneration = [];
+    private readonly Dictionary<LogGeneration, long> _adoptedContentVersion = [];
+    private readonly Dictionary<LogGeneration, long> _contentReplaceStamp = [];
     private readonly Dictionary<LogGeneration, IEventColumnReader> _latestReaders = [];
     private readonly LiveReaderResolver _liveResolver;
     private readonly Dictionary<EventLogId, int> _requestedGeneration = [];
@@ -121,6 +124,12 @@ internal sealed class OrderedViewState
             if (!_activeGeneration.TryGetValue(logId, out int active) || active != reader.Generation) { return false; }
 
             if (_scopeState.Coverage(new LogGeneration(logId, reader.Generation)) != reader.Count) { return false; }
+
+            if (!_adoptedContentVersion.TryGetValue(new LogGeneration(logId, reader.Generation), out long adoptedContentVersion) ||
+                adoptedContentVersion != reader.ContentVersion)
+            {
+                return false;
+            }
         }
 
         return true;
@@ -132,6 +141,8 @@ internal sealed class OrderedViewState
     {
         Interlocked.Increment(ref _generation);
         _latestReaders.Clear();
+        _adoptedContentVersion.Clear();
+        _contentReplaceStamp.Clear();
         _activeGeneration.Clear();
         _requestedGeneration.Clear();
         _scopeState.Reset();
@@ -210,6 +221,16 @@ internal sealed class OrderedViewState
                     _index.Insert(new OrderKey(locator));
                     mutated = true;
                 }
+            }
+
+            // An append keeps the adopted index coherent with the reader's content, so advance the content-version
+            // stamp - but only one that already exists. A missing stamp marks a head whose provenance the adopted index
+            // no longer reflects (a refused mixed-content adopt, or a replace admitted since the last adopt); an append
+            // cannot restore it, so it stays refused until a rebuild re-stamps. The explicit !contentReplaced guard
+            // keeps a replace (which owes a rebuild and already dropped the stamp at admit) from advancing it here.
+            if (!contentReplaced && _adoptedContentVersion.TryGetValue(readerKey, out long stampedContentVersion))
+            {
+                _adoptedContentVersion[readerKey] = Math.Max(stampedContentVersion, reader.ContentVersion);
             }
         }
 
@@ -334,6 +355,7 @@ internal sealed class OrderedViewState
         _scopeState.EvictOutOfScope(_adoptedScope, _activeGeneration);
         EvictGenerationsOutOfScope();
 
+        StampAdoptedContentVersions(request, commitResolver);
         PruneReleasedReaders();
         _index.RebindInsertComparer(OrderKeyComparerFactory.Create(_activeContext, _liveResolver));
         PublishWith(FreezeReaders());
@@ -645,6 +667,7 @@ internal sealed class OrderedViewState
     {
         long generation = Interlocked.Increment(ref _generation);
         var generationSnapshot = new Dictionary<EventLogId, int>(_requestedGeneration);
+        var replaceStampSnapshot = new Dictionary<LogGeneration, long>(_contentReplaceStamp);
 
         return new RebuildRequest(
             generation,
@@ -656,7 +679,8 @@ internal sealed class OrderedViewState
             FreezeReaders(),
             _scopeState.Freeze(),
             _scopeState.ScopeVersion,
-            _scopeState.SingleLog);
+            _scopeState.SingleLog,
+            replaceStampSnapshot);
     }
 
     private void EvictGenerationsOutOfScope()
@@ -721,6 +745,8 @@ internal sealed class OrderedViewState
         {
             _scopeState.RecordGenerationSeen(key.LogId, key.Generation);
             _latestReaders.Remove(key);
+            _adoptedContentVersion.Remove(key);
+            _contentReplaceStamp.Remove(key);
         }
     }
 
@@ -734,8 +760,43 @@ internal sealed class OrderedViewState
         return snapshot;
     }
 
+    // After a rebuild adopts, record the content version the adopted index reflects for each in-scope log-generation.
+    // The index head [0, coverage) was ordered from the begin-time reader and the tail from the commit reader. The head
+    // still reflects the commit content when either the head is empty (every row came from the tail replay) or no
+    // content replace landed during the build: an append only extends the tail, leaving the head a valid prefix, so an
+    // append-only build still stamps. A mid-build replace reorders the head into a mixed index, so refuse (remove the
+    // stamp) and let the next request rebuild.
+    private void StampAdoptedContentVersions(RebuildRequest request, IReaderResolver commitResolver)
+    {
+        // Iterate the admitted readers (which include a zero-row reader for an open-but-empty log) rather than
+        // _scopeState.Keys, whose coverage map omits zero-row generations - otherwise an empty in-scope log would
+        // never be stamped and CanRestampAdopted would refuse the fast-path for the whole scope.
+        foreach (LogGeneration key in _latestReaders.Keys)
+        {
+            if (!request.Scope.Includes(key.LogId) || !IsCurrent(key, _requestedGeneration)) { continue; }
+
+            if (!commitResolver.TryResolve(new EventLocator(key.LogId, key.Generation, 0), out IEventColumnReader? commitReader))
+            {
+                _adoptedContentVersion.Remove(key);
+
+                continue;
+            }
+
+            bool headReflectsCommit =
+                request.Coverage.CoverageOf(key) == 0 ||
+                request.ReplaceStampAtCapture.GetValueOrDefault(key) == _contentReplaceStamp.GetValueOrDefault(key);
+
+            if (headReflectsCommit) { _adoptedContentVersion[key] = commitReader.ContentVersion; }
+            else { _adoptedContentVersion.Remove(key); }
+        }
+    }
+
     private bool TryAdmitReader(
-        EventLogId logId, IEventColumnReader reader, bool isReplace, out LogGeneration readerKey, out bool contentReplaced)
+        EventLogId logId,
+        IEventColumnReader reader,
+        bool isReplace,
+        out LogGeneration readerKey,
+        out bool contentReplaced)
     {
         readerKey = new LogGeneration(logId, reader.Generation);
         contentReplaced = false;
@@ -756,6 +817,16 @@ internal sealed class OrderedViewState
 
             contentReplaced = reader.ContentVersion > existing.ContentVersion &&
                 (reader.Count <= existing.Count || isReplace);
+        }
+
+        if (contentReplaced)
+        {
+            // A replace reorders existing rows, so the adopted index no longer reflects this content: drop its stamp
+            // immediately (a rebuild re-stamps on adopt). Bump the replace counter so a rebuild already in flight can
+            // tell at adopt that its begin-ordered head went stale. Dropping the stamp here also stops a later append
+            // from reviving stale provenance via the append-advance below.
+            _adoptedContentVersion.Remove(readerKey);
+            _contentReplaceStamp[readerKey] = _contentReplaceStamp.GetValueOrDefault(readerKey) + 1;
         }
 
         _latestReaders[readerKey] = reader;

@@ -395,6 +395,46 @@ public sealed class OrderedViewFaultRecoveryTests
     }
 
     [Fact]
+    public async Task HandleXmlFilterMatchReady_WhileFaulted_ReissuesWithoutClearingTheWriterFault()
+    {
+        await using var harness = new OrderedViewShadowHarness();
+
+        var logId = EventLogId.Create();
+        LogTableState faulted = StateWith(logId) with { OrderedViewDisplayEnabled = false };
+        Assert.Equal(PresentationState.Faulted, faulted.PresentationState);
+        harness.SetState(faulted, new RawEventStoreState(), new EventLogState());
+
+        // Establish a REAL writer fault with a predicate that throws a fresh exception per call. A low sequence keeps
+        // the forced Always re-issue (a higher issuer sequence) ahead of the writer's highest-seen sequence.
+        harness.Writer.EnqueueViewRequest(ViewRequests.For(
+            faulted.SortContext,
+            ViewRequests.EmptyFilter,
+            [logId],
+            static (_, _) => throw new InvalidOperationException("engine failed"),
+            readers: Readers(logId),
+            sequence: 1,
+            activeLogId: logId));
+        await harness.Writer.DrainAsync().WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+
+        Exception? firstFault = harness.Writer.Faulted;
+        Assert.NotNull(firstFault);
+
+        // The failed request already issued this identity, so a plain Sync would de-dup it; only the Always force
+        // reissues past the de-dup.
+        Assert.NotNull(harness.Issuer.TryIssue(faulted.ViewIdentity));
+        harness.Dispatcher.ClearReceivedCalls();
+
+        await harness.Effects.HandleXmlFilterMatchReady(harness.Dispatcher);
+
+        harness.Dispatcher.Received(1).Dispatch(Arg.Any<ViewRequestInvalidatedAction>());
+
+        // Drain so any wrongly enqueued ClearFault would be processed before the assertion.
+        await harness.Writer.DrainAsync().WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+
+        Assert.Same(firstFault, harness.Writer.Faulted);
+    }
+
+    [Fact]
     public void ManyThreadsClaimingTheSameRecovery_ProduceExactlyOneAttempt()
     {
         ViewIdentity identity = StateWith(EventLogId.Create()).ViewIdentity;
