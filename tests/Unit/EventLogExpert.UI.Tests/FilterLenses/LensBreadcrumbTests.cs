@@ -22,9 +22,10 @@ namespace EventLogExpert.UI.Tests.FilterLenses;
 
 public sealed class LensBreadcrumbTests : BunitContext
 {
-    private static readonly string FilterPaneSelector = (string)typeof(LensBreadcrumb)
+    private static readonly string s_filterPaneSelector = (string)typeof(LensBreadcrumb)
         .GetField("FilterPaneFocusSelector", BindingFlags.NonPublic | BindingFlags.Static)!
         .GetRawConstantValue()!;
+
     private readonly IAlertDialogService _alertDialog = Substitute.For<IAlertDialogService>();
     private readonly IAnnouncementService _announcements = Substitute.For<IAnnouncementService>();
     private readonly IFilterLensCommands _commands = Substitute.For<IFilterLensCommands>();
@@ -107,6 +108,48 @@ public sealed class LensBreadcrumbTests : BunitContext
     }
 
     [Fact]
+    public void Escape_OnLastChipKeepButton_RemovesLastLens_RestoresNeighborKeepButton()
+    {
+        var a = Summary("a");
+        var b = Summary("b");
+        var c = Summary("c");
+        _source.Lenses.Returns(ImmutableList.Create(a, b, c));
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+        focusModule.Setup<bool>("focusIfNotElsewhere", _ => true).SetResult(true);
+
+        var cut = Render<LensBreadcrumb>();
+
+        // Escape while the LAST chip's keep button holds focus removes the last lens; stopPropagation keeps the
+        // container handler from also firing, so exactly one lens is removed.
+        cut.FindAll(".lens-chip-keep")[2].KeyDown(new KeyboardEventArgs { Key = "Escape" });
+        _commands.Received(1).RemoveLens(c.Id);
+        _commands.Received(1).RemoveLens(Arg.Any<FilterLensId>());
+
+        _source.Lenses.Returns(ImmutableList.Create(a, b));
+        _source.Changed += Raise.Event<Action>();
+
+        // Symmetry: the restore lands on the neighbor's KEEP button, not its remove ×.
+        cut.WaitForAssertion(() => AssertGuardedFocusRestoredToChipButton(focusModule, cut, b.Id, "_keepRefs"));
+    }
+
+    [Fact]
+    public void Escape_OnNonLastKeepButton_StillRemovesTheLastLens()
+    {
+        var a = Summary("a");
+        var b = Summary("b");
+        var c = Summary("c");
+        _source.Lenses.Returns(ImmutableList.Create(a, b, c));
+
+        var cut = Render<LensBreadcrumb>();
+
+        // Escape keeps its region-level "remove the last lens" contract regardless of which keep button has focus.
+        cut.FindAll(".lens-chip-keep")[0].KeyDown(new KeyboardEventArgs { Key = "Escape" });
+
+        _commands.Received(1).RemoveLens(c.Id);
+        _commands.Received(1).RemoveLens(Arg.Any<FilterLensId>());
+    }
+
+    [Fact]
     public void Escape_PopsTopLens_RestoresPreviousChipThroughOrphanGuard()
     {
         var older = Summary("older");
@@ -160,6 +203,27 @@ public sealed class LensBreadcrumbTests : BunitContext
     }
 
     [Fact]
+    public void KeepButton_Click_GuardUnavailable_FailsClosed_MovesNoFocus()
+    {
+        var a = Summary("a");
+        var b = Summary("b");
+        _source.Lenses.Returns(ImmutableList.Create(a, b));
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+        focusModule.Setup<bool>("focusIfNotElsewhere", _ => true).SetException(new JSException("boom"));
+
+        var cut = Render<LensBreadcrumb>();
+
+        cut.FindAll(".lens-chip-keep")[0].Click();
+        _source.Lenses.Returns(ImmutableList.Create(b));
+        _source.Changed += Raise.Event<Action>();
+
+        // The guard threw: fail CLOSED - no bare FocusAsync fallback that could steal focus that had moved.
+        cut.WaitForAssertion(() => focusModule.VerifyInvoke("focusIfNotElsewhere"));
+        Assert.DoesNotContain(JSInterop.Invocations, invocation =>
+            invocation.Identifier.Contains("domWrapper.focus", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void KeepButton_Click_RemovingOnlyLens_RestoresFocusToFilterPane()
     {
         var only = Summary("only");
@@ -185,6 +249,8 @@ public sealed class LensBreadcrumbTests : BunitContext
         var b = Summary("b");
         var c = Summary("c");
         _source.Lenses.Returns(ImmutableList.Create(a, b, c));
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+        focusModule.Setup<bool>("focusIfNotElsewhere", _ => true).SetResult(true);
 
         var cut = Render<LensBreadcrumb>();
 
@@ -195,8 +261,9 @@ public sealed class LensBreadcrumbTests : BunitContext
         _source.Lenses.Returns(ImmutableList.Create(a, c));
         _source.Changed += Raise.Event<Action>();
 
-        // Restore to the neighbor's KEEP button (not its remove ×), so keeping lenses in sequence never lands on delete.
-        cut.WaitForAssertion(() => AssertFocusRestoredToChipButton(cut, c.Id, "_keepRefs"));
+        // Restore to the neighbor's KEEP button (not its remove ×), guarded so an assistive-tech or synthetic click
+        // that left focus elsewhere declines rather than yanking focus to the neighbor.
+        cut.WaitForAssertion(() => AssertGuardedFocusRestoredToChipButton(focusModule, cut, c.Id, "_keepRefs"));
     }
 
     [Fact]
@@ -226,6 +293,63 @@ public sealed class LensBreadcrumbTests : BunitContext
     }
 
     [Fact]
+    public void NonEscapeKeyDown_OnKeepButton_DoesNotRemoveLens()
+    {
+        var a = Summary("a");
+        var b = Summary("b");
+        _source.Lenses.Returns(ImmutableList.Create(a, b));
+
+        var cut = Render<LensBreadcrumb>();
+
+        // The new keep-button handler acts only on Escape; activation keys still route to the click (promote) path.
+        cut.FindAll(".lens-chip-keep")[0].KeyDown(new KeyboardEventArgs { Key = "Enter" });
+        cut.FindAll(".lens-chip-keep")[0].KeyDown(new KeyboardEventArgs { Key = "a" });
+
+        _commands.DidNotReceive().RemoveLens(Arg.Any<FilterLensId>());
+    }
+
+    [Fact]
+    public void RemoveChip_Click_GuardDeclines_DoesNotFallBackToBareFocus()
+    {
+        var a = Summary("a");
+        var b = Summary("b");
+        _source.Lenses.Returns(ImmutableList.Create(a, b));
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+        focusModule.Setup<bool>("focusIfNotElsewhere", _ => true).SetResult(false);
+
+        var cut = Render<LensBreadcrumb>();
+
+        cut.FindAll(".lens-chip-remove")[0].Click();
+        _source.Lenses.Returns(ImmutableList.Create(b));
+        _source.Changed += Raise.Event<Action>();
+
+        // The guard declined (focus had moved elsewhere, e.g. an assistive-tech click): no bare FocusAsync yank.
+        cut.WaitForAssertion(() => focusModule.VerifyInvoke("focusIfNotElsewhere"));
+        Assert.DoesNotContain(JSInterop.Invocations, invocation =>
+            invocation.Identifier.Contains("domWrapper.focus", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void RemoveChip_Click_GuardUnavailable_FailsClosed_MovesNoFocus()
+    {
+        var a = Summary("a");
+        var b = Summary("b");
+        _source.Lenses.Returns(ImmutableList.Create(a, b));
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+        focusModule.Setup<bool>("focusIfNotElsewhere", _ => true).SetException(new JSException("boom"));
+
+        var cut = Render<LensBreadcrumb>();
+
+        cut.FindAll(".lens-chip-remove")[0].Click();
+        _source.Lenses.Returns(ImmutableList.Create(b));
+        _source.Changed += Raise.Event<Action>();
+
+        cut.WaitForAssertion(() => focusModule.VerifyInvoke("focusIfNotElsewhere"));
+        Assert.DoesNotContain(JSInterop.Invocations, invocation =>
+            invocation.Identifier.Contains("domWrapper.focus", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void RemoveChip_Click_RemovingOnlyLens_RestoresFocusToFilterPane()
     {
         var only = Summary("only");
@@ -252,6 +376,8 @@ public sealed class LensBreadcrumbTests : BunitContext
         var b = Summary("b");
         var c = Summary("c");
         _source.Lenses.Returns(ImmutableList.Create(a, b, c));
+        var focusModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/Common/focusGuard.js");
+        focusModule.Setup<bool>("focusIfNotElsewhere", _ => true).SetResult(true);
 
         var cut = Render<LensBreadcrumb>();
 
@@ -260,14 +386,13 @@ public sealed class LensBreadcrumbTests : BunitContext
         _commands.Received(1).RemoveLens(b.Id);
 
         // The source has not changed yet (removal in flight): the arm must NOT fire while the chip is still present.
-        Assert.DoesNotContain(JSInterop.Invocations, invocation =>
-            invocation.Identifier.Contains("focus", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(focusModule.Invocations, invocation => invocation.Identifier == "focusIfNotElsewhere");
 
-        // Removal propagates: b is gone. The deferred restore fires once, moving focus to the forward neighbor (c).
+        // Removal propagates: b is gone. The deferred restore fires once (guarded), moving focus to the neighbor (c).
         _source.Lenses.Returns(ImmutableList.Create(a, c));
         _source.Changed += Raise.Event<Action>();
 
-        cut.WaitForAssertion(() => AssertFocusRestoredTo(cut, c.Id));
+        cut.WaitForAssertion(() => AssertGuardedFocusRestoredToChipButton(focusModule, cut, c.Id, "_removeRefs"));
     }
 
     [Fact]
@@ -582,7 +707,24 @@ public sealed class LensBreadcrumbTests : BunitContext
     private static void AssertFilterPaneRestore(BunitJSModuleInterop focusModule)
     {
         var invocation = Assert.Single(focusModule.Invocations["focusSelectorIfNotElsewhere"]);
-        Assert.Equal(FilterPaneSelector, invocation.Arguments[0]);
+        Assert.Equal(s_filterPaneSelector, invocation.Arguments[0]);
+    }
+
+    private static void AssertGuardedFocusRestoredToChipButton(
+        BunitJSModuleInterop focusModule,
+        IRenderedComponent<LensBreadcrumb> cut,
+        FilterLensId expectedLensId,
+        string refsField)
+    {
+        var focusCall = focusModule.Invocations.Last(invocation => invocation.Identifier == "focusIfNotElsewhere");
+        var focusedId = ((ElementReference)focusCall.Arguments[0]!).Id;
+
+        var field = typeof(LensBreadcrumb).GetField(refsField, BindingFlags.NonPublic | BindingFlags.Instance);
+        var refs = (Dictionary<FilterLensId, ElementReference>)field!.GetValue(cut.Instance)!;
+
+        Assert.True(refs.TryGetValue(expectedLensId, out var expectedRef));
+        Assert.False(string.IsNullOrEmpty(focusedId));
+        Assert.Equal(expectedRef.Id, focusedId);
     }
 
     private static IElement SaveActionButton(IRenderedComponent<LensBreadcrumb> cut, string text) =>
@@ -593,24 +735,6 @@ public sealed class LensBreadcrumbTests : BunitContext
 
     private static FilterLensSummary TimeSummary() =>
         new(FilterLensId.Create(), new FilterLensLabel.TimeWindow(DateTime.Now, TimeSpan.FromHours(1)), LensKind.TimeWindow);
-
-    private void AssertFocusRestoredTo(IRenderedComponent<LensBreadcrumb> cut, FilterLensId expectedLensId) =>
-        AssertFocusRestoredToChipButton(cut, expectedLensId, "_removeRefs");
-
-    private void AssertFocusRestoredToChipButton(
-        IRenderedComponent<LensBreadcrumb> cut, FilterLensId expectedLensId, string refsField)
-    {
-        var focusCall = Assert.Single(JSInterop.Invocations, invocation =>
-            invocation.Identifier.Contains("domWrapper.focus", StringComparison.OrdinalIgnoreCase));
-        var focusedId = ((ElementReference)focusCall.Arguments[0]!).Id;
-
-        var field = typeof(LensBreadcrumb).GetField(refsField, BindingFlags.NonPublic | BindingFlags.Instance);
-        var refs = (Dictionary<FilterLensId, ElementReference>)field!.GetValue(cut.Instance)!;
-
-        Assert.True(refs.TryGetValue(expectedLensId, out var expectedRef));
-        Assert.False(string.IsNullOrEmpty(focusedId));
-        Assert.Equal(expectedRef.Id, focusedId);
-    }
 
     private void StubSaveAsGroupPrompt(PromptChoice choice, string value) =>
         _alertDialog.DisplayPromptWithSecondary(
