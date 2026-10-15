@@ -25,6 +25,8 @@
                 <button aria-label="@Localizer["FilterLens_SaveAria", label].Value"
                     class="lens-chip-keep"
                     @onclick="@(() => PromoteLensWithFocus(lensId))"
+                    @onkeydown="HandleKeepKeyDown"
+                    @onkeydown:stopPropagation="true"
                     @ref="_keepRefs[lensId]"
                     type="button">
                     <i aria-hidden="true" class="bi bi-floppy"></i>

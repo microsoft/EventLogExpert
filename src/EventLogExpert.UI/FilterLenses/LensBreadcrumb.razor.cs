@@ -106,10 +106,11 @@ public sealed partial class LensBreadcrumb
         base.OnInitialized();
     }
 
-    // Arm the surviving neighbor chip (or the always-guarded filters-pane fallback when none survives) to focus once a
-    // single-lens removal propagates; run before the synchronous Commands dispatch. Guarded governs the neighbor-chip
-    // restore only: Escape guards it (origin unknown), x/keep fail open to the neighbor (the clicked control unmounts).
-    private void ArmChipRemovalFocus(FilterLensId removedId, bool guardedOrigin, bool keepButtonTarget)
+    // Arm the surviving neighbor chip (or the filters-pane fallback when none survives) to focus once a single-lens
+    // removal propagates; run before the synchronous Commands dispatch. Every neighbor-chip restore is guarded: a
+    // normal click/keyboard removal orphans focus to the body so the guard restores, while an assistive-tech or
+    // synthetic activation that left focus elsewhere declines rather than yanking it to the neighbor.
+    private void ArmChipRemovalFocus(FilterLensId removedId, bool keepButtonTarget)
     {
         var lenses = LensSource.Lenses;
 
@@ -131,15 +132,14 @@ public sealed partial class LensBreadcrumb
         _pendingRestore = new PendingFocusRestore(
             RemovedId: removedId,
             TargetId: targetId,
-            TargetIsKeepButton: keepButtonTarget,
-            Guarded: guardedOrigin);
+            TargetIsKeepButton: keepButtonTarget);
     }
 
     // Save all / Clear all unmount the whole region; no removed id, so the arm consumes when the list empties and takes
-    // the always-guarded pane fallback (Guarded is moot here: there is no chip target).
+    // the always-guarded pane fallback.
     private void ArmSynchronousBulkFocus() =>
         _pendingRestore = new PendingFocusRestore(
-            RemovedId: null, TargetId: null, TargetIsKeepButton: false, Guarded: false);
+            RemovedId: null, TargetId: null, TargetIsKeepButton: false);
 
     private void ClearLensesWithFocus()
     {
@@ -147,18 +147,24 @@ public sealed partial class LensBreadcrumb
         Commands.ClearLenses();
     }
 
+    // Escape while a chip's keep button holds focus removes the last lens and restores to the neighbor KEEP button, so
+    // keeping lenses in sequence never lands focus on a delete control. stopPropagation (set in the markup) keeps the
+    // container's HandleKeyDown from also firing and removing a second lens.
+    private void HandleKeepKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key != "Escape") { return; }
+
+        RemoveLastLensWithFocus(keepButtonTarget: true);
+    }
+
+    // Escape anywhere in the region removes the last lens. From the region, label, or an action button the focus
+    // origin is a non-chip control, so the restore targets the neighbor remove button (the keep button has its own
+    // handler for symmetry - see HandleKeepKeyDown).
     private void HandleKeyDown(KeyboardEventArgs args)
     {
         if (args.Key != "Escape") { return; }
 
-        var lenses = LensSource.Lenses;
-
-        if (lenses.IsEmpty) { return; }
-
-        // Escape removes the last lens; guard the restore since the focus origin is unknown.
-        FilterLensId removedId = lenses[^1].Id;
-        ArmChipRemovalFocus(removedId, guardedOrigin: true, keepButtonTarget: false);
-        Commands.RemoveLens(removedId);
+        RemoveLastLensWithFocus(keepButtonTarget: false);
     }
 
     private ValueTask<IJSObjectReference> ImportFocusModuleAsync() =>
@@ -168,7 +174,7 @@ public sealed partial class LensBreadcrumb
     {
         // Keep promotes and removes this chip; target the neighbor's KEEP button so the next Enter never lands on a
         // delete control.
-        ArmChipRemovalFocus(lensId, guardedOrigin: false, keepButtonTarget: true);
+        ArmChipRemovalFocus(lensId, keepButtonTarget: true);
         Commands.PromoteLens(lensId);
     }
 
@@ -189,9 +195,20 @@ public sealed partial class LensBreadcrumb
         foreach (var id in stale) { refs.Remove(id); }
     }
 
+    private void RemoveLastLensWithFocus(bool keepButtonTarget)
+    {
+        var lenses = LensSource.Lenses;
+
+        if (lenses.IsEmpty) { return; }
+
+        FilterLensId removedId = lenses[^1].Id;
+        ArmChipRemovalFocus(removedId, keepButtonTarget);
+        Commands.RemoveLens(removedId);
+    }
+
     private void RemoveLensWithFocus(FilterLensId lensId)
     {
-        ArmChipRemovalFocus(lensId, guardedOrigin: false, keepButtonTarget: false);
+        ArmChipRemovalFocus(lensId, keepButtonTarget: false);
         Commands.RemoveLens(lensId);
     }
 
@@ -210,8 +227,8 @@ public sealed partial class LensBreadcrumb
         catch (TaskCanceledException) { }
     }
 
-    // Guarded neighbor-chip restore (Escape path): if the module is unavailable, do NOT restore (focus may rest on a
-    // survivor).
+    // Guarded neighbor-chip restore for every chip target (Escape, keep, remove): if the module is unavailable, do NOT
+    // restore (focus may rest on a survivor).
     private async ValueTask RestoreFocusIfOrphanedAsync(ElementReference target)
     {
         try
@@ -231,8 +248,9 @@ public sealed partial class LensBreadcrumb
 
         if (arm.TargetId is { } id && refs.TryGetValue(id, out var targetRef))
         {
-            if (arm.Guarded) { await RestoreFocusIfOrphanedAsync(targetRef); }
-            else { await ElementFocus.SafelyAsync(targetRef, preventScroll: true); }
+            // Guarded (never a bare focus): a normal removal orphans focus to the body so the restore lands, while an
+            // assistive-tech or synthetic activation that left focus elsewhere declines rather than stealing it.
+            await RestoreFocusIfOrphanedAsync(targetRef);
 
             return;
         }
@@ -287,6 +305,5 @@ public sealed partial class LensBreadcrumb
     private readonly record struct PendingFocusRestore(
         FilterLensId? RemovedId,
         FilterLensId? TargetId,
-        bool TargetIsKeepButton,
-        bool Guarded);
+        bool TargetIsKeepButton);
 }
