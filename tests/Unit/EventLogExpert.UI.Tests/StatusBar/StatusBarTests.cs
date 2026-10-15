@@ -540,8 +540,10 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
     }
 
     [Fact]
-    public void GroupedChip_HiddenByRequestedClear_EvenWhenCommittedStillGrouped()
+    public void GroupedChip_Hidden_WhenRequestedGroupCleared_EvenIfCommittedStillGrouped()
     {
+        // The chip follows the REQUESTED grouping, so an explicit ungroup (RequestedGroupBy = null, committed grouping
+        // lingering) hides it. Hiding the grouped column no longer clears grouping, so it does not hide the chip.
         SetOrdering(new DisplayOrdering(OrderBy: null, IsDescending: true, GroupBy: ColumnName.Level, IsGroupDescending: false)
         {
             RequestedGroupBy = null

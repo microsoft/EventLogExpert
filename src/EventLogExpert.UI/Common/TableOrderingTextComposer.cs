@@ -9,6 +9,27 @@ namespace EventLogExpert.UI.Common;
 
 internal static class TableOrderingTextComposer
 {
+    // Owns the Table_Announce_SortedAndGrouped composition for the table accessible descriptions: "{sort}. {group}" when
+    // both axes are present, the lone phrase when one is, or null when neither is. Callers needing a non-null result
+    // apply their own fallback. (The live SortAndGroupAnnouncement reuses the key with count-bearing fragments instead.)
+    internal static string? CombineOrderingDescription(
+        IStringLocalizer<SharedResource> localizer,
+        ColumnName? orderBy,
+        bool isDescending,
+        ColumnName? groupBy,
+        bool isGroupDescending)
+    {
+        string? sortPhrase = orderBy is { } sort ? SortAnnouncement(localizer, sort, isDescending) : null;
+        string? groupPhrase = groupBy is { } group ? GroupDirectionPhrase(localizer, group, isGroupDescending) : null;
+
+        if (sortPhrase is not null && groupPhrase is not null)
+        {
+            return localizer["Table_Announce_SortedAndGrouped", sortPhrase, groupPhrase];
+        }
+
+        return groupPhrase ?? sortPhrase;
+    }
+
     internal static string DefaultOrderReversedAnnouncement(
         IStringLocalizer<SharedResource> localizer,
         bool isDescending,
@@ -97,18 +118,9 @@ internal static class TableOrderingTextComposer
         ColumnName? orderBy,
         bool isDescending,
         ColumnName? groupBy,
-        bool isGroupDescending)
-    {
-        string? groupPhrase = groupBy is { } group ? GroupDirectionPhrase(localizer, group, isGroupDescending) : null;
-        string? sortPhrase = orderBy is { } sort ? SortAnnouncement(localizer, sort, isDescending) : null;
-
-        if (groupPhrase is not null && sortPhrase is not null)
-        {
-            return localizer["Table_Announce_SortedAndGrouped", sortPhrase, groupPhrase];
-        }
-
-        return groupPhrase ?? sortPhrase ?? DefaultOrderReversedAnnouncement(localizer, isDescending, withinGroups: false);
-    }
+        bool isGroupDescending) =>
+        CombineOrderingDescription(localizer, orderBy, isDescending, groupBy, isGroupDescending) ??
+        DefaultOrderReversedAnnouncement(localizer, isDescending, withinGroups: false);
 
     private static string GroupDirectionPhrase(
         IStringLocalizer<SharedResource> localizer,

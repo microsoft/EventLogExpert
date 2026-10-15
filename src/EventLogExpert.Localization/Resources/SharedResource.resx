@@ -2341,11 +2341,11 @@
   </data>
   <data name="Table_Announce_GroupedAscending" xml:space="preserve">
     <value>Grouped by {0}, ascending</value>
-    <comment>{0} is the localized column label. Screen-reader announcement when the table grouping changes.</comment>
+    <comment>{0} is the localized column label. Screen-reader phrase for the table grouping, used when grouping changes and in the persistent table-level accessible description when the grouped column is hidden.</comment>
   </data>
   <data name="Table_Announce_GroupedDescending" xml:space="preserve">
     <value>Grouped by {0}, descending</value>
-    <comment>{0} is the localized column label. Screen-reader announcement when the table grouping changes.</comment>
+    <comment>{0} is the localized column label. Screen-reader phrase for the table grouping, used when grouping changes and in the persistent table-level accessible description when the grouped column is hidden.</comment>
   </data>
   <data name="Table_Announce_GroupCleared" xml:space="preserve">
     <value>Grouping cleared</value>
@@ -2385,7 +2385,7 @@
   </data>
   <data name="Table_Announce_SortedAndGrouped" xml:space="preserve">
     <value>{0}. {1}</value>
-    <comment>Screen-reader announcement composing a simultaneous sort change ({0}) and group change ({1}) into one message; both placeholders are already-localized sort and group phrases.</comment>
+    <comment>Composes a sort phrase ({0}) and a group phrase ({1}) into one message; both placeholders are already-localized. Used for a simultaneous sort-and-group change announcement and for the persistent table-level accessible description when both the sorted and grouped columns are hidden.</comment>
   </data>
   <data name="Table_GroupedColumnDescription_Ascending" xml:space="preserve">
     <value>Grouped, ascending</value>

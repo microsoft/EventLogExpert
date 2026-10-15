@@ -418,35 +418,6 @@ public sealed class OrderedViewShadowTests
     }
 
     [Fact]
-    public async Task ForcingTheGroupingOff_RecordsWhatWasOnScreen_BecauseNothingLaterCan()
-    {
-        RoutedSetup setup = await BuildRoutedAsync(seed: 411, count: 60, TestContext.Current.CancellationToken);
-
-        LogTableState groupedRequest = setup.Routed with
-        {
-            GroupBy = ColumnName.Source, RequestedGroupBy = ColumnName.Source
-        };
-
-        LogTableState grouped = groupedRequest with
-        {
-            ActiveOrderedView = setup.Update with { Config = groupedRequest.SortContext }
-        };
-
-        Assert.NotNull(grouped.ServingOrderedView);
-
-        LogTableState ungrouped = Reducers.ReduceLoadColumnsCompleted(
-            grouped,
-            new LoadColumnsCompletedAction(
-                ImmutableDictionary<ColumnName, bool>.Empty.Add(ColumnName.Source, false),
-                grouped.ColumnWidths,
-                grouped.ColumnOrder));
-
-        Assert.Equal(ColumnName.Source, ungrouped.GroupBy);
-        Assert.Null(ungrouped.RequestedGroupBy);
-        Assert.Same(grouped.ServingOrderedView, ungrouped.RetainedFor(grouped.ServingOrderedView!));
-    }
-
-    [Fact]
     public async Task GoNoGo_AfterAFault_TheDisplayKeepsTheRowsTheUserWasReading()
     {
         RoutedSetup setup = await BuildRoutedAsync(seed: 900, count: 60, TestContext.Current.CancellationToken);
@@ -601,6 +572,38 @@ public sealed class OrderedViewShadowTests
         // DrainToUpdateAsync does not produce an OrderedViewReady and the test fails.
         var ready = Assert.IsType<OrderedViewReady>(await DrainToUpdateAsync(harness, TestContext.Current.CancellationToken));
         Assert.Equal(events.Count, ready.View.Count);
+    }
+
+    [Fact]
+    public async Task HidingTheGroupedColumn_KeepsTheGroupingAndTheServingView()
+    {
+        RoutedSetup setup = await BuildRoutedAsync(seed: 411, count: 60, TestContext.Current.CancellationToken);
+
+        LogTableState groupedRequest = setup.Routed with
+        {
+            GroupBy = ColumnName.Source, RequestedGroupBy = ColumnName.Source
+        };
+
+        LogTableState grouped = groupedRequest with
+        {
+            ActiveOrderedView = setup.Update with { Config = groupedRequest.SortContext }
+        };
+
+        Assert.NotNull(grouped.ServingOrderedView);
+
+        LogTableState afterHide = Reducers.ReduceLoadColumnsCompleted(
+            grouped,
+            new LoadColumnsCompletedAction(
+                ImmutableDictionary<ColumnName, bool>.Empty.Add(ColumnName.Source, false),
+                grouped.ColumnWidths,
+                grouped.ColumnOrder));
+
+        // Column visibility is orthogonal to ordering: hiding the grouped column keeps the grouping (committed AND
+        // requested) and leaves the serving view in place - no ungroup, no retained-view detour.
+        Assert.Equal(ColumnName.Source, afterHide.GroupBy);
+        Assert.Equal(ColumnName.Source, afterHide.RequestedGroupBy);
+        Assert.False(afterHide.HasPendingSortChange);
+        Assert.Same(grouped.ServingOrderedView, afterHide.ServingOrderedView);
     }
 
     [Fact]

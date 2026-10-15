@@ -561,7 +561,7 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
-    public void ReduceLoadColumnsCompleted_WhenGroupColumnHidden_AsksToUngroupWithoutMovingTheRowsYet()
+    public void ReduceLoadColumnsCompleted_WhenGroupColumnHidden_KeepsTheGroupingAndCollapseState()
     {
         var state = new LogTableState
         {
@@ -571,7 +571,9 @@ public sealed class LogTableStoreTests
             RequestedIsGroupDescending = true,
             GroupCollapseOverrides = ImmutableHashSet.Create("g"),
             OrderBy = ColumnName.EventId,
-            IsDescending = false
+            IsDescending = false,
+            RequestedOrderBy = ColumnName.EventId,
+            RequestedIsDescending = false
         };
 
         var hiddenColumns = ImmutableDictionary<ColumnName, bool>.Empty
@@ -582,10 +584,12 @@ public sealed class LogTableStoreTests
             state,
             new LoadColumnsCompletedAction(hiddenColumns, ImmutableDictionary<ColumnName, int>.Empty, []));
 
-        Assert.Null(result.RequestedGroupBy);
-        Assert.False(result.RequestedIsGroupDescending);
+        // Grouping (like sorting) by a hidden column persists: no deferred ungroup, and the collapse overrides survive.
+        Assert.Equal(ColumnName.Source, result.RequestedGroupBy);
+        Assert.True(result.RequestedIsGroupDescending);
         Assert.Equal(ColumnName.Source, result.GroupBy);
-        Assert.True(result.HasPendingSortChange);
+        Assert.False(result.HasPendingSortChange);
+        Assert.Equal(state.GroupCollapseOverrides, result.GroupCollapseOverrides);
     }
 
     [Fact]
@@ -605,7 +609,7 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
-    public void ReduceLoadColumnsCompleted_WhenLiveAndRequestedGroupBothHidden_ClearsTheRequest()
+    public void ReduceLoadColumnsCompleted_WhenLiveAndRequestedGroupBothHidden_KeepsTheRequest()
     {
         var state = new LogTableState
         {
@@ -623,8 +627,9 @@ public sealed class LogTableStoreTests
             state,
             new LoadColumnsCompletedAction(columns, ImmutableDictionary<ColumnName, int>.Empty, []));
 
-        Assert.Null(result.RequestedGroupBy);
-        Assert.False(result.RequestedIsGroupDescending);
+        // The committed and requested grouping both target the now-hidden column; both persist.
+        Assert.Equal(ColumnName.Source, result.RequestedGroupBy);
+        Assert.True(result.RequestedIsGroupDescending);
         Assert.Equal(ColumnName.Source, result.GroupBy);
     }
 
@@ -650,7 +655,7 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
-    public void ReduceLoadColumnsCompleted_WhenRequestedGroupHiddenWhileLiveUngrouped_ClearsPendingRequest()
+    public void ReduceLoadColumnsCompleted_WhenRequestedGroupHiddenWhileLiveUngrouped_KeepsPendingRequest()
     {
         var state = new LogTableState
         {
@@ -667,13 +672,16 @@ public sealed class LogTableStoreTests
             state,
             new LoadColumnsCompletedAction(columns, ImmutableDictionary<ColumnName, int>.Empty, []));
 
-        Assert.Null(result.RequestedGroupBy);
-        Assert.False(result.RequestedIsGroupDescending);
+        // A pending regroup onto a hidden column is not cancelled by the hide; it still reaches adoption (committed
+        // GroupBy catches up on the next reproject), so the change stays pending.
+        Assert.Equal(ColumnName.Source, result.RequestedGroupBy);
+        Assert.True(result.RequestedIsGroupDescending);
         Assert.Null(result.GroupBy);
+        Assert.True(result.HasPendingSortChange);
     }
 
     [Fact]
-    public void ReduceLoadColumnsCompleted_WhenResetDefaultsHidesGroupColumn_AsksToUngroup()
+    public void ReduceLoadColumnsCompleted_WhenResetDefaultsHidesGroupColumn_KeepsTheGrouping()
     {
         var state = new LogTableState { GroupBy = ColumnName.ActivityId, RequestedGroupBy = ColumnName.ActivityId };
 
@@ -685,7 +693,9 @@ public sealed class LogTableStoreTests
             state,
             new LoadColumnsCompletedAction(defaults, ImmutableDictionary<ColumnName, int>.Empty, []));
 
-        Assert.Null(result.RequestedGroupBy);
+        // Reset-to-defaults restores the column layout only; grouping (like a custom sort) persists even though the
+        // grouped column is no longer visible - symmetric with the sort axis, which reset never clears.
+        Assert.Equal(ColumnName.ActivityId, result.RequestedGroupBy);
         Assert.Equal(ColumnName.ActivityId, result.GroupBy);
     }
 

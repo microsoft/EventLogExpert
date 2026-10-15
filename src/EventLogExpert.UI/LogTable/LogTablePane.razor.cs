@@ -994,18 +994,30 @@ public sealed partial class LogTablePane
         }
     }
 
-    // The effective order column can fall outside the visible headers (the common single-log default orders by the
-    // hidden Record ID column). No <th> then carries aria-sort, so every header reads "none" and a screen reader hears
-    // no sort at all; surface the effective order as a table-level accessible description in that case.
-    private string? HiddenEffectiveSortDescription()
+    // The sorted and/or grouped column can fall outside the visible headers (the single-log default orders by the hidden
+    // Record ID column; grouping can target a hidden column). No <th> then carries that axis, so surface whichever hidden
+    // axis applies as a table accessible description. Reads the requested axes to mirror the headers; a visible axis is
+    // omitted because its own <th> already surfaces it.
+    private string? HiddenOrderingDescription()
     {
-        if ((Presentation.Ordering.EffectiveOrderBy ?? Presentation.Ordering.RequestedOrderBy) is not { } effectiveColumn ||
-            Array.IndexOf(_enabledColumns, effectiveColumn) >= 0)
-        {
-            return null;
-        }
+        ColumnName? hiddenSort =
+            (Presentation.Ordering.EffectiveOrderBy ?? Presentation.Ordering.RequestedOrderBy) is { } sortColumn &&
+            Array.IndexOf(_enabledColumns, sortColumn) < 0 ?
+                sortColumn :
+                null;
 
-        return TableOrderingTextComposer.SortAnnouncement(Localizer, effectiveColumn, Presentation.Ordering.RequestedIsDescending);
+        ColumnName? hiddenGroup =
+            Presentation.Ordering.RequestedGroupBy is { } groupColumn &&
+            Array.IndexOf(_enabledColumns, groupColumn) < 0 ?
+                groupColumn :
+                null;
+
+        return TableOrderingTextComposer.CombineOrderingDescription(
+            Localizer,
+            hiddenSort,
+            Presentation.Ordering.RequestedIsDescending,
+            hiddenGroup,
+            Presentation.Ordering.RequestedIsGroupDescending);
     }
 
     private string? IndicatorSentence() =>

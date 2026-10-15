@@ -105,19 +105,17 @@ public sealed class OrderingAnnouncementEffectsTests
     }
 
     [Fact]
-    public async Task LoadColumnsCompleted_ClearsHiddenGroup_AnnouncesOnceThenStaysSyncedOnNextSort()
+    public async Task LoadColumnsCompleted_WhenGroupedColumnHidden_StaysSilentAndKeepsBaselineSynced()
     {
-        // Hiding the grouped column clears grouping without a group action; the effect must announce that clear AND sync
-        // its snapshot, so a later unrelated sort does not replay a stale "grouping cleared".
+        // Hiding the grouped column no longer clears grouping, so LoadColumnsCompleted announces nothing; the baseline
+        // stays synced so a later sort still announces exactly once.
         _state.Value.Returns(State(groupBy: ColumnName.Source, isGroupDescending: false));
         var sut = CreateSut();
 
-        _state.Value.Returns(State());
         await sut.HandleLoadColumnsCompleted(_dispatcher);
-        _announcer.Received(1).Announce(Arg.Any<AnnouncementPayload.TableGroupCleared>());
+        _announcer.DidNotReceive().Announce(Arg.Any<AnnouncementPayload>());
 
-        _announcer.ClearReceivedCalls();
-        _state.Value.Returns(State(orderBy: ColumnName.DateAndTime, isDescending: true));
+        _state.Value.Returns(State(groupBy: ColumnName.Source, isGroupDescending: false, orderBy: ColumnName.DateAndTime, isDescending: true));
         await sut.HandleSetOrderBy(_dispatcher);
 
         _announcer.Received(1).Announce(Arg.Is<AnnouncementPayload.TableSorted>(payload => payload.Column == ColumnName.DateAndTime));

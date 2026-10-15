@@ -176,6 +176,39 @@ public sealed class LogTablePaneGroupingTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void Grouped_ByHiddenColumn_StillRendersGroupHeaderRows()
+    {
+        // Grouping by the hidden Source column still produces group header rows (the group key comes from the event, not
+        // the rendered cell) even though no Source column header is shown.
+        _presentation = DisplayViewTestFactory.Presentation(
+            _logId,
+            [Event(1, "Alpha"), Event(2, "Alpha"), Event(3, "Beta")],
+            isDescending: false,
+            groupBy: ColumnName.Source,
+            groupCollapseOverrides: ImmutableHashSet<string>.Empty,
+            revision: ++_presentationRevision) with
+        {
+            Columns = ImmutableDictionary<ColumnName, bool>.Empty.Add(ColumnName.DateAndTime, true),
+            ColumnOrder = ImmutableList.Create(ColumnName.DateAndTime)
+        };
+
+        _logTableState.Value.Returns(new LogTableState
+        {
+            ActiveEventLogId = _logId,
+            EventTables = ImmutableList.Create(new LogView(_logId) { LogName = LogName }),
+            Columns = ImmutableDictionary<ColumnName, bool>.Empty.Add(ColumnName.DateAndTime, true),
+            ColumnOrder = ImmutableList.Create(ColumnName.DateAndTime),
+            GroupBy = ColumnName.Source,
+            RequestedGroupBy = ColumnName.Source
+        });
+
+        var cut = Render<LogTablePane>();
+
+        Assert.Equal(2, cut.FindAll("tr.group-header-row").Count);
+        Assert.Empty(cut.FindAll("th[data-column='Source']"));
+    }
+
+    [Fact]
     public void Grouped_CollapsedHeader_HasAriaExpandedFalse()
     {
         var cut = RenderGrouped(
