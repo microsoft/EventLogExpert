@@ -138,26 +138,16 @@ internal sealed class Reducers
     [ReducerMethod]
     public static LogTableState ReduceLoadColumnsCompleted(
         LogTableState state,
-        LoadColumnsCompletedAction action)
-    {
-        var updated = state with
+        LoadColumnsCompletedAction action) =>
+        // Column visibility is orthogonal to ordering: grouping (like sorting) by a hidden column persists. The group
+        // key comes from the event, not the rendered cell, so a hidden grouped column still yields correct group
+        // headers, surfaced to assistive tech via the table description (HiddenOrderingDescription in LogTablePane).
+        state with
         {
             Columns = action.LoadedColumns,
             ColumnWidths = action.ColumnWidths,
             ColumnOrder = action.ColumnOrder
         };
-
-        bool requestedGroupHidden = updated.RequestedGroupBy is { } requestedGroup && IsHidden(requestedGroup);
-
-        if (!requestedGroupHidden) { return updated; }
-
-        var result = updated with { RequestedGroupBy = null, RequestedIsGroupDescending = false };
-
-        return RetainServedView(state, result);
-
-        bool IsHidden(ColumnName column) =>
-            !action.LoadedColumns.TryGetValue(column, out bool isVisible) || !isVisible;
-    }
 
     [ReducerMethod]
     public static LogTableState ReduceLoadEvents(LogTableState state, LoadEventsAction action)

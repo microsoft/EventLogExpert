@@ -15,10 +15,11 @@ namespace EventLogExpert.Runtime.LogTable;
 ///     re-selects and no-op clears/toggles stay silent and only a real change speaks.
 /// </summary>
 /// <remarks>
-///     INVARIANT: the five request actions handled below (SetGroupBy, SetOrderBy, ToggleGroupSorting, ToggleSorting,
-///     LoadColumnsCompleted) are the ONLY writers of the <c>LogTableState.Requested*</c> ordering fields (verified by
-///     searching every assignment). A future reducer that writes those fields must be routed through here as well, or
-///     <see cref="_lastAnnounced" /> drifts and the next real change mis-announces.
+///     INVARIANT: the four request actions handled below (SetGroupBy, SetOrderBy, ToggleGroupSorting, ToggleSorting)
+///     are the ONLY writers of the <c>LogTableState.Requested*</c> ordering fields (verified by searching every
+///     assignment). A future reducer that writes those fields must be routed through here as well, or
+///     <see cref="_lastAnnounced" /> drifts and the next real change mis-announces. LoadColumnsCompleted is also handled
+///     below but only observes (column visibility no longer changes ordering), like <see cref="OrderedViewUpdatedAction" />.
 ///     <see cref="OrderedViewUpdatedAction" /> is additionally observed - not as a writer, but as the adopt signal that
 ///     flushes an announcement deferred while faulted AND the point at which a group-by announcement can carry the real
 ///     group count. The snapshot is deliberately requested-only: the committed ordering fields adopt the engine result
@@ -40,8 +41,8 @@ internal sealed class OrderingAnnouncementEffects(IState<LogTableState> logTable
 
     private AnnouncedOrdering _lastAnnounced = Snapshot(logTableState.Value);
 
-    // Hiding the grouped column (column toggle / reset defaults / startup load) clears grouping without a group action;
-    // routing it here announces that automatic clear and keeps the snapshot synced so a later ordering action is correct.
+    // Grouping by a hidden column now persists, so a column load no longer changes the requested ordering; this stays a
+    // defensive no-op (the snapshot is already synced) in case a future column-load path does touch requested ordering.
     [EffectMethod(typeof(LoadColumnsCompletedAction))]
     public Task HandleLoadColumnsCompleted(IDispatcher dispatcher) => AnnounceIfChanged();
 

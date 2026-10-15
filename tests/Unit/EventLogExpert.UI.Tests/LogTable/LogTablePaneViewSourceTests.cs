@@ -340,6 +340,78 @@ public sealed class LogTablePaneViewSourceTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void AriaDescription_ComposesSortAndGrouping_WhenBothColumnsAreHidden()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var columns = ImmutableDictionary<ColumnName, bool>.Empty
+            .Add(ColumnName.DateAndTime, true)
+            .Add(ColumnName.Source, true);
+
+        // Explicit within-group sort on Record ID (hidden) AND grouping by Level (hidden): neither axis has a visible
+        // th, so the table description composes both, sort first.
+        var presentation = new OrderedViewPresentation(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+            _logId,
+            new DisplayOrdering(OrderBy: ColumnName.RecordId, IsDescending: false, GroupBy: ColumnName.Level, IsGroupDescending: true)
+            {
+                EffectiveOrderBy = ColumnName.RecordId,
+                RequestedOrderBy = ColumnName.RecordId,
+                RequestedIsDescending = false,
+                RequestedGroupBy = ColumnName.Level,
+                RequestedIsGroupDescending = true
+            },
+            PresentationState.Current,
+            Revision: 1)
+        {
+            Columns = columns,
+            ColumnOrder = ImmutableList.Create(ColumnName.DateAndTime, ColumnName.Source)
+        };
+
+        _viewSource.Current.Returns(presentation);
+
+        var cut = Render<LogTablePane>();
+
+        Assert.Equal(
+            "Sorted by Record ID, ascending. Grouped by Level, descending",
+            cut.Find("#eventTable").GetAttribute("aria-description"));
+    }
+
+    [Fact]
+    public void AriaDescription_OmitsGrouping_WhenTheGroupedColumnIsVisible()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var columns = ImmutableDictionary<ColumnName, bool>.Empty
+            .Add(ColumnName.DateAndTime, true)
+            .Add(ColumnName.Source, true);
+
+        // Grouped by the visible Source column with no hidden sort: the grouped column's own th carries the grouped
+        // aria-description, so the table-level description stays null to avoid double-announcing.
+        var presentation = new OrderedViewPresentation(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+            _logId,
+            new DisplayOrdering(OrderBy: null, IsDescending: true, GroupBy: ColumnName.Source, IsGroupDescending: false)
+            {
+                RequestedGroupBy = ColumnName.Source,
+                RequestedIsGroupDescending = false
+            },
+            PresentationState.Current,
+            Revision: 1)
+        {
+            Columns = columns,
+            ColumnOrder = ImmutableList.Create(ColumnName.DateAndTime, ColumnName.Source)
+        };
+
+        _viewSource.Current.Returns(presentation);
+
+        var cut = Render<LogTablePane>();
+
+        Assert.Null(cut.Find("#eventTable").GetAttribute("aria-description"));
+        Assert.Equal("Grouped, ascending", cut.Find("th[data-column='Source']").GetAttribute("aria-description"));
+    }
+
+    [Fact]
     public void AriaDescription_SurfacesEffectiveSort_WhenTheEffectiveColumnIsHidden()
     {
         SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
@@ -404,6 +476,109 @@ public sealed class LogTablePaneViewSourceTests : CultureSensitiveBunitContext
 
         Assert.Equal("Sorted by Record ID, ascending", cut.Find("#eventTable").GetAttribute("aria-description"));
         Assert.Equal("none", cut.Find("th[data-column='Source']").GetAttribute("aria-sort"));
+    }
+
+    [Fact]
+    public void AriaDescription_SurfacesGrouping_WhenTheGroupedColumnIsHidden()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var columns = ImmutableDictionary<ColumnName, bool>.Empty
+            .Add(ColumnName.DateAndTime, true)
+            .Add(ColumnName.Source, true);
+
+        // Grouped by Level while that column is hidden: no th carries the grouped aria-description, so the table-level
+        // description must convey the grouping (and its direction, which the group header rows never state).
+        var presentation = new OrderedViewPresentation(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+            _logId,
+            new DisplayOrdering(OrderBy: null, IsDescending: true, GroupBy: ColumnName.Level, IsGroupDescending: false)
+            {
+                RequestedGroupBy = ColumnName.Level,
+                RequestedIsGroupDescending = false
+            },
+            PresentationState.Current,
+            Revision: 1)
+        {
+            Columns = columns,
+            ColumnOrder = ImmutableList.Create(ColumnName.DateAndTime, ColumnName.Source)
+        };
+
+        _viewSource.Current.Returns(presentation);
+
+        var cut = Render<LogTablePane>();
+
+        Assert.Equal("Grouped by Level, ascending", cut.Find("#eventTable").GetAttribute("aria-description"));
+    }
+
+    [Fact]
+    public void AriaDescription_SurfacesOnlyTheHiddenSort_WhenTheGroupedColumnIsVisible()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var columns = ImmutableDictionary<ColumnName, bool>.Empty
+            .Add(ColumnName.DateAndTime, true)
+            .Add(ColumnName.Source, true);
+
+        // Grouped by the visible Source column, with an explicit within-group sort on the hidden Record ID column: only
+        // the hidden sort needs the table-level description; the visible group is surfaced by its own th.
+        var presentation = new OrderedViewPresentation(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+            _logId,
+            new DisplayOrdering(OrderBy: ColumnName.RecordId, IsDescending: true, GroupBy: ColumnName.Source, IsGroupDescending: false)
+            {
+                EffectiveOrderBy = ColumnName.RecordId,
+                RequestedOrderBy = ColumnName.RecordId,
+                RequestedIsDescending = true,
+                RequestedGroupBy = ColumnName.Source,
+                RequestedIsGroupDescending = false
+            },
+            PresentationState.Current,
+            Revision: 1)
+        {
+            Columns = columns,
+            ColumnOrder = ImmutableList.Create(ColumnName.DateAndTime, ColumnName.Source)
+        };
+
+        _viewSource.Current.Returns(presentation);
+
+        var cut = Render<LogTablePane>();
+
+        Assert.Equal("Sorted by Record ID, descending", cut.Find("#eventTable").GetAttribute("aria-description"));
+        Assert.Equal("Grouped, ascending", cut.Find("th[data-column='Source']").GetAttribute("aria-description"));
+    }
+
+    [Fact]
+    public void AriaDescription_TracksTheRequestedGrouping_WhileItIsStillBeingAdopted()
+    {
+        SetCommittedState(_logId, [_logId], Event(1, "Alpha"), Event(2, "Beta"));
+
+        var columns = ImmutableDictionary<ColumnName, bool>.Empty
+            .Add(ColumnName.DateAndTime, true)
+            .Add(ColumnName.Source, true);
+
+        // A pending regroup onto the hidden Level column: committed GroupBy is not yet set, so the description must track
+        // the REQUESTED grouping (reading committed GroupBy here would yield no description).
+        var presentation = new OrderedViewPresentation(
+            DisplayViewTestFactory.Identity([Event(1, "Alpha"), Event(2, "Beta")]),
+            _logId,
+            new DisplayOrdering(OrderBy: null, IsDescending: true, GroupBy: null, IsGroupDescending: false)
+            {
+                RequestedGroupBy = ColumnName.Level,
+                RequestedIsGroupDescending = false
+            },
+            PresentationState.Current,
+            Revision: 1)
+        {
+            Columns = columns,
+            ColumnOrder = ImmutableList.Create(ColumnName.DateAndTime, ColumnName.Source)
+        };
+
+        _viewSource.Current.Returns(presentation);
+
+        var cut = Render<LogTablePane>();
+
+        Assert.Equal("Grouped by Level, ascending", cut.Find("#eventTable").GetAttribute("aria-description"));
     }
 
     [Fact]
