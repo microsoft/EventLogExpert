@@ -4,6 +4,7 @@
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.FilterLenses;
+using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.Focus;
 using Microsoft.AspNetCore.Components;
@@ -48,8 +49,12 @@ public sealed partial class LensBreadcrumb
 
     private string? SaveAsGroupHintRef => CanSaveAsGroup ? null : _saveAsGroupHintId;
 
+    [Inject] private ISettingsService Settings { get; init; } = null!;
+
     protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
+        Settings.TimeZoneChanged -= OnTimeZoneChanged;
+
         await JsModuleInterop.DisposeModuleSafelyAsync(_focusModule);
         _focusModule = null;
 
@@ -102,6 +107,7 @@ public sealed partial class LensBreadcrumb
     protected override void OnInitialized()
     {
         ObserveSource(LensSource);
+        Settings.TimeZoneChanged += OnTimeZoneChanged;
 
         base.OnInitialized();
     }
@@ -169,6 +175,9 @@ public sealed partial class LensBreadcrumb
 
     private ValueTask<IJSObjectReference> ImportFocusModuleAsync() =>
         JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/EventLogExpert.UI/Common/focusGuard.js");
+
+    // Time-window chip labels are stored in UTC and formatted in the display zone, so re-render on a zone change.
+    private void OnTimeZoneChanged(object? sender, TimeZoneInfo timeZone) => _ = InvokeAsync(StateHasChanged);
 
     private void PromoteLensWithFocus(FilterLensId lensId)
     {

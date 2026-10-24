@@ -3,6 +3,7 @@
 
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Localization;
+using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.FilterLenses;
 using Microsoft.Extensions.Localization;
 
@@ -10,18 +11,18 @@ namespace EventLogExpert.UI.Common;
 
 internal static class FilterLensLabelFormatter
 {
-    public static string Format(IStringLocalizer<SharedResource> localizer, FilterLensLabel label) =>
+    public static string Format(IStringLocalizer<SharedResource> localizer, FilterLensLabel label, TimeZoneInfo displayZone) =>
         label switch
         {
             FilterLensLabel.PropertyComparison(var property, var isEqual, var value) =>
                 $"{PropertyName(localizer, property)} {(isEqual ? "=" : "\u2260")} {ValueText(localizer, property, value)}",
             FilterLensLabel.ParentActivity(var activityId) =>
                 $"{localizer["FilterLens_ParentActivity"]} = {activityId}",
-            FilterLensLabel.TimeRange(var afterLocal, var beforeLocal, var sameDay) => sameDay ?
-                $"{afterLocal:T} - {beforeLocal:T}" :
-                $"{afterLocal:d} {afterLocal:T} - {beforeLocal:d} {beforeLocal:T}",
-            FilterLensLabel.TimeWindow(var centerLocal, var radius) => localizer["FilterLens_Near",
-                $"{centerLocal:T}",
+            FilterLensLabel.TimeRange(var afterUtc, var beforeUtc) => FormatTimeRange(
+                afterUtc.ConvertTimeZone(displayZone),
+                beforeUtc.ConvertTimeZone(displayZone)),
+            FilterLensLabel.TimeWindow(var centerUtc, var radius) => localizer["FilterLens_Near",
+                $"{centerUtc.ConvertTimeZone(displayZone):T}",
                 FilterLensLabelText.FormatRadius(radius)].Value,
             _ => throw new ArgumentOutOfRangeException(nameof(label), label, null)
         };
@@ -48,6 +49,11 @@ internal static class FilterLensLabelFormatter
         EventProperty.ResolutionStatus => localizer["FilterLens_Property_ResolutionStatus"],
         _ => throw new ArgumentOutOfRangeException(nameof(property), property, null)
     };
+
+    private static string FormatTimeRange(DateTime afterLocal, DateTime beforeLocal) =>
+        afterLocal.Date == beforeLocal.Date ?
+            $"{afterLocal:T} - {beforeLocal:T}" :
+            $"{afterLocal:d} {afterLocal:T} - {beforeLocal:d} {beforeLocal:T}";
 
     private static string ValueText(IStringLocalizer<SharedResource> localizer, EventProperty property, string value) =>
         property switch

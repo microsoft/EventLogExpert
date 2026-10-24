@@ -7,7 +7,6 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Runtime.LogTable;
 using Fluxor;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -60,13 +59,10 @@ public sealed class RestoreFilterPaneStateTests
         var appliedFilter = Substitute.For<IStateSelection<EventLogState, Filter>>();
         appliedFilter.Value.Returns(new Filter(null, []));
 
-        var rawEventStore = Substitute.For<IState<RawEventStoreState>>();
-        rawEventStore.Value.Returns(new RawEventStoreState());
-
         var lensState = Substitute.For<IState<FilterLensState>>();
         lensState.Value.Returns(new FilterLensState());
 
-        var effects = new Effects(appliedFilter, rawEventStore, filterPaneState, lensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()), new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
+        var effects = new Effects(appliedFilter, filterPaneState, lensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()), new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
 
         return (effects, Substitute.For<IDispatcher>());
     }

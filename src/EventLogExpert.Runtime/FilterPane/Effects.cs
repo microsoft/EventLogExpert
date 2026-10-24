@@ -1,12 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Filtering.Evaluation;
+using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterLibrary;
-using EventLogExpert.Runtime.LogTable;
 using Fluxor;
 
 namespace EventLogExpert.Runtime.FilterPane;
@@ -18,12 +17,16 @@ internal sealed class Effects
     private readonly IState<FilterPaneState> _filterPaneState;
     private readonly FilterPromotedNotifier _filterPromotedNotifier;
     private readonly IState<FilterLensState> _lensState;
-    private readonly IState<RawEventStoreState> _rawEventStore;
     private readonly SetFilterDateRangeSucceededNotifier _setFilterDateRangeSucceededNotifier;
+
+    /// <summary>
+    ///     The range the last zone change produced and the readings it was re-read from. Only used while the applied
+    ///     bounds are still exactly that range; writing a new range (apply, narrow, lens keep) forgets it.
+    /// </summary>
+    private (DateTime? AfterUtc, DateTime? BeforeUtc, DateTime? AfterWallClock, DateTime? BeforeWallClock)? _lastReinterpretation;
 
     public Effects(
         IStateSelection<EventLogState, Filter> appliedFilter,
-        IState<RawEventStoreState> rawEventStore,
         IState<FilterPaneState> filterPaneState,
         IState<FilterLensState> lensState,
         ClearAllFiltersNotifier clearAllFiltersNotifier,
@@ -31,7 +34,6 @@ internal sealed class Effects
         FilterPromotedNotifier filterPromotedNotifier)
     {
         _appliedFilter = appliedFilter;
-        _rawEventStore = rawEventStore;
         _filterPaneState = filterPaneState;
         _lensState = lensState;
         _clearAllFiltersNotifier = clearAllFiltersNotifier;
@@ -67,6 +69,8 @@ internal sealed class Effects
     [EffectMethod]
     public Task HandleCommitPromoted(CommitPromotedLensAction action, IDispatcher dispatcher)
     {
+        if (action.Window is { IsEnabled: true }) { _lastReinterpretation = null; }
+
         dispatcher.Dispatch(new ApplyFilterAction(BuildCandidate(_filterPaneState.Value)));
 
         if (action.Window is { IsEnabled: true })
@@ -82,6 +86,8 @@ internal sealed class Effects
     [EffectMethod]
     public Task HandleCommitPromotedLenses(CommitPromotedLensesAction action, IDispatcher dispatcher)
     {
+        if (action.Commits.Any(commit => commit.Window is { IsEnabled: true })) { _lastReinterpretation = null; }
+
         dispatcher.Dispatch(new ApplyFilterAction(BuildCandidate(_filterPaneState.Value)));
 
         if (action.Commits.Any(commit => commit.Window is { IsEnabled: true }))
@@ -98,6 +104,67 @@ internal sealed class Effects
     public Task HandleMergeFilters(IDispatcher dispatcher)
     {
         UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod]
+    public Task HandleNarrowFilterDateRange(NarrowFilterDateRangeAction action, IDispatcher dispatcher)
+    {
+        _lastReinterpretation = null;
+
+        // A disabled range is not narrowing anything, so its bounds are not carried into the new one.
+        var current = _filterPaneState.Value.FilteredDateRange is { IsEnabled: true } enabled ? enabled : null;
+
+        // Intersect with the enabled range so a narrowing shortcut never brings back events it already hides.
+        var narrowed = new DateFilter
+        {
+            After = Latest(action.After, current?.After),
+            Before = Earliest(action.Before, current?.Before)
+        };
+
+        dispatcher.Dispatch(new SetFilterDateRangeSuccessAction(narrowed));
+
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod]
+    public Task HandleReinterpretFilterDateRange(ReinterpretFilterDateRangeAction action, IDispatcher dispatcher)
+    {
+        if (_filterPaneState.Value.FilteredDateRange is not { } current) { return Task.CompletedTask; }
+
+        // Re-reading from the previous reinterpretation's readings (while the range is untouched since) keeps a reading
+        // skipped by a daylight-saving gap from drifting to the transition instant's reading across zone changes.
+        var rangeIsUntouchedSinceLastReinterpretation = _lastReinterpretation is { } last &&
+            last.AfterUtc == current.After && last.BeforeUtc == current.Before;
+        var afterWallClock = rangeIsUntouchedSinceLastReinterpretation ?
+            _lastReinterpretation!.Value.AfterWallClock :
+            current.After?.ConvertTimeZone(action.PreviousZone);
+        var beforeWallClock = rangeIsUntouchedSinceLastReinterpretation ?
+            _lastReinterpretation!.Value.BeforeWallClock :
+            current.Before?.ConvertTimeZone(action.PreviousZone);
+
+        var reinterpreted = current with
+        {
+            After = afterWallClock?.ConvertWallClockToUtc(action.NewZone, AmbiguousTimeResolution.Earliest),
+            Before = beforeWallClock?.ConvertWallClockToUtc(action.NewZone, AmbiguousTimeResolution.Latest)
+        };
+
+        // Bounds inside a repeated fall-back hour can read in reverse order; re-reading them would hide every event, so
+        // such a range keeps its instants.
+        if (reinterpreted.After > reinterpreted.Before && !(current.After > current.Before))
+        {
+            _lastReinterpretation = null;
+
+            return Task.CompletedTask;
+        }
+
+        _lastReinterpretation = (reinterpreted.After, reinterpreted.Before, afterWallClock, beforeWallClock);
+
+        if (reinterpreted != current)
+        {
+            dispatcher.Dispatch(new SetFilterDateRangeSuccessAction(reinterpreted));
+        }
+
         return Task.CompletedTask;
     }
 
@@ -138,31 +205,11 @@ internal sealed class Effects
     [EffectMethod]
     public Task HandleSetFilterDateRange(SetFilterDateRangeAction action, IDispatcher dispatcher)
     {
-        if (action.DateFilter is null)
-        {
-            dispatcher.Dispatch(new SetFilterDateRangeSuccessAction(action.DateFilter));
+        // Clearing the range keeps the memory: a scenario rollback restores the exact prior range, which must still
+        // re-read from its remembered readings. Any newly written range forgets it.
+        if (action.DateFilter is not null) { _lastReinterpretation = null; }
 
-            return Task.CompletedTask;
-        }
-
-        DateTime? updatedAfter = action.DateFilter?.After ?? _filterPaneState.Value.FilteredDateRange?.After;
-        DateTime? updatedBefore = action.DateFilter?.Before ?? _filterPaneState.Value.FilteredDateRange?.Before;
-
-        if (updatedAfter is null || updatedBefore is null)
-        {
-            var (after, before) = _rawEventStore.Value.TryGetRawEventDateRange().RoundOrFallback(DateTime.UtcNow);
-
-            updatedAfter ??= after;
-            updatedBefore ??= before;
-        }
-
-        dispatcher.Dispatch(
-            new SetFilterDateRangeSuccessAction(
-                new DateFilter
-                {
-                    After = updatedAfter,
-                    Before = updatedBefore
-                }));
+        dispatcher.Dispatch(new SetFilterDateRangeSuccessAction(action.DateFilter));
 
         return Task.CompletedTask;
     }
@@ -215,6 +262,12 @@ internal sealed class Effects
 
         return Task.CompletedTask;
     }
+
+    private static DateTime? Earliest(DateTime? first, DateTime? second) =>
+        first is null ? second : second is null ? first : first < second ? first : second;
+
+    private static DateTime? Latest(DateTime? first, DateTime? second) =>
+        first is null ? second : second is null ? first : first > second ? first : second;
 
     private Filter BuildCandidate(FilterPaneState filterPaneState) =>
         EffectiveFilterBuilder.Build(FilterPaneFilterBuilder.Build(filterPaneState), _lensState.Value.Lenses);

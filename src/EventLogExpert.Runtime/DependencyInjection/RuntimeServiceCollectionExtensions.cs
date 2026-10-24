@@ -204,6 +204,9 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<FilterPromotedNotifier>();
             services.Forward<IFilterPromotedNotifier, FilterPromotedNotifier>();
 
+            // Eager lifecycle hosts (force-resolved by the composition root)
+            services.AddSingleton<DateFilterTimeZoneSynchronizer>();
+
             // Indicators, resolvers, formatters, and selectors
             services.AddSingleton<DisplayIndicatorGate>();
             services.AddSingleton<IEventDetailResolver, EventDetailResolver>();

@@ -10,6 +10,7 @@ using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.FilterLibrary;
+using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Scenarios;
 using EventLogExpert.Runtime.Scenarios.Favorites;
@@ -117,6 +118,7 @@ public static class MauiProgram
         mauiApp.Services.GetRequiredService<IAttentionBannerService>();
         mauiApp.Services.GetRequiredService<DatabaseRecoveryHost>();
         mauiApp.Services.GetRequiredService<DebugLogHost>();
+        mauiApp.Services.GetRequiredService<DateFilterTimeZoneSynchronizer>();
 
         return mauiApp;
     }

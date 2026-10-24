@@ -6,6 +6,7 @@ using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.UI.Inputs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EventLogExpert.UI.Tests.Inputs;
 
@@ -14,10 +15,17 @@ public sealed class DateRangeQuickPickTests : BunitContext
     private static readonly DateTime s_leapNow = new(2024, 2, 29, 12, 0, 0, DateTimeKind.Utc);
     private static readonly DateTime s_standardNow = new(2024, 6, 15, 12, 0, 0, DateTimeKind.Utc);
 
-    public DateRangeQuickPickTests() => JSInterop.Mode = JSRuntimeMode.Loose;
+    public DateRangeQuickPickTests()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddEventLogLocalization();
+    }
 
     public static IEnumerable<object[]> PresetCases() =>
     [
+        [s_standardNow, "Last 15 minutes", new DateTime(2024, 6, 15, 11, 45, 0, DateTimeKind.Utc)],
+        [s_standardNow, "Last 1 hour", new DateTime(2024, 6, 15, 11, 0, 0, DateTimeKind.Utc)],
+        [s_standardNow, "Last 24 hours", new DateTime(2024, 6, 14, 12, 0, 0, DateTimeKind.Utc)],
         [s_standardNow, "Last 7 days", new DateTime(2024, 6, 8, 12, 0, 0, DateTimeKind.Utc)],
         [s_standardNow, "Last 14 days", new DateTime(2024, 6, 1, 12, 0, 0, DateTimeKind.Utc)],
         [s_standardNow, "Last 1 month", new DateTime(2024, 5, 15, 12, 0, 0, DateTimeKind.Utc)],
@@ -51,8 +59,8 @@ public sealed class DateRangeQuickPickTests : BunitContext
         await dropdown.KeyDownAsync(new KeyboardEventArgs { Code = "ArrowDown" });
 
         Assert.Equal(2, captured.Count);
-        Assert.Equal(new DateTime(2024, 6, 8, 12, 0, 0, DateTimeKind.Utc), captured[0].After);
-        Assert.Equal(new DateTime(2024, 6, 1, 12, 0, 0, DateTimeKind.Utc), captured[1].After);
+        Assert.Equal(new DateTime(2024, 6, 15, 11, 45, 0, DateTimeKind.Utc), captured[0].After);
+        Assert.Equal(new DateTime(2024, 6, 15, 11, 0, 0, DateTimeKind.Utc), captured[1].After);
     }
 
     [Fact]
@@ -65,17 +73,45 @@ public sealed class DateRangeQuickPickTests : BunitContext
     }
 
     [Fact]
-    public void Render_ShowsPlaceholderAndSevenPresetOptions()
+    public void Render_WithEntireLogRange_OffersEntireLogFirst()
+    {
+        var component = Render<DateRangeQuickPick>(parameters => parameters
+            .Add(p => p.EntireLogRangeUtc, () => (s_leapNow, s_standardNow)));
+
+        var options = component.FindAll("[role='option']");
+
+        Assert.Equal(11, options.Count);
+        Assert.Equal("Entire log", options[0].TextContent.Trim());
+    }
+
+    [Fact]
+    public void Render_WithoutEntireLogRange_ShowsPlaceholderAndOnlyRelativePresets()
     {
         var component = Render<DateRangeQuickPick>();
 
         Assert.Equal("Quick range...", component.Find("input[role='combobox']").GetAttribute("value"));
-        Assert.Equal(7, component.FindAll("[role='option']").Count);
+        Assert.Equal(10, component.FindAll("[role='option']").Count);
+        Assert.DoesNotContain(component.FindAll("[role='option']"), option => option.TextContent.Trim() == "Entire log");
+    }
+
+    [Fact]
+    public async Task Selecting_EntireLog_EmitsTheSuppliedClosedRange()
+    {
+        DateFilter? captured = null;
+        var component = Render<DateRangeQuickPick>(parameters => parameters
+            .Add(p => p.EntireLogRangeUtc, () => (s_leapNow, s_standardNow))
+            .Add(p => p.OnRangeSelected, EventCallback.Factory.Create<DateFilter>(this, filter => captured = filter)));
+
+        await SelectPreset(component, "Entire log");
+
+        Assert.NotNull(captured);
+        Assert.Equal(s_leapNow, captured!.After);
+        Assert.Equal(s_standardNow, captured.Before);
     }
 
     [Theory]
     [MemberData(nameof(PresetCases))]
-    public async Task Selecting_Preset_EmitsExpectedUtcWindow(DateTime now, string label, DateTime expectedAfter)
+    public async Task Selecting_Preset_EmitsUtcStartWithAnOpenEnd(DateTime now, string label, DateTime expectedAfter)
     {
         DateFilter? captured = null;
         var component = Render<DateRangeQuickPick>(parameters => parameters
@@ -86,9 +122,9 @@ public sealed class DateRangeQuickPickTests : BunitContext
 
         Assert.NotNull(captured);
         Assert.Equal(expectedAfter, captured!.After);
-        Assert.Equal(now, captured.Before);
+        // An open end keeps newly arriving events of a live log inside the relative window.
+        Assert.Null(captured.Before);
         Assert.Equal(DateTimeKind.Utc, captured.After!.Value.Kind);
-        Assert.Equal(DateTimeKind.Utc, captured.Before!.Value.Kind);
         Assert.True(captured.IsEnabled);
     }
 

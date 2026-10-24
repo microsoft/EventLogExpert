@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.FilterLenses;
 
 namespace EventLogExpert.Runtime.Tests.FilterLenses;
@@ -68,65 +67,45 @@ public sealed class FilterLensFactoryTests
     }
 
     [Fact]
-    public void ForTimeRange_CrossesDisplayedMidnight_LabelIncludesDates()
+    public void ForTimeRange_NormalizesReversedUtcInstants()
     {
-        var after = new DateTime(2026, 7, 16, 23, 55, 0, DateTimeKind.Utc);
-        var before = new DateTime(2026, 7, 17, 0, 5, 0, DateTimeKind.Utc);
+        var earlierUtc = new DateTime(2026, 7, 16, 18, 0, 0, DateTimeKind.Utc);
+        var laterUtc = new DateTime(2026, 7, 16, 20, 0, 0, DateTimeKind.Utc);
 
-        var lens = FilterLensFactory.ForTimeRange(after, before, TimeZoneInfo.Utc);
+        var lens = FilterLensFactory.ForTimeRange(laterUtc, earlierUtc);
 
-        var afterLocal = after.ConvertTimeZone(TimeZoneInfo.Utc);
-        var beforeLocal = before.ConvertTimeZone(TimeZoneInfo.Utc);
         var range = Assert.IsType<FilterLensLabel.TimeRange>(lens.Label);
-        Assert.Equal(afterLocal, range.AfterLocal);
-        Assert.Equal(beforeLocal, range.BeforeLocal);
-        Assert.False(range.SameDay);
+        Assert.Equal(earlierUtc, range.AfterUtc);
+        Assert.Equal(laterUtc, range.BeforeUtc);
     }
 
     [Fact]
-    public void ForTimeRange_DayBoundaryEvaluatedInDisplayZoneNotUtc()
+    public void ForTimeRange_StoresTheProvidedUtcInstants()
     {
-        // Both endpoints share a UTC calendar day (2026-07-16), but the +5h display zone pushes them across displayed midnight, so the label must still show dates.
-        var plusFive = TimeZoneInfo.CreateCustomTimeZone("t+5", TimeSpan.FromHours(5), "t+5", "t+5");
-        var after = new DateTime(2026, 7, 16, 18, 0, 0, DateTimeKind.Utc);   // +5 => 2026-07-16 23:00
-        var before = new DateTime(2026, 7, 16, 20, 0, 0, DateTimeKind.Utc);  // +5 => 2026-07-17 01:00
+        var afterUtc = new DateTime(2026, 7, 16, 23, 55, 0, DateTimeKind.Utc);
+        var beforeUtc = new DateTime(2026, 7, 17, 0, 5, 0, DateTimeKind.Utc);
 
-        var lens = FilterLensFactory.ForTimeRange(after, before, plusFive);
+        var lens = FilterLensFactory.ForTimeRange(afterUtc, beforeUtc);
 
-        var afterLocal = after.ConvertTimeZone(plusFive);
-        var beforeLocal = before.ConvertTimeZone(plusFive);
-        Assert.NotEqual(afterLocal.Date, beforeLocal.Date);
         var range = Assert.IsType<FilterLensLabel.TimeRange>(lens.Label);
-        Assert.Equal(afterLocal, range.AfterLocal);
-        Assert.Equal(beforeLocal, range.BeforeLocal);
-        Assert.False(range.SameDay);
+        Assert.Equal(afterUtc, range.AfterUtc);
+        Assert.Equal(beforeUtc, range.BeforeUtc);
+        Assert.Equal(afterUtc, lens.Window!.After);
+        Assert.Equal(beforeUtc, lens.Window.Before);
     }
 
     [Fact]
-    public void ForTimeRange_WithinOneDisplayedDay_LabelShowsTimesOnly()
+    public void ForTimeWindow_StoresTheProvidedUtcCenter()
     {
-        var after = new DateTime(2026, 7, 16, 10, 0, 0, DateTimeKind.Utc);
-        var before = new DateTime(2026, 7, 16, 14, 30, 0, DateTimeKind.Utc);
-
-        var lens = FilterLensFactory.ForTimeRange(after, before, TimeZoneInfo.Utc);
-
-        var range = Assert.IsType<FilterLensLabel.TimeRange>(lens.Label);
-        Assert.Equal(after.ConvertTimeZone(TimeZoneInfo.Utc), range.AfterLocal);
-        Assert.Equal(before.ConvertTimeZone(TimeZoneInfo.Utc), range.BeforeLocal);
-        Assert.True(range.SameDay);
-    }
-
-    [Fact]
-    public void ForTimeWindow_EmitsTimeWindowDescriptorInDisplayZone()
-    {
-        var timeCreated = new DateTime(2026, 7, 16, 18, 0, 0, DateTimeKind.Utc);
+        var centerUtc = new DateTime(2026, 7, 16, 18, 0, 0, DateTimeKind.Utc);
         var radius = TimeSpan.FromMinutes(5);
-        var plusFive = TimeZoneInfo.CreateCustomTimeZone("t+5", TimeSpan.FromHours(5), "t+5", "t+5");
 
-        var lens = FilterLensFactory.ForTimeWindow(timeCreated, radius, plusFive);
+        var lens = FilterLensFactory.ForTimeWindow(centerUtc, radius);
 
         var window = Assert.IsType<FilterLensLabel.TimeWindow>(lens.Label);
-        Assert.Equal(timeCreated.ConvertTimeZone(plusFive), window.CenterLocal);
+        Assert.Equal(centerUtc, window.CenterUtc);
         Assert.Equal(radius, window.Radius);
+        Assert.Equal(centerUtc.Add(-radius), lens.Window!.After);
+        Assert.Equal(centerUtc.Add(radius), lens.Window.Before);
     }
 }

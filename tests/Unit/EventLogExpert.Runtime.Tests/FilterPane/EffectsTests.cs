@@ -1,9 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.Eventing.Common.EventLogs;
-using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Filtering.TestUtils.Constants;
@@ -12,8 +9,6 @@ using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Runtime.LogTable;
-using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using Fluxor;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -91,8 +86,6 @@ public sealed class EffectsTests
         filterPaneState.Value.Returns(new FilterPaneState());
         var appliedFilter = Substitute.For<IStateSelection<EventLogState, Filter>>();
         appliedFilter.Value.Returns(new Filter(null, []));
-        var rawEventStore = Substitute.For<IState<RawEventStoreState>>();
-        rawEventStore.Value.Returns(new RawEventStoreState());
         var lensState = Substitute.For<IState<FilterLensState>>();
         lensState.Value.Returns(new FilterLensState());
 
@@ -101,7 +94,7 @@ public sealed class EffectsTests
         notifier.Requested += () => raised++;
 
         var effects = new Effects(
-            appliedFilter, rawEventStore, filterPaneState, lensState,
+            appliedFilter, filterPaneState, lensState,
             notifier, new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()),
             new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
 
@@ -234,6 +227,230 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleNarrowFilterDateRange_AfterOnly_KeepsExistingBeforeAndEnablesRange()
+    {
+        var newAfter = new DateTime(2024, 1, 1, 10, 0, 0, DateTimeKind.Utc);
+        var existingBefore = new DateTime(2024, 1, 1, 16, 0, 0, DateTimeKind.Utc);
+        var (effects, dispatcher) = CreateEffects(
+            filteredDateRange: new DateFilter { After = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc), Before = existingBefore });
+
+        await effects.HandleNarrowFilterDateRange(new NarrowFilterDateRangeAction(After: newAfter, Before: null), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(action =>
+            action != null && action.DateFilter == new DateFilter
+            {
+                After = newAfter,
+                Before = existingBefore,
+                IsEnabled = true
+            }));
+    }
+
+    [Fact]
+    public async Task HandleNarrowFilterDateRange_BeforeOnly_KeepsExistingAfterAndEnablesRange()
+    {
+        var existingAfter = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc);
+        var newBefore = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var (effects, dispatcher) = CreateEffects(
+            filteredDateRange: new DateFilter { After = existingAfter, Before = new DateTime(2024, 1, 1, 16, 0, 0, DateTimeKind.Utc) });
+
+        await effects.HandleNarrowFilterDateRange(new NarrowFilterDateRangeAction(After: null, Before: newBefore), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(action =>
+            action != null && action.DateFilter == new DateFilter
+            {
+                After = existingAfter,
+                Before = newBefore,
+                IsEnabled = true
+            }));
+    }
+
+    [Fact]
+    public async Task HandleNarrowFilterDateRange_WhenRangeIsDisabled_DoesNotCarryItsBounds()
+    {
+        var newAfter = new DateTime(2024, 3, 1, 0, 0, 0, DateTimeKind.Utc);
+        var (effects, dispatcher) = CreateEffects(
+            filteredDateRange: new DateFilter { Before = new DateTime(2024, 2, 1, 0, 0, 0, DateTimeKind.Utc), IsEnabled = false });
+
+        await effects.HandleNarrowFilterDateRange(new NarrowFilterDateRangeAction(After: newAfter, Before: null), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(action =>
+            action != null && action.DateFilter == new DateFilter { After = newAfter, IsEnabled = true }));
+    }
+
+    [Fact]
+    public async Task HandleNarrowFilterDateRange_WhenTheSuppliedBoundIsLooser_KeepsTheTighterExistingBound()
+    {
+        var existingAfter = new DateTime(2024, 1, 1, 15, 0, 0, DateTimeKind.Utc);
+        var (effects, dispatcher) = CreateEffects(filteredDateRange: new DateFilter { After = existingAfter });
+
+        await effects.HandleNarrowFilterDateRange(
+            new NarrowFilterDateRangeAction(After: new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc), Before: null),
+            dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(action =>
+            action != null && action.DateFilter == new DateFilter { After = existingAfter, IsEnabled = true }));
+    }
+
+    [Fact]
+    public async Task HandleNarrowFilterDateRange_WithoutExistingRange_LeavesUnspecifiedSideOpen()
+    {
+        var before = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var (effects, dispatcher) = CreateEffects();
+
+        await effects.HandleNarrowFilterDateRange(new NarrowFilterDateRangeAction(After: null, Before: before), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(action =>
+            action != null && action.DateFilter == new DateFilter
+            {
+                Before = before,
+                IsEnabled = true
+            }));
+    }
+
+    [Fact]
+    public async Task HandleReinterpretFilterDateRange_AfterAClearAndRestore_StillRestoresTheOriginalReading()
+    {
+        var daylightBegins = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(
+            new DateTime(1, 1, 1, 2, 0, 0), month: 3, week: 2, DayOfWeek.Sunday);
+        var daylightEnds = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(
+            new DateTime(1, 1, 1, 2, 0, 0), month: 11, week: 1, DayOfWeek.Sunday);
+        var easternZone = TimeZoneInfo.CreateCustomTimeZone(
+            "test-eastern", TimeSpan.FromHours(-5), "test-eastern", "test-eastern", "test-eastern",
+            [TimeZoneInfo.AdjustmentRule.CreateAdjustmentRule(
+                new DateTime(2024, 1, 1), new DateTime(2024, 12, 31), TimeSpan.FromHours(1), daylightBegins, daylightEnds)]);
+        var originalAfter = new DateTime(2024, 3, 10, 2, 30, 0, DateTimeKind.Utc);
+        var paneState = Substitute.For<IState<FilterPaneState>>();
+        DateFilter? currentRange = new DateFilter { After = originalAfter };
+        paneState.Value.Returns(_ => new FilterPaneState { FilteredDateRange = currentRange });
+        var (effects, dispatcher) = CreateEffects(filterPaneState: paneState);
+        dispatcher.When(mock => mock.Dispatch(Arg.Any<SetFilterDateRangeSuccessAction>()))
+            .Do(call => currentRange = call.Arg<SetFilterDateRangeSuccessAction>().DateFilter);
+
+        await effects.HandleReinterpretFilterDateRange(
+            new ReinterpretFilterDateRangeAction(TimeZoneInfo.Utc, easternZone), dispatcher);
+        var rangeBeforeScenarioLaunch = currentRange;
+        // A failed scenario launch clears the range, then restores the prior pane state.
+        await effects.HandleSetFilterDateRange(new SetFilterDateRangeAction(null), dispatcher);
+        currentRange = rangeBeforeScenarioLaunch;
+        await effects.HandleReinterpretFilterDateRange(
+            new ReinterpretFilterDateRangeAction(easternZone, TimeZoneInfo.Utc), dispatcher);
+
+        Assert.Equal(originalAfter, currentRange?.After);
+    }
+
+    [Fact]
+    public async Task HandleReinterpretFilterDateRange_AfterTheUserSetsTheRange_ReadsTheNewRangeNotTheRememberedOne()
+    {
+        var daylightBegins = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(
+            new DateTime(1, 1, 1, 2, 0, 0), month: 3, week: 2, DayOfWeek.Sunday);
+        var daylightEnds = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(
+            new DateTime(1, 1, 1, 2, 0, 0), month: 11, week: 1, DayOfWeek.Sunday);
+        var easternZone = TimeZoneInfo.CreateCustomTimeZone(
+            "test-eastern", TimeSpan.FromHours(-5), "test-eastern", "test-eastern", "test-eastern",
+            [TimeZoneInfo.AdjustmentRule.CreateAdjustmentRule(
+                new DateTime(2024, 1, 1), new DateTime(2024, 12, 31), TimeSpan.FromHours(1), daylightBegins, daylightEnds)]);
+        var transitionInstant = new DateTime(2024, 3, 10, 7, 0, 0, DateTimeKind.Utc);
+        var paneState = Substitute.For<IState<FilterPaneState>>();
+        var currentRange = new DateFilter { After = new DateTime(2024, 3, 10, 2, 30, 0, DateTimeKind.Utc) };
+        paneState.Value.Returns(_ => new FilterPaneState { FilteredDateRange = currentRange });
+        var (effects, dispatcher) = CreateEffects(filterPaneState: paneState);
+        dispatcher.When(mock => mock.Dispatch(Arg.Any<SetFilterDateRangeSuccessAction>()))
+            .Do(call => currentRange = call.Arg<SetFilterDateRangeSuccessAction>().DateFilter);
+
+        await effects.HandleReinterpretFilterDateRange(
+            new ReinterpretFilterDateRangeAction(TimeZoneInfo.Utc, easternZone), dispatcher);
+        // The user applies 03:00 Eastern, which is the same instant the skipped 02:30 was re-read to.
+        await effects.HandleSetFilterDateRange(new SetFilterDateRangeAction(new DateFilter { After = transitionInstant }), dispatcher);
+        await effects.HandleReinterpretFilterDateRange(
+            new ReinterpretFilterDateRangeAction(easternZone, TimeZoneInfo.Utc), dispatcher);
+
+        Assert.Equal(new DateTime(2024, 3, 10, 3, 0, 0, DateTimeKind.Utc), currentRange?.After);
+    }
+
+    [Fact]
+    public async Task HandleReinterpretFilterDateRange_KeepsWallClockReadingsAndDisabledState()
+    {
+        var previousZone = TimeZoneInfo.CreateCustomTimeZone("test+2", TimeSpan.FromHours(2), "test+2", "test+2");
+        var newZone = TimeZoneInfo.CreateCustomTimeZone("test-5", TimeSpan.FromHours(-5), "test-5", "test-5");
+        var currentRange = new DateFilter
+        {
+            After = new DateTime(2024, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+            Before = new DateTime(2024, 1, 1, 14, 0, 0, DateTimeKind.Utc),
+            IsEnabled = false
+        };
+        var (effects, dispatcher) = CreateEffects(filteredDateRange: currentRange);
+
+        await effects.HandleReinterpretFilterDateRange(
+            new ReinterpretFilterDateRangeAction(previousZone, newZone), dispatcher);
+
+        dispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(action =>
+            action != null && action.DateFilter == new DateFilter
+            {
+                After = new DateTime(2024, 1, 1, 17, 0, 0, DateTimeKind.Utc),
+                Before = new DateTime(2024, 1, 1, 21, 0, 0, DateTimeKind.Utc),
+                IsEnabled = false
+            }));
+    }
+
+    [Fact]
+    public async Task HandleReinterpretFilterDateRange_RoundTripThroughADaylightSavingGap_RestoresTheOriginalReading()
+    {
+        var daylightBegins = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(
+            new DateTime(1, 1, 1, 2, 0, 0), month: 3, week: 2, DayOfWeek.Sunday);
+        var daylightEnds = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(
+            new DateTime(1, 1, 1, 2, 0, 0), month: 11, week: 1, DayOfWeek.Sunday);
+        var easternZone = TimeZoneInfo.CreateCustomTimeZone(
+            "test-eastern", TimeSpan.FromHours(-5), "test-eastern", "test-eastern", "test-eastern",
+            [TimeZoneInfo.AdjustmentRule.CreateAdjustmentRule(
+                new DateTime(2024, 1, 1), new DateTime(2024, 12, 31), TimeSpan.FromHours(1), daylightBegins, daylightEnds)]);
+        var originalAfter = new DateTime(2024, 3, 10, 2, 30, 0, DateTimeKind.Utc);
+        var paneState = Substitute.For<IState<FilterPaneState>>();
+        var currentRange = new DateFilter { After = originalAfter };
+        paneState.Value.Returns(_ => new FilterPaneState { FilteredDateRange = currentRange });
+        var (effects, dispatcher) = CreateEffects(filterPaneState: paneState);
+        dispatcher.When(mock => mock.Dispatch(Arg.Any<SetFilterDateRangeSuccessAction>()))
+            .Do(call => currentRange = call.Arg<SetFilterDateRangeSuccessAction>().DateFilter);
+
+        await effects.HandleReinterpretFilterDateRange(
+            new ReinterpretFilterDateRangeAction(TimeZoneInfo.Utc, easternZone), dispatcher);
+        var afterInEastern = currentRange?.After;
+        await effects.HandleReinterpretFilterDateRange(
+            new ReinterpretFilterDateRangeAction(easternZone, TimeZoneInfo.Utc), dispatcher);
+
+        Assert.Equal(new DateTime(2024, 3, 10, 7, 0, 0, DateTimeKind.Utc), afterInEastern);
+        Assert.Equal(originalAfter, currentRange?.After);
+    }
+
+    [Fact]
+    public async Task HandleReinterpretFilterDateRange_WhenNoRangeExists_DoesNotDispatch()
+    {
+        var (effects, dispatcher) = CreateEffects();
+        var previousZone = TimeZoneInfo.CreateCustomTimeZone("test+2", TimeSpan.FromHours(2), "test+2", "test+2");
+        var newZone = TimeZoneInfo.CreateCustomTimeZone("test-5", TimeSpan.FromHours(-5), "test-5", "test-5");
+
+        await effects.HandleReinterpretFilterDateRange(
+            new ReinterpretFilterDateRangeAction(previousZone, newZone), dispatcher);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterDateRangeSuccessAction>());
+    }
+
+    [Fact]
+    public async Task HandleReinterpretFilterDateRange_WhenZoneDoesNotChangeRange_DoesNotDispatch()
+    {
+        var zone = TimeZoneInfo.CreateCustomTimeZone("test+2", TimeSpan.FromHours(2), "test+2", "test+2");
+        var currentRange = new DateFilter
+        {
+            After = new DateTime(2024, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+            Before = new DateTime(2024, 1, 1, 14, 0, 0, DateTimeKind.Utc)
+        };
+        var (effects, dispatcher) = CreateEffects(filteredDateRange: currentRange);
+
+        await effects.HandleReinterpretFilterDateRange(new ReinterpretFilterDateRangeAction(zone, zone), dispatcher);
+
+        dispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterDateRangeSuccessAction>());
+    }
+
+    [Fact]
     public async Task HandleRemoveAdvancedFilter_ShouldUpdateEventTableFilters()
     {
         var (effects, mockDispatcher) = CreateEffects(
@@ -252,8 +469,6 @@ public sealed class EffectsTests
         filterPaneState.Value.Returns(new FilterPaneState());
         var appliedFilter = Substitute.For<IStateSelection<EventLogState, Filter>>();
         appliedFilter.Value.Returns(new Filter(null, []));
-        var rawEventStore = Substitute.For<IState<RawEventStoreState>>();
-        rawEventStore.Value.Returns(new RawEventStoreState());
         var lensState = Substitute.For<IState<FilterLensState>>();
         lensState.Value.Returns(new FilterLensState());
 
@@ -262,7 +477,7 @@ public sealed class EffectsTests
         notifier.Succeeded += () => raised++;
 
         var effects = new Effects(
-            appliedFilter, rawEventStore, filterPaneState, lensState,
+            appliedFilter, filterPaneState, lensState,
             new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), notifier,
             new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
 
@@ -286,156 +501,24 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleSetFilterDateRange_WhenAfterIsNull_ShouldUseRangeFromActiveLogs()
+    public async Task HandleSetFilterDateRange_PassesReplacementVerbatimWithNullBoundOpen()
     {
-        var oldest = new DateTime(2024, 1, 1, 8, 30, 45, DateTimeKind.Utc);
-        var newest = new DateTime(2024, 1, 1, 14, 15, 0, DateTimeKind.Utc);
-        var unrelatedBefore = new DateTime(2024, 1, 1, 23, 0, 0, DateTimeKind.Utc);
-
-        var events = new List<ResolvedEvent>
+        var existingRange = new DateFilter
         {
-            FilterEventBuilder.CreateTestEvent(timeCreated: newest),
-            FilterEventBuilder.CreateTestEvent(timeCreated: oldest)
+            After = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc),
+            Before = new DateTime(2024, 1, 1, 16, 0, 0, DateTimeKind.Utc)
         };
-
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
-
-        var (effects, mockDispatcher) = CreateEffects(logsWithEvents: [(logData, events)]);
-        var action = new SetFilterDateRangeAction(new DateFilter { Before = unrelatedBefore });
-
-        await effects.HandleSetFilterDateRange(action, mockDispatcher);
-
-        var expectedAfter = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc);
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
-            x != null &&
-            x.DateFilter != null &&
-            x.DateFilter.After == expectedAfter &&
-            x.DateFilter.Before == unrelatedBefore));
-    }
-
-    [Fact]
-    public async Task HandleSetFilterDateRange_WhenBeforeIsNull_ShouldUseRangeFromActiveLogs()
-    {
-        var oldest = new DateTime(2024, 1, 1, 8, 30, 45, DateTimeKind.Utc);
-        var newest = new DateTime(2024, 1, 1, 14, 15, 0, DateTimeKind.Utc);
-        var unrelatedAfter = new DateTime(2023, 12, 1, 0, 0, 0, DateTimeKind.Utc);
-
-        var events = new List<ResolvedEvent>
+        var replacement = new DateFilter
         {
-            FilterEventBuilder.CreateTestEvent(timeCreated: newest),
-            FilterEventBuilder.CreateTestEvent(timeCreated: oldest)
+            Before = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc),
+            IsEnabled = false
         };
+        var (effects, dispatcher) = CreateEffects(filteredDateRange: existingRange);
 
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel);
+        await effects.HandleSetFilterDateRange(new SetFilterDateRangeAction(replacement), dispatcher);
 
-        var (effects, mockDispatcher) = CreateEffects(logsWithEvents: [(logData, events)]);
-        var action = new SetFilterDateRangeAction(new DateFilter { After = unrelatedAfter });
-
-        await effects.HandleSetFilterDateRange(action, mockDispatcher);
-
-        var expectedBefore = new DateTime(2024, 1, 1, 15, 0, 0, DateTimeKind.Utc);
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
-            x != null &&
-            x.DateFilter != null &&
-            x.DateFilter.After == unrelatedAfter &&
-            x.DateFilter.Before == expectedBefore));
-    }
-
-    [Fact]
-    public async Task HandleSetFilterDateRange_WhenBothNullAcrossMultipleLogs_ShouldComputeRange()
-    {
-        var logAOldest = new DateTime(2024, 1, 1, 4, 0, 0, DateTimeKind.Utc);
-        var logANewest = new DateTime(2024, 1, 1, 6, 0, 0, DateTimeKind.Utc);
-        var logBOldest = new DateTime(2024, 1, 5, 20, 0, 0, DateTimeKind.Utc);
-        var logBNewest = new DateTime(2024, 1, 5, 22, 0, 0, DateTimeKind.Utc);
-
-        var eventsA = new List<ResolvedEvent>
-        {
-            FilterEventBuilder.CreateTestEvent(timeCreated: logANewest),
-            FilterEventBuilder.CreateTestEvent(timeCreated: logAOldest)
-        };
-
-        var eventsB = new List<ResolvedEvent>
-        {
-            FilterEventBuilder.CreateTestEvent(timeCreated: logBNewest),
-            FilterEventBuilder.CreateTestEvent(timeCreated: logBOldest)
-        };
-
-        var logA = new EventLogData(
-            "LogA",
-            LogPathType.Channel);
-        var logB = new EventLogData(
-            "LogB",
-            LogPathType.Channel);
-
-        var (effects, mockDispatcher) = CreateEffects(logsWithEvents: [(logA, eventsA), (logB, eventsB)]);
-        var action = new SetFilterDateRangeAction(new DateFilter());
-
-        await effects.HandleSetFilterDateRange(action, mockDispatcher);
-
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
-            x != null &&
-            x.DateFilter != null &&
-            x.DateFilter.After == new DateTime(2024, 1, 1, 4, 0, 0, DateTimeKind.Utc) &&
-            x.DateFilter.Before == new DateTime(2024, 1, 5, 22, 0, 0, DateTimeKind.Utc)));
-    }
-
-    [Fact]
-    public async Task HandleSetFilterDateRange_WhenBothProvided_ShouldUseProvidedValues()
-    {
-        var after = new DateTime(2024, 1, 1, 10, 0, 0, DateTimeKind.Utc);
-        var before = new DateTime(2024, 1, 1, 14, 0, 0, DateTimeKind.Utc);
-
-        var (effects, mockDispatcher) = CreateEffects();
-        var action = new SetFilterDateRangeAction(new DateFilter { After = after, Before = before });
-
-        await effects.HandleSetFilterDateRange(action, mockDispatcher);
-
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
-            x != null &&
-            x.DateFilter != null &&
-            x.DateFilter.After == after &&
-            x.DateFilter.Before == before));
-    }
-
-    [Fact]
-    public async Task HandleSetFilterDateRange_WhenExistingDateRangeHasAfter_ShouldUseExistingAfter()
-    {
-        var existingAfter = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc);
-        var newBefore = new DateTime(2024, 1, 1, 16, 0, 0, DateTimeKind.Utc);
-
-        var (effects, mockDispatcher) = CreateEffects(
-            filteredDateRange: new DateFilter { After = existingAfter });
-
-        var action = new SetFilterDateRangeAction(new DateFilter { Before = newBefore });
-
-        await effects.HandleSetFilterDateRange(action, mockDispatcher);
-
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
-            x != null &&
-            x.DateFilter != null &&
-            x.DateFilter.After == existingAfter &&
-            x.DateFilter.Before == newBefore));
-    }
-
-    [Fact]
-    public async Task HandleSetFilterDateRange_WhenExistingDateRangeHasBefore_ShouldUseExistingBefore()
-    {
-        var existingBefore = new DateTime(2024, 1, 1, 16, 0, 0, DateTimeKind.Utc);
-        var newAfter = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc);
-
-        var (effects, mockDispatcher) = CreateEffects(
-            filteredDateRange: new DateFilter { Before = existingBefore });
-
-        var action = new SetFilterDateRangeAction(new DateFilter { After = newAfter });
-
-        await effects.HandleSetFilterDateRange(action, mockDispatcher);
-
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
-            x != null &&
-            x.DateFilter != null &&
-            x.DateFilter.After == newAfter &&
-            x.DateFilter.Before == existingBefore));
+        dispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(action =>
+            action != null && action.DateFilter == replacement));
     }
 
     [Fact]
@@ -637,9 +720,6 @@ public sealed class EffectsTests
         var applied = Substitute.For<IStateSelection<EventLogState, Filter>>();
         applied.Value.Returns(appliedFilter);
 
-        var rawEventStore = Substitute.For<IState<RawEventStoreState>>();
-        rawEventStore.Value.Returns(new RawEventStoreState());
-
         var lensState = Substitute.For<IState<FilterLensState>>();
         lensState.Value.Returns(new FilterLensState());
 
@@ -652,7 +732,7 @@ public sealed class EffectsTests
         dateResyncNotifier.Succeeded += () => dateResyncRaised++;
 
         var effects = new Effects(
-            applied, rawEventStore, filterPaneState, lensState,
+            applied, filterPaneState, lensState,
             new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()),
             dateResyncNotifier,
             promotedNotifier);
@@ -664,41 +744,34 @@ public sealed class EffectsTests
         bool isEnabled = false,
         ImmutableList<SavedFilter>? filters = null,
         DateFilter? filteredDateRange = null,
-        IReadOnlyList<(EventLogData Log, IReadOnlyList<ResolvedEvent> Events)>? logsWithEvents = null,
-        Filter? appliedFilter = null)
+        Filter? appliedFilter = null,
+        IState<FilterPaneState>? filterPaneState = null)
     {
-        var mockFilterPaneState = Substitute.For<IState<FilterPaneState>>();
+        var mockFilterPaneState = filterPaneState ?? Substitute.For<IState<FilterPaneState>>();
 
-        mockFilterPaneState.Value.Returns(new FilterPaneState
+        if (filterPaneState is null)
         {
-            IsEnabled = isEnabled,
-            Filters = filters ?? ImmutableList<SavedFilter>.Empty,
-            FilteredDateRange = filteredDateRange
-        });
+            mockFilterPaneState.Value.Returns(new FilterPaneState
+            {
+                IsEnabled = isEnabled,
+                Filters = filters ?? ImmutableList<SavedFilter>.Empty,
+                FilteredDateRange = filteredDateRange
+            });
+        }
 
         var mockAppliedFilter = Substitute.For<IStateSelection<EventLogState, Filter>>();
         mockAppliedFilter.Value.Returns(appliedFilter ?? new Filter(null, []));
 
-        var logs = logsWithEvents ?? [];
-        var rawStore = new RawEventStoreState();
-
-        foreach (var (logData, logEvents) in logs)
-        {
-            rawStore = RawEventStoreReducers.ReduceAddTable(rawStore, new AddTableAction(logData));
-            rawStore = RawEventStoreReducers.ReduceIngestRawEvents(
-                rawStore,
-                new IngestRawEventsAction(
-                    new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> { [logData.Id] = logEvents },
-                    RawIngestMode.Append));
-        }
-
-        var mockRawEventStore = Substitute.For<IState<RawEventStoreState>>();
-        mockRawEventStore.Value.Returns(rawStore);
-
         var mockLensState = Substitute.For<IState<FilterLensState>>();
         mockLensState.Value.Returns(new FilterLensState());
 
-        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState, mockLensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()), new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
+        var effects = new Effects(
+            mockAppliedFilter,
+            mockFilterPaneState,
+            mockLensState,
+            new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()),
+            new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()),
+            new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
         var mockDispatcher = Substitute.For<IDispatcher>();
 
         return (effects, mockDispatcher);

@@ -126,53 +126,119 @@
 <div class="filter-set" data-toggle="@MenuState">
     @if (IsDateFilterVisible)
     {
-        <EditForm EditContext="_editContext" class="filter-form flex-row">
-            <span>
-                @Localizer["FilterPane_Date_AfterLabel"]
-                <InputDate Type="InputDateType.DateTimeLocal" aria-label="@Localizer["FilterPane_Date_AfterAria"]" @bind-Value="ModelAfter" class="filter-datetime input" disabled="@(!_canEditDate)" />
-            </span>
-            <span>
-                @Localizer["FilterPane_Date_BeforeLabel"]
-                <InputDate Type="InputDateType.DateTimeLocal" aria-label="@Localizer["FilterPane_Date_BeforeAria"]" @bind-Value="ModelBefore" class="filter-datetime input" disabled="@(!_canEditDate)" />
-            </span>
-
-            @if (_canEditDate)
-            {
-                <span>
-                    @Localizer["FilterPane_Date_QuickRangeLabel"]
-                    <DateRangeQuickPick AriaLabel="@Localizer["FilterPane_Date_QuickRangeAria"]" CssClass="input filter-datetime" OnRangeSelected="SetQuickDateRange" />
+        <EditForm EditContext="_editContext" OnSubmit="ApplyDateFilter">
+            <div class="filter-form flex-row">
+                @* Escape is scoped to the bounds so it does not also cancel when closing the quick-range dropdown. *@
+                <span class="filter-date-bounds" @onkeydown="HandleDateFormKeyDown" @onkeydown:stopPropagation="_canEditDate">
+                    <span>
+                        @Localizer["FilterPane_Date_AfterLabel"]
+                        @if (_canEditDate || _dateDraft.After is not null)
+                        {
+                            <InputDate Type="InputDateType.DateTimeLocal"
+                                aria-label="@Localizer["FilterPane_Date_AfterAria"]"
+                                @bind-Value="_dateDraft.After"
+                                class="filter-datetime input"
+                                disabled="@(!_canEditDate)"
+                                step="1" />
+                        }
+                        else
+                        {
+                            <span class="filter-date-no-limit">@Localizer["FilterPane_Date_NoLimit"]</span>
+                        }
+                        @if (_canEditDate && _dateDraft.After is not null)
+                        {
+                            <Button IconClass="bi bi-x-lg"
+                                IconOnly
+                                OnClick="ClearDraftAfter"
+                                aria-label="@Localizer["FilterPane_Date_ClearAfterAria"]"
+                                data-tooltip="@Localizer["FilterPane_Date_ClearAfterAria"]" />
+                        }
+                    </span>
+                    <span>
+                        @Localizer["FilterPane_Date_BeforeLabel"]
+                        @if (_canEditDate || _dateDraft.Before is not null)
+                        {
+                            <InputDate Type="InputDateType.DateTimeLocal"
+                                aria-label="@Localizer["FilterPane_Date_BeforeAria"]"
+                                @bind-Value="_dateDraft.Before"
+                                class="filter-datetime input"
+                                disabled="@(!_canEditDate)"
+                                step="1" />
+                        }
+                        else
+                        {
+                            <span class="filter-date-no-limit">@Localizer["FilterPane_Date_NoLimit"]</span>
+                        }
+                        @if (_canEditDate && _dateDraft.Before is not null)
+                        {
+                            <Button IconClass="bi bi-x-lg"
+                                IconOnly
+                                OnClick="ClearDraftBefore"
+                                aria-label="@Localizer["FilterPane_Date_ClearBeforeAria"]"
+                                data-tooltip="@Localizer["FilterPane_Date_ClearBeforeAria"]" />
+                        }
+                    </span>
                 </span>
+                <span class="filter-date-zone">@Localizer["FilterPane_Date_TimeZoneLabel", Settings.TimeZoneInfo.DisplayName]</span>
 
-                <PrimaryButton IconClass="bi bi-check-circle" OnClick="ApplyDateFilter">
-                    @Localizer["FilterPane_Action_Apply"]
-                </PrimaryButton>
-
-                <DangerButton IconClass="bi bi-dash-circle" OnClick="RemoveDateFilter">
-                    @Localizer["FilterPane_Action_Remove"]
-                </DangerButton>
-            }
-            else
-            {
-                <Button IconClass="bi bi-funnel" OnClick="EditDateFilter">
-                    @Localizer["FilterPane_Action_Edit"]
-                </Button>
-
-                <DangerButton IconClass="bi bi-dash-circle" OnClick="RemoveDateFilter">
-                    @Localizer["FilterPane_Action_Remove"]
-                </DangerButton>
-
-                @if (FilteredDateRange.Current?.IsEnabled is true)
+                @if (_canEditDate)
                 {
-                    <DangerButton IconClass="bi bi-dash-circle" OnClick="ToggleDateFilter">
-                        @Localizer["FilterPane_Action_Disable"]
+                    <span>
+                        @Localizer["FilterPane_Date_QuickRangeLabel"]
+                        <DateRangeQuickPick AriaLabel="@Localizer["FilterPane_Date_QuickRangeAria"]"
+                            CssClass="input filter-datetime"
+                            EntireLogRangeUtc="GetEntireLogRangeUtc"
+                            OnRangeSelected="SetQuickDateRange" />
+                    </span>
+
+                    <PrimaryButton Disabled="@(DateDraftError is not null)" IconClass="bi bi-check-circle" Type="submit">
+                        @Localizer["FilterPane_Action_Apply"]
+                    </PrimaryButton>
+
+                    <Button IconClass="bi bi-x-circle" OnClick="CancelDateFilterEdit">
+                        @Localizer["FilterPane_Action_Cancel"]
+                    </Button>
+
+                    <DangerButton IconClass="bi bi-dash-circle" OnClick="RemoveDateFilter">
+                        @Localizer["FilterPane_Action_Remove"]
                     </DangerButton>
                 }
                 else
                 {
-                    <PrimaryButton IconClass="bi bi-plus-circle" OnClick="ToggleDateFilter">
-                        @Localizer["FilterPane_Action_Enable"]
-                    </PrimaryButton>
+                    <Button IconClass="bi bi-funnel" OnClick="EditDateFilter">
+                        @Localizer["FilterPane_Action_Edit"]
+                    </Button>
+
+                    <DangerButton IconClass="bi bi-dash-circle" OnClick="RemoveDateFilter">
+                        @Localizer["FilterPane_Action_Remove"]
+                    </DangerButton>
+
+                    @if (FilteredDateRange.Current?.IsEnabled is true)
+                    {
+                        <DangerButton IconClass="bi bi-dash-circle" OnClick="ToggleDateFilter">
+                            @Localizer["FilterPane_Action_Disable"]
+                        </DangerButton>
+                    }
+                    else
+                    {
+                        <PrimaryButton IconClass="bi bi-plus-circle" OnClick="ToggleDateFilter">
+                            @Localizer["FilterPane_Action_Enable"]
+                        </PrimaryButton>
+                    }
                 }
+            </div>
+            @if (_canEditDate)
+            {
+                <div aria-live="polite" class="filter-date-messages">
+                    @if (DateDraftError is { } dateError)
+                    {
+                        <div class="validation-message">@dateError</div>
+                    }
+                    @foreach (var skippedTimeWarning in DateDraftSkippedTimeWarnings)
+                    {
+                        <div class="filter-date-warning">@skippedTimeWarning</div>
+                    }
+                </div>
             }
         </EditForm>
     }

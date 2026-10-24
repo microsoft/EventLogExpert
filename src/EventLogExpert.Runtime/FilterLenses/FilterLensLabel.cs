@@ -13,7 +13,9 @@ public abstract record FilterLensLabel
 
     public sealed record ParentActivity(Guid ActivityId) : FilterLensLabel;
 
-    public sealed record TimeRange(DateTime AfterLocal, DateTime BeforeLocal, bool SameDay) : FilterLensLabel;
+    /// <summary>UTC bounds; formatted in the display zone at render time so a zone change re-labels the chip.</summary>
+    public sealed record TimeRange(DateTime AfterUtc, DateTime BeforeUtc) : FilterLensLabel;
 
-    public sealed record TimeWindow(DateTime CenterLocal, TimeSpan Radius) : FilterLensLabel;
+    /// <summary>UTC center; formatted in the display zone at render time so a zone change re-labels the chip.</summary>
+    public sealed record TimeWindow(DateTime CenterUtc, TimeSpan Radius) : FilterLensLabel;
 }

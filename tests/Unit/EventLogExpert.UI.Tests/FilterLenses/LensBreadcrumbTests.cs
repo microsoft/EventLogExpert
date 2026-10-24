@@ -8,6 +8,7 @@ using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLenses;
+using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.FilterLenses;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -29,12 +30,15 @@ public sealed class LensBreadcrumbTests : BunitContext
     private readonly IAlertDialogService _alertDialog = Substitute.For<IAlertDialogService>();
     private readonly IAnnouncementService _announcements = Substitute.For<IAnnouncementService>();
     private readonly IFilterLensCommands _commands = Substitute.For<IFilterLensCommands>();
+    private readonly ISettingsService _settings = Substitute.For<ISettingsService>();
     private readonly IFilterLensSource _source = Substitute.For<IFilterLensSource>();
 
     public LensBreadcrumbTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         _source.Lenses.Returns(ImmutableList<FilterLensSummary>.Empty);
+        _settings.TimeZoneInfo.Returns(TimeZoneInfo.Utc);
+        Services.AddSingleton(_settings);
         Services.AddSingleton(_commands);
         Services.AddSingleton(_source);
         Services.AddSingleton(_alertDialog);
@@ -690,6 +694,25 @@ public sealed class LensBreadcrumbTests : BunitContext
     }
 
     [Fact]
+    public void TimeZoneChanged_ReRendersTimeLensLabelsInTheNewZone()
+    {
+        var centerUtc = new DateTime(2024, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+        _source.Lenses.Returns(ImmutableList.Create(new FilterLensSummary(
+            FilterLensId.Create(),
+            new FilterLensLabel.TimeWindow(centerUtc, TimeSpan.FromHours(1)),
+            LensKind.TimeWindow)));
+        var newZone = TimeZoneInfo.CreateCustomTimeZone("H+05", TimeSpan.FromHours(5), "H+05", "H+05");
+        var expectedNewZoneTime = $"{new DateTime(2024, 6, 1, 17, 0, 0):T}";
+        var cut = Render<LensBreadcrumb>();
+        Assert.DoesNotContain(expectedNewZoneTime, cut.Markup);
+
+        _settings.TimeZoneInfo.Returns(newZone);
+        _settings.TimeZoneChanged?.Invoke(_settings, newZone);
+
+        cut.WaitForAssertion(() => Assert.Contains(expectedNewZoneTime, cut.Markup));
+    }
+
+    [Fact]
     public void WithLens_RendersLabel_AndRemoveButtonDispatchesRemoveLens()
     {
         var lens = Summary("abc");
@@ -734,7 +757,7 @@ public sealed class LensBreadcrumbTests : BunitContext
         new(FilterLensId.Create(), new FilterLensLabel.PropertyComparison(EventProperty.ActivityId, IsEqual: true, value));
 
     private static FilterLensSummary TimeSummary() =>
-        new(FilterLensId.Create(), new FilterLensLabel.TimeWindow(DateTime.Now, TimeSpan.FromHours(1)), LensKind.TimeWindow);
+        new(FilterLensId.Create(), new FilterLensLabel.TimeWindow(DateTime.UtcNow, TimeSpan.FromHours(1)), LensKind.TimeWindow);
 
     private void StubSaveAsGroupPrompt(PromptChoice choice, string value) =>
         _alertDialog.DisplayPromptWithSecondary(

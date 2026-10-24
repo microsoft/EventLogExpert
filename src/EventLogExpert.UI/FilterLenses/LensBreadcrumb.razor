@@ -19,7 +19,7 @@
         @foreach (var lens in lenses)
         {
             var lensId = lens.Id;
-            var label = FilterLensLabelFormatter.Format(Localizer, lens.Label);
+            var label = FilterLensLabelFormatter.Format(Localizer, lens.Label, Settings.TimeZoneInfo);
             <span class="lens-chip" @key="lensId">
                 <span class="lens-chip-label" data-tooltip="@label" data-tooltip-overflow>@label</span>
                 <button aria-label="@Localizer["FilterLens_SaveAria", label].Value"

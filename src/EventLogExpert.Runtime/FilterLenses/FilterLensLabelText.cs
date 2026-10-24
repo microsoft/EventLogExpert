@@ -19,19 +19,24 @@ public static class FilterLensLabelText
         _ => $"{radius.TotalSeconds:0}s"
     };
 
-    public static string Invariant(FilterLensLabel label) =>
+    public static string Invariant(FilterLensLabel label, TimeZoneInfo displayZone) =>
         label switch
         {
             FilterLensLabel.PropertyComparison(var property, var isEqual, var value) =>
                 $"{property.ToFullString()} {(isEqual ? "=" : "\u2260")} {value}",
             FilterLensLabel.ParentActivity(var activityId) => $"Parent Activity = {activityId}",
-            FilterLensLabel.TimeRange(var afterLocal, var beforeLocal, var sameDay) => sameDay ?
-                string.Format(CultureInfo.InvariantCulture, "{0:T} - {1:T}", afterLocal, beforeLocal) :
-                string.Format(CultureInfo.InvariantCulture, "{0:d} {0:T} - {1:d} {1:T}", afterLocal, beforeLocal),
-            FilterLensLabel.TimeWindow(var centerLocal, var radius) => string.Format(CultureInfo.InvariantCulture,
+            FilterLensLabel.TimeRange(var afterUtc, var beforeUtc) => InvariantTimeRange(
+                afterUtc.ConvertTimeZone(displayZone),
+                beforeUtc.ConvertTimeZone(displayZone)),
+            FilterLensLabel.TimeWindow(var centerUtc, var radius) => string.Format(CultureInfo.InvariantCulture,
                 "Near {0:T} \u00b1{1}",
-                centerLocal,
+                centerUtc.ConvertTimeZone(displayZone),
                 FormatRadius(radius)),
             _ => throw new ArgumentOutOfRangeException(nameof(label), label, null)
         };
+
+    private static string InvariantTimeRange(DateTime afterLocal, DateTime beforeLocal) =>
+        afterLocal.Date == beforeLocal.Date ?
+            string.Format(CultureInfo.InvariantCulture, "{0:T} - {1:T}", afterLocal, beforeLocal) :
+            string.Format(CultureInfo.InvariantCulture, "{0:d} {0:T} - {1:d} {1:T}", afterLocal, beforeLocal);
 }

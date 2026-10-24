@@ -42,18 +42,18 @@ public sealed class EventLogQueriesTests
     }
 
     [Fact]
-    public void GetEventDateRange_ReadsRawStore_ReturnsHourAlignedBounds()
+    public void GetEventDateRange_ReadsRawStore_ReturnsSecondAlignedBoundsContainingEveryEvent()
     {
         var (state, id) = Opened("Populated");
         state = Ingest(state, id, RawIngestMode.Append,
-            Ev(1, new DateTime(2024, 1, 1, 14, 45, 30, DateTimeKind.Utc)),
-            Ev(2, new DateTime(2024, 1, 1, 8, 15, 10, DateTimeKind.Utc)));
+            Ev(1, new DateTime(2024, 1, 1, 14, 45, 30, DateTimeKind.Utc).AddTicks(1)),
+            Ev(2, new DateTime(2024, 1, 1, 8, 15, 10, DateTimeKind.Utc).AddTicks(9_999_999)));
         var queries = new EventLogQueries(StateReturning(state), EventLogStateReturning(new EventLogState()));
 
         var (after, before) = queries.GetEventDateRange(s_fallbackNow);
 
-        Assert.Equal(new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc), after);
-        Assert.Equal(new DateTime(2024, 1, 1, 15, 0, 0, DateTimeKind.Utc), before);
+        Assert.Equal(new DateTime(2024, 1, 1, 8, 15, 10, DateTimeKind.Utc), after);
+        Assert.Equal(new DateTime(2024, 1, 1, 14, 45, 31, DateTimeKind.Utc), before);
     }
 
     [Fact]
@@ -65,8 +65,8 @@ public sealed class EventLogQueriesTests
 
         var (after, before) = queries.GetEventDateRange(s_fallbackNow);
 
-        Assert.Equal(new DateTime(2024, 6, 15, 9, 0, 0, DateTimeKind.Utc), after);
-        Assert.Equal(new DateTime(2024, 6, 15, 10, 0, 0, DateTimeKind.Utc), before);
+        Assert.Equal(s_fallbackNow, after);
+        Assert.Equal(s_fallbackNow, before);
     }
 
     [Fact]
@@ -105,27 +105,27 @@ public sealed class EventLogQueriesTests
     }
 
     [Fact]
-    public void RoundOrFallback_WhenNewestIsExactHour_DoesNotPushBeforeForward()
+    public void RoundOrFallback_WhenNewestIsWholeSecond_DoesNotPushBeforeForward()
     {
-        var exactHour = new DateTime(2024, 1, 1, 14, 0, 0, DateTimeKind.Utc);
-        (DateTime After, DateTime Before)? range = (exactHour, exactHour);
+        var wholeSecond = new DateTime(2024, 1, 1, 14, 0, 0, DateTimeKind.Utc);
+        (DateTime After, DateTime Before)? range = (wholeSecond, wholeSecond);
 
         var (after, before) = range.RoundOrFallback(s_fallbackNow);
 
-        Assert.Equal(exactHour, after);
-        Assert.Equal(exactHour, before);
+        Assert.Equal(wholeSecond, after);
+        Assert.Equal(wholeSecond, before);
     }
 
     [Fact]
-    public void RoundOrFallback_WhenOldestIsExactHour_DoesNotPushAfterBackward()
+    public void RoundOrFallback_WhenOldestIsWholeSecond_DoesNotPushAfterBackward()
     {
-        var exactHour = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc);
+        var wholeSecond = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc);
         var newer = new DateTime(2024, 1, 1, 9, 30, 0, DateTimeKind.Utc);
-        (DateTime After, DateTime Before)? range = (exactHour, newer);
+        (DateTime After, DateTime Before)? range = (wholeSecond, newer);
 
         var (after, _) = range.RoundOrFallback(s_fallbackNow);
 
-        Assert.Equal(exactHour, after);
+        Assert.Equal(wholeSecond, after);
     }
 
     private static ResolvedEvent Ev(int id, DateTime timeCreated = default, string source = "TestSource") =>

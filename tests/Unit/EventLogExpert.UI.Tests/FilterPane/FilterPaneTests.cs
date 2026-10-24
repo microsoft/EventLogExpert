@@ -141,12 +141,34 @@ public sealed class FilterPaneTests : BunitContext
             .GetMethod("AddDateFilter", BindingFlags.NonPublic | BindingFlags.Instance)!
             .Invoke(component.Instance, null);
 
-        var model = (DateFilter)typeof(UI.FilterPane.FilterPane)
-            .GetField("_model", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .GetValue(component.Instance)!;
+        var model = GetDateDraft(component);
         _eventLogQueries.Received(1).GetEventDateRange(Arg.Any<DateTime>());
         Assert.Equal(TimeZoneInfo.ConvertTimeFromUtc(after, timeZone), model.After!.Value);
         Assert.Equal(TimeZoneInfo.ConvertTimeFromUtc(before, timeZone), model.Before!.Value);
+    }
+
+    [Fact]
+    public async Task AddDateFilter_ThenZoneChangeAndExcludeEventsBefore_ApplyKeepsTheExclusion()
+    {
+        var logStart = new DateTime(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var logEnd = new DateTime(2024, 6, 2, 0, 0, 0, DateTimeKind.Utc);
+        var excludedBefore = new DateTime(2024, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+        _eventLogQueries.GetEventDateRange(Arg.Any<DateTime>()).Returns((logStart, logEnd));
+        var component = Render<UI.FilterPane.FilterPane>();
+        await component.InvokeAsync(() => typeof(UI.FilterPane.FilterPane)
+            .GetMethod("AddDateFilter", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(component.Instance, null));
+
+        var newZone = TimeZoneInfo.CreateCustomTimeZone("H+05", TimeSpan.FromHours(5), "H+05", "H+05");
+        _settings.TimeZoneInfo.Returns(newZone);
+        await component.InvokeAsync(() => _settings.TimeZoneChanged?.Invoke(_settings, newZone));
+
+        SetPaneState(new FilterPaneState { FilteredDateRange = new DateFilter { After = excludedBefore, IsEnabled = true } });
+        await component.InvokeAsync(() => _setFilterDateRangeSucceededNotifier.Succeeded += Raise.Event<Action>());
+        component.Find("form").Submit();
+
+        _filterPaneCommands.Received(1).SetFilterDateRange(Arg.Is<DateFilter>(filter =>
+            filter.After == excludedBefore && filter.Before == null));
     }
 
     [Fact]
@@ -189,6 +211,123 @@ public sealed class FilterPaneTests : BunitContext
         menuService.Received(1).OpenAt(
             Arg.Any<double>(), Arg.Any<double>(), Arg.Any<IReadOnlyList<MenuItem>>(),
             Arg.Any<bool>(), Arg.Any<bool>());
+    }
+
+    [Fact]
+    public void AppliedRangeWithOpenBefore_ShowsNoLimitInsteadOfAnEmptyInput()
+    {
+        SetPaneState(new FilterPaneState
+        {
+            FilteredDateRange = new DateFilter { After = new DateTime(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc), IsEnabled = true }
+        });
+
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        Assert.Single(component.FindAll($"input[aria-label='{Localizer["FilterPane_Date_AfterAria"]}']"));
+        Assert.Empty(component.FindAll($"input[aria-label='{Localizer["FilterPane_Date_BeforeAria"]}']"));
+        Assert.Contains(Localizer["FilterPane_Date_NoLimit"].Value, component.Find(".filter-date-no-limit").TextContent);
+    }
+
+    [Fact]
+    public void ApplyDateFilter_AfterAPresetWithinTheAppliedSecond_AppliesThePresetInstant()
+    {
+        var appliedAfter = new DateTime(2024, 6, 1, 12, 0, 0, DateTimeKind.Utc).AddMilliseconds(900);
+        var presetAfter = new DateTime(2024, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+        SetPaneState(new FilterPaneState { FilteredDateRange = new DateFilter { After = appliedAfter, IsEnabled = true } });
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+
+        component.Instance.SetQuickDateRange(new DateFilter { After = presetAfter });
+        component.Render();
+        component.Find("form").Submit();
+
+        _filterPaneCommands.Received(1).SetFilterDateRange(Arg.Is<DateFilter>(filter => filter.After == presetAfter));
+    }
+
+    [Fact]
+    public void ApplyDateFilter_ConvertsTheDraftWallClockFromTheDisplayZoneToUtc()
+    {
+        var timeZone = TimeZoneInfo.CreateCustomTimeZone("H+05", TimeSpan.FromHours(5), "H+05", "H+05");
+        _settings.TimeZoneInfo.Returns(timeZone);
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+        GetDateDraft(component).After = new DateTime(2024, 6, 1, 12, 0, 0);
+        component.Render();
+
+        component.Find("form").Submit();
+
+        _filterPaneCommands.Received(1).SetFilterDateRange(Arg.Is<DateFilter>(filter =>
+            filter.After == new DateTime(2024, 6, 1, 7, 0, 0, DateTimeKind.Utc) &&
+            filter.Before == null &&
+            filter.IsEnabled));
+        Assert.False(GetCanEditDate(component));
+    }
+
+    [Fact]
+    public void ApplyDateFilter_PresetInARepeatedDaylightSavingHour_AppliesThePresetInstant()
+    {
+        _settings.TimeZoneInfo.Returns(CreateDaylightSavingZone());
+        // 06:15Z reads 01:15 standard time, the second occurrence of the repeated hour.
+        var presetAfter = new DateTime(2024, 11, 3, 6, 15, 0, DateTimeKind.Utc);
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+
+        component.Instance.SetQuickDateRange(new DateFilter { After = presetAfter });
+        component.Render();
+        component.Find("form").Submit();
+
+        _filterPaneCommands.Received(1).SetFilterDateRange(Arg.Is<DateFilter>(filter => filter.After == presetAfter));
+    }
+
+    [Fact]
+    public void ApplyDateFilter_ShowsTheAppliedRangeInTheReadOnlyView()
+    {
+        _settings.TimeZoneInfo.Returns(CreateDaylightSavingZone());
+        _filterPaneCommands
+            .When(commands => commands.SetFilterDateRange(Arg.Any<DateFilter?>()))
+            .Do(call => SetPaneState(new FilterPaneState { FilteredDateRange = call.Arg<DateFilter?>() }));
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+        // 02:30 is skipped by the spring-forward gap, so the applied bound is the transition instant (03:00).
+        GetDateDraft(component).After = new DateTime(2024, 3, 10, 2, 30, 0);
+        component.Render();
+
+        component.Find("form").Submit();
+
+        Assert.False(GetCanEditDate(component));
+        Assert.Equal(new DateTime(2024, 3, 10, 3, 0, 0), GetDateDraft(component).After);
+    }
+
+    [Fact]
+    public void ApplyDateFilter_WhenABoundIsUnedited_KeepsTheAppliedSubSecondInstant()
+    {
+        var appliedAfter = new DateTime(2024, 6, 1, 12, 0, 0, DateTimeKind.Utc).AddTicks(1_234_567);
+        SetPaneState(new FilterPaneState { FilteredDateRange = new DateFilter { After = appliedAfter, IsEnabled = true } });
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+        component.Render();
+
+        component.Find("form").Submit();
+
+        _filterPaneCommands.Received(1).SetFilterDateRange(Arg.Is<DateFilter>(filter => filter.After == appliedAfter));
+    }
+
+    [Fact]
+    public void ApplyDateFilter_WhenAfterIsLaterThanBefore_ShowsAnErrorAndDoesNotApply()
+    {
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+        GetDateDraft(component).After = new DateTime(2024, 6, 2);
+        GetDateDraft(component).Before = new DateTime(2024, 6, 1);
+        component.Render();
+
+        component.Find("form").Submit();
+
+        _filterPaneCommands.DidNotReceiveWithAnyArgs().SetFilterDateRange(null);
+        Assert.True(GetCanEditDate(component));
+        Assert.Contains(
+            Localizer["FilterPane_Date_Error_AfterLaterThanBefore"].Value,
+            component.Find(".validation-message").TextContent);
     }
 
     [Fact]
@@ -358,6 +497,23 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
+    public void CancelDateFilterEdit_RevertsTheDraftToTheAppliedRangeAndLeavesEditMode()
+    {
+        var appliedAfter = new DateTime(2024, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+        SetPaneState(new FilterPaneState { FilteredDateRange = new DateFilter { After = appliedAfter, IsEnabled = true } });
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+        GetDateDraft(component).After = new DateTime(2020, 1, 1);
+        component.Render();
+
+        component.FindAll("button").First(button => button.TextContent.Contains(Localizer["FilterPane_Action_Cancel"].Value)).Click();
+
+        Assert.False(GetCanEditDate(component));
+        Assert.Equal(appliedAfter, GetDateDraft(component).After);
+        _filterPaneCommands.DidNotReceiveWithAnyArgs().SetFilterDateRange(null);
+    }
+
+    [Fact]
     public async Task CancelScenarioPicker_ResetsSelectedScenarioId()
     {
         var scenario = Scenario("sys", ScenarioGroup.SystemHealth);
@@ -391,6 +547,38 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
+    public async Task ClearAllFilters_ClearsTheDateDraft()
+    {
+        SetPaneState(new FilterPaneState
+        {
+            FilteredDateRange = new DateFilter { After = new DateTime(2024, 6, 1, 8, 0, 0, DateTimeKind.Utc), IsEnabled = true }
+        });
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+
+        SetPaneState(new FilterPaneState());
+        await component.InvokeAsync(() => _clearAllFiltersNotifier.Requested += Raise.Event<Action>());
+
+        Assert.False(GetCanEditDate(component));
+        Assert.Null(GetDateDraft(component).After);
+    }
+
+    [Fact]
+    public void ClearBeforeButton_ClearsOnlyTheBeforeBoundOfTheDraft()
+    {
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+        GetDateDraft(component).After = new DateTime(2024, 6, 1);
+        GetDateDraft(component).Before = new DateTime(2024, 6, 2);
+        component.Render();
+
+        component.Find($"button[aria-label='{Localizer["FilterPane_Date_ClearBeforeAria"]}']").Click();
+
+        Assert.Null(GetDateDraft(component).Before);
+        Assert.Equal(new DateTime(2024, 6, 1), GetDateDraft(component).After);
+    }
+
+    [Fact]
     public async Task CopyScenario_ExportsOnlyEnabledRows()
     {
         Services.AddSingleton(new ScenarioAuthoringOptions(true));
@@ -415,19 +603,57 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
+    public void DateEditor_WhenBothBoundsAreCleared_ShowsAnErrorAndDisablesApply()
+    {
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+        GetDateDraft(component).After = null;
+        GetDateDraft(component).Before = null;
+        component.Render();
+
+        Assert.Contains(Localizer["FilterPane_Date_Error_NoBounds"].Value, component.Find(".validation-message").TextContent);
+        Assert.True(component.Find("button[type='submit']").HasAttribute("disabled"));
+    }
+
+    [Fact]
+    public void DateEditor_WhenBothBoundsAreSkippedByADaylightSavingGap_WarnsForEachBoundWithoutAnOrderError()
+    {
+        _settings.TimeZoneInfo.Returns(CreateDaylightSavingZone());
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+        GetDateDraft(component).After = new DateTime(2024, 3, 10, 2, 15, 0);
+        GetDateDraft(component).Before = new DateTime(2024, 3, 10, 2, 45, 0);
+        component.Render();
+
+        Assert.Equal(2, component.FindAll(".filter-date-warning").Count);
+        Assert.Empty(component.FindAll(".validation-message"));
+    }
+
+    [Fact]
+    public void DateInput_EscapeKey_CancelsTheEdit()
+    {
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+        component.Render();
+
+        component.Find($"input[aria-label='{Localizer["FilterPane_Date_AfterAria"]}']")
+            .KeyDown(new KeyboardEventArgs { Key = "Escape" });
+
+        Assert.False(GetCanEditDate(component));
+    }
+
+    [Fact]
     public async Task DirectHandlersAreInertAfterDisposal()
     {
         var component = Render<UI.FilterPane.FilterPane>();
-        SetDateModel(component, new DateFilter { After = new DateTime(2020, 6, 1, 12, 0, 0, DateTimeKind.Unspecified) });
-        var appliedBeforeDispose = GetDateModel(component).After;
-
         await ((IAsyncDisposable)component.Instance).DisposeAsync();
+        var rendersAfterDispose = component.RenderCount;
 
         typeof(UI.FilterPane.FilterPane)
-            .GetMethod("UpdateFilterDateTimeZone", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetMethod("OnTimeZoneChanged", BindingFlags.NonPublic | BindingFlags.Instance)!
             .Invoke(component.Instance, [null, TimeZoneInfo.CreateCustomTimeZone("probe", TimeSpan.FromHours(5), "probe", "probe")]);
 
-        Assert.Equal(appliedBeforeDispose, GetDateModel(component).After);
+        Assert.Equal(rendersAfterDispose, component.RenderCount);
     }
 
     [Fact]
@@ -546,6 +772,18 @@ public sealed class FilterPaneTests : BunitContext
     }
 
     [Fact]
+    public async Task FilteredDateRangeChanged_WithoutASuccessNotification_ResyncsTheReadOnlyView()
+    {
+        var restoredAfter = new DateTime(2024, 6, 1, 8, 0, 0, DateTimeKind.Utc);
+        var component = Render<UI.FilterPane.FilterPane>();
+
+        SetPaneState(new FilterPaneState { FilteredDateRange = new DateFilter { After = restoredAfter, IsEnabled = true } });
+        await component.InvokeAsync(() => _filteredDateRange.Changed += Raise.Event<Action>());
+
+        Assert.Equal(new DateTime(2024, 6, 1, 8, 0, 0), GetDateDraft(component).After);
+    }
+
+    [Fact]
     public void GetRecentDisabledReason_WhenEmpty_ReturnsRecentNoneAvailable()
     {
         SetLibraryState(new FilterLibraryState
@@ -626,7 +864,7 @@ public sealed class FilterPaneTests : BunitContext
 
         var component = Render<UI.FilterPane.FilterPane>();
 
-        Assert.Equal(TimeZoneInfo.ConvertTimeFromUtc(afterUtc, timeZone), GetDateModel(component).After);
+        Assert.Equal(TimeZoneInfo.ConvertTimeFromUtc(afterUtc, timeZone), GetDateDraft(component).After);
     }
 
     [Fact]
@@ -863,14 +1101,14 @@ public sealed class FilterPaneTests : BunitContext
         _settings.TimeZoneInfo.Returns(timeZone);
         SetPaneState(new FilterPaneState());
         var component = Render<UI.FilterPane.FilterPane>();
-        Assert.Null(GetDateModel(component).After);
+        Assert.Null(GetDateDraft(component).After);
 
         var afterUtc = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         SetPaneState(new FilterPaneState { FilteredDateRange = new DateFilter { After = afterUtc, IsEnabled = true } });
         await component.InvokeAsync(() => _setFilterDateRangeSucceededNotifier.Succeeded += Raise.Event<Action>());
         await component.InvokeAsync(() => _filterPromotedNotifier.Promoted += Raise.Event<Action>());
 
-        Assert.Equal(TimeZoneInfo.ConvertTimeFromUtc(afterUtc, timeZone), GetDateModel(component).After);
+        Assert.Equal(TimeZoneInfo.ConvertTimeFromUtc(afterUtc, timeZone), GetDateDraft(component).After);
         Assert.Equal("true", component.Find(".filter-set").GetAttribute("data-toggle"));
     }
 
@@ -1148,14 +1386,69 @@ public sealed class FilterPaneTests : BunitContext
         SetPaneState(new FilterPaneState());
         var component = Render<UI.FilterPane.FilterPane>();
 
-        Assert.Null(GetDateModel(component).After);
+        Assert.Null(GetDateDraft(component).After);
 
         var applied = new DateFilter { After = DateTimeOffset.UnixEpoch.UtcDateTime, IsEnabled = true };
         SetPaneState(new FilterPaneState { FilteredDateRange = applied });
 
         await component.InvokeAsync(() => _setFilterDateRangeSucceededNotifier.Succeeded += Raise.Event<Action>());
 
-        Assert.Equal(applied.After, GetDateModel(component).After);
+        Assert.Equal(applied.After, GetDateDraft(component).After);
+    }
+
+    [Fact]
+    public async Task SetFilterDateRangeSucceededNotifier_WhileEditing_FollowsTheAppliedRangeForUntouchedBounds()
+    {
+        var narrowedAfter = new DateTime(2024, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+        var appliedBefore = new DateTime(2024, 6, 1, 17, 0, 0, DateTimeKind.Utc);
+        SetPaneState(new FilterPaneState
+        {
+            FilteredDateRange = new DateFilter { After = narrowedAfter.AddHours(-3), Before = appliedBefore, IsEnabled = true }
+        });
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+
+        SetPaneState(new FilterPaneState
+        {
+            FilteredDateRange = new DateFilter { After = narrowedAfter, Before = appliedBefore, IsEnabled = true }
+        });
+        await component.InvokeAsync(() => _setFilterDateRangeSucceededNotifier.Succeeded += Raise.Event<Action>());
+        component.Find("form").Submit();
+
+        Assert.Equal(new DateTime(2024, 6, 1, 12, 0, 0), GetDateDraft(component).After);
+        _filterPaneCommands.Received(1).SetFilterDateRange(Arg.Is<DateFilter>(filter =>
+            filter.After == narrowedAfter && filter.Before == appliedBefore));
+    }
+
+    [Fact]
+    public async Task SetFilterDateRangeSucceededNotifier_WhileEditing_KeepsTheInProgressDraft()
+    {
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+        var typedAfter = new DateTime(2024, 6, 1, 12, 0, 0);
+        GetDateDraft(component).After = typedAfter;
+
+        SetPaneState(new FilterPaneState
+        {
+            FilteredDateRange = new DateFilter { After = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsEnabled = true }
+        });
+        await component.InvokeAsync(() => _setFilterDateRangeSucceededNotifier.Succeeded += Raise.Event<Action>());
+
+        Assert.Equal(typedAfter, GetDateDraft(component).After);
+    }
+
+    [Fact]
+    public void SetQuickDateRange_ConvertsTheUtcRangeToDisplayZoneWallClockAndKeepsAnOpenBound()
+    {
+        var timeZone = TimeZoneInfo.CreateCustomTimeZone("H-05", TimeSpan.FromHours(-5), "H-05", "H-05");
+        _settings.TimeZoneInfo.Returns(timeZone);
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+
+        component.Instance.SetQuickDateRange(new DateFilter { After = new DateTime(2024, 6, 8, 12, 0, 0, DateTimeKind.Utc) });
+
+        Assert.Equal(new DateTime(2024, 6, 8, 7, 0, 0), GetDateDraft(component).After);
+        Assert.Null(GetDateDraft(component).Before);
     }
 
     [Fact]
@@ -1175,6 +1468,59 @@ public sealed class FilterPaneTests : BunitContext
         Assert.Contains("2024-06-08", component.Find($"input[aria-label='{Localizer["FilterPane_Date_AfterAria"]}']").GetAttribute("value"));
         Assert.Contains("2024-06-15", component.Find($"input[aria-label='{Localizer["FilterPane_Date_BeforeAria"]}']").GetAttribute("value"));
         _filterPaneCommands.DidNotReceiveWithAnyArgs().SetFilterDateRange(null);
+    }
+
+    [Fact]
+    public async Task TimeZoneChanged_KeepsTheDraftWallClockAndShowsTheNewZone()
+    {
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+        var typedAfter = new DateTime(2024, 6, 1, 12, 0, 0);
+        GetDateDraft(component).After = typedAfter;
+        var newZone = TimeZoneInfo.CreateCustomTimeZone("H+05", TimeSpan.FromHours(5), "Probe Zone +05", "Probe Zone +05");
+        _settings.TimeZoneInfo.Returns(newZone);
+
+        await component.InvokeAsync(() => _settings.TimeZoneChanged?.Invoke(_settings, newZone));
+
+        Assert.Equal(typedAfter, GetDateDraft(component).After);
+        component.WaitForAssertion(() => Assert.Contains("Probe Zone +05", component.Find(".filter-date-zone").TextContent));
+    }
+
+    [Fact]
+    public async Task TimeZoneChanged_ReinterpretsAPresetBoundInTheNewZone()
+    {
+        var component = Render<UI.FilterPane.FilterPane>();
+        component.Instance.EditDateFilter();
+        component.Instance.SetQuickDateRange(new DateFilter { After = new DateTime(2024, 6, 1, 12, 0, 0, DateTimeKind.Utc) });
+        var newZone = TimeZoneInfo.CreateCustomTimeZone("H+05", TimeSpan.FromHours(5), "H+05", "H+05");
+        _settings.TimeZoneInfo.Returns(newZone);
+
+        await component.InvokeAsync(() => _settings.TimeZoneChanged?.Invoke(_settings, newZone));
+        component.Find("form").Submit();
+
+        _filterPaneCommands.Received(1).SetFilterDateRange(Arg.Is<DateFilter>(filter =>
+            filter.After == new DateTime(2024, 6, 1, 7, 0, 0, DateTimeKind.Utc)));
+    }
+
+    [Fact]
+    public async Task TimeZoneChanged_ThenReinterpretedAppliedRange_ShowsTheSameWallClock()
+    {
+        // The synchronizer reinterprets the applied range before the pane re-hydrates: the new UTC instant reads the
+        // same wall clock in the new zone, so the read-only view must not shift.
+        var appliedAfterUtc = new DateTime(2024, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+        SetPaneState(new FilterPaneState { FilteredDateRange = new DateFilter { After = appliedAfterUtc, IsEnabled = true } });
+        var component = Render<UI.FilterPane.FilterPane>();
+        var newZone = TimeZoneInfo.CreateCustomTimeZone("H+05", TimeSpan.FromHours(5), "H+05", "H+05");
+        _settings.TimeZoneInfo.Returns(newZone);
+
+        await component.InvokeAsync(() => _settings.TimeZoneChanged?.Invoke(_settings, newZone));
+        SetPaneState(new FilterPaneState
+        {
+            FilteredDateRange = new DateFilter { After = appliedAfterUtc.AddHours(-5), IsEnabled = true }
+        });
+        await component.InvokeAsync(() => _setFilterDateRangeSucceededNotifier.Succeeded += Raise.Event<Action>());
+
+        Assert.Equal(new DateTime(2024, 6, 1, 12, 0, 0), GetDateDraft(component).After);
     }
 
     private static LibraryEntryFilterSet BuildFilterSet(string name, ImmutableList<string>? tags = null) =>
@@ -1201,6 +1547,19 @@ public sealed class FilterPaneTests : BunitContext
         };
     }
 
+    private static TimeZoneInfo CreateDaylightSavingZone()
+    {
+        var daylightBegins = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(
+            new DateTime(1, 1, 1, 2, 0, 0), month: 3, week: 2, DayOfWeek.Sunday);
+        var daylightEnds = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(
+            new DateTime(1, 1, 1, 2, 0, 0), month: 11, week: 1, DayOfWeek.Sunday);
+
+        return TimeZoneInfo.CreateCustomTimeZone(
+            "test-eastern", TimeSpan.FromHours(-5), "test-eastern", "test-eastern", "test-eastern",
+            [TimeZoneInfo.AdjustmentRule.CreateAdjustmentRule(
+                new DateTime(2024, 1, 1), new DateTime(2024, 12, 31), TimeSpan.FromHours(1), daylightBegins, daylightEnds)]);
+    }
+
     private static ResolvedEvent EventWithName(string logName) =>
         new("file", LogPathType.File) { LogName = logName };
 
@@ -1212,9 +1571,9 @@ public sealed class FilterPaneTests : BunitContext
             .GetField("_canEditDate", BindingFlags.NonPublic | BindingFlags.Instance)!
             .GetValue(component.Instance)!;
 
-    private static DateFilter GetDateModel(IRenderedComponent<UI.FilterPane.FilterPane> component) =>
-        (DateFilter)typeof(UI.FilterPane.FilterPane)
-            .GetField("_model", BindingFlags.NonPublic | BindingFlags.Instance)!
+    private static DateFilterDraft GetDateDraft(IRenderedComponent<UI.FilterPane.FilterPane> component) =>
+        (DateFilterDraft)typeof(UI.FilterPane.FilterPane)
+            .GetField("_dateDraft", BindingFlags.NonPublic | BindingFlags.Instance)!
             .GetValue(component.Instance)!;
 
     private static ScenarioDefinition Scenario(string id, ScenarioGroup group) =>
@@ -1227,11 +1586,6 @@ public sealed class FilterPaneTests : BunitContext
             Channels = ["System"],
             Filters = [],
         };
-
-    private static void SetDateModel(IRenderedComponent<UI.FilterPane.FilterPane> component, DateFilter model) =>
-        typeof(UI.FilterPane.FilterPane)
-            .GetField("_model", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .SetValue(component.Instance, model);
 
     private void SetLibraryState(FilterLibraryState state) => _libraryStateMock.Value.Returns(state);
 

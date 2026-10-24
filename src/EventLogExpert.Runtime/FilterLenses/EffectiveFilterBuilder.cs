@@ -38,10 +38,10 @@ internal static class EffectiveFilterBuilder
     }
 
     /// <summary>
-    ///     Intersects <paramref name="window" /> into <paramref name="baseDate" />, producing a two-sided, enabled
-    ///     <see cref="DateFilter" />. A null or disabled base imposes no gate (treated as unbounded); any null bound (base or
-    ///     lens) is treated as -/+ infinity so the result never carries a null bound - an enabled date filter with a null
-    ///     bound matches nothing. An empty overlap (After > Before) intentionally yields an empty view. Also reused by the
+    ///     Intersects <paramref name="window" /> into <paramref name="baseDate" />, producing an enabled
+    ///     <see cref="DateFilter" />. A null or disabled base imposes no gate (treated as unbounded); a null bound (base or
+    ///     lens) is open on that side, and a side left open by both stays null rather than carrying a min/max sentinel the
+    ///     pane would display. An empty overlap (After > Before) intentionally yields an empty view. Also reused by the
     ///     promote-lens reducer to fold a time-window lens into the persistent pane date range.
     /// </summary>
     internal static DateFilter IntersectWindow(DateFilter? baseDate, DateFilter window)
@@ -56,7 +56,12 @@ internal static class EffectiveFilterBuilder
             baseActive ? baseDate!.Before ?? DateTime.MaxValue : DateTime.MaxValue,
             window.Before ?? DateTime.MaxValue);
 
-        return new DateFilter { After = after, Before = before, IsEnabled = true };
+        return new DateFilter
+        {
+            After = after == DateTime.MinValue ? null : after,
+            Before = before == DateTime.MaxValue ? null : before,
+            IsEnabled = true
+        };
     }
 
     private static DateTime Earlier(DateTime first, DateTime second) => first <= second ? first : second;
