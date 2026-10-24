@@ -112,6 +112,26 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     }
 
     [Fact]
+    public async Task AddEventLogRuntime_DateFilterTimeZoneSynchronizer_IsSingleton()
+    {
+        var services = new ServiceCollection();
+        var preferences = Substitute.For<ISettingsPreferencesProvider>();
+        preferences.TimeZonePreference.Returns(TimeZoneInfo.Utc.Id);
+        RegisterHostDependencies(services, preferences);
+        services.AddEventLogRuntime();
+
+        await using var provider = services.BuildServiceProvider(
+            new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+        await using var firstScope = provider.CreateAsyncScope();
+        await using var secondScope = provider.CreateAsyncScope();
+
+        var first = firstScope.ServiceProvider.GetRequiredService<DateFilterTimeZoneSynchronizer>();
+        var second = secondScope.ServiceProvider.GetRequiredService<DateFilterTimeZoneSynchronizer>();
+
+        Assert.Same(first, second);
+    }
+
+    [Fact]
     public async Task AddEventLogRuntime_Resolves5BannerFacetsToSameSingleton()
     {
         var services = new ServiceCollection();

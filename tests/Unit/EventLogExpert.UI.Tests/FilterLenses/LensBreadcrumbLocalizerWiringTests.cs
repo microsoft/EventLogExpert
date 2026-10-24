@@ -8,6 +8,7 @@ using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLenses;
+using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.FilterLenses;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +33,9 @@ public sealed class LensBreadcrumbLocalizerWiringTests : BunitContext
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         _source.Lenses.Returns(ImmutableList<FilterLensSummary>.Empty);
+        var settings = Substitute.For<ISettingsService>();
+        settings.TimeZoneInfo.Returns(TimeZoneInfo.Utc);
+        Services.AddSingleton(settings);
         Services.AddSingleton(_commands);
         Services.AddSingleton(_source);
         Services.AddSingleton(Substitute.For<IAlertDialogService>());

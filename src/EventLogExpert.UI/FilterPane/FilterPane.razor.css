@@ -100,3 +100,11 @@
     min-width: 0;
 }
 
+
+.filter-date-no-limit,
+.filter-date-zone,
+.filter-date-warning { color: var(--text-secondary); }
+
+.filter-date-messages { padding: 0 0.25rem 0.25rem; }
+
+.filter-date-bounds { display: contents; }

@@ -13,6 +13,12 @@ internal sealed class FilterPaneCommands(IDispatcher dispatcher) : IFilterPaneCo
 
     public void ClearAllFilters() => _dispatcher.Dispatch(new ClearAllFiltersAction());
 
+    public void ExcludeEventsAfter(DateTime timeCreatedUtc) =>
+        _dispatcher.Dispatch(new NarrowFilterDateRangeAction(After: null, Before: timeCreatedUtc));
+
+    public void ExcludeEventsBefore(DateTime timeCreatedUtc) =>
+        _dispatcher.Dispatch(new NarrowFilterDateRangeAction(After: timeCreatedUtc, Before: null));
+
     public void RemoveFilter(FilterId id) => _dispatcher.Dispatch(new RemoveFilterAction(id));
 
     public void SetFilter(SavedFilter filter) => _dispatcher.Dispatch(new SetFilterAction(filter));

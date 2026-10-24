@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Compilation;
-using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
@@ -1555,11 +1554,9 @@ public sealed partial class LogTablePane
             MenuItem.Item(Localizer["Menu_Edit_CopySelectedFull"].Value, () => ClipboardService.CopySelectedEvent(EventCopyFormat.Full)),
             MenuItem.Separator(),
             MenuItem.Item(Localizer["LogTable_ExcludeEventsBefore"].Value, () =>
-                FilterPaneCommands.SetFilterDateRange(
-                    new DateFilter { Before = selectedEvent.TimeCreated })),
+                FilterPaneCommands.ExcludeEventsBefore(selectedEvent.TimeCreated)),
             MenuItem.Item(Localizer["LogTable_ExcludeEventsAfter"].Value, () =>
-                FilterPaneCommands.SetFilterDateRange(
-                    new DateFilter { After = selectedEvent.TimeCreated })),
+                FilterPaneCommands.ExcludeEventsAfter(selectedEvent.TimeCreated)),
             MenuItem.Separator(),
             MenuItem.Item(
                 Localizer["LogTable_ShowRelatedByActivityId"].Value,
@@ -1582,23 +1579,23 @@ public sealed partial class LogTablePane
                     MenuItem.Item(
                         Localizer["LogTable_NearTime_30Seconds"].Value,
                         () => FilterLensCommands.ShowEventsNearTime(
-                            selectedEvent.TimeCreated, TimeSpan.FromSeconds(30), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
+                            selectedEvent.TimeCreated, TimeSpan.FromSeconds(30), selectedEvent.OwningLog)),
                     MenuItem.Item(
                         Localizer["LogTable_NearTime_1Minute"].Value,
                         () => FilterLensCommands.ShowEventsNearTime(
-                            selectedEvent.TimeCreated, TimeSpan.FromMinutes(1), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
+                            selectedEvent.TimeCreated, TimeSpan.FromMinutes(1), selectedEvent.OwningLog)),
                     MenuItem.Item(
                         Localizer["LogTable_NearTime_5Minutes"].Value,
                         () => FilterLensCommands.ShowEventsNearTime(
-                            selectedEvent.TimeCreated, TimeSpan.FromMinutes(5), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
+                            selectedEvent.TimeCreated, TimeSpan.FromMinutes(5), selectedEvent.OwningLog)),
                     MenuItem.Item(
                         Localizer["LogTable_NearTime_15Minutes"].Value,
                         () => FilterLensCommands.ShowEventsNearTime(
-                            selectedEvent.TimeCreated, TimeSpan.FromMinutes(15), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
+                            selectedEvent.TimeCreated, TimeSpan.FromMinutes(15), selectedEvent.OwningLog)),
                     MenuItem.Item(
                         Localizer["LogTable_NearTime_1Hour"].Value,
                         () => FilterLensCommands.ShowEventsNearTime(
-                            selectedEvent.TimeCreated, TimeSpan.FromHours(1), Settings.TimeZoneInfo, selectedEvent.OwningLog)),
+                            selectedEvent.TimeCreated, TimeSpan.FromHours(1), selectedEvent.OwningLog)),
                 ])
         };
 

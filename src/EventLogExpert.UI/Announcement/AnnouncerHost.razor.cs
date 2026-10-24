@@ -3,6 +3,7 @@
 
 using EventLogExpert.Localization;
 using EventLogExpert.Runtime.Announcement;
+using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Common;
 using EventLogExpert.UI.FilterLibrary;
 using Microsoft.AspNetCore.Components;
@@ -16,6 +17,8 @@ public sealed partial class AnnouncerHost : ComponentBase, IDisposable
     [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
 
     [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
+
+    [Inject] private ISettingsService Settings { get; init; } = null!;
 
     public void Dispose() => AnnouncementService.StateChanged -= OnStateChanged;
 
@@ -36,7 +39,7 @@ public sealed partial class AnnouncerHost : ComponentBase, IDisposable
         {
             AnnouncementPayload.Text(var message) => message,
             AnnouncementPayload.LensKept(var label) =>
-                Localizer["FilterLens_KeptAnnouncement", FilterLensLabelFormatter.Format(Localizer, label)].Value,
+                Localizer["FilterLens_KeptAnnouncement", FilterLensLabelFormatter.Format(Localizer, label, Settings.TimeZoneInfo)].Value,
             AnnouncementPayload.LensGroupSaved(var name) =>
                 Localizer["FilterLens_SavedAsGroupAnnouncement", name].Value,
             AnnouncementPayload.LensesSavedAll _ =>

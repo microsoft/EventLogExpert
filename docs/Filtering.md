@@ -65,7 +65,13 @@ Predicates live underneath the parent and can be combined freely. `AND` requires
 
 ### Date filter
 
-`After` / `Before` timestamps in the configured time zone (see [Settings](Settings.md) → `Time Zone`). Only one date filter is allowed; removing it lets `Add Date Filter` reappear. Right-clicking an event in the table and choosing `Exclude Events Before` / `Exclude Events After` is a shortcut that sets a date filter using the right-clicked event's timestamp as the boundary.
+`After` / `Before` timestamps, to the second, in the configured time zone (see [Settings](Settings.md) → `Time Zone`). The editor shows the zone it is using. Only one date filter is allowed; removing it lets `Add Date Filter` reappear.
+
+- **Open bounds:** either bound can be cleared with its `×` button, which leaves that side unlimited (shown as `No limit`). At least one bound is required, each bound must be a valid date and time, and `After` can't be later than `Before`.
+- **Quick range:** `Entire log` (the loaded events' span), or `Last 15 minutes` through `Last 2 years`. Relative ranges leave `Before` open, so new events from a live log stay in view.
+- **Keyboard:** `Enter` applies the edit and `Escape` (while a date input has focus) cancels it, restoring the applied range. `Cancel` does the same.
+- **Time zone changes:** the date filter keeps the same clock reading and is re-applied in the new zone. For example, `After 09:00` stays `09:00` after you switch zones, so different events can match. A time you type that falls in a daylight saving gap is treated as the first valid time after it, and the editor warns about it. An applied filter that a zone change moves into a gap shows the adjusted time instead. If re-reading an applied range in the new zone would put `After` later than `Before` (possible when a bound sits in a repeated daylight saving hour), the filter keeps its original moments instead and the editor shows them in the new zone.
+- **Table shortcut:** right-click an event and choose `Exclude Events Before` to hide events older than it, or `Exclude Events After` to hide newer ones. This narrows an enabled date filter using that event's timestamp: it never brings back events the filter already hides, and the other bound stays as it was. If the date filter is off or missing, a new one is created with only that bound.
 
 ### Advanced filters
 

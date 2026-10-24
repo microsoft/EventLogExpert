@@ -5,7 +5,6 @@ using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Runtime.Common.Display;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.FilterLenses;
@@ -103,16 +102,13 @@ internal static class FilterLensFactory
     public static FilterLens ForTimeRange(
         DateTime startUtc,
         DateTime endUtc,
-        TimeZoneInfo displayZone,
         string? originLog = null)
     {
         var (after, before) = startUtc <= endUtc ? (startUtc, endUtc) : (endUtc, startUtc);
-        var afterLocal = after.ConvertTimeZone(displayZone);
-        var beforeLocal = before.ConvertTimeZone(displayZone);
 
         return new FilterLens
         {
-            Label = new FilterLensLabel.TimeRange(afterLocal, beforeLocal, afterLocal.Date == beforeLocal.Date),
+            Label = new FilterLensLabel.TimeRange(after, before),
             Kind = LensKind.TimeWindow,
             Window = new DateFilter { After = after, Before = before, IsEnabled = true },
             OriginLog = originLog
@@ -122,7 +118,6 @@ internal static class FilterLensFactory
     public static FilterLens ForTimeWindow(
         DateTime timeCreatedUtc,
         TimeSpan radius,
-        TimeZoneInfo displayZone,
         string? originLog = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(radius, TimeSpan.Zero);
@@ -138,7 +133,7 @@ internal static class FilterLensFactory
 
         return new FilterLens
         {
-            Label = new FilterLensLabel.TimeWindow(timeCreatedUtc.ConvertTimeZone(displayZone), radius),
+            Label = new FilterLensLabel.TimeWindow(timeCreatedUtc, radius),
             Kind = LensKind.TimeWindow,
             Window = new DateFilter { After = after, Before = before, IsEnabled = true },
             OriginLog = originLog

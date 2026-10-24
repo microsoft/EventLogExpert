@@ -7,7 +7,6 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Runtime.LogTable;
 using Fluxor;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -90,13 +89,10 @@ public sealed class ReplaceFiltersTests
         var mockAppliedFilter = Substitute.For<IStateSelection<EventLogState, Filter>>();
         mockAppliedFilter.Value.Returns(new Filter(null, []));
 
-        var mockRawEventStore = Substitute.For<IState<RawEventStoreState>>();
-        mockRawEventStore.Value.Returns(new RawEventStoreState());
-
         var mockLensState = Substitute.For<IState<FilterLensState>>();
         mockLensState.Value.Returns(new FilterLensState());
 
-        var effects = new Effects(mockAppliedFilter, mockRawEventStore, mockFilterPaneState, mockLensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()), new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
+        var effects = new Effects(mockAppliedFilter, mockFilterPaneState, mockLensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()), new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
         var dispatcher = Substitute.For<IDispatcher>();
 
         return (effects, dispatcher);

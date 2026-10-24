@@ -8,6 +8,7 @@ using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterLibrary;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Announcement;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +25,9 @@ public sealed class AnnouncerHostTests : BunitContext
     public AnnouncerHostTests()
     {
         _announcementService.Current.Returns(new CurrentAnnouncement(new AnnouncementPayload.Text(string.Empty), 0));
+        var settings = Substitute.For<ISettingsService>();
+        settings.TimeZoneInfo.Returns(TimeZoneInfo.Utc);
+        Services.AddSingleton(settings);
         Services.AddSingleton(_announcementService);
         Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
     }

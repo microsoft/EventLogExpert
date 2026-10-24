@@ -148,7 +148,7 @@ public sealed class HistogramPaneTests : BunitContext
         await cut.InvokeAsync(() => cut.Instance.OnHistogramScopeBin(0.5));
 
         _filterLensCommands.DidNotReceive().ShowTimeRange(
-            Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<TimeZoneInfo>(), Arg.Any<string?>());
+            Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<string?>());
     }
 
     [Fact]

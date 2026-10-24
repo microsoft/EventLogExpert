@@ -204,6 +204,8 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<FilterPromotedNotifier>();
             services.Forward<IFilterPromotedNotifier, FilterPromotedNotifier>();
 
+            services.AddSingleton<DateFilterTimeZoneSynchronizer>();
+
             // Indicators, resolvers, formatters, and selectors
             services.AddSingleton<DisplayIndicatorGate>();
             services.AddSingleton<IEventDetailResolver, EventDetailResolver>();

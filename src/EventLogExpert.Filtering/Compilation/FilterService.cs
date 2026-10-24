@@ -312,7 +312,7 @@ public sealed class FilterService : IFilterService
     {
         reader.GetField(locator, EventFieldId.TimeCreated).TryGetDateTime(out var timeCreated);
 
-        return timeCreated >= after && timeCreated <= before;
+        return (after is null || timeCreated >= after) && (before is null || timeCreated <= before);
     }
 
     private static bool ShouldParallelizeAcrossLogs(

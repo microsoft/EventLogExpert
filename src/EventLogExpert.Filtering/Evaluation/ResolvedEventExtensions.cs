@@ -50,7 +50,7 @@ internal static class ResolvedEventExtensions
 
             if (dateFilter is null || !dateFilter.IsEnabled) { return true; }
 
-            return @event.TimeCreated >= dateFilter.After && @event.TimeCreated <= dateFilter.Before;
+            return dateFilter.Contains(@event.TimeCreated);
         }
     }
 }

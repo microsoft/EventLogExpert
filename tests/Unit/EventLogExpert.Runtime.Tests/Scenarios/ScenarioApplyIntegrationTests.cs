@@ -5,7 +5,6 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterLenses;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Runtime.LogTable;
 using Fluxor;
 using NSubstitute;
 using EventLogReducers = EventLogExpert.Runtime.EventLog.Reducers;
@@ -46,13 +45,10 @@ public sealed class ScenarioApplyIntegrationTests
         var appliedFilter = Substitute.For<IStateSelection<EventLogState, Filter>>();
         appliedFilter.Value.Returns(new Filter(null, []));
 
-        var rawEventStore = Substitute.For<IState<RawEventStoreState>>();
-        rawEventStore.Value.Returns(new RawEventStoreState());
-
         var lensState = Substitute.For<IState<FilterLensState>>();
         lensState.Value.Returns(new FilterLensState());
 
-        var effects = new FilterPaneEffects(appliedFilter, rawEventStore, paneStateAccessor, lensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()), new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
+        var effects = new FilterPaneEffects(appliedFilter, paneStateAccessor, lensState, new ClearAllFiltersNotifier(Substitute.For<ITraceLogger>()), new SetFilterDateRangeSucceededNotifier(Substitute.For<ITraceLogger>()), new FilterPromotedNotifier(Substitute.For<ITraceLogger>()));
         var dispatcher = Substitute.For<IDispatcher>();
 
         ApplyFilterAction? captured = null;

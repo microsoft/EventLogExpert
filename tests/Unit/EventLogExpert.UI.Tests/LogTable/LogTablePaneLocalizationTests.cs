@@ -283,6 +283,36 @@ public sealed class LogTablePaneLocalizationTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public async Task EventContextMenu_ExcludeEventsAfter_ExcludesEventsNewerThanTheSelectedEvent()
+    {
+        var @event = Event(1, "Alpha");
+        var cut = RenderTable(groupBy: null, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, @event);
+        _selectedEvent.Current.Returns(Focus(@event, 0));
+        var filterPaneCommands = Services.GetRequiredService<IFilterPaneCommands>();
+
+        OpenMenu(cut, "tbody");
+        await _capturedMenu!.Single(item => item.Label == "[[LogTable_ExcludeEventsAfter]]").OnClickAsync!();
+
+        filterPaneCommands.Received(1).ExcludeEventsAfter(@event.TimeCreated);
+        filterPaneCommands.DidNotReceiveWithAnyArgs().ExcludeEventsBefore(default);
+    }
+
+    [Fact]
+    public async Task EventContextMenu_ExcludeEventsBefore_ExcludesEventsOlderThanTheSelectedEvent()
+    {
+        var @event = Event(1, "Alpha");
+        var cut = RenderTable(groupBy: null, ImmutableHashSet<string>.Empty, orderBy: ColumnName.Source, @event);
+        _selectedEvent.Current.Returns(Focus(@event, 0));
+        var filterPaneCommands = Services.GetRequiredService<IFilterPaneCommands>();
+
+        OpenMenu(cut, "tbody");
+        await _capturedMenu!.Single(item => item.Label == "[[LogTable_ExcludeEventsBefore]]").OnClickAsync!();
+
+        filterPaneCommands.Received(1).ExcludeEventsBefore(@event.TimeCreated);
+        filterPaneCommands.DidNotReceiveWithAnyArgs().ExcludeEventsAfter(default);
+    }
+
+    [Fact]
     public void EventContextMenu_RoutesEveryEventActionThroughMarkerLocalizer()
     {
         var @event = Event(1, "Alpha");

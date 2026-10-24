@@ -6,8 +6,12 @@
     ToStringFunc="@PresetLabel"
     Value="_selectedKey"
     ValueChanged="OnPresetSelectedAsync">
-    @foreach (var preset in s_presets)
+    @if (EntireLogRangeUtc is not null)
     {
-        <ValueSelectItem T="string" Value="@preset.Key">@preset.Label</ValueSelectItem>
+        <ValueSelectItem T="string" Value="@EntireLogKey">@PresetLabel(EntireLogKey)</ValueSelectItem>
+    }
+    @foreach (var preset in s_relativePresets)
+    {
+        <ValueSelectItem T="string" Value="@preset.Key">@PresetLabel(preset.Key)</ValueSelectItem>
     }
 </ValueSelect>

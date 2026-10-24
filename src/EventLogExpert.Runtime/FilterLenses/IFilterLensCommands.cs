@@ -25,7 +25,7 @@ public interface IFilterLensCommands
 
     void SaveLensesAsGroup(string name, bool clearAfterSave = false);
 
-    void ShowEventsNearTime(DateTime timeCreated, TimeSpan radius, TimeZoneInfo displayZone, string? originLog = null);
+    void ShowEventsNearTime(DateTime timeCreated, TimeSpan radius, string? originLog = null);
 
     void ShowParentActivity(Guid? relatedActivityId, string? originLog = null);
 
@@ -33,5 +33,5 @@ public interface IFilterLensCommands
 
     void ShowRelatedByRelatedActivityId(Guid? relatedActivityId, string? originLog = null);
 
-    void ShowTimeRange(DateTime startUtc, DateTime endUtc, TimeZoneInfo displayZone, string? originLog = null);
+    void ShowTimeRange(DateTime startUtc, DateTime endUtc, string? originLog = null);
 }

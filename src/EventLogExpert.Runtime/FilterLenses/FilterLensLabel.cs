@@ -13,7 +13,7 @@ public abstract record FilterLensLabel
 
     public sealed record ParentActivity(Guid ActivityId) : FilterLensLabel;
 
-    public sealed record TimeRange(DateTime AfterLocal, DateTime BeforeLocal, bool SameDay) : FilterLensLabel;
+    public sealed record TimeRange(DateTime AfterUtc, DateTime BeforeUtc) : FilterLensLabel;
 
-    public sealed record TimeWindow(DateTime CenterLocal, TimeSpan Radius) : FilterLensLabel;
+    public sealed record TimeWindow(DateTime CenterUtc, TimeSpan Radius) : FilterLensLabel;
 }
