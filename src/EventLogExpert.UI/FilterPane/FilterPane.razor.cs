@@ -30,6 +30,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Security;
 using FilterMode = EventLogExpert.Filtering.Evaluation.FilterMode;
 
@@ -43,25 +44,34 @@ public sealed partial class FilterPane
     internal ScenarioGroup? SelectedScenarioGroup;
     internal string? SelectedScenarioId;
 
+    private readonly DateFilterDraft _dateDraft = new();
+    private readonly string _dateErrorId = $"filter-date-error-{Guid.NewGuid():N}";
     private readonly List<string> _filterSetTags = [];
     private readonly List<FilterDraft> _pendingDrafts = [];
     private readonly Dictionary<FilterId, FilterRow?> _rowRefs = new();
 
+    private Button? _addDateFilterButton;
     private Button? _addFilterButton;
     private Button? _addFilterChevron;
     private long _addFilterMenuId;
     private ScenarioAuthoringRowContext? _authoringContext;
     private bool _canEditDate;
     private ScenarioClipboardExporter _clipboardExporter = null!;
-    private TimeZoneInfo _currentTimeZone = TimeZoneInfo.Utc;
+    private bool _dateAfterHadParseError;
+    private InputDate<DateTime?>? _dateAfterInput;
+    private int _dateAfterInputKey;
+    private bool _dateBeforeHadParseError;
+    private InputDate<DateTime?>? _dateBeforeInput;
+    private int _dateBeforeInputKey;
+    private Func<ElementReference?>? _dateFocusTargetAfterRender;
     private volatile bool _disposed;
     private EditContext _editContext = null!;
+    private Button? _editDateButton;
     private ElementReference _filterPaneRootRef;
     private bool _focusAddButtonAfterRemove;
     private FilterId? _focusTargetAfterRemove;
     private bool _isFilterListVisible;
     private IJSObjectReference? _menuAnchorModule;
-    private DateFilter _model = new();
     private IReadOnlyList<IGrouping<ScenarioGroup, ScenarioDefinition>> _scenarioMatchGroups = [];
     private ImmutableHashSet<string>? _scenarioMatchSource;
     private IJSObjectReference? _scrollSuppressorModule;
@@ -87,10 +97,46 @@ public sealed partial class FilterPane
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
+    private string? DateDraftError
+    {
+        get
+        {
+            // A rejected input keeps the previous draft value, so its parse error must win over the draft checks.
+            if (_editContext.GetValidationMessages().Any()) { return Localizer["FilterPane_Date_Error_InvalidDateTime"]; }
+
+            if (_dateDraft is { After: null, Before: null }) { return Localizer["FilterPane_Date_Error_NoBounds"]; }
+
+            var (afterUtc, beforeUtc) = ConvertDateDraftToUtc();
+
+            return afterUtc > beforeUtc ? Localizer["FilterPane_Date_Error_AfterLaterThanBefore"].Value : null;
+        }
+    }
+
+    private IEnumerable<string> DateDraftSkippedTimeWarnings
+    {
+        get
+        {
+            var displayZone = Settings.TimeZoneInfo;
+
+            foreach (var bound in (DateTime?[])[_dateDraft.After, _dateDraft.Before])
+            {
+                if (bound is not { } wallClock || !wallClock.IsSkippedWallClock(displayZone)) { continue; }
+
+                var effectiveWallClock = wallClock
+                    .ConvertWallClockToUtc(displayZone, AmbiguousTimeResolution.Earliest)
+                    .ConvertTimeZone(displayZone);
+
+                yield return Localizer[
+                    "FilterPane_Date_Warning_SkippedTime",
+                    FormatWallClock(wallClock),
+                    FormatWallClock(effectiveWallClock)];
+            }
+        }
+    }
+
     private ScenarioGroup? EffectiveScenarioGroup =>
-        SelectedScenarioGroup is { } group && ScenarioMatchGroups.Any(match => match.Key == group)
-            ? group
-            : ScenarioMatchGroups.FirstOrDefault()?.Key;
+        SelectedScenarioGroup is { } group && ScenarioMatchGroups.Any(match => match.Key == group) ?
+            group : ScenarioMatchGroups.FirstOrDefault()?.Key;
 
     [Inject] private IEventLogQueries EventLogQueries { get; init; } = null!;
 
@@ -148,18 +194,6 @@ public sealed partial class FilterPane
     private string MenuState => HasFilters ? _isFilterListVisible.ToString().ToLower() : "false";
 
     [Inject] private IModalCoordinator ModalCoordinator { get; init; } = null!;
-
-    private DateTime? ModelAfter
-    {
-        get => _model.After;
-        set => _model = _model with { After = value };
-    }
-
-    private DateTime? ModelBefore
-    {
-        get => _model.Before;
-        set => _model = _model with { Before = value };
-    }
 
     [Inject] private IOpenLogsPresenceSource OpenLogsPresence { get; init; } = null!;
 
@@ -262,7 +296,11 @@ public sealed partial class FilterPane
             disabledReason: GetRecentDisabledReason()),
     ];
 
-    internal void EditDateFilter() => _canEditDate = true;
+    internal void EditDateFilter()
+    {
+        HydrateDateDraftFromApplied();
+        _canEditDate = true;
+    }
 
     internal string FormatScenarioGroup(ScenarioGroup? group) =>
         group is { } value ? ScenarioGroupLocalizer.GroupDisplay(Localizer, value) : string.Empty;
@@ -345,7 +383,13 @@ public sealed partial class FilterPane
         ApplyScenario(scenario, replace: true);
     }
 
-    internal void SetQuickDateRange(DateFilter dateFilter) => UpdateFilterDate(dateFilter);
+    internal void SetQuickDateRange(DateFilter dateFilterUtc)
+    {
+        var displayZone = Settings.TimeZoneInfo;
+
+        LoadDateDraftAfter(dateFilterUtc.After, displayZone, DateFilterBoundOrigin.Preset);
+        LoadDateDraftBefore(dateFilterUtc.Before, displayZone, DateFilterBoundOrigin.Preset);
+    }
 
     internal bool TryResolveSelectedFilterSet()
     {
@@ -387,8 +431,9 @@ public sealed partial class FilterPane
         {
             _disposed = true;
 
-            Settings.TimeZoneChanged -= UpdateFilterDateTimeZone;
+            Settings.TimeZoneChanged -= OnTimeZoneChanged;
             MenuService.StateChanged -= OnMenuServiceStateChanged;
+            _editContext.OnValidationStateChanged -= OnDateValidationStateChanged;
         }
 
         await base.DisposeAsyncCore(disposing);
@@ -448,23 +493,41 @@ public sealed partial class FilterPane
             }
         }
 
+        if (_dateFocusTargetAfterRender is { } resolveDateFocusTarget)
+        {
+            _dateFocusTargetAfterRender = null;
+
+            if (resolveDateFocusTarget() is { } dateFocusTarget)
+            {
+                await ElementFocus.SafelyAsync(dateFocusTarget);
+            }
+        }
+
         await base.OnAfterRenderAsync(firstRender);
     }
 
     protected override void OnInitialized()
     {
-        // Seed the display zone and hydrate the date model from any already-applied range BEFORE binding the
-        // EditContext, so an externally-set FilteredDateRange (e.g. a promoted time-window lens) renders in local time
-        // rather than UTC, and the EditContext wraps the populated model.
-        _currentTimeZone = Settings.TimeZoneInfo;
-        UpdateFilterDate(FilteredDateRange.Current);
+        // The draft is only mutated in place, so this EditContext stays bound to it for the component's lifetime.
+        _editContext = new EditContext(_dateDraft);
+        _editContext.OnValidationStateChanged += OnDateValidationStateChanged;
 
-        _editContext = new EditContext(_model);
+        HydrateDateDraftFromApplied();
 
         ObserveSource(LibraryEntries);
         ObserveSource(LibraryLoadStatus);
         ObserveSource(ActiveFilters);
-        ObserveSource(FilteredDateRange);
+        ObserveSource(
+            FilteredDateRange,
+            () =>
+            {
+                if (_disposed) { return Task.CompletedTask; }
+
+                SyncDateDraftWithApplied();
+                StateHasChanged();
+
+                return Task.CompletedTask;
+            });
         ObserveSource(OpenLogsPresence);
         ObserveSource(LoadedLogNames);
 
@@ -476,6 +539,7 @@ public sealed partial class FilterPane
                 if (_disposed) { return Task.CompletedTask; }
 
                 _canEditDate = false;
+                HydrateDateDraftFromApplied();
                 _pendingDrafts.Clear();
                 IsFilterSetPickerVisible = false;
                 CancelScenarioPicker();
@@ -493,7 +557,7 @@ public sealed partial class FilterPane
             {
                 if (_disposed) { return Task.CompletedTask; }
 
-                UpdateFilterDate(FilteredDateRange.Current);
+                SyncDateDraftWithApplied();
                 StateHasChanged();
 
                 return Task.CompletedTask;
@@ -514,7 +578,7 @@ public sealed partial class FilterPane
                 return Task.CompletedTask;
             });
 
-        Settings.TimeZoneChanged += UpdateFilterDateTimeZone;
+        Settings.TimeZoneChanged += OnTimeZoneChanged;
         MenuService.StateChanged += OnMenuServiceStateChanged;
 
         _clipboardExporter = new ScenarioClipboardExporter(
@@ -529,6 +593,8 @@ public sealed partial class FilterPane
 
         base.OnInitialized();
     }
+
+    private static string FormatWallClock(DateTime wallClock) => wallClock.ToString("G", CultureInfo.CurrentCulture);
 
     private void AddAdvancedFilter()
     {
@@ -556,15 +622,11 @@ public sealed partial class FilterPane
 
     private void AddDateFilter()
     {
-        _currentTimeZone = Settings.TimeZoneInfo;
-
         var (after, before) = EventLogQueries.GetEventDateRange(DateTime.UtcNow);
 
-        _model = _model with
-        {
-            After = after.ConvertTimeZone(_currentTimeZone),
-            Before = before.ConvertTimeZone(_currentTimeZone)
-        };
+        var displayZone = Settings.TimeZoneInfo;
+        LoadDateDraftAfter(after, displayZone, DateFilterBoundOrigin.Suggested);
+        LoadDateDraftBefore(before, displayZone, DateFilterBoundOrigin.Suggested);
 
         _isFilterListVisible = true;
         _canEditDate = true;
@@ -590,20 +652,32 @@ public sealed partial class FilterPane
 
     private void ApplyDateFilter()
     {
-        FilterPaneCommands.SetFilterDateRange(
-            new DateFilter
-            {
-                After = _model.After?.ConvertTimeZoneToUtc(_currentTimeZone),
-                Before = _model.Before?.ConvertTimeZoneToUtc(_currentTimeZone)
-            });
+        if (!_canEditDate || DateDraftError is not null) { return; }
 
+        var (afterUtc, beforeUtc) = ConvertDateDraftToUtc();
+
+        // Leave edit mode first so the success notifier re-hydrates the read-only view with the applied range.
         _canEditDate = false;
+
+        FilterPaneCommands.SetFilterDateRange(new DateFilter { After = afterUtc, Before = beforeUtc, IsEnabled = true });
+
+        HydrateDateDraftFromApplied();
+        FocusDateFilterEntryAfterRender();
     }
 
     private void ApplyScenario(ScenarioDefinition scenario, bool replace)
     {
         ScenarioApplyService.ApplyInApp(scenario, replace);
         CancelScenarioPicker();
+    }
+
+    private void CancelDateFilterEdit()
+    {
+        if (!_canEditDate) { return; }
+
+        _canEditDate = false;
+        HydrateDateDraftFromApplied();
+        FocusDateFilterEntryAfterRender();
     }
 
     private void CancelFilterSetPicker()
@@ -641,6 +715,32 @@ public sealed partial class FilterPane
         if (confirmed) { FilterPaneCommands.ClearAllFilters(); }
     }
 
+    // The clear button unmounts with its value, so focus moves to the input it cleared.
+    private void ClearDraftAfter()
+    {
+        _dateDraft.After = null;
+        DiscardDateAfterParseError();
+        _dateFocusTargetAfterRender = () => _dateAfterInput?.Element;
+    }
+
+    private void ClearDraftBefore()
+    {
+        _dateDraft.Before = null;
+        DiscardDateBeforeParseError();
+        _dateFocusTargetAfterRender = () => _dateBeforeInput?.Element;
+    }
+
+    private (DateTime? AfterUtc, DateTime? BeforeUtc) ConvertDateDraftToUtc()
+    {
+        var displayZone = Settings.TimeZoneInfo;
+
+        return (
+            _dateDraft.AfterExactUtc ??
+            _dateDraft.After?.ConvertWallClockToUtc(displayZone, AmbiguousTimeResolution.Earliest),
+            _dateDraft.BeforeExactUtc ??
+            _dateDraft.Before?.ConvertWallClockToUtc(displayZone, AmbiguousTimeResolution.Latest));
+    }
+
     private Task CopyActiveRowAsync(SavedFilter filter) =>
         _clipboardExporter.CopyAsync(
             ScenarioAuthoringService.ExportRows([filter], CurrentChannelNames()),
@@ -654,6 +754,17 @@ public sealed partial class FilterPane
             ScenarioExportSubject.CurrentFilters);
 
     private IReadOnlyList<string> CurrentChannelNames() => EventLogQueries.GetChannelNames();
+
+    // An input keeps its rejected text and parse error until it is remounted, even after the draft value is replaced.
+    private void DiscardDateAfterParseError()
+    {
+        if (HasDateParseError(nameof(DateFilterDraft.After))) { _dateAfterInputKey++; }
+    }
+
+    private void DiscardDateBeforeParseError()
+    {
+        if (HasDateParseError(nameof(DateFilterDraft.Before))) { _dateBeforeInputKey++; }
+    }
 
     private ScenarioExportResult ExportCurrentRows() =>
         ScenarioAuthoringService.ExportRows(
@@ -683,6 +794,10 @@ public sealed partial class FilterPane
         builder.AddContent(4, template[(placeholderIndex + Placeholder.Length)..]);
     };
 
+    // Resolved after render: Edit while the date filter stays visible, otherwise the reappearing Add Date Filter button.
+    private void FocusDateFilterEntryAfterRender() =>
+        _dateFocusTargetAfterRender = () => IsDateFilterVisible ? _editDateButton?.Element : _addDateFilterButton?.Element;
+
     private string FormatFilterSetDetail(LibraryEntryFilterSet set)
     {
         int count = set.Filters.Count;
@@ -705,6 +820,8 @@ public sealed partial class FilterPane
 
         return count;
     }
+
+    private (DateTime After, DateTime Before) GetEntireLogRangeUtc() => EventLogQueries.GetEventDateRange(DateTime.UtcNow);
 
     private string GetFilterSetName(LibraryEntryId id)
     {
@@ -730,6 +847,11 @@ public sealed partial class FilterPane
         {
             await OpenAddFilterMenuAtAsync(false, openedByKeyboard: true);
         }
+    }
+
+    private void HandleDateFormKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape") { CancelDateFilterEdit(); }
     }
 
     private void HandlePendingDiscard(FilterDraft draft)
@@ -761,8 +883,72 @@ public sealed partial class FilterPane
         _focusAddButtonAfterRemove = target is null;
     }
 
+    private bool HasDateParseError(string fieldName) =>
+        _editContext.GetValidationMessages(new FieldIdentifier(_dateDraft, fieldName)).Any();
+
+    private void HydrateDateDraftFromApplied()
+    {
+        var applied = FilteredDateRange.Current;
+        var displayZone = Settings.TimeZoneInfo;
+
+        LoadDateDraftAfter(applied?.After, displayZone, DateFilterBoundOrigin.Applied);
+        LoadDateDraftBefore(applied?.Before, displayZone, DateFilterBoundOrigin.Applied);
+    }
+
+    private void HydrateUntouchedDateDraftBoundsFromApplied()
+    {
+        var applied = FilteredDateRange.Current;
+        var displayZone = Settings.TimeZoneInfo;
+
+        if (FollowsAppliedRange(_dateDraft.AfterOrigin, applied))
+        {
+            LoadDateDraftAfter(applied?.After, displayZone, DateFilterBoundOrigin.Applied);
+        }
+
+        if (FollowsAppliedRange(_dateDraft.BeforeOrigin, applied))
+        {
+            LoadDateDraftBefore(applied?.Before, displayZone, DateFilterBoundOrigin.Applied);
+        }
+
+        return;
+
+        static bool FollowsAppliedRange(DateFilterBoundOrigin origin, DateFilter? applied) =>
+            origin == DateFilterBoundOrigin.Applied || (origin == DateFilterBoundOrigin.Suggested && applied is not null);
+    }
+
     private bool IsFocusable(FilterId id) =>
         _rowRefs.TryGetValue(id, out var row) && row is not null && !row.IsEditing;
+
+    private void LoadDateDraftAfter(DateTime? utc, TimeZoneInfo displayZone, DateFilterBoundOrigin origin)
+    {
+        _dateDraft.LoadAfter(utc, displayZone, origin);
+        DiscardDateAfterParseError();
+    }
+
+    private void LoadDateDraftBefore(DateTime? utc, TimeZoneInfo displayZone, DateFilterBoundOrigin origin)
+    {
+        _dateDraft.LoadBefore(utc, displayZone, origin);
+        DiscardDateBeforeParseError();
+    }
+
+    // A newly rejected entry makes its bound the user's, so automatic syncs keep the typed text and Apply converts the
+    // retyped value in the current zone instead of a remembered instant. Only a new error marks the bound: a remounted
+    // input clearing its stale error also raises this event and must not claim a bound that was just loaded. The pane
+    // re-renders to update Apply and the live region.
+    private void OnDateValidationStateChanged(object? sender, ValidationStateChangedEventArgs args)
+    {
+        var afterHasParseError = HasDateParseError(nameof(DateFilterDraft.After));
+        var beforeHasParseError = HasDateParseError(nameof(DateFilterDraft.Before));
+
+        if (afterHasParseError && !_dateAfterHadParseError) { _dateDraft.MarkAfterEdited(); }
+
+        if (beforeHasParseError && !_dateBeforeHadParseError) { _dateDraft.MarkBeforeEdited(); }
+
+        _dateAfterHadParseError = afterHasParseError;
+        _dateBeforeHadParseError = beforeHasParseError;
+
+        RequestGuardedRender(StateHasChanged);
+    }
 
     private void OnFilterSetTagsChanged(List<string> tags)
     {
@@ -775,6 +961,15 @@ public sealed partial class FilterPane
     private void OnMenuServiceStateChanged() => RequestGuardedRender(StateHasChanged);
 
     private void OnRowDisposed(FilterId id) => _rowRefs.Remove(id);
+
+    // The synchronizer has already reinterpreted the applied range, so draft readings stay the same across zones.
+    private void OnTimeZoneChanged(object? sender, TimeZoneInfo timeZone) =>
+        RequestGuardedRender(() =>
+        {
+            SyncDateDraftWithApplied();
+            _dateDraft.ReinterpretInNewTimeZone();
+            StateHasChanged();
+        });
 
     private async Task OpenAddFilterMenuAsync(MouseEventArgs args) =>
         await OpenAddFilterMenuAtAsync(true, MenuButtonActivation.WasKeyboardTriggered(args));
@@ -831,7 +1026,10 @@ public sealed partial class FilterPane
     private void RemoveDateFilter()
     {
         _canEditDate = false;
+        LoadDateDraftAfter(null, Settings.TimeZoneInfo, DateFilterBoundOrigin.Applied);
+        LoadDateDraftBefore(null, Settings.TimeZoneInfo, DateFilterBoundOrigin.Applied);
         FilterPaneCommands.SetFilterDateRange(null);
+        FocusDateFilterEntryAfterRender();
     }
 
     private Task SaveFiltersAsFilterSetAsync() => !HasSavableFilters ? Task.CompletedTask : MenuActions.SaveFiltersAsFilterSetAsync();
@@ -864,31 +1062,14 @@ public sealed partial class FilterPane
         await _clipboardExporter.AnnounceAsync(Localizer["FilterPane_ScenarioSaved", path], export.Warnings);
     }
 
+    // Bounds the user edited stay theirs; the rest follow the applied range so Apply never undoes an external change.
+    private void SyncDateDraftWithApplied()
+    {
+        if (_canEditDate) { HydrateUntouchedDateDraftBoundsFromApplied(); }
+        else { HydrateDateDraftFromApplied(); }
+    }
+
     private void ToggleDateFilter() => FilterPaneCommands.ToggleFilterDate();
 
     private void ToggleMenu() => _isFilterListVisible = !_isFilterListVisible;
-
-    private void UpdateFilterDate(DateFilter? updatedDate)
-    {
-        _model = _model with
-        {
-            Before = updatedDate?.Before?.ConvertTimeZone(_currentTimeZone),
-            After = updatedDate?.After?.ConvertTimeZone(_currentTimeZone)
-        };
-    }
-
-    private void UpdateFilterDateTimeZone(object? sender, TimeZoneInfo timeZoneInfo)
-    {
-        if (_disposed) { return; }
-
-        _model = _model with
-        {
-            Before = _model.Before is not null ?
-                TimeZoneInfo.ConvertTime(_model.Before.Value, _currentTimeZone, timeZoneInfo) : null,
-            After = _model.After is not null ?
-                TimeZoneInfo.ConvertTime(_model.After.Value, _currentTimeZone, timeZoneInfo) : null
-        };
-
-        _currentTimeZone = timeZoneInfo;
-    }
 }

@@ -34,8 +34,8 @@ internal sealed class FilterLensCommands(IDispatcher dispatcher) : IFilterLensCo
     public void SaveLensesAsGroup(string name, bool clearAfterSave = false) =>
         _dispatcher.Dispatch(new SaveLensesAsGroupAction(name, clearAfterSave));
 
-    public void ShowEventsNearTime(DateTime timeCreated, TimeSpan radius, TimeZoneInfo displayZone, string? originLog = null) =>
-        PushLens(FilterLensFactory.ForTimeWindow(timeCreated, radius, displayZone, originLog));
+    public void ShowEventsNearTime(DateTime timeCreated, TimeSpan radius, string? originLog = null) =>
+        PushLens(FilterLensFactory.ForTimeWindow(timeCreated, radius, originLog));
 
     public void ShowParentActivity(Guid? relatedActivityId, string? originLog = null)
     {
@@ -55,8 +55,8 @@ internal sealed class FilterLensCommands(IDispatcher dispatcher) : IFilterLensCo
         if (relatedActivityId is { } id) { PushLens(FilterLensFactory.ForRelatedActivityId(id, originLog)); }
     }
 
-    public void ShowTimeRange(DateTime startUtc, DateTime endUtc, TimeZoneInfo displayZone, string? originLog = null) =>
-        PushLens(FilterLensFactory.ForTimeRange(startUtc, endUtc, displayZone, originLog));
+    public void ShowTimeRange(DateTime startUtc, DateTime endUtc, string? originLog = null) =>
+        PushLens(FilterLensFactory.ForTimeRange(startUtc, endUtc, originLog));
 
     private void PushLens(FilterLens? lens)
     {

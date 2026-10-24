@@ -3118,6 +3118,66 @@
   <data name="FilterPane_Date_QuickRangeAria" xml:space="preserve">
     <value>Quick date range</value>
   </data>
+  <data name="FilterPane_Date_TimeZoneLabel" xml:space="preserve">
+    <value>Time zone: {0}</value>
+  </data>
+  <data name="FilterPane_Date_NoLimit" xml:space="preserve">
+    <value>No limit</value>
+  </data>
+  <data name="FilterPane_Date_ClearAfterAria" xml:space="preserve">
+    <value>Clear the After time</value>
+  </data>
+  <data name="FilterPane_Date_ClearBeforeAria" xml:space="preserve">
+    <value>Clear the Before time</value>
+  </data>
+  <data name="FilterPane_Date_Error_NoBounds" xml:space="preserve">
+    <value>Enter an After time, a Before time, or both.</value>
+  </data>
+  <data name="FilterPane_Date_Error_AfterLaterThanBefore" xml:space="preserve">
+    <value>The After time must not be later than the Before time.</value>
+  </data>
+  <data name="FilterPane_Date_Error_InvalidDateTime" xml:space="preserve">
+    <value>Enter a valid date and time.</value>
+  </data>
+  <data name="FilterPane_Date_Warning_SkippedTime" xml:space="preserve">
+    <value>{0} is skipped by a daylight saving time change in this time zone and will be treated as {1}.</value>
+  </data>
+  <data name="DateRangeQuickPick_Placeholder" xml:space="preserve">
+    <value>Quick range...</value>
+  </data>
+  <data name="DateRangeQuickPick_EntireLog" xml:space="preserve">
+    <value>Entire log</value>
+  </data>
+  <data name="DateRangeQuickPick_Last15Minutes" xml:space="preserve">
+    <value>Last 15 minutes</value>
+  </data>
+  <data name="DateRangeQuickPick_Last1Hour" xml:space="preserve">
+    <value>Last 1 hour</value>
+  </data>
+  <data name="DateRangeQuickPick_Last24Hours" xml:space="preserve">
+    <value>Last 24 hours</value>
+  </data>
+  <data name="DateRangeQuickPick_Last7Days" xml:space="preserve">
+    <value>Last 7 days</value>
+  </data>
+  <data name="DateRangeQuickPick_Last14Days" xml:space="preserve">
+    <value>Last 14 days</value>
+  </data>
+  <data name="DateRangeQuickPick_Last1Month" xml:space="preserve">
+    <value>Last 1 month</value>
+  </data>
+  <data name="DateRangeQuickPick_Last3Months" xml:space="preserve">
+    <value>Last 3 months</value>
+  </data>
+  <data name="DateRangeQuickPick_Last6Months" xml:space="preserve">
+    <value>Last 6 months</value>
+  </data>
+  <data name="DateRangeQuickPick_Last1Year" xml:space="preserve">
+    <value>Last 1 year</value>
+  </data>
+  <data name="DateRangeQuickPick_Last2Years" xml:space="preserve">
+    <value>Last 2 years</value>
+  </data>
   <data name="FilterPane_Action_Apply" xml:space="preserve">
     <value>Apply</value>
   </data>

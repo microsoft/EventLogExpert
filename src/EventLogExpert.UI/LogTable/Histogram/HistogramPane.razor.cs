@@ -163,7 +163,6 @@ public sealed partial class HistogramPane
         FilterLensCommands.ShowTimeRange(
             new DateTime(bin.StartTicks, DateTimeKind.Utc),
             new DateTime(bin.EndTicks, DateTimeKind.Utc),
-            _timeZone,
             Presentation.ActiveLogName);
     }
 
@@ -1012,7 +1011,6 @@ public sealed partial class HistogramPane
         FilterLensCommands.ShowTimeRange(
             new DateTime(bin.StartTicks, DateTimeKind.Utc),
             new DateTime(bin.EndTicks, DateTimeKind.Utc),
-            _timeZone,
             Presentation.ActiveLogName);
 
     private void ScopeBinCursorOrWindow()
@@ -1034,7 +1032,6 @@ public sealed partial class HistogramPane
         FilterLensCommands.ShowTimeRange(
             new DateTime(render.WindowStartTicks, DateTimeKind.Utc),
             new DateTime(render.WindowEndTicks, DateTimeKind.Utc),
-            _timeZone,
             Presentation.ActiveLogName);
     }
 

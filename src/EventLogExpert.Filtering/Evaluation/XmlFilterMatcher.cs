@@ -110,7 +110,7 @@ public sealed class XmlFilterMatcher : IXmlFilterMatcher
     {
         reader.GetField(locator, EventFieldId.TimeCreated).TryGetDateTime(out DateTime timeCreated);
 
-        return timeCreated >= dateFilter.After && timeCreated <= dateFilter.Before;
+        return dateFilter.Contains(timeCreated);
     }
 
     private static bool Matches(IEventColumnReader reader, EventLocator locator, Filter filter, string xml)

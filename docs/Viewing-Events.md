@@ -41,7 +41,7 @@ The `User` column shows the best-available account identity, resolved offline (n
 **Right-click on a row.** Opens a context menu:
 
 - `Copy Selected` / `Copy Selected (Simple)` / `Copy Selected (XML)` / `Copy Selected (Full)` — same four formats as the `Edit` menu.
-- `Exclude Events Before` / `Exclude Events After` — sets a date filter using the right-clicked event's timestamp as the boundary.
+- `Exclude Events Before` / `Exclude Events After` — hides events older (`Before`) or newer (`After`) than the right-clicked event, narrowing the date filter (see [Filtering](Filtering.md#date-filter) → Date filter).
 - `Group by <column>` - groups by the right-clicked cell's column when that column is groupable; the same item reads `Remove grouping by <column>` when you right-click a cell in the column you are already grouped by. For a cell that is not groupable (or a keyboard-invoked row menu), a `Group By` submenu is offered instead.
 - `Include` and `Exclude` submenus — each lists the field comparisons applicable to a single right-clicked event; a field is enabled only when the event carries a value for it (otherwise it is shown disabled with a reason). Picking an enabled one creates a new basic filter (or exclusion) for that field equal to the right-clicked event's value. `Description`, `Xml`, and the advanced-only `User ID` are not offered; the fields that can produce a filter are `Event ID`, `Activity ID`, `Level`, `Keywords`, `Source`, `Task Category`, `Process ID`, `Thread ID`, `User` (the resolved account name, or the raw SID when that is all the event carries), and `Log Name`.
 

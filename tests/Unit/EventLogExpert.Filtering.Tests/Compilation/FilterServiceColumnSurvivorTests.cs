@@ -39,7 +39,8 @@ public sealed class FilterServiceColumnSurvivorTests
         "null-compiled-plus-include",
         "date-plus-exclude",
         "date-disabled-with-bounds",
-        "date-after-only-null-before"
+        "date-after-only-null-before",
+        "date-before-only-null-after"
     ];
 
     [Theory]
@@ -228,6 +229,8 @@ public sealed class FilterServiceColumnSurvivorTests
                 new Filter(DisabledDate(s_baseTime.AddMinutes(2), s_baseTime.AddMinutes(5)), []),
             "date-after-only-null-before" =>
                 new Filter(EnabledDate(s_baseTime.AddMinutes(3), null), []),
+            "date-before-only-null-after" =>
+                new Filter(EnabledDate(null, s_baseTime.AddMinutes(3)), []),
             _ => throw new ArgumentOutOfRangeException(nameof(caseName), caseName, "Unknown battery case.")
         };
 }

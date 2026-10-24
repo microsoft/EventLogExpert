@@ -82,7 +82,7 @@ public sealed class FilterLensSourceTests
     {
         // Guards the FilterLensSummary.Kind projection: if it were dropped, a time-window lens would default to
         // Property and wrongly enable "Save as group" (which a filter set cannot store a date window for).
-        var time = FilterLensFactory.ForTimeWindow(DateTime.UtcNow, TimeSpan.FromMinutes(5), TimeZoneInfo.Utc);
+        var time = FilterLensFactory.ForTimeWindow(new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc), TimeSpan.FromMinutes(5));
         var harness = new Harness(time);
 
         var summary = Assert.Single(harness.Source.Lenses);

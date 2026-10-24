@@ -67,7 +67,7 @@ public sealed class EffectiveFilterBuilderTests
         var belowWindow = FilterEventBuilder.CreateTestEvent(id: 4, timeCreated: At(10));
         var aboveWindow = FilterEventBuilder.CreateTestEvent(id: 5, timeCreated: At(14));
 
-        var lens = FilterLensFactory.ForTimeWindow(anchor, TimeSpan.FromHours(1), TimeZoneInfo.Utc);
+        var lens = FilterLensFactory.ForTimeWindow(anchor, TimeSpan.FromHours(1));
         var composed = EffectiveFilterBuilder.Build(new Filter(null, []), [lens]);
 
         var result = s_filterService.GetFilteredEvents(

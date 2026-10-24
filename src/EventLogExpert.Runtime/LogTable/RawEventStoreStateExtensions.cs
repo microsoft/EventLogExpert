@@ -14,7 +14,7 @@ internal static class RawEventStoreStateExtensions
         {
             if (!store.TryGetTimeRange(out long minTicks, out long maxTicks)) { continue; }
 
-            // Only Ticks are read downstream (comparison and hour rounding), so stamping UTC is safe.
+            // Only Ticks are read downstream (comparison and rounding), so stamping UTC is safe.
             var logOldest = new DateTime(minTicks, DateTimeKind.Utc);
             var logNewest = new DateTime(maxTicks, DateTimeKind.Utc);
 

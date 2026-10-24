@@ -64,7 +64,7 @@ public sealed class FilterLensEffectsTests
     public async Task HandlePromoteAll_CommitsEveryPromotableLens_AndAnnouncesOnce()
     {
         var keep = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
-        var time = FilterLensFactory.ForTimeWindow(DateTime.UtcNow, TimeSpan.FromMinutes(5), TimeZoneInfo.Utc);
+        var time = FilterLensFactory.ForTimeWindow(new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc), TimeSpan.FromMinutes(5));
         var (effects, dispatcher, announcer) =
             CreateEffectsWithAnnouncer(new FilterLensState { Lenses = [keep, time] }, new FilterPaneState());
 
@@ -258,7 +258,7 @@ public sealed class FilterLensEffectsTests
     [Fact]
     public async Task HandlePromote_TimeWindowLens_DispatchesCommitWithWindow()
     {
-        var lens = FilterLensFactory.ForTimeWindow(DateTime.UtcNow, TimeSpan.FromMinutes(5), TimeZoneInfo.Utc);
+        var lens = FilterLensFactory.ForTimeWindow(new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc), TimeSpan.FromMinutes(5));
         var (effects, dispatcher, announcer) =
             CreateEffectsWithAnnouncer(new FilterLensState { Lenses = [lens] }, new FilterPaneState());
 
@@ -382,7 +382,7 @@ public sealed class FilterLensEffectsTests
         // A time-window lens contributes no filter (the UI says it can't be grouped), so save-and-clear must remove
         // only the contributing value lens and leave the non-groupable time-window lens active.
         var value = FilterLensFactory.ForExcludedValue(EventProperty.Source, "Contoso")!;
-        var time = FilterLensFactory.ForTimeWindow(DateTime.UtcNow, TimeSpan.FromMinutes(5), TimeZoneInfo.Utc);
+        var time = FilterLensFactory.ForTimeWindow(new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc), TimeSpan.FromMinutes(5));
         var (effects, dispatcher) =
             CreateEffects(new FilterLensState { Lenses = [value, time] }, new FilterPaneState());
 
@@ -432,7 +432,7 @@ public sealed class FilterLensEffectsTests
     public async Task HandleSaveLensesAsGroup_MixedStack_SavesOnlyValueLensAndLeavesAllLensesActive()
     {
         var keep = FilterLensFactory.ForActivityId(Guid.NewGuid())!;
-        var time = FilterLensFactory.ForTimeWindow(DateTime.UtcNow, TimeSpan.FromMinutes(5), TimeZoneInfo.Utc);
+        var time = FilterLensFactory.ForTimeWindow(new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc), TimeSpan.FromMinutes(5));
         var (effects, dispatcher) =
             CreateEffects(new FilterLensState { Lenses = [keep, time] }, new FilterPaneState());
 
@@ -448,7 +448,7 @@ public sealed class FilterLensEffectsTests
     [Fact]
     public async Task HandleSaveLensesAsGroup_OnlyTimeWindowLenses_DoesNothing()
     {
-        var time = FilterLensFactory.ForTimeWindow(DateTime.UtcNow, TimeSpan.FromMinutes(5), TimeZoneInfo.Utc);
+        var time = FilterLensFactory.ForTimeWindow(new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc), TimeSpan.FromMinutes(5));
         var (effects, dispatcher) = CreateEffects(new FilterLensState { Lenses = [time] }, new FilterPaneState());
 
         await effects.HandleSaveLensesAsGroup(new SaveLensesAsGroupAction("My Group"), dispatcher);

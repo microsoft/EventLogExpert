@@ -11,7 +11,7 @@
 
 ### Time Zone
 
-Drop-down of every system time zone. Event timestamps in the table, the Details pane, and the Date filter are all rendered in the selected zone. Changing this re-renders open logs in place; it doesn't reload them.
+Drop-down of every system time zone. Event timestamps in the table, the Details pane, filter lens labels, and the Date filter are all rendered in the selected zone. Changing this re-renders open logs in place; it doesn't reload them. The Date filter keeps its clock reading (`After 09:00` stays `09:00`) and is re-applied in the new zone; see [Filtering](Filtering.md) → `Date filter`.
 
 Set this to match the source machine, the customer's locale, or your own — whatever lines up most clearly with the events you're reading. Combined views from machines in different zones use this single zone for sorting and display.
 
