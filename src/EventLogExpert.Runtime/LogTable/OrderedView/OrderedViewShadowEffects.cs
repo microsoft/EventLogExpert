@@ -7,7 +7,6 @@ using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Histogram;
 using Fluxor;
-using System.Collections.Immutable;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Runtime.LogTable.OrderedView;
@@ -150,27 +149,30 @@ internal sealed class OrderedViewShadowEffects(
     [EffectMethod(typeof(XmlFilterMatchReadyAction))]
     public Task HandleXmlFilterMatchReady(IDispatcher dispatcher) => Shadow(() => Sync(ReissueForce.Always));
 
+    private ViewProbe Probe()
+    {
+        LogTableState state = _logTableState.Value;
+        ViewIdentity identity = state.ViewIdentity;
+        RawEventStoreState rawStore = _rawEventStore.Value;
+        Dictionary<EventLogId, IEventColumnReader> readers = new(identity.Scope.Length);
+
+        foreach (EventLogId logId in identity.Scope)
+        {
+            if (rawStore.ByLog.TryGetValue(logId, out EventColumnStore? store))
+            {
+                readers[logId] = store.CreateReader(logId);
+            }
+        }
+
+        return new ViewProbe(identity, readers, state.SortContext);
+    }
+
     private void Reconcile(EventLogId logId, bool isReplace)
     {
         if (_rawEventStore.Value.ByLog.TryGetValue(logId, out var store))
         {
             _writer.EnqueueReconcile(logId, store.CreateReader(logId), isReplace);
         }
-    }
-
-    private IReadOnlyDictionary<EventLogId, IEventColumnReader> ScopeReaders(ImmutableArray<EventLogId> scope)
-    {
-        var readers = new Dictionary<EventLogId, IEventColumnReader>(scope.Length);
-
-        foreach (EventLogId logId in scope)
-        {
-            if (_rawEventStore.Value.ByLog.TryGetValue(logId, out var store))
-            {
-                readers[logId] = store.CreateReader(logId);
-            }
-        }
-
-        return readers;
     }
 
     private Task Shadow(Action work)
@@ -195,42 +197,39 @@ internal sealed class OrderedViewShadowEffects(
         ViewIdentity identity = state.ViewIdentity;
         Filter filter = identity.Filter;
 
-        // Arm the sticky force BEFORE the gate check: the gate scans every open log but the ViewIdentity covers only the
-        // active scope, so an out-of-scope log can reopen the gate and let a racing Sync consume the de-dup before a
-        // post-gate arm runs. A non-deferred Always consumes the flag inside its own TryIssue (not a direct force, which
-        // would double-issue when the race lands). WhenFaulted is deliberately not armed (pre-existing, tracked).
-        if (force == ReissueForce.Always) { _issuer.ArmForce(); }
+        // Arm before the gate check so a deferred gate holds the entitlement for the next successful issue.
+        if (force == ReissueForce.Always)
+        {
+            _issuer.ArmForce();
+        }
+        else if (force == ReissueForce.WhenFaulted && state.PresentationState == PresentationState.Faulted)
+        {
+            _issuer.ArmRecovery();
+        }
 
         if (XmlFilterGate.IsDeferred(filter, _eventLogState.Value, _rawEventStore.Value, _concurrencyState, _matchCache))
         {
             return;
         }
 
-        // SetOrderBy/SetGroupBy are absolute ordering requests and the user's manual recovery path while faulted
-        // (parameterless toggles stay inert). When such a request equals the already-masked requested value - most
-        // often clicking a remounted clear chip's x after a clear CAUSED the fault, where the requested column is
-        // already null - the ViewIdentity is unchanged and the issuer would de-dup the failed identity, so the retry
-        // would never reach the writer. WhenFaulted re-trusts the engine (EnqueueClearFault) and forces the re-issue
-        // directly past the de-dup. Always does NOT force here: it armed the sticky force before the gate, so TryIssue
-        // consumes that; forcing again would double-issue when a concurrent Sync consumes the sticky force first.
-        bool clearFault = force == ReissueForce.WhenFaulted && state.PresentationState == PresentationState.Faulted;
+        IssueOutcome outcome = _issuer.TryIssue(identity, Probe);
 
-        if (clearFault) { _writer.EnqueueClearFault(); }
+        if (outcome is not { Kind: IssueKind.Issued, Readers: { } readers }) { return; }
 
-        if (_issuer.TryIssue(identity, clearFault) is not { } sequence) { return; }
+        if (outcome.ClearFault) { _writer.EnqueueClearFault(); }
 
         Func<IEventColumnReader, EventLocator, bool> survives =
             XmlFilterGate.BuildSurvivorPredicate(filter, _concurrencyState, _matchCache);
 
-        _dispatcher.Dispatch(new ViewRequestInvalidatedAction(sequence));
+        _dispatcher.Dispatch(new ViewRequestInvalidatedAction(outcome.Sequence));
 
         _writer.EnqueueViewRequest(
             new ViewRequest(
                 identity,
-                sequence,
+                outcome.Sequence,
                 identity.Scope,
-                ScopeReaders(identity.Scope),
-                state.SortContext,
+                readers,
+                outcome.SortContext,
                 filter,
                 (locator, reader) => survives(reader, locator)));
     }

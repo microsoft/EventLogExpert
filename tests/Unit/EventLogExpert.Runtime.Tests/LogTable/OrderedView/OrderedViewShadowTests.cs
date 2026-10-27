@@ -14,10 +14,10 @@ using EventLogExpert.Runtime.Tests.LogTable.TestSupport;
 using Fluxor;
 using NSubstitute;
 using System.Collections.Immutable;
-using CloseLogAction = EventLogExpert.Runtime.LogTable.CloseLogAction;
-using Reducers = EventLogExpert.Runtime.LogTable.Reducers;
 using static EventLogExpert.Runtime.Tests.LogTable.OrderedView.CombinedViewParityAsserts;
 using static EventLogExpert.Runtime.Tests.TestUtils.RetainedViewTestFactory;
+using CloseLogAction = EventLogExpert.Runtime.LogTable.CloseLogAction;
+using Reducers = EventLogExpert.Runtime.LogTable.Reducers;
 
 namespace EventLogExpert.Runtime.Tests.LogTable.OrderedView;
 
@@ -506,8 +506,8 @@ public sealed class OrderedViewShadowTests
         Assert.True(faulted.HasPendingSortChange);
         harness.SetState(faulted, raw, eventLog);
 
-        Assert.NotNull(harness.Issuer.TryIssue(faulted.ViewIdentity));
-        Assert.Null(harness.Issuer.TryIssue(faulted.ViewIdentity));
+        Assert.Equal(IssueKind.Issued, harness.Issuer.Issue(faulted.ViewIdentity));
+        Assert.Equal(IssueKind.Deduped, harness.Issuer.Issue(faulted.ViewIdentity));
 
         await harness.Effects.HandleSetGroupBy(new SetGroupByAction(null), harness.Dispatcher);
 
@@ -530,7 +530,7 @@ public sealed class OrderedViewShadowTests
         harness.SetState(served, raw, eventLog);
 
         // The current ordering was already issued; while not faulted a re-selection of the same ordering must de-dup.
-        Assert.NotNull(harness.Issuer.TryIssue(served.ViewIdentity));
+        Assert.Equal(IssueKind.Issued, harness.Issuer.Issue(served.ViewIdentity));
         harness.Dispatcher.ClearReceivedCalls();
 
         await harness.Effects.HandleSetOrderBy(new SetOrderByAction(null), harness.Dispatcher);
@@ -562,9 +562,9 @@ public sealed class OrderedViewShadowTests
         Assert.True(faulted.HasPendingSortChange);
         harness.SetState(faulted, raw, eventLog);
 
-        // The clear that caused the fault already issued this identity; a plain retry de-dups (returns no sequence).
-        Assert.NotNull(harness.Issuer.TryIssue(faulted.ViewIdentity));
-        Assert.Null(harness.Issuer.TryIssue(faulted.ViewIdentity));
+        // The clear that caused the fault already issued this identity; a plain retry de-dups.
+        Assert.Equal(IssueKind.Issued, harness.Issuer.Issue(faulted.ViewIdentity));
+        Assert.Equal(IssueKind.Deduped, harness.Issuer.Issue(faulted.ViewIdentity));
 
         await harness.Effects.HandleSetOrderBy(new SetOrderByAction(null), harness.Dispatcher);
 
@@ -1077,6 +1077,122 @@ public sealed class OrderedViewShadowTests
         AssertReferenceOrderChanges(events, hidden.SortContext, shown.SortContext);
         AssertShadowMatchesReference(await harness.Writer.DrainAsync(), reader, logId, events, shown.SortContext);
         Assert.Null(harness.Issuer.LastFault);
+    }
+
+    [Fact]
+    public async Task SetOrderByWhileFaulted_ClearsTheWriterFaultBeforeTheRecoveryRequest_SoAFaultTheRequestRaisesIsKept()
+    {
+        EventLogId logId = EventLogId.Create();
+        List<ResolvedEvent> events = Rows("Log", (1, 50), (2, 10), (3, 60), (4, 20), (5, 40));
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        await using OrderedViewShadowHarness harness = new();
+
+        var (served, raw, eventLog, _) = SingleLog(logId, events, descending: true);
+        harness.SetState(served, raw, eventLog);
+
+        await harness.Effects.HandleLoadEvents(new LoadEventsAction(LogData(logId), events), harness.Dispatcher);
+
+        OrderedViewReady servedView = await DrainToReadyAsync(harness, cancellationToken);
+        int buildsAfterServing = harness.Writer.BuildsStarted;
+
+        LogTableState faulted = served with { OrderedViewDisplayEnabled = false };
+        Assert.Equal(PresentationState.Faulted, faulted.PresentationState);
+        harness.SetState(faulted, raw, eventLog);
+
+        InvalidOperationException raised = new("the recovery publication failed");
+        long thrownAt = -1;
+
+        harness.Writer.Updated += update =>
+        {
+            if (update.Sequence > servedView.Sequence &&
+                Interlocked.CompareExchange(ref thrownAt, update.SnapshotVersion, -1) == -1)
+            {
+                throw raised;
+            }
+        };
+
+        await harness.Effects.HandleSetOrderBy(new SetOrderByAction(null), harness.Dispatcher);
+
+        OrderedViewSnapshot drained =
+            await harness.Writer.DrainAsync().WaitAsync(OrderedViewTestTimeouts.Default, cancellationToken);
+
+        Assert.Equal(buildsAfterServing, harness.Writer.BuildsStarted);
+        Assert.InRange(Interlocked.Read(ref thrownAt), 1, drained.Version - 1);
+        Assert.Same(raised, harness.Writer.Faulted);
+    }
+
+    [Fact]
+    public async Task SetOrderByWhileFaulted_WhenAnOutOfScopeLogDefersTheGate_RecoversAndClearsTheFaultOnceItReopens()
+    {
+        const string fileName = "FileLog";
+        const string readyChannelName = "ReadyChannel";
+        const string latecomerName = "Latecomer";
+        EventLogId fileId = EventLogId.Create();
+        EventLogId readyChannelId = EventLogId.Create();
+        EventLogId latecomerId = EventLogId.Create();
+        Filter xmlFilter = new(null, [SavedFilter.TryCreate("Xml.Contains(\"x\")") ??
+            throw new InvalidOperationException("XML filter failed to compile.")]);
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        await using OrderedViewShadowHarness harness = new();
+
+        harness.ConcurrencyState.MarkLoadedWithXml(readyChannelId);
+
+        List<ResolvedEvent> rows = SourcedRows(fileName, (1, 0, "A"), (2, 10, "B"), (3, 20, "C"));
+        EventColumnStore store = EventColumnStore.Build(rows, generation: 0, contentVersion: 0);
+        StampMatch(harness, xmlFilter, fileId, store);
+
+        LogTableState faulted = XmlFilteredMultiTab(fileId, xmlFilter, readyChannelId) with
+        {
+            OrderedViewDisplayEnabled = false
+        };
+
+        Assert.Equal(PresentationState.Faulted, faulted.PresentationState);
+
+        harness.SetState(
+            faulted,
+            StoreOf(fileId, store),
+            OpenFileAndChannels(fileId, fileName, xmlFilter, (readyChannelId, readyChannelName)));
+
+        harness.Writer.EnqueueViewRequest(ViewRequests.For(
+            faulted.SortContext,
+            ViewRequests.EmptyFilter,
+            [fileId],
+            static (_, _) => throw new InvalidOperationException("engine failed"),
+            readers: new Dictionary<EventLogId, IEventColumnReader> { [fileId] = store.CreateReader(fileId) },
+            sequence: 1,
+            activeLogId: fileId));
+        await harness.Writer.DrainAsync().WaitAsync(OrderedViewTestTimeouts.Default, cancellationToken);
+
+        Exception? firstFault = harness.Writer.Faulted;
+
+        Assert.NotNull(firstFault);
+        Assert.Equal(IssueKind.Issued, harness.Issuer.Issue(faulted.ViewIdentity));
+
+        harness.SetState(
+            XmlFilteredMultiTab(fileId, xmlFilter, readyChannelId, latecomerId) with { OrderedViewDisplayEnabled = false },
+            StoreOf(fileId, store),
+            OpenFileAndChannels(
+                fileId, fileName, xmlFilter, (readyChannelId, readyChannelName), (latecomerId, latecomerName)));
+        harness.Dispatcher.ClearReceivedCalls();
+
+        await harness.Effects.HandleSetOrderBy(new SetOrderByAction(ColumnName.Source), harness.Dispatcher);
+
+        harness.Dispatcher.DidNotReceive().Dispatch(Arg.Any<ViewRequestInvalidatedAction>());
+        await harness.Writer.DrainAsync().WaitAsync(OrderedViewTestTimeouts.Default, cancellationToken);
+        Assert.Same(firstFault, harness.Writer.Faulted);
+
+        harness.ConcurrencyState.MarkLoadedWithXml(latecomerId);
+        harness.Dispatcher.ClearReceivedCalls();
+
+        await harness.Effects.HandleLoadEvents(
+            new LoadEventsAction(new EventLogData(latecomerName, LogPathType.Channel) { Id = latecomerId }, []),
+            harness.Dispatcher);
+
+        harness.Dispatcher.Received(1).Dispatch(Arg.Any<ViewRequestInvalidatedAction>());
+        await harness.Writer.DrainAsync().WaitAsync(OrderedViewTestTimeouts.Default, cancellationToken);
+        Assert.Null(harness.Writer.Faulted);
     }
 
     [Fact]
