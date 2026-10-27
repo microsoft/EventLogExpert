@@ -11,6 +11,8 @@ public sealed record InlineAlertRequest(
     bool IsPrompt,
     string? PromptInitialValue)
 {
+    public bool DefaultToCancel { get; init; }
+
     public Func<string, string?>? Validate { get; init; }
 
     public string? SecondaryActionLabel { get; init; }

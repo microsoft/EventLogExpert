@@ -31,7 +31,8 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
     private (long UsedMebibytes, long WorkingSetBytes, MemoryUsageLevel Level) _memoryFacets;
     private bool _persistentFilterActive;
     private (int Total, ImmutableDictionary<EventLogId, ProviderResolutionCounts> ByLog) _rawCountFacets;
-    private (ImmutableDictionary<StatusActivityId, (int Loaded, int Failed, long? Total)> Loading, ResolverStatus Resolver) _statusFacets;
+    private (ImmutableDictionary<StatusActivityId, (int Loaded, int Failed, long? Total)> Loading, ResolverStatus
+        Resolver, (int FailedTotal, int CompletedCount, int LastCompletedFailedTotal) Episode) _statusFacets;
 
     public StatusBarSource(
         IState<EventLogState> eventLogState,
@@ -138,6 +139,9 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
                 pair => pair.Key,
                 pair => new LoadingProgress(pair.Value.Loaded, pair.Value.Failed, pair.Value.Total)),
             ResolverStatus = statusBar.ResolverStatus,
+            EpisodeFailedTotal = statusBar.EpisodeFailedTotal,
+            FailedEpisodeCompletionCount = statusBar.FailedEpisodeCompletionCount,
+            LastCompletedEpisodeFailedTotal = statusBar.LastCompletedEpisodeFailedTotal,
             Tabs = logTable.EventTables,
             Groups = logTable.Groups,
             ActiveTabId = logTable.ActiveEventLogId,
@@ -159,8 +163,11 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
     private static (int, ImmutableDictionary<EventLogId, ProviderResolutionCounts>) ProjectRawCount(RawEventCountState state) =>
         (state.Total, state.ByLog);
 
-    private static (ImmutableDictionary<StatusActivityId, (int Loaded, int Failed, long? Total)>, ResolverStatus) ProjectStatus(StatusBarState state) =>
-        (state.EventsLoading, state.ResolverStatus);
+    private static (ImmutableDictionary<StatusActivityId, (int Loaded, int Failed, long? Total)>, ResolverStatus, (int,
+        int, int)) ProjectStatus(StatusBarState state) =>
+        (state.EventsLoading,
+            state.ResolverStatus,
+            (state.EpisodeFailedTotal, state.FailedEpisodeCompletionCount, state.LastCompletedEpisodeFailedTotal));
 
     private void OnEventLogChanged(object? sender, EventArgs e)
     {
@@ -248,7 +255,9 @@ internal sealed class StatusBarSource : IStatusBarSource, IDisposable
         lock (_gate)
         {
             if (_disposed ||
-                (next.Item2 == _statusFacets.Resolver && DictEquals(next.Item1, _statusFacets.Loading)))
+                (next.Item2 == _statusFacets.Resolver &&
+                    next.Item3 == _statusFacets.Episode &&
+                    DictEquals(next.Item1, _statusFacets.Loading)))
             {
                 return;
             }

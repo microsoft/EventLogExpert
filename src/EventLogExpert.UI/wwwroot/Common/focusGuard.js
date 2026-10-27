@@ -15,9 +15,47 @@ export function focusIfNotElsewhere(element, preventScroll) {
         return false;
     }
 
-    element.focus({ preventScroll });
+    const focusTarget = getStatusBarFocusTarget(element);
+    focusTarget.focus({ preventScroll });
 
-    return document.activeElement === element;
+    return document.activeElement === focusTarget;
+}
+
+function getStatusBarFocusTarget(element) {
+    if (typeof element.closest !== 'function') {
+        return element;
+    }
+
+    const hiddenItem = element.closest('[data-statusbar-hidden]');
+    if (!hiddenItem) {
+        return element;
+    }
+
+    const content = hiddenItem.closest('.status-bar-content');
+    const countsButton = content?.querySelector('[data-statusbar-counts]');
+    if (isUsableFocusTarget(countsButton)) {
+        return countsButton;
+    }
+
+    const footer = content?.closest('footer[data-pane="status"]');
+    const statusBar = content?.closest('.status-bar') ?? footer;
+    const notificationTrigger = statusBar?.querySelector('[data-notification-trigger]');
+    if (isUsableFocusTarget(notificationTrigger)) {
+        return notificationTrigger;
+    }
+
+    return [footer, statusBar].find(isUsableFocusTarget) ?? element;
+}
+
+export function isUsableFocusTarget(element) {
+    return element instanceof HTMLElement
+        && element.isConnected
+        && !element.disabled
+        && !element.closest('[inert]')
+        && !element.closest('[aria-hidden="true"]')
+        && !element.closest('[data-statusbar-hidden]')
+        && element.getClientRects().length > 0
+        && element.ownerDocument.defaultView.getComputedStyle(element).display !== 'none';
 }
 
 // Guarded (focusIfNotElsewhere) focus against a selector, for the filters-pane fallback the caller holds no

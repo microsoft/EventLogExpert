@@ -10,7 +10,15 @@ namespace EventLogExpert.UI.Banner;
 
 public sealed partial class BannerHost : ComponentBase, IDisposable
 {
+    [Parameter] public EventCallback BeforeAction { get; set; }
+
+    [Parameter] public bool CriticalOnly { get; set; }
+
     [Parameter] public BannerHostLocation Location { get; set; } = BannerHostLocation.MainLayout;
+
+    [Parameter] public string? NotificationReturnTriggerId { get; set; }
+
+    [Parameter] public bool ShowAllEntries { get; set; }
 
     [Inject] private IAttentionBannerService AttentionBannerService { get; init; } = null!;
 

@@ -5,6 +5,7 @@ using EventLogExpert.Localization;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Menu;
+using EventLogExpert.UI.Common;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
@@ -13,11 +14,20 @@ namespace EventLogExpert.UI.Banner;
 
 public sealed partial class AttentionBanner : ComponentBase
 {
+    private readonly string _actionHintId = ComponentId.NewUnique("notification-action-hint").Value;
+    private readonly string _titleId = ComponentId.NewUnique("notification-card-title").Value;
+
+    [Parameter] public bool ActionsDisabled { get; set; }
+
     [Parameter] public int AttentionCount { get; set; }
+
+    [Parameter] public EventCallback BeforeAction { get; set; }
 
     [Parameter] public RenderFragment? CycleNav { get; set; }
 
     [Parameter] public EventCallback<BannerCycleItem> OnFallbackErrorPosted { get; set; }
+
+    [Parameter] public bool StaticPresentation { get; set; }
 
     [Inject] private IAttentionBannerService AttentionBannerService { get; init; } = null!;
 
@@ -33,6 +43,7 @@ public sealed partial class AttentionBanner : ComponentBase
 
     private async Task OnOpenDatabasesClickedAsync()
     {
+        await BeforeAction.InvokeAsync();
         AttentionBannerService.DismissAttention();
 
         bool success;

@@ -50,6 +50,14 @@ public sealed class BannerContentLocalizerTests
     };
 
     [Fact]
+    public void NotificationActionHint_ExplainsDeferredMainWindowAvailabilityExactly()
+    {
+        Assert.Equal(
+            "This action is available from the main window after this dialog closes. A running operation may need to finish first.",
+            BuildLocalizer()["Notifications_CloseDialogForAction"].Value);
+    }
+
+    [Fact]
     public void Preformatted_LivesOutsideRuntimeAssembly()
     {
         Assert.NotSame(typeof(BannerMessage).Assembly, typeof(Preformatted).Assembly);
@@ -396,6 +404,7 @@ public sealed class BannerContentLocalizerTests
     {
         Dictionary<Type, BannerMessage> samples = new()
         {
+            [typeof(DatabaseAttention)] = new DatabaseAttention(1),
             [typeof(ExportBlocked)] = new ExportBlocked(ExportBlockReason.NoEvents),
             [typeof(ExportCanceled)] = new ExportCanceled(),
             [typeof(ExportFailed)] = new ExportFailed("failure"),

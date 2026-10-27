@@ -2,21 +2,41 @@
     BannerContentText text = BannerContentLocalizer.Resolve(Localizer, Entry.Content);
 }
 
-<aside class="banner banner-error" role="alert">
-    <span class="banner-message">@text.Title: @text.Message</span>
+<aside class="banner banner-error" role="@(StaticPresentation ? null : "alert")">
+    @if (StaticPresentation)
+    {
+        <i aria-hidden="true"
+            class="bi bi-exclamation-circle notification-card-icon"
+            data-tooltip="@Localizer["Notifications_Severity_Error"]">
+        </i>
+        <strong class="notification-card-title" id="@_titleId">@text.Title</strong>
+        <span class="notification-card-message">@text.Message</span>
+    }
+    else
+    {
+        <span class="banner-message">@text.Title: @text.Message</span>
+    }
 
     @CycleNav
 
     @if (text.ActionLabel is { } actionLabel && Entry.Action is { } action)
     {
         <Button CssClass="banner-action"
-            OnClick="() => OnErrorActionClickedAsync(action)">
+            Disabled="ActionsDisabled"
+            OnClick="() => OnErrorActionClickedAsync(action)"
+            aria-describedby="@(ActionsDisabled ? _actionHintId : null)">
             @actionLabel
         </Button>
+
+        @if (ActionsDisabled)
+        {
+            <span class="banner-action-hint" id="@_actionHintId">@Localizer["Notifications_CloseDialogForAction"]</span>
+        }
     }
 
     <Button CssClass="banner-dismiss"
-        IconClass="bi bi-x-circle"
+        IconClass="@(StaticPresentation ? "bi bi-x" : "bi bi-x-circle")"
         OnClick="OnDismissError"
+        aria-describedby="@(StaticPresentation ? _titleId : null)"
         aria-label='@Localizer["Banner_Error_DismissAria"]' />
 </aside>

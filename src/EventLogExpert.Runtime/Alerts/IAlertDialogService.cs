@@ -28,7 +28,13 @@ public interface IAlertDialogService
 
     Task<bool> ShowAlert(string title, string message, string accept, string cancel);
 
-    Task<bool> ShowAlert(string title, string message, string accept, string cancel, AlertPresentation presentation);
+    Task<bool> ShowAlert(
+        string title,
+        string message,
+        string accept,
+        string cancel,
+        AlertPresentation presentation,
+        bool defaultToCancel = false);
 
     /// <summary>
     ///     Shows a one-button alert whose text is supplied as localizable keys; the UI implementation resolves them

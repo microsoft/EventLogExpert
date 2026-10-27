@@ -95,6 +95,23 @@ public sealed class LibraryEntryRowTests : BunitContext
     }
 
     [Fact]
+    public async Task ConfirmedDelete_SelectsTheNextItemBeforeDeletingTheCurrentRow()
+    {
+        var entry = BuildSavedFilter("Current");
+        List<string> operations = [];
+        var component = RenderRow(entry,
+            onRequestPendingFocus: identifier => { operations.Add($"focus:{identifier}"); return Task.CompletedTask; },
+            onDelete: identifier => { operations.Add($"delete:{identifier}"); return Task.CompletedTask; });
+        _alerts.ShowAlert("[[FilterLibrary_Entry_DeleteTitle]]", "[[FilterLibrary_Entry_DeleteFilterMessage(Current)]]",
+            "[[FilterLibrary_Entry_DeleteMenu]]", "[[Modal_Cancel]]").Returns(true);
+        var items = await CapturedMoreMenuItemsAsync(component);
+
+        await items.Single(item => item.Label == "[[FilterLibrary_Entry_DeleteMenu]]").OnClickAsync!.Invoke();
+
+        Assert.Equal([$"focus:{entry.Id}", $"delete:{entry.Id}"], operations);
+    }
+
+    [Fact]
     public async Task DeleteOnAutoTrackedFilter_NoConfirm_InvokesPendingFocusThenDelete()
     {
         var entry = BuildAutoTrackedFilterEntry("X");

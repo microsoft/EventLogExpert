@@ -9,6 +9,8 @@ public interface IAttentionBannerService
 {
     event Action StateChanged;
 
+    DateTime AttentionCreatedUtc { get; }
+
     bool AttentionDismissed { get; }
 
     IReadOnlyList<DatabaseEntry> AttentionEntries { get; }

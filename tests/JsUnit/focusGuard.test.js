@@ -11,7 +11,8 @@ import {
 
 // Node has no DOM, so stub a minimal class to create distinct stand-ins for the document roots and focus targets.
 // isActiveElementElsewhere compares by identity: null and the two roots are "not elsewhere", any other node is.
-class HTMLElement {}
+class HTMLElement { getAttribute() { return null; } }
+globalThis.HTMLElement = HTMLElement;
 
 const body = new HTMLElement();
 const documentElement = new HTMLElement();
@@ -81,6 +82,28 @@ test("focusIfNotElsewhere: reports false when focus() silently no-ops (hidden/no
     assert.equal(moved, false);
 });
 
+test("focusIfNotElsewhere: hidden status-bar targets fall back to the visible counts control", () => {
+    const activeDocument = { activeElement: body, body, documentElement, querySelector: () => null };
+    const countsButton = new HTMLElement();
+    countsButton.isConnected = true;
+    countsButton.disabled = false;
+    countsButton.ownerDocument = { defaultView: { getComputedStyle: () => ({ display: "inline" }) } };
+    countsButton.getClientRects = () => [{}];
+    countsButton.closest = () => null;
+    countsButton.focus = () => { activeDocument.activeElement = countsButton; };
+    const content = { querySelector: () => countsButton };
+    const hiddenItem = { closest: selector => selector === ".status-bar-content" ? content : null };
+    const target = new HTMLElement();
+    target.closest = selector => selector === "[data-statusbar-hidden]" ? hiddenItem : null;
+    target.focus = () => { throw new Error("A hidden status-bar chip must not receive focus."); };
+    globalThis.document = activeDocument;
+
+    const moved = focusIfNotElsewhere(target, true);
+
+    assert.equal(moved, true);
+    assert.equal(activeDocument.activeElement, countsButton);
+});
+
 // --- focusSelectorIfNotElsewhere: the guarded selector focus for the filters-pane fallback ---
 
 test("focusSelectorIfNotElsewhere: declines when focus already rests on a control elsewhere", () => {
@@ -114,3 +137,32 @@ test("focusSelectorIfNotElsewhere: returns false when the selector matches nothi
 
     assert.equal(moved, false);
 });
+
+for (const disabled of [false, true]) {
+    test(`Hidden status-bar chip uses only its own ${disabled ? 'disabled trigger footer fallback' : 'trigger, not an earlier modal trigger'}`, () => {
+        const activeDocument = { activeElement: body, body, documentElement };
+        const makeTarget = () => {
+            const element = new HTMLElement();
+            element.isConnected = true;
+            element.getClientRects = () => [{}];
+            element.closest = () => null;
+            element.ownerDocument = { defaultView: { getComputedStyle: () => ({ display: 'inline' }) } };
+            element.focus = () => { activeDocument.activeElement = element; };
+            return element;
+        };
+        const modalTrigger = makeTarget();
+        const trigger = makeTarget();
+        trigger.disabled = disabled;
+        const footer = makeTarget();
+        footer.querySelector = () => trigger;
+        const content = { querySelector: () => null, closest: selector => selector === 'footer[data-pane="status"]' ? footer : null };
+        const hiddenItem = { closest: () => content };
+        const target = makeTarget();
+        target.closest = () => hiddenItem;
+        activeDocument.querySelector = () => modalTrigger;
+        globalThis.document = activeDocument;
+
+        assert.equal(focusIfNotElsewhere(target, true), true);
+        assert.equal(activeDocument.activeElement, disabled ? footer : trigger);
+    });
+}

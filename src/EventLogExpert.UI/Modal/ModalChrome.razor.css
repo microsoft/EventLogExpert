@@ -27,6 +27,11 @@ dialog:not(:modal) {
     min-height: 0;
 }
 
+.dialog-header-collapsed {
+    display: flex;
+    flex: 0 0 auto;
+}
+
 .dialog-header {
     display: flex;
     align-items: center;
@@ -35,6 +40,17 @@ dialog:not(:modal) {
     margin-bottom: .5rem;
     padding-bottom: .5rem;
     border-bottom: 1px solid var(--clr-statusbar);
+    flex: 0 0 auto;
+    min-height: 28px;
+    gap: .5rem;
+}
+
+.dialog-header-actions {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: .25rem;
+    margin-left: auto;
 }
 
 .dialog-title {

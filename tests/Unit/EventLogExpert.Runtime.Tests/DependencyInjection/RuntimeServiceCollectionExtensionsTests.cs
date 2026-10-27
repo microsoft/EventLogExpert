@@ -87,6 +87,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     }
 
     [Theory]
+    [InlineData(typeof(INotificationBulkDismissService))]
     [InlineData(typeof(IAttentionBannerService))]
     [InlineData(typeof(IProgressBannerService))]
     [InlineData(typeof(ICriticalErrorService))]
@@ -132,7 +133,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public async Task AddEventLogRuntime_Resolves5BannerFacetsToSameSingleton()
+    public async Task AddEventLogRuntime_Resolves6BannerFacetsToSameSingleton()
     {
         var services = new ServiceCollection();
         RegisterHostDependencies(services);
@@ -149,12 +150,14 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         var criticalScope1 = scope1.ServiceProvider.GetRequiredService<ICriticalErrorService>();
         var errorScope1 = scope1.ServiceProvider.GetRequiredService<IErrorBannerService>();
         var infoScope1 = scope1.ServiceProvider.GetRequiredService<IInfoBannerService>();
+        var bulkScope1 = scope1.ServiceProvider.GetRequiredService<INotificationBulkDismissService>();
         var attentionScope2 = scope2.ServiceProvider.GetRequiredService<IAttentionBannerService>();
 
         Assert.Same(attentionScope1, progressScope1);
         Assert.Same(attentionScope1, criticalScope1);
         Assert.Same(attentionScope1, errorScope1);
         Assert.Same(attentionScope1, infoScope1);
+        Assert.Same(attentionScope1, bulkScope1);
         Assert.Same(attentionScope1, attentionScope2);
     }
 
@@ -215,6 +218,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(IHighlightSelector))]
     [InlineData(typeof(ILogTableColumnDefaultsProvider))]
     [InlineData(typeof(IAppTitleService))]
+    [InlineData(typeof(INotificationBulkDismissService))]
     [InlineData(typeof(IAttentionBannerService))]
     [InlineData(typeof(IProgressBannerService))]
     [InlineData(typeof(ICriticalErrorService))]

@@ -222,6 +222,7 @@ public static class RuntimeServiceCollectionExtensions
             services.AddSingleton<IAppTitleService, AppTitleService>();
             services.AddSingleton<BannerService>();
             services.Forward<IAttentionBannerService, BannerService>();
+            services.Forward<INotificationBulkDismissService, BannerService>();
             services.Forward<IProgressBannerService, BannerService>();
             services.Forward<ICriticalErrorService, BannerService>();
             services.Forward<IErrorBannerService, BannerService>();

@@ -1,9 +1,9 @@
 ﻿@*
     Application root. The hybrid shell is intentionally non-routed: there are no @page directives anywhere.
-    BannerHost lives outside UnhandledExceptionHandler so the error banner survives when child rendering faults.
+    BannerHost lives outside UnhandledExceptionHandler so the critical banner survives when child rendering faults.
 *@
 <div class="banner-region">
-    <BannerHost Location="BannerHostLocation.MainLayout" />
+    <BannerHost CriticalOnly="true" Location="BannerHostLocation.MainLayout" />
 </div>
 
 <UnhandledExceptionHandler>

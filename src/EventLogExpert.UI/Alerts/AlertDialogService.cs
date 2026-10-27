@@ -64,9 +64,10 @@ public sealed class AlertDialogService(
         string message,
         string accept,
         string cancel,
-        AlertPresentation presentation)
+        AlertPresentation presentation,
+        bool defaultToCancel = false)
     {
-        return ShowAlertCore(title, message, accept, cancel, presentation);
+        return ShowAlertCore(title, message, accept, cancel, presentation, defaultToCancel);
     }
 
     public Task ShowAlert(LocalizableText title, LocalizableText message, LocalizableText cancel) =>
@@ -184,7 +185,8 @@ public sealed class AlertDialogService(
         string message,
         string? accept,
         string cancel,
-        AlertPresentation presentation)
+        AlertPresentation presentation,
+        bool defaultToCancel = false)
     {
         return InvokeOnMainThreadAsync(async () =>
         {
@@ -210,13 +212,14 @@ public sealed class AlertDialogService(
                     ["Message"] = message,
                     ["AcceptLabel"] = accept,
                     ["CancelLabel"] = cancel,
+                    [nameof(AlertModal.DefaultToCancel)] = defaultToCancel,
                 });
             }
 
             try
             {
                 InlineAlertResult result = await host.ShowInlineAlertAsync(
-                    new InlineAlertRequest(title, message, accept, cancel, false, null),
+                    new InlineAlertRequest(title, message, accept, cancel, false, null) { DefaultToCancel = defaultToCancel },
                     CancellationToken.None);
 
                 return result.Accepted;

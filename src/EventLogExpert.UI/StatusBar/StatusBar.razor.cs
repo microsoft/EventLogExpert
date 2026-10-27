@@ -19,9 +19,15 @@ namespace EventLogExpert.UI.StatusBar;
 
 public sealed partial class StatusBar
 {
+    private readonly Lock _failedCountAnnouncementLock = new();
+    private readonly FailedCountAnnouncementState _failedCountAnnouncementState = new();
+
+    private ElementReference _content;
+    private bool _disposed;
     private IJSObjectReference? _focusModule;
     private ElementReference _groupDirButton;
     private DisplayIndicatorState _indicatorState = null!;
+    private IJSObjectReference? _layoutModule;
     private bool _pendingChipFaulted;
     private PendingChipFocus _pendingChipFocus = PendingChipFocus.None;
     private EventLogId? _pendingChipTabId;
@@ -36,6 +42,11 @@ public sealed partial class StatusBar
     }
 
     [Inject] private IEventLogCommands EventLogCommands { get; init; } = null!;
+
+    private string? FailedCountAnnouncement
+    {
+        get { lock (_failedCountAnnouncementLock) { return _failedCountAnnouncementState.Announcement; } }
+    }
 
     [Inject] private IFilterAppliedSource FilterApplied { get; init; } = null!;
 
@@ -59,10 +70,16 @@ public sealed partial class StatusBar
 
     protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
+        lock (_failedCountAnnouncementLock) { _disposed = true; }
         if (disposing)
         {
+            StatusBarSource.Changed -= OnFailedCountChanged;
             _indicatorState?.Dispose();
         }
+
+        await JsModuleInterop.DisposeModuleSafelyAsync(
+            _layoutModule, module => module.InvokeVoidAsync("detach", _content));
+        _layoutModule = null;
 
         await JsModuleInterop.DisposeModuleSafelyAsync(_focusModule);
         _focusModule = null;
@@ -72,6 +89,11 @@ public sealed partial class StatusBar
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            await AttachLayoutAsync();
+        }
+
         if (_pendingChipFocus != PendingChipFocus.None)
         {
             var ordering = Presentation.Ordering;
@@ -146,12 +168,43 @@ public sealed partial class StatusBar
     {
         _indicatorState = new DisplayIndicatorState(IndicatorGate, RequestIndicatorRender);
 
+        lock (_failedCountAnnouncementLock)
+        {
+            _failedCountAnnouncementState.Initialize(StatusBarSource.Current);
+        }
+
+        StatusBarSource.Changed += OnFailedCountChanged;
+        OnFailedCountChanged();
+
         ObserveSource(StatusBarSource);
         ObserveSource(FilterApplied);
         ObserveSource(LensSource);
         ObserveSource(StatsVisibility);
 
         base.OnInitialized();
+    }
+
+    private async Task AttachLayoutAsync()
+    {
+        try
+        {
+            IJSObjectReference module = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/EventLogExpert.UI/StatusBar/StatusBar.razor.js");
+
+            if (_disposed)
+            {
+                await JsModuleInterop.DisposeModuleSafelyAsync(module);
+
+                return;
+            }
+
+            _layoutModule = module;
+            await module.InvokeVoidAsync("attach", _content);
+        }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+        catch (JSException) when (_disposed) { }
+        catch (ObjectDisposedException) when (_disposed) { }
     }
 
     private void ClearGroup()
@@ -173,6 +226,16 @@ public sealed partial class StatusBar
     }
 
     private void LoadNewEvents() => EventLogCommands.LoadNewEvents();
+
+    private void OnFailedCountChanged()
+    {
+        lock (_failedCountAnnouncementLock)
+        {
+            if (_disposed) { return; }
+
+            _failedCountAnnouncementState.Update(StatusBarSource.Current, Localizer);
+        }
+    }
 
     private void OpenCoverage() => _ = ModalCoordinator.OpenResolutionCoverageAsync();
 
@@ -196,7 +259,6 @@ public sealed partial class StatusBar
                 "./_content/EventLogExpert.UI/Common/focusGuard.js");
 
             await _focusModule.InvokeAsync<bool>("focusIfNotElsewhere", target, preventScroll);
-
             return;
         }
         catch (JSDisconnectedException) { }

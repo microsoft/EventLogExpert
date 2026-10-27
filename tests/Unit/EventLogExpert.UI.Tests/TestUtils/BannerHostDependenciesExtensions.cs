@@ -1,10 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Modal;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.TestUtils;
@@ -15,7 +18,10 @@ internal static class BannerHostDependenciesExtensions
     {
         public void AddBannerHostDependencies()
         {
+            services.TryAddSingleton(Substitute.For<ITraceLogger>());
             services.AddEventLogLocalization();
+            services.AddSingleton(Substitute.For<IAlertDialogService>());
+            services.AddSingleton(Substitute.For<INotificationBulkDismissService>());
 
             var attention = Substitute.For<IAttentionBannerService>();
             attention.AttentionEntries.Returns([]);
@@ -47,6 +53,7 @@ internal static class BannerHostDependenciesExtensions
             services.AddSingleton(modalCoordinator);
 
             services.AddSingleton<IBannerCycleStateService, BannerCycleStateService>();
+            services.AddScoped<NotificationAnnouncementState>();
         }
     }
 }

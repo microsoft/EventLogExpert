@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Localization;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common;
@@ -29,6 +30,7 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
     private bool _isClosed;
     private bool _isClosingByCancel;
     private IJSObjectReference? _modalModule;
+    private bool _notificationTriggerShown;
     private InlineAlertRequest? _previouslyRenderedInlineAlert;
     private InlineAlertRequest? _validationCacheAlert;
     private string? _validationCacheError;
@@ -49,6 +51,8 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
     [Parameter] public string? CloseButtonAriaLabel { get; set; }
 
     [Parameter] public string? CloseLabel { get; set; }
+
+    [Parameter] public bool DefaultToCancel { get; set; }
 
     [Parameter] public string? DialogClass { get; set; }
 
@@ -96,6 +100,8 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Parameter] public bool ShowCloseButton { get; set; }
 
+    [Parameter] public bool ShowNotifications { get; set; } = true;
+
     [Parameter] public bool StackFooterExtra { get; set; }
 
     [Parameter] public string? Title { get; set; }
@@ -133,11 +139,16 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     private string EffectiveSaveLabel => string.IsNullOrEmpty(SaveLabel) ? Localizer["Modal_Save"] : SaveLabel;
 
+    private bool HasHeaderChrome =>
+        !string.IsNullOrEmpty(Title) || ShowCloseButton || (ShowNotifications && _notificationTriggerShown);
+
     private bool HasInlineAlert => InlineAlert is not null;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
     [Inject] private IStringLocalizer<SharedResource> Localizer { get; init; } = null!;
+
+    [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
     private string? ValidationError
     {
@@ -215,7 +226,13 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
         if (!ReferenceEquals(_previouslyRenderedInlineAlert, InlineAlert))
         {
+            bool inlineAlertClosed = _previouslyRenderedInlineAlert is not null && InlineAlert is null;
             _previouslyRenderedInlineAlert = InlineAlert;
+
+            if (_modalModule is not null)
+            {
+                await TryInvokeModalAsync(inlineAlertClosed ? "restoreInlineAlertFocus" : "rememberInlineAlert");
+            }
 
             await FocusInlineAlertElementAsync();
         }
@@ -223,11 +240,16 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         await base.OnAfterRenderAsync(firstRender);
     }
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
         ResetInlineAlertPromptValueIfChanged();
 
-        base.OnParametersSet();
+        if (InlineAlert is not null && _previouslyRenderedInlineAlert is null && _modalModule is not null)
+        {
+            await TryInvokeModalAsync("captureInlineAlertFocus");
+        }
+
+        await base.OnParametersSetAsync();
     }
 
     private async Task FocusInlineAlertElementAsync()
@@ -246,7 +268,7 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
                 return;
             }
 
-            if (!string.IsNullOrEmpty(InlineAlert.AcceptLabel))
+            if (!InlineAlert.DefaultToCancel && !string.IsNullOrEmpty(InlineAlert.AcceptLabel))
             {
                 await (_inlineAlertAcceptButton?.FocusAsync(true) ?? ValueTask.CompletedTask);
 
@@ -342,6 +364,8 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     private Task HandleSecondaryActionAsync() => OnSecondaryAction.InvokeAsync();
 
+    private void OnNotificationTriggerVisibilityChanged(bool isShown) => _notificationTriggerShown = isShown;
+
     private void ResetInlineAlertPromptValueIfChanged()
     {
         if (ReferenceEquals(_inlineAlertInitializedFor, InlineAlert)) { return; }
@@ -351,5 +375,27 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         _inlineAlertPromptValue = InlineAlert is { IsPrompt: true }
             ? InlineAlert.PromptInitialValue ?? string.Empty
             : string.Empty;
+    }
+
+    private async Task TryInvokeModalAsync(string identifier)
+    {
+        if (_modalModule is not { } modalModule) { return; }
+
+        try
+        {
+            await modalModule.InvokeVoidAsync(identifier, _dialogRef);
+        }
+        catch (JSDisconnectedException) { }
+        catch (JSException) when (_isClosed) { }
+        catch (JSException exception)
+        {
+            TraceLogger.Warning($"{nameof(ModalChrome)}: {identifier} failed: {exception}");
+        }
+        catch (ObjectDisposedException) when (_isClosed) { }
+        catch (ObjectDisposedException exception)
+        {
+            TraceLogger.Warning($"{nameof(ModalChrome)}: {identifier} failed: {exception}");
+        }
+        catch (TaskCanceledException) { }
     }
 }

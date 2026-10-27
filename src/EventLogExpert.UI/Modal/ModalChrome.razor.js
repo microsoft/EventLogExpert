@@ -1,9 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+import { normalizeReturnTarget } from '../Banner/NotificationCenter.razor.js';
+
 // Capture the previously focused element on open and restore it on close so closing a modal
 // (Esc, native cancel, footer buttons) returns keyboard focus to the trigger that opened it,
 // matching native dialog accessibility expectations (WAI-ARIA Authoring Practices: Dialog).
+// Restoration only reclaims orphaned focus, so a caller that already moved focus keeps its target.
 // Sequentially-focusable controls, used to move initial focus onto the modal's content.
 const focusableInBody =
     'a[href]:not([tabindex="-1"]),' +
@@ -20,8 +23,9 @@ export function showModal(ref) {
     // Stash on the dialog element so close can restore even if the host component is torn down
     // before close runs (e.g. async disposal racing with native cancel).
     const previouslyFocused = document.activeElement;
-    ref._returnFocusElement = (previouslyFocused instanceof HTMLElement && previouslyFocused !== document.body) ?
-        previouslyFocused : null;
+    ref._returnFocusElement = previouslyFocused instanceof HTMLElement && previouslyFocused !== document.body
+        ? normalizeReturnTarget(previouslyFocused)
+        : null;
 
     // Dismiss any focus tooltip before the dialog enters the top layer, so a launcher tooltip can't be
     // stranded behind the modal or consume an Escape meant for it. focusTooltip.js listens for this on
@@ -59,21 +63,75 @@ export function closeModal(ref) {
     ref._returnFocusElement = null;
 
     if (ref.open) {
-        // Symmetric with showModal (which gates on ref.open too): tear down any tooltip showing over the
-        // dialog before it leaves the top layer, so one anchored to in-dialog content isn't stranded on the
-        // body-level popover after the dialog detaches. A no-op when nothing is showing; the focus restored
-        // below re-fires focusin to re-show a launcher tooltip.
+        // Dismiss in-dialog tooltips before the dialog leaves the top layer so none remain stranded.
         document.dispatchEvent(new Event("focus-tooltip:dismiss"));
         ref.close();
     }
 
-    // Defer focus to the next frame so the dialog's close + DOM detach completes first; otherwise
-    // browsers may move focus to <body> after we set it.
-    if (returnTarget && document.body.contains(returnTarget) && typeof returnTarget.focus === "function") {
-        requestAnimationFrame(() => {
-            try { returnTarget.focus({ preventScroll: true }); }
-            catch { /* element detached between frames; nothing to restore */ }
-        });
-    }
+    // Wait for close and DOM detach; otherwise native focus restoration can overwrite our target with body.
+    requestAnimationFrame(() => {
+        const activeElement = document.activeElement;
+        if (activeElement && activeElement !== document.body && !ref.contains(activeElement)) { return; }
+
+        const normalizedTarget = normalizeReturnTarget(returnTarget);
+        if (isUsableFocusTarget(normalizedTarget)) {
+            normalizedTarget.focus({ preventScroll: true });
+            return;
+        }
+
+        const openDialogs = [...document.querySelectorAll("dialog[open]")];
+        const topmostDialog = openDialogs.at(-1);
+        if (topmostDialog instanceof HTMLDialogElement) {
+            const dialogTargets = [
+                topmostDialog.querySelector(".dialog-body[tabindex='-1']"),
+                topmostDialog.querySelector("h2[tabindex='-1']")
+            ];
+            const dialogTarget = dialogTargets.find(isUsableFocusTarget);
+            if (dialogTarget) {
+                dialogTarget.focus({ preventScroll: true });
+                return;
+            }
+        }
+
+        const workspaceTarget = document.querySelector("[data-notification-focus-fallback]");
+        if (isUsableFocusTarget(workspaceTarget)) {
+            workspaceTarget.focus({ preventScroll: true });
+        }
+    });
 }
 
+export function captureInlineAlertFocus(dialog) {
+    dialog._inlineReturnFocusElement = normalizeReturnTarget(document.activeElement);
+}
+
+export function rememberInlineAlert(dialog) {
+    dialog._inlineAlertElement = dialog.querySelector('.inline-alert');
+}
+
+export function restoreInlineAlertFocus(dialog) {
+    const returnTarget = dialog._inlineReturnFocusElement;
+    const inlineAlert = dialog._inlineAlertElement;
+    dialog._inlineReturnFocusElement = null;
+    dialog._inlineAlertElement = null;
+    requestAnimationFrame(() => {
+        if (!dialog.isConnected || !dialog.open) { return; }
+        const activeElement = document.activeElement;
+        if (activeElement && activeElement !== document.body && !inlineAlert?.contains(activeElement)) { return; }
+        const normalizedTarget = normalizeReturnTarget(returnTarget);
+        const focusTarget = isUsableFocusTarget(normalizedTarget) ? normalizedTarget
+            : dialog.querySelector('h2[tabindex="-1"]') ?? dialog.querySelector('.dialog-body');
+        if (focusTarget instanceof HTMLElement) {
+            if (!focusTarget.hasAttribute('tabindex')) { focusTarget.tabIndex = -1; }
+            focusTarget.focus({ preventScroll: true });
+        }
+    });
+}
+
+function isUsableFocusTarget(target) {
+    return target instanceof HTMLElement
+        && target.isConnected
+        && target.getClientRects().length > 0
+        && !target.matches(":disabled")
+        && !target.closest("[inert]")
+        && target.getAttribute("aria-hidden") !== "true";
+}

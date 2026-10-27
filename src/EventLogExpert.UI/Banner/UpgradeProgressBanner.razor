@@ -1,26 +1,54 @@
-<aside class="banner banner-upgrade-progress" role="status">
-    <i aria-hidden="true" class="banner-spinner bi bi-arrow-repeat loader-spin"></i>
-
-    @if (string.IsNullOrEmpty(Progress.CurrentEntryName))
+<aside class="banner banner-upgrade-progress" role="@(StaticPresentation ? null : "status")">
+    @if (StaticPresentation)
     {
-        <span class="banner-message">@PluralText.Format(Localizer, "Banner_Upgrade_Preparing", ("count", Progress.CurrentBatchSize))</span>
+        <i aria-hidden="true"
+            class="bi bi-arrow-repeat loader-spin notification-card-icon"
+            data-tooltip="@Localizer["Notifications_Severity_Progress"]">
+        </i>
+        <strong class="notification-card-title" id="@_titleId">@Localizer["Banner_Upgrade_Title"]</strong>
+        <span class="notification-card-message">
+            @if (string.IsNullOrEmpty(Progress.CurrentEntryName))
+            {
+                @PluralText.Format(Localizer, "Banner_Upgrade_Preparing", ("count", Progress.CurrentBatchSize))
+            }
+            else
+            {
+                @Localizer["Banner_Upgrade_InProgress", Progress.CurrentBatchPosition, Progress.CurrentBatchSize, Progress.CurrentEntryName, Progress.CurrentPhase]
+            }
+            @if (Progress.QueuedBatchesAfter > 0)
+            {
+                <span>@(" ")@PluralText.Format(Localizer, "Banner_Upgrade_QueuedBatches", ("count", Progress.QueuedBatchesAfter))</span>
+            }
+        </span>
     }
     else
     {
-        <span class="banner-message">
-            @Localizer["Banner_Upgrade_InProgress", Progress.CurrentBatchPosition, Progress.CurrentBatchSize, Progress.CurrentEntryName, Progress.CurrentPhase]
-        </span>
-    }
+        <i aria-hidden="true" class="banner-spinner bi bi-arrow-repeat loader-spin"></i>
 
-    @if (Progress.QueuedBatchesAfter > 0)
-    {
-        <span class="banner-subtitle">@PluralText.Format(Localizer, "Banner_Upgrade_QueuedBatches", ("count", Progress.QueuedBatchesAfter))</span>
+        @if (string.IsNullOrEmpty(Progress.CurrentEntryName))
+        {
+            <span class="banner-message">@PluralText.Format(Localizer, "Banner_Upgrade_Preparing", ("count", Progress.CurrentBatchSize))</span>
+        }
+        else
+        {
+            <span class="banner-message">
+                @Localizer["Banner_Upgrade_InProgress", Progress.CurrentBatchPosition, Progress.CurrentBatchSize, Progress.CurrentEntryName, Progress.CurrentPhase]
+            </span>
+        }
+
+        @if (Progress.QueuedBatchesAfter > 0)
+        {
+            <span class="banner-subtitle">
+                @PluralText.Format(Localizer, "Banner_Upgrade_QueuedBatches", ("count", Progress.QueuedBatchesAfter))
+            </span>
+        }
     }
 
     @CycleNav
 
     <Button CssClass="banner-action"
-        OnClick="() => OnCancelUpgradeClickedAsync(Progress)">
+        OnClick="() => OnCancelUpgradeClickedAsync(Progress)"
+        aria-describedby="@(StaticPresentation ? _titleId : null)">
         @Localizer["Modal_Cancel"]
     </Button>
 </aside>

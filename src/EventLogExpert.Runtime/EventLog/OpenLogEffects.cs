@@ -26,6 +26,7 @@ namespace EventLogExpert.Runtime.EventLog;
 
 internal sealed class OpenLogEffects(
     IState<EventLogState> eventLogState,
+    IState<StatusBarState> statusBarState,
     [FromKeyedServices(LogCategories.EventLog)] ITraceLogger logger,
     ILogWatcherService logWatcherService,
     IEventResolverCache resolverCache,
@@ -63,6 +64,7 @@ internal sealed class OpenLogEffects(
     private readonly IEventLogReaderFactory _readerFactory = readerFactory;
     private readonly IEventResolverCache _resolverCache = resolverCache;
     private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
+    private readonly IState<StatusBarState> _statusBarState = statusBarState;
     private readonly IEventXmlResolver _xmlResolver = xmlResolver;
 
     private long _cancelToken;
@@ -169,6 +171,9 @@ internal sealed class OpenLogEffects(
         _lifecycleLogger.Debug($"Open requested for '{action.LogName}' (path type: {action.LogPathType}).");
 
         long cancelTokenAtStart = Volatile.Read(ref _cancelToken);
+        // Fluxor runs this prefix after all feature reducers and before the next action's reducers,
+        // so a later close-all advances past this generation and rejects this load's start.
+        int loadGeneration = _statusBarState.Value.LoadGeneration;
 
         if (!_eventLogState.Value.OpenLogs.TryGetValue(action.LogName, out var openInfo))
         {
@@ -251,7 +256,7 @@ internal sealed class OpenLogEffects(
                 return;
             }
 
-            await LoadLogAsync(action, logData, eventResolver, dispatcher, token, stopwatch);
+            await LoadLogAsync(action, logData, eventResolver, dispatcher, token, stopwatch, loadGeneration);
         }
         finally
         {
@@ -350,7 +355,8 @@ internal sealed class OpenLogEffects(
         IEventResolver eventResolver,
         IDispatcher dispatcher,
         CancellationToken token,
-        Stopwatch stopwatch)
+        Stopwatch stopwatch,
+        int loadGeneration)
     {
         if (action.LogPathType == LogPathType.File)
         {
@@ -408,7 +414,7 @@ internal sealed class OpenLogEffects(
 
         try
         {
-            dispatcher.Dispatch(new SetEventsLoadingAction(activityId, 0, 0));
+            dispatcher.Dispatch(new StartEventsLoadingAction(activityId, loadGeneration));
 
             bool renderXml = _eventLogState.Value.AppliedFilter.RequiresXml;
 
@@ -446,6 +452,8 @@ internal sealed class OpenLogEffects(
             await using (var timer = new Timer(
                     _ =>
                     {
+                        if (token.IsCancellationRequested) { return; }
+
                         dispatcher.Dispatch(new SetEventsLoadingAction(activityId, Volatile.Read(ref resolved), Volatile.Read(ref failed)));
 
                         if (Interlocked.Increment(ref timerTick) <= 1) { return; }
@@ -626,7 +634,7 @@ internal sealed class OpenLogEffects(
         }
         finally
         {
-            dispatcher.Dispatch(new ClearStatusAction(activityId));
+            dispatcher.Dispatch(new ClearStatusAction(activityId, Volatile.Read(ref failed)));
         }
 
         void TryDispatchPartial()

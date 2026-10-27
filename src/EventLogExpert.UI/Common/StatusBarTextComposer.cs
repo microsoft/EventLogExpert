@@ -64,6 +64,12 @@ internal static class StatusBarTextComposer
         };
     }
 
+    internal static string CountsShortShownTotal(IStringLocalizer<SharedResource> localizer, int shown, int total) =>
+        localizer["StatusBar_Counts_ShortShownTotal", FormatCount(shown), FormatCount(total)];
+
+    internal static string CountsShortTotal(IStringLocalizer<SharedResource> localizer, int total) =>
+        localizer["StatusBar_Counts_ShortTotal", FormatCount(total)];
+
     internal static string CoverageAriaLabel(IStringLocalizer<SharedResource> localizer, int unresolved) =>
         localizer["StatusBar_Coverage_AriaLabel", FormatCount(unresolved)];
 
@@ -126,6 +132,9 @@ internal static class StatusBarTextComposer
         return new StatusBarLoadingChip(text, totalFailed);
     }
 
+    internal static string LoadingFailedCompactText(IStringLocalizer<SharedResource> localizer, int failedEvents) =>
+        localizer["StatusBar_Loading_FailedCompact", FormatCount(failedEvents)];
+
     internal static string LoadingFailedText(IStringLocalizer<SharedResource> localizer, int failedEvents) =>
         localizer["StatusBar_Loading_Failed", FormatCount(failedEvents)];
 
@@ -134,6 +143,13 @@ internal static class StatusBarTextComposer
         MemoryUsageLevel.Normal => string.Empty,
         MemoryUsageLevel.Elevated => "status-bar-memory-elevated",
         MemoryUsageLevel.High => "status-bar-memory-high",
+        _ => throw new ArgumentOutOfRangeException(nameof(level), level, null)
+    };
+
+    internal static string MemoryLevelWord(IStringLocalizer<SharedResource> localizer, MemoryUsageLevel level) => level switch
+    {
+        MemoryUsageLevel.Elevated => localizer["StatusBar_Memory_Short_Elevated"],
+        MemoryUsageLevel.High => localizer["StatusBar_Memory_Short_High"],
         _ => throw new ArgumentOutOfRangeException(nameof(level), level, null)
     };
 

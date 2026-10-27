@@ -1,4 +1,5 @@
 @using EventLogExpert.Eventing.Common.Channels
+@using EventLogExpert.Runtime.Memory
 @using EventLogExpert.Runtime.StatusBar
 @inherits PresentationViewComponentBase
 
@@ -15,9 +16,23 @@
     var orderingFaulted = Presentation.State == PresentationState.Faulted;
 
     var loadingSummary = StatusBarTextComposer.Loading(Localizer, status.LoadingActivities);
+    var failedAnnouncement = FailedCountAnnouncement;
 
     var source = StatusBarTextComposer.Source(Localizer, activeTable, status.Tabs, status.Groups);
+    var sourceTooltip = activeTable?.FileName ?? source;
     var filterTooltip = StatusBarTextComposer.FilterIndicatorTooltip(Localizer, status.IsPersistentFilterActive, LensSource.Lenses.Count);
+    var filterDescription = filterTooltip ?? Localizer["StatusBar_Filter_Chip"].Value;
+    var memoryValue = StatusBarTextComposer.MemoryValue(Localizer, status.MemoryUsedMebibytes, status.MemoryLevel);
+    var memoryTooltip = StatusBarTextComposer.MemoryTooltip(Localizer, status.MemoryUsedMebibytes, status.MemoryWorkingSetBytes, status.MemoryLevel);
+    var bufferFullText = Localizer["StatusBar_Activity_BufferFull"].Value;
+    var liveText = Localizer["StatusBar_Activity_ContinuouslyUpdating"].Value;
+    var newEventsHint = status.NewEventBufferCount == 0 ? Localizer["StatusBar_NewEvents_None"].Value : Localizer["StatusBar_NewEvents_Load"].Value;
+
+    var resolverText = status.ResolverStatus.Reason != ResolverStatusReason.None ?
+        ResolverStatusLocalizer.Describe(Localizer, status.ResolverStatus) :
+        string.Empty;
+
+    var displayIndicator = ResolveIndicator();
 
     var announcement = StatusBarTextComposer.ActivityAnnouncement(
         Localizer,
@@ -25,171 +40,248 @@
         hasChannel && status.NewEventBufferIsFull,
         hasChannel && status.ContinuouslyUpdate,
         status.ResolverStatus,
-        ResolveIndicator());
+        displayIndicator);
 }
 
 <div class="status-bar">
-    <div class="status-bar-left">
-        @{
-            var sourceTooltip = activeTable?.FileName ?? source;
-        }
-        @if (sourceTooltip == source)
-        {
-            <span class="status-bar-source" data-tooltip="@sourceTooltip" data-tooltip-overflow>@source</span>
-        }
-        else
-        {
-            <span class="status-bar-source" data-tooltip="@sourceTooltip">@source</span>
-            <span class="visually-hidden">@sourceTooltip</span>
-        }
-
-        @if (activeTable is not null)
-        {
-            var scoped = status.ScopedCounts(activeTable);
-
-            var describesActiveTab = Presentation.ActiveTabId == activeTable.Id &&
-                Presentation.State == PresentationState.Current;
-
-            var shown = Presentation.View.Count;
-
-            <span aria-hidden="true" class="status-bar-sep">|</span>
-            <button aria-controls="stats-drawer"
-                aria-describedby="statusbar-stats-hint"
-                aria-expanded="@(StatsVisibility.IsVisible ? "true" : "false")"
-                class="status-bar-stats"
-                data-tooltip="@(StatsVisibility.IsVisible ? Localizer["StatusBar_Stats_Hide"] : Localizer["StatusBar_Stats_Show"])"
-                @onclick="ToggleStats"
-                @ref="_statsButton"
-                type="button">
-                <span class="status-bar-counts">
-                    @StatusBarTextComposer.Counts(Localizer, scoped.Total, shown, isFiltered && describesActiveTab, status.SelectionCount)
-                </span>
-                <i aria-hidden="true" class="bi bi-caret-@(StatsVisibility.IsVisible ? "down" : "up")"></i>
-            </button>
-            <span class="visually-hidden" id="statusbar-stats-hint">@(StatsVisibility.IsVisible ? Localizer["StatusBar_Stats_Hide"] : Localizer["StatusBar_Stats_Show"])</span>
-
-            <span aria-hidden="true" class="status-bar-sep">|</span>
-            <button aria-describedby="statusbar-coverage-hint"
-                aria-label="@StatusBarTextComposer.CoverageAriaLabel(Localizer, scoped.Unresolved)"
-                class="status-bar-coverage status-bar-stats"
-                data-tooltip="@StatusBarTextComposer.CoverageTooltip(Localizer, scoped.Unresolved, scoped.Total)"
-                @onclick="OpenCoverage"
-                type="button">
-                <i aria-hidden="true" class="bi bi-patch-question"></i>
-                <span class="status-bar-counts">@StatusBarTextComposer.CoverageChip(Localizer, scoped.Unresolved)</span>
-            </button>
-            <span class="visually-hidden" id="statusbar-coverage-hint">@StatusBarTextComposer.CoverageTooltip(Localizer, scoped.Unresolved, scoped.Total)</span>
-        }
-
-        @if (isFiltered)
-        {
-            <span aria-hidden="true" class="status-bar-sep">|</span>
-            <span class="status-bar-filter" data-tooltip="@filterTooltip">@Localizer["StatusBar_Filter_Chip"]</span>
-            <span class="visually-hidden">@filterTooltip</span>
-        }
-
-        @if (hasActiveTab && ordering.RequestedOrderBy is { } sortColumn)
-        {
-            var sortedLabel = StatusBarTextComposer.SortedChip(Localizer, sortColumn);
-
-            <span aria-hidden="true" class="status-bar-sep">|</span>
-            <span class="status-bar-order-chip status-bar-sort-chip">
-                <span class="status-bar-order-label" data-tooltip="@sortedLabel" data-tooltip-overflow>@sortedLabel</span>
-                <button aria-disabled="@(orderingFaulted ? "true" : null)"
-                    aria-label="@StatusBarTextComposer.SortDirectionAria(Localizer, sortColumn, ordering.RequestedIsDescending)"
-                    class="status-bar-order-dir status-bar-sort-dir"
-                    @onclick="ToggleSort"
-                    @ref="_sortDirButton"
-                    type="button">
-                    <i aria-hidden="true" class="bi bi-caret-@(ordering.RequestedIsDescending ? "down" : "up")"></i>
-                </button>
-                <button aria-label="@StatusBarTextComposer.ClearSortAria(Localizer, sortColumn)"
-                    class="status-bar-order-remove status-bar-sort-remove"
-                    @onclick="ClearSort"
-                    type="button">
-                    <i aria-hidden="true" class="bi bi-x-lg"></i>
-                </button>
-            </span>
-        }
-
-        @if (hasActiveTab && ordering.RequestedGroupBy is { } groupColumn)
-        {
-            var groupedLabel = StatusBarTextComposer.GroupedChip(Localizer, groupColumn);
-
-            <span aria-hidden="true" class="status-bar-sep">|</span>
-            <span class="status-bar-group-chip status-bar-order-chip">
-                <span class="status-bar-order-label" data-tooltip="@groupedLabel" data-tooltip-overflow>@groupedLabel</span>
-                <button aria-disabled="@(orderingFaulted ? "true" : null)"
-                    aria-label="@StatusBarTextComposer.GroupDirectionAria(Localizer, groupColumn, ordering.RequestedIsGroupDescending)"
-                    class="status-bar-group-dir status-bar-order-dir"
-                    @onclick="ToggleGroup"
-                    @ref="_groupDirButton"
-                    type="button">
-                    <i aria-hidden="true" class="bi bi-caret-@(ordering.RequestedIsGroupDescending ? "down" : "up")"></i>
-                </button>
-                <button aria-label="@StatusBarTextComposer.ClearGroupAria(Localizer, groupColumn)"
-                    class="status-bar-group-remove status-bar-order-remove"
-                    @onclick="ClearGroup"
-                    type="button">
-                    <i aria-hidden="true" class="bi bi-x-lg"></i>
-                </button>
-            </span>
-        }
-    </div>
-
-    <div class="status-bar-right">
-        <span aria-atomic="true" aria-live="polite" class="status-bar-announce" role="status">@announcement</span>
-
-        <span class="status-bar-activity status-bar-memory @StatusBarTextComposer.MemoryLevelClass(status.MemoryLevel)"
-            data-tooltip="@StatusBarTextComposer.MemoryTooltip(Localizer, status.MemoryUsedMebibytes, status.MemoryWorkingSetBytes, status.MemoryLevel)">
-            @StatusBarTextComposer.MemoryValue(Localizer, status.MemoryUsedMebibytes, status.MemoryLevel)
+    <div class="status-bar-content"
+        data-hidden-item-separator="@Localizer["StatusBar_Hidden_Separator"]"
+        data-hidden-tooltip-format="@Localizer["StatusBar_Hidden_TooltipFormat"]"
+        @ref="_content">
+        <span aria-hidden="true" class="status-bar-sizing-sentinel"></span>
+        <span aria-hidden="true" class="status-bar-font-sentinel-wrapper">
+            <span class="status-bar-font-sentinel">0123456789 MB</span>
         </span>
-        <span class="visually-hidden">@StatusBarTextComposer.MemoryTooltip(Localizer, status.MemoryUsedMebibytes, status.MemoryWorkingSetBytes, status.MemoryLevel)</span>
-        @* Always rendered so this live region is present from first paint - only its content changes, so a band
-           transition is announced but the initial Normal content on mount is not. *@
-        <span aria-live="polite" class="status-bar-announce status-bar-memory-announce" role="status">
-            @MemoryUsageLevelLocalizer.Announcement(Localizer, status.MemoryLevel)
-        </span>
-
-        @if (loadingSummary is { } loading)
-        {
-            <span class="status-bar-activity">@loading.Text</span>
-
-            @if (loading.FailedEvents > 0)
+        <div class="status-bar-left">
+            @if (sourceTooltip == source)
             {
-                <span class="status-bar-activity status-bar-warn">@StatusBarTextComposer.LoadingFailedText(Localizer, loading.FailedEvents)</span>
-            }
-        }
-
-        @if (status.ResolverStatus.Reason != ResolverStatusReason.None)
-        {
-            var resolverText = ResolverStatusLocalizer.Describe(Localizer, status.ResolverStatus);
-            <span class="status-bar-activity status-bar-resolver" data-tooltip="@resolverText" data-tooltip-overflow>@resolverText</span>
-        }
-
-        @if (hasChannel)
-        {
-            @if (status.ContinuouslyUpdate)
-            {
-                <span class="status-bar-activity status-bar-live">@Localizer["StatusBar_Activity_ContinuouslyUpdating"]</span>
+                <span class="status-bar-source" data-statusbar-floor="12" data-statusbar-item="source" data-tooltip="@sourceTooltip" data-tooltip-overflow>@source</span>
             }
             else
             {
-                @if (status.NewEventBufferIsFull)
-                {
-                    <span class="status-bar-activity status-bar-warn">@Localizer["StatusBar_Activity_BufferFull"]</span>
-                }
+                <span class="status-bar-source" data-statusbar-floor="12" data-statusbar-item="source" data-tooltip="@sourceTooltip">@source</span>
+                <span class="visually-hidden" data-statusbar-companion="source">@sourceTooltip</span>
+            }
+            <span data-hidden-description="source" hidden id="statusbar-hidden-source">@sourceTooltip</span>
 
+            @if (activeTable is not null)
+            {
+                var scoped = status.ScopedCounts(activeTable);
+                var describesActiveTab = Presentation.ActiveTabId == activeTable.Id && Presentation.State == PresentationState.Current;
+                var shown = Presentation.View.Count;
+                var fullCounts = StatusBarTextComposer.Counts(Localizer, scoped.Total, shown, isFiltered && describesActiveTab, status.SelectionCount);
+                var shortCounts = isFiltered && describesActiveTab ?
+                    StatusBarTextComposer.CountsShortShownTotal(Localizer, shown, scoped.Total) :
+                    StatusBarTextComposer.CountsShortTotal(Localizer, scoped.Total);
+                var shortestCounts = StatusBarTextComposer.CountsShortTotal(Localizer, scoped.Total);
+                var coverageTooltip = StatusBarTextComposer.CoverageTooltip(Localizer, scoped.Unresolved, scoped.Total);
+
+                <span aria-hidden="true" class="status-bar-sep">|</span>
+                <button aria-controls="stats-drawer"
+                    aria-describedby="statusbar-stats-hint"
+                    aria-expanded="@(StatsVisibility.IsVisible ? "true" : "false")"
+                    class="status-bar-stats"
+                    data-statusbar-counts
+                    data-statusbar-item="counts"
+                    data-tooltip="@(StatsVisibility.IsVisible ? Localizer["StatusBar_Stats_Hide"] : Localizer["StatusBar_Stats_Show"])"
+                    @onclick="ToggleStats"
+                    @ref="_statsButton"
+                    type="button">
+                    <span class="status-bar-counts" data-active data-variant="counts-full">@fullCounts</span>
+                    <span class="status-bar-counts" data-variant="counts-shown-total">@shortCounts</span>
+                    <span class="status-bar-counts" data-variant="counts-total">@shortestCounts</span>
+                    <i aria-hidden="true" class="bi bi-caret-@(StatsVisibility.IsVisible ? "down" : "up")"></i>
+                </button>
+                <span hidden id="statusbar-stats-hint">@(StatsVisibility.IsVisible ? Localizer["StatusBar_Stats_Hide"] : Localizer["StatusBar_Stats_Show"])</span>
+
+                <span aria-hidden="true" class="status-bar-sep">|</span>
+                <button aria-describedby="statusbar-coverage-hint"
+                    aria-label="@StatusBarTextComposer.CoverageAriaLabel(Localizer, scoped.Unresolved)"
+                    class="status-bar-coverage status-bar-stats"
+                    data-statusbar-item="coverage"
+                    data-tooltip="@coverageTooltip"
+                    @onclick="OpenCoverage"
+                    type="button">
+                    <i aria-hidden="true" class="bi bi-patch-question"></i>
+                    <span class="status-bar-counts">@StatusBarTextComposer.CoverageChip(Localizer, scoped.Unresolved)</span>
+                </button>
+                <span class="visually-hidden" data-statusbar-companion="coverage" id="statusbar-coverage-hint">@coverageTooltip</span>
+                <span data-hidden-description="coverage" hidden id="statusbar-hidden-coverage">@coverageTooltip</span>
+                <span data-hidden-description="counts" hidden id="statusbar-hidden-counts">@fullCounts</span>
+            }
+
+            @if (isFiltered)
+            {
+                <span aria-hidden="true" class="status-bar-sep">|</span>
+                <span class="status-bar-filter" data-statusbar-item="filter" data-tooltip="@filterTooltip">@Localizer["StatusBar_Filter_Chip"]</span>
+                <span class="visually-hidden" data-statusbar-companion="filter">@filterDescription</span>
+                <span data-hidden-description="filter" hidden id="statusbar-hidden-filter">@filterDescription</span>
+            }
+
+            @if (hasActiveTab && ordering.RequestedOrderBy is { } sortColumn)
+            {
+                var sortedLabel = StatusBarTextComposer.SortedChip(Localizer, sortColumn);
+
+                <span aria-hidden="true" class="status-bar-sep">|</span>
+                <span class="status-bar-order-chip status-bar-sort-chip" data-statusbar-item="sort">
+                    <span class="status-bar-order-label" data-statusbar-floor="8" data-tooltip="@sortedLabel" data-tooltip-overflow>@sortedLabel</span>
+                    <button aria-disabled="@(orderingFaulted ? "true" : null)"
+                        aria-label="@StatusBarTextComposer.SortDirectionAria(Localizer, sortColumn, ordering.RequestedIsDescending)"
+                        class="status-bar-order-dir status-bar-sort-dir"
+                        @onclick="ToggleSort"
+                        @ref="_sortDirButton"
+                        type="button">
+                        <i aria-hidden="true" class="bi bi-caret-@(ordering.RequestedIsDescending ? "down" : "up")"></i>
+                    </button>
+                    <button aria-label="@StatusBarTextComposer.ClearSortAria(Localizer, sortColumn)"
+                        class="status-bar-order-remove status-bar-sort-remove"
+                        @onclick="ClearSort"
+                        type="button">
+                        <i aria-hidden="true" class="bi bi-x-lg"></i>
+                    </button>
+                </span>
+                <span data-hidden-description="sort" hidden id="statusbar-hidden-sort">@sortedLabel</span>
+            }
+
+            @if (hasActiveTab && ordering.RequestedGroupBy is { } groupColumn)
+            {
+                var groupedLabel = StatusBarTextComposer.GroupedChip(Localizer, groupColumn);
+
+                <span aria-hidden="true" class="status-bar-sep">|</span>
+                <span class="status-bar-group-chip status-bar-order-chip" data-statusbar-item="group">
+                    <span class="status-bar-order-label" data-statusbar-floor="8" data-tooltip="@groupedLabel" data-tooltip-overflow>@groupedLabel</span>
+                    <button aria-disabled="@(orderingFaulted ? "true" : null)"
+                        aria-label="@StatusBarTextComposer.GroupDirectionAria(Localizer, groupColumn, ordering.RequestedIsGroupDescending)"
+                        class="status-bar-group-dir status-bar-order-dir"
+                        @onclick="ToggleGroup"
+                        @ref="_groupDirButton"
+                        type="button">
+                        <i aria-hidden="true" class="bi bi-caret-@(ordering.RequestedIsGroupDescending ? "down" : "up")"></i>
+                    </button>
+                    <button aria-label="@StatusBarTextComposer.ClearGroupAria(Localizer, groupColumn)"
+                        class="status-bar-group-remove status-bar-order-remove"
+                        @onclick="ClearGroup"
+                        type="button">
+                        <i aria-hidden="true" class="bi bi-x-lg"></i>
+                    </button>
+                </span>
+                <span data-hidden-description="group" hidden id="statusbar-hidden-group">@groupedLabel</span>
+            }
+        </div>
+
+        <div class="status-bar-right">
+            <span aria-atomic="true" aria-live="polite" class="status-bar-announce" role="status">@announcement</span>
+            <span aria-atomic="true"
+                aria-live="polite"
+                class="status-bar-announce status-bar-failed-announce"
+                role="status">
+                @failedAnnouncement
+            </span>
+
+            <span class="status-bar-activity status-bar-memory @StatusBarTextComposer.MemoryLevelClass(status.MemoryLevel)"
+                data-statusbar-item="memory"
+                data-statusbar-memory-level="@status.MemoryLevel.ToString().ToLowerInvariant()"
+                data-statusbar-side="right"
+                data-tooltip="@memoryTooltip">
+                <span data-active data-variant="memory-full">@memoryValue</span>
+                @if (status.MemoryLevel != MemoryUsageLevel.Normal)
+                {
+                    <span data-variant="memory-level">@StatusBarTextComposer.MemoryLevelWord(Localizer, status.MemoryLevel)</span>
+                }
+            </span>
+            <span class="visually-hidden" data-statusbar-companion="memory">@memoryTooltip</span>
+            <span data-hidden-description="memory" hidden id="statusbar-hidden-memory">@memoryValue</span>
+            @* Always mounted from first paint so band transitions, not initial Normal content, are announced. *@
+            <span aria-live="polite" class="status-bar-announce status-bar-memory-announce" role="status">
+                @MemoryUsageLevelLocalizer.Announcement(Localizer, status.MemoryLevel)
+            </span>
+
+            @if (loadingSummary is { } loading)
+            {
+                <span class="status-bar-activity" data-statusbar-item="loading" data-statusbar-side="right">@loading.Text</span>
+                <span data-hidden-description="loading" hidden id="statusbar-hidden-loading">@loading.Text</span>
+
+                @if (loading.FailedEvents > 0)
+                {
+                    var failedText = StatusBarTextComposer.LoadingFailedText(Localizer, loading.FailedEvents);
+                    var compactFailedText = StatusBarTextComposer.LoadingFailedCompactText(Localizer, loading.FailedEvents);
+                    <span class="status-bar-activity status-bar-warn"
+                        data-statusbar-item="failed"
+                        data-statusbar-side="right"
+                        data-tooltip="@failedText">
+                        <span data-active data-variant="failed-full">@failedText</span>
+                        <span data-variant="failed-compact">@compactFailedText</span>
+                    </span>
+                    <span class="visually-hidden"
+                        data-statusbar-companion="failed"
+                        data-statusbar-companion-variant="failed-compact"
+                        hidden>
+                        @failedText
+                    </span>
+                    <span data-hidden-description="failed" hidden id="statusbar-hidden-failed">@failedText</span>
+                }
+            }
+
+            @if (resolverText.Length > 0)
+            {
+                <span class="status-bar-activity status-bar-resolver"
+                    data-statusbar-floor="12"
+                    data-statusbar-item="resolver"
+                    data-statusbar-side="right"
+                    data-tooltip="@resolverText"
+                    data-tooltip-overflow>
+                    @resolverText
+                </span>
+                <span data-hidden-description="resolver" hidden id="statusbar-hidden-resolver">@resolverText</span>
+            }
+
+            @if (hasChannel && status.ContinuouslyUpdate)
+            {
+                <span class="status-bar-activity status-bar-live" data-statusbar-item="live" data-statusbar-side="right">@liveText</span>
+                <span data-hidden-description="live" hidden id="statusbar-hidden-live">@liveText</span>
+            }
+
+            @if (hasChannel && status is { ContinuouslyUpdate: false, NewEventBufferIsFull: true })
+            {
+                <span class="status-bar-activity status-bar-warn"
+                    data-statusbar-item="buffer"
+                    data-statusbar-side="right"
+                    data-tooltip="@bufferFullText">
+                    <span data-active data-variant="buffer-full">@bufferFullText</span>
+                    <span data-variant="buffer-compact"><i aria-hidden="true" class="bi bi-exclamation-triangle"></i></span>
+                </span>
+                <span class="visually-hidden"
+                    data-statusbar-companion="buffer"
+                    data-statusbar-companion-variant="buffer-compact"
+                    hidden>
+                    @bufferFullText
+                </span>
+                <span data-hidden-description="buffer" hidden id="statusbar-hidden-buffer">@bufferFullText</span>
+            }
+
+            @if (hasChannel && !status.ContinuouslyUpdate)
+            {
                 <button aria-describedby="statusbar-newevents-hint"
                     aria-live="off"
                     class="status-bar-activity status-bar-newevents"
-                    data-tooltip="@(status.NewEventBufferCount == 0 ? Localizer["StatusBar_NewEvents_None"] : Localizer["StatusBar_NewEvents_Load"])"
+                    data-statusbar-item="new-events"
+                    data-statusbar-side="right"
+                    data-tooltip="@newEventsHint"
                     @onclick="LoadNewEvents"
                     type="button">
                     @StatusBarTextComposer.NewEventsLabel(Localizer, status.NewEventBufferCount)
                 </button>
-                <span class="visually-hidden" id="statusbar-newevents-hint">@(status.NewEventBufferCount == 0 ? Localizer["StatusBar_NewEvents_None"] : Localizer["StatusBar_NewEvents_Load"])</span>
+                <span class="visually-hidden" data-statusbar-companion="new-events" id="statusbar-newevents-hint">@newEventsHint</span>
+                <span data-hidden-description="new-events"
+                    hidden
+                    id="statusbar-hidden-new-events">
+                    @StatusBarTextComposer.NewEventsLabel(Localizer, status.NewEventBufferCount)
+                </span>
             }
-        }
+        </div>
+
+        <span data-hidden-label hidden id="statusbar-hidden-label">@Localizer["StatusBar_Hidden_Label"]</span>
+        <span hidden id="statusbar-hidden-separator">@Localizer["StatusBar_Hidden_Separator"]</span>
     </div>
+    <NotificationCenter />
 </div>

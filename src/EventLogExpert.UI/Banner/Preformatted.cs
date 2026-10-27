@@ -9,5 +9,7 @@ public sealed record Preformatted(string Title, string Message, string? ActionLa
 {
     public string? ActionLabel { get; } = string.IsNullOrWhiteSpace(ActionLabel) ? null : ActionLabel;
 
+    public bool IsRecoveryReminder { get; internal init; }
+
     public override bool RequiresAction => ActionLabel is not null;
 }

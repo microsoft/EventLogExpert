@@ -541,6 +541,48 @@ public sealed class ModalAlertDialogServiceTests
         Assert.Equal("[[Modal_No]]", capturedAlert["CancelLabel"]);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ShowAlert_DefaultToCancelReachesStandaloneAndInlinePresentations(bool inline)
+    {
+        IInlineAlertHost host = Substitute.For<IInlineAlertHost>();
+        InlineAlertRequest? capturedInline = null;
+        host.ShowInlineAlertAsync(Arg.Do<InlineAlertRequest>(request => capturedInline = request), CancellationToken.None)
+            .Returns(new InlineAlertResult(false, null));
+        IModalCoordinator coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
+        {
+            call[0] = inline ? host : null;
+            return inline;
+        });
+        IReadOnlyDictionary<string, object?>? capturedStandalone = null;
+        AlertDialogService service = new(coordinator, PassthroughMainThread(), Substitute.For<IErrorBannerService>(),
+            new MarkerLocalizer(), parameters =>
+            {
+                capturedStandalone = parameters;
+                return Task.FromResult(false);
+            }, _ => Task.FromResult(string.Empty));
+
+        Assert.False(await service.ShowAlert("Clear notifications?", "Clear 2 notifications?", "Clear all", "Cancel", AlertPresentation.Auto, true));
+        if (inline)
+        {
+            Assert.NotNull(capturedInline);
+            Assert.True(capturedInline.DefaultToCancel);
+            Assert.Equal("Clear all", capturedInline.AcceptLabel);
+            Assert.Equal("Cancel", capturedInline.CancelLabel);
+            Assert.Null(capturedStandalone);
+        }
+        else
+        {
+            Assert.NotNull(capturedStandalone);
+            Assert.Equal(true, capturedStandalone[nameof(AlertModal.DefaultToCancel)]);
+            Assert.Equal("Clear all", capturedStandalone[nameof(AlertModal.AcceptLabel)]);
+            Assert.Equal("Cancel", capturedStandalone[nameof(AlertModal.CancelLabel)]);
+            Assert.Null(capturedInline);
+        }
+    }
+
     [Fact]
     public async Task ShowAlert_ShouldMarshalThroughMainThreadService()
     {

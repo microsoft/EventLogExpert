@@ -3,6 +3,7 @@
 <ModalChrome AcceptLabel="@(string.IsNullOrEmpty(AcceptLabel) ? CancelLabel : AcceptLabel)"
     AriaLabel="@AriaLabelText"
     CancelLabel="@CancelLabel"
+    DefaultToCancel="DefaultToCancel"
     Footer="@(string.IsNullOrEmpty(AcceptLabel) ? FooterPreset.Dismiss : FooterPreset.AcceptCancel)"
     InlineAlert="@CurrentInlineAlert"
     MaxWidth="min(34rem, calc(100vw - 2rem))"
@@ -11,8 +12,9 @@
     OnCancel="HandleCancelClickedAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
     OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
-    @ref="ChromeRef"
-    Title="@Title">
+    ShowNotifications="false"
+    Title="@Title"
+    @ref="ChromeRef">
     <ChildContent>
         <p class="alert-modal-message">@Message</p>
     </ChildContent>

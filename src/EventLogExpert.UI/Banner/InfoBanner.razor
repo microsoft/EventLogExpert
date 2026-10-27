@@ -2,13 +2,23 @@
     BannerContentText text = BannerContentLocalizer.Resolve(Localizer, Entry.Content);
 }
 
-<aside class="banner @SeverityClass" role="status">
-    <span class="banner-message">@text.Title: @text.Message</span>
+<aside class="banner @SeverityClass" role="@(StaticPresentation ? null : "status")">
+    @if (StaticPresentation)
+    {
+        <i aria-hidden="true" class="notification-card-icon @SeverityIconClass" data-tooltip="@SeverityText"></i>
+        <strong class="notification-card-title" id="@_titleId">@text.Title</strong>
+        <span class="notification-card-message">@text.Message</span>
+    }
+    else
+    {
+        <span class="banner-message">@text.Title: @text.Message</span>
+    }
 
     @CycleNav
 
     <Button CssClass="banner-dismiss"
-        IconClass="bi bi-x-circle"
+        IconClass="@(StaticPresentation ? "bi bi-x" : "bi bi-x-circle")"
         OnClick="OnDismissInfo"
+        aria-describedby="@(StaticPresentation ? _titleId : null)"
         aria-label='@Localizer["Banner_Info_DismissAria"]' />
 </aside>
