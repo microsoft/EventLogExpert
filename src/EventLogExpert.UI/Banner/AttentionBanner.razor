@@ -1,14 +1,32 @@
-<aside class="banner banner-attention" role="alert">
-    <span class="banner-message">@PluralText.Format(Localizer, "Banner_Attention", ("count", AttentionCount))</span>
+<aside class="banner banner-attention" role="@(StaticPresentation ? null : "alert")">
+    @if (StaticPresentation)
+    {
+        <i aria-hidden="true"
+            class="bi bi-exclamation-triangle notification-card-icon"
+            data-tooltip="@Localizer["Notifications_Severity_Warning"]">
+        </i>
+        <strong class="notification-card-title" id="@_titleId">@Localizer["Notifications_DatabaseAttention"]</strong>
+        <span class="notification-card-message">@PluralText.Format(Localizer, "Banner_Attention", ("count", AttentionCount))</span>
+    }
+    else
+    {
+        <span class="banner-message">@PluralText.Format(Localizer, "Banner_Attention", ("count", AttentionCount))</span>
+    }
 
     @CycleNav
 
-    <Button CssClass="banner-action" OnClick="OnOpenDatabasesClickedAsync">
+    <Button CssClass="banner-action"
+        Disabled="ActionsDisabled" OnClick="OnOpenDatabasesClickedAsync" aria-describedby="@(ActionsDisabled ? _actionHintId : null)">
         @Localizer["Banner_Attention_OpenDatabases"]
     </Button>
+    @if (ActionsDisabled)
+    {
+        <span class="banner-action-hint" id="@_actionHintId">@Localizer["Notifications_CloseDialogForAction"]</span>
+    }
 
-    <Button aria-label='@Localizer["Banner_Attention_DismissAria"]'
-        CssClass="banner-dismiss"
-        IconClass="bi bi-x-circle"
-        OnClick="OnDismissAttention" />
+    <Button CssClass="banner-dismiss"
+        IconClass="@(StaticPresentation ? "bi bi-x" : "bi bi-x-circle")"
+        OnClick="OnDismissAttention"
+        aria-describedby="@(StaticPresentation ? _titleId : null)"
+        aria-label='@Localizer["Banner_Attention_DismissAria"]' />
 </aside>

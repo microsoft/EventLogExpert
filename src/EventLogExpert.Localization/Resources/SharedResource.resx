@@ -2717,6 +2717,18 @@
   <data name="StatusBar_Counts_ShownOfTotalSelected" xml:space="preserve">
     <value>{0} of {1} shown · {2} selected</value>
   </data>
+  <data name="StatusBar_Counts_ShortShownTotal" xml:space="preserve">
+    <value>{0}/{1}</value>
+  </data>
+  <data name="StatusBar_Counts_ShortTotal" xml:space="preserve">
+    <value>{0}</value>
+  </data>
+  <data name="StatusBar_Hidden_Label" xml:space="preserve">
+    <value>Hidden: </value>
+  </data>
+  <data name="StatusBar_Hidden_Separator" xml:space="preserve">
+    <value>; </value>
+  </data>
   <data name="StatusBar_Coverage_Chip" xml:space="preserve">
     <value>{0} unresolved</value>
     <comment>Coverage adjective agreement and full plural handling are deferred to the Humanizer roadmap.</comment>
@@ -2746,6 +2758,9 @@
   <data name="StatusBar_Loading_Failed" xml:space="preserve">
     <value>Failed: {0}</value>
   </data>
+  <data name="StatusBar_Loading_FailedCompact" xml:space="preserve">
+    <value>! {0}</value>
+  </data>
   <data name="StatusBar_Memory_Value_Normal" xml:space="preserve">
     <value>Memory: {0}</value>
   </data>
@@ -2754,6 +2769,12 @@
   </data>
   <data name="StatusBar_Memory_Value_High" xml:space="preserve">
     <value>Memory: {0} · High</value>
+  </data>
+  <data name="StatusBar_Memory_Short_Elevated" xml:space="preserve">
+    <value>Elevated</value>
+  </data>
+  <data name="StatusBar_Memory_Short_High" xml:space="preserve">
+    <value>High</value>
   </data>
   <data name="StatusBar_Memory_Announce_Normal" xml:space="preserve">
     <value>Memory usage normal</value>
@@ -5243,4 +5264,36 @@
   <data name="Column_Opcode" xml:space="preserve">
     <value>Opcode</value>
   </data>
+  <data name="Notifications_Title" xml:space="preserve"><value>Notifications</value></data>
+  <data name="Notifications_ToastMore" xml:space="preserve"><value>+{0:N0} more</value></data>
+  <data name="Notifications_ActiveCount" xml:space="preserve"><value>Active notifications: {0:N0}</value></data>
+  <data name="Notifications_TriggerAria" xml:space="preserve"><value>Notifications: {0:N0} active. {1}. {2}</value></data>
+  <data name="Notifications_Severity_None" xml:space="preserve"><value>No active severity</value></data>
+  <data name="Notifications_Severity_Progress" xml:space="preserve"><value>Progress</value></data>
+  <data name="Notifications_InProgress" xml:space="preserve"><value>In progress</value></data>
+  <data name="Notifications_UpgradeStarted" xml:space="preserve"><value>Database upgrade is in progress.</value></data>
+  <data name="Notifications_ExportStarted" xml:space="preserve"><value>Export is in progress.</value></data>
+  <data name="Notifications_ContextualAttentionOmitted" xml:space="preserve"><value>Database attention is not repeated here because this dialog already provides the relevant controls.</value></data>
+  <data name="Notifications_CloseDialogForAction" xml:space="preserve"><value>This action is available from the main window after this dialog closes. A running operation may need to finish first.</value></data>
+  <data name="Notifications_Severity_Info" xml:space="preserve"><value>Information</value></data>
+  <data name="Notifications_Severity_Warning" xml:space="preserve"><value>Warning</value></data>
+  <data name="Notifications_Severity_Error" xml:space="preserve"><value>Error</value></data>
+  <data name="Notifications_DatabaseAttention" xml:space="preserve"><value>Database attention</value></data>
+  <data name="Notifications_DatabaseAttentionCount" xml:space="preserve"><value>{count, plural, one {{count:N0} database needs attention.} other {{count:N0} databases need attention.}}</value></data>
+  <data name="Notifications_ClearAll" xml:space="preserve"><value>Clear all</value></data>
+  <data name="Notifications_ClearAllAria" xml:space="preserve"><value>Clear all notifications</value></data>
+  <data name="Notifications_ClearAllDescription" xml:space="preserve"><value>Dismisses the listed notifications. Running tasks continue.</value></data>
+  <data name="Notifications_ClearTitle" xml:space="preserve"><value>Clear notifications?</value></data>
+  <data name="Notifications_ClearConfirmation" xml:space="preserve"><value>{count, plural, one {Clear {count:N0} notification?} other {Clear {count:N0} notifications?}} They can't be restored.</value></data>
+  <data name="Notifications_ClearAttentionWarning" xml:space="preserve"><value> Attention for these databases won't reappear this session.</value></data>
+  <data name="Notifications_ClearRecoveryWarning" xml:space="preserve"><value> Recovery reminders for these backups won't reappear.</value></data>
+  <data name="Notifications_ClearDatabaseToolsHint" xml:space="preserve"><value> Database Tools still lists the databases.</value></data>
+  <data name="Notifications_Cleared" xml:space="preserve"><value>{count, plural, one {{count:N0} notification cleared} other {{count:N0} notifications cleared}}</value></data>
+  <data name="Notifications_TasksRunning" xml:space="preserve"><value>; {count, plural, one {{count:N0} task still running} other {{count:N0} tasks still running}}</value></data>
+  <data name="Banner_Upgrade_Title" xml:space="preserve"><value>Upgrade databases</value></data>
+  <data name="Notifications_NoticeSummary" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="Notifications_SummaryWithProgress" xml:space="preserve"><value>{0}. {1}</value></data>
+  <data name="Notifications_NoticeAnnouncement" xml:space="preserve"><value>{0}. {1}. {2}. {3}</value></data>
+  <data name="Notifications_CountBadgeOverflow" xml:space="preserve"><value>{0:N0}+</value></data>
+  <data name="StatusBar_Hidden_TooltipFormat" xml:space="preserve"><value>{0}; {1}{2}</value></data>
 </root>

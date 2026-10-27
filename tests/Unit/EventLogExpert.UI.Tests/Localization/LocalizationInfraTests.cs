@@ -608,7 +608,8 @@ public sealed class LocalizationInfraTests
             ("Banner_Recovery_Resolve", 0),
             ("Banner_Upgrade_InProgress", 4),
             ("Banner_Upgrade_Preparing", 0),
-            ("Banner_Upgrade_QueuedBatches", 0)
+            ("Banner_Upgrade_QueuedBatches", 0),
+            ("Banner_Upgrade_Title", 0)
         ];
 
         foreach ((string key, int arity) in expected)
@@ -809,6 +810,23 @@ public sealed class LocalizationInfraTests
         Assert.Equal(5, PlaceholderArity(neutralValues["Histogram_WindowAnnouncement_Breakdown"]));
     }
 
+    [Theory]
+    [InlineData("Notifications_ClearConfirmation")]
+    [InlineData("Notifications_Cleared")]
+    [InlineData("Notifications_TasksRunning")]
+    [InlineData("Notifications_DatabaseAttentionCount")]
+    public void NeutralNotificationPluralValues_HaveGroupedQuantitiesInEveryBranch(string key)
+    {
+        var neutralValues = ResxValues();
+        string pattern = neutralValues[key];
+        Assert.Equal(0, PlaceholderArity(pattern));
+        int pluralStart = pattern.IndexOf('{');
+        int pluralEnd = FindMatchingBrace(pattern, pluralStart, pattern.Length);
+        Dictionary<string, string> pluralValues = new() { [key] = pattern[pluralStart..(pluralEnd + 1)] };
+        AssertPluralPatternBehavior(pluralValues, key, "count", [Grouped("count")], ["one", "other"], RenderShape.SingularPluralDiffer);
+        Assert.Matches(@"one\s*\{[^{}]*\{count:N0\}", pattern);
+    }
+
     [Fact]
     public void NeutralPropertyLabelValues_MirrorInvariant()
     {
@@ -938,6 +956,8 @@ public sealed class LocalizationInfraTests
         [
             "StatusBar_Counts_TotalSelected",
             "StatusBar_Counts_ShownOfTotalSelected",
+            "StatusBar_Hidden_Label",
+            "StatusBar_Hidden_Separator",
             "StatusBar_Memory_Value_Elevated",
             "StatusBar_Memory_Value_High"
         ];
@@ -962,6 +982,11 @@ public sealed class LocalizationInfraTests
             ("StatusBar_Counts_TotalSelected", 0),
             ("StatusBar_Counts_ShownOfTotal", 2),
             ("StatusBar_Counts_ShownOfTotalSelected", 3),
+            ("StatusBar_Counts_ShortShownTotal", 2),
+            ("StatusBar_Counts_ShortTotal", 1),
+            ("StatusBar_Hidden_Label", 0),
+            ("StatusBar_Hidden_Separator", 0),
+            ("StatusBar_Hidden_TooltipFormat", 3),
             ("StatusBar_Coverage_Chip", 1),
             ("StatusBar_Coverage_AriaLabel", 1),
             ("StatusBar_Coverage_Tooltip", 0),
@@ -971,9 +996,12 @@ public sealed class LocalizationInfraTests
             ("StatusBar_Loading_CountPercent", 2),
             ("StatusBar_Loading_ManyLogs", 0),
             ("StatusBar_Loading_Failed", 1),
+            ("StatusBar_Loading_FailedCompact", 1),
             ("StatusBar_Memory_Value_Normal", 1),
             ("StatusBar_Memory_Value_Elevated", 1),
             ("StatusBar_Memory_Value_High", 1),
+            ("StatusBar_Memory_Short_Elevated", 0),
+            ("StatusBar_Memory_Short_High", 0),
             ("StatusBar_Memory_Announce_Normal", 0),
             ("StatusBar_Memory_Announce_Elevated", 0),
             ("StatusBar_Memory_Announce_High", 0),
@@ -2111,6 +2139,7 @@ public sealed class LocalizationInfraTests
     {
         public StatusBarRenderContext(int newEventCount)
         {
+            Services.AddBannerHostDependencies();
             JSInterop.Mode = JSRuntimeMode.Loose;
 
             var eventLogCommands = Substitute.For<IEventLogCommands>();

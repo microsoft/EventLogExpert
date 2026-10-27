@@ -12,14 +12,20 @@
     style="@DialogInlineStyle">
     <div class="dialog-group">
         <div class="banner-region" inert="@HasInlineAlert">
-            <BannerHost Location="BannerHostLocation.InsideModal" />
+            <BannerHost CriticalOnly="true" Location="BannerHostLocation.InsideModal" />
         </div>
 
-        @if (!string.IsNullOrEmpty(Title))
-        {
-            <header class="dialog-header" inert="@HasInlineAlert">
-                <h2 class="dialog-title" data-tooltip="@Title" data-tooltip-overflow id="@_titleId">@Title</h2>
+        <header class="@(HasHeaderChrome ? "dialog-header" : "dialog-header-collapsed")" inert="@HasInlineAlert">
+            @if (!string.IsNullOrEmpty(Title))
+            {
+                <h2 class="dialog-title" data-tooltip="@Title" data-tooltip-overflow id="@_titleId" tabindex="-1">@Title</h2>
+            }
 
+            <div class="dialog-header-actions">
+                <NotificationCenter Disabled="HasInlineAlert"
+                    Location="BannerHostLocation.InsideModal"
+                    ShowNotifications="ShowNotifications"
+                    TriggerVisibilityChanged="OnNotificationTriggerVisibilityChanged" />
                 @if (ShowCloseButton)
                 {
                     <Button CssClass="dialog-close"
@@ -28,8 +34,8 @@
                         OnClick="HandleCloseButtonAsync"
                         aria-label="@EffectiveCloseButtonAriaLabel" />
                 }
-            </header>
-        }
+            </div>
+        </header>
 
         <div class="dialog-body" inert="@HasInlineAlert">
             @ChildContent
@@ -60,7 +66,8 @@
                             @EffectiveSaveLabel
                         </PrimaryButton>
                         <Button Disabled="@(HasInlineAlert || FooterDisabled)"
-                            OnClick="HandleCancelButtonAsync">
+                            OnClick="HandleCancelButtonAsync"
+                            autofocus="@DefaultToCancel">
                             @EffectiveCancelLabel
                         </Button>
                     </div>
@@ -88,7 +95,7 @@
                 case FooterPreset.Dismiss:
                     <Button Disabled="@(HasInlineAlert || FooterDisabled)"
                         OnClick="HandleAcceptAsync"
-                        autofocus>
+                        autofocus="true">
                         @EffectiveAcceptLabel
                     </Button>
 
@@ -97,7 +104,7 @@
                 case FooterPreset.AcceptCancel:
                     <PrimaryButton Disabled="@(HasInlineAlert || FooterDisabled || AcceptDisabled)"
                         OnClick="HandleAcceptAsync"
-                        autofocus>
+                        autofocus="@(!DefaultToCancel)">
                         @EffectiveAcceptLabel
                     </PrimaryButton>
 
@@ -110,7 +117,8 @@
                     }
 
                     <Button Disabled="@(HasInlineAlert || FooterDisabled)"
-                        OnClick="HandleCancelButtonAsync">
+                        OnClick="HandleCancelButtonAsync"
+                        autofocus="@DefaultToCancel">
                         @EffectiveCancelLabel
                     </Button>
 
@@ -166,7 +174,7 @@
                 {
                     <PrimaryButton Disabled="@(ValidationError is not null)"
                         OnClick="HandleInlineAlertAcceptAsync"
-                        autofocus="@(!InlineAlert.IsPrompt)"
+                        autofocus="@(!InlineAlert.IsPrompt && !InlineAlert.DefaultToCancel)"
                         @ref="_inlineAlertAcceptButton">
                         @InlineAlert.AcceptLabel
                     </PrimaryButton>
@@ -179,7 +187,7 @@
                     </Button>
                 }
                 <Button OnClick="HandleInlineAlertCancelAsync"
-                    autofocus="@(string.IsNullOrEmpty(InlineAlert.AcceptLabel))"
+                    autofocus="@(InlineAlert.DefaultToCancel || string.IsNullOrEmpty(InlineAlert.AcceptLabel))"
                     @ref="_inlineAlertCancelButton">
                     @InlineAlert.CancelLabel
                 </Button>

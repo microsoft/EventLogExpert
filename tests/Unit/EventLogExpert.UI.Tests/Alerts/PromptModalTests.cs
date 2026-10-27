@@ -64,6 +64,8 @@ public sealed class PromptModalTests : BunitContext
 
         Assert.Contains("--modal-min-width: min(34rem, calc(100vw - 2rem));", style);
         Assert.Contains("--modal-max-width: min(34rem, calc(100vw - 2rem));", style);
+        Assert.Empty(component.FindAll(".notification-trigger"));
+        Assert.Contains("Prompt", component.Find(".dialog-title").TextContent);
     }
 
     [Fact]

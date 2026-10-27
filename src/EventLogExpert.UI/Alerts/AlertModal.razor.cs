@@ -16,6 +16,8 @@ public sealed partial class AlertModal : ModalBase<bool>
 
     [Parameter] public string CancelLabel { get; set; } = "OK";
 
+    [Parameter] public bool DefaultToCancel { get; set; }
+
     [Parameter] public string Message { get; set; } = string.Empty;
 
     [Parameter] public string Title { get; set; } = string.Empty;

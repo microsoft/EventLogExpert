@@ -41,6 +41,7 @@ public sealed class StatusBarLocalizerWiringTests : BunitContext
 
     public StatusBarLocalizerWiringTests()
     {
+        Services.AddBannerHostDependencies();
         JSInterop.Mode = JSRuntimeMode.Loose;
 
         Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());

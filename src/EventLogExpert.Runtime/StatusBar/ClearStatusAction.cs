@@ -3,4 +3,8 @@
 
 namespace EventLogExpert.Runtime.StatusBar;
 
-public sealed record ClearStatusAction(StatusActivityId ActivityId);
+/// <param name="ActivityId">The loading activity that finished.</param>
+/// <param name="FinalFailedCount">
+///     The activity's failed count when it finished, which can exceed the last progress report.
+/// </param>
+public sealed record ClearStatusAction(StatusActivityId ActivityId, int FinalFailedCount);

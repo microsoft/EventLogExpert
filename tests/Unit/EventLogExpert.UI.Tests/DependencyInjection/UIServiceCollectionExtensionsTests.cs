@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Modal;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,6 +51,20 @@ public sealed class UIServiceCollectionExtensionsTests
         Assert.IsType<MenuService>(provider.GetRequiredService<IMenuService>());
         Assert.IsType<ModalService>(provider.GetRequiredService<IModalService>());
         Assert.IsType<ModalCoordinator>(provider.GetRequiredService<IModalCoordinator>());
+    }
+
+    [Fact]
+    public void AddEventLogUIServices_RegistersNotificationAnnouncementStateAsScoped()
+    {
+        ServiceCollection services = new();
+
+        services.AddEventLogUIServices();
+
+        ServiceDescriptor descriptor = Assert.Single(
+            services,
+            candidate => candidate.ServiceType == typeof(NotificationAnnouncementState));
+
+        Assert.Equal(ServiceLifetime.Scoped, descriptor.Lifetime);
     }
 
     [Theory]

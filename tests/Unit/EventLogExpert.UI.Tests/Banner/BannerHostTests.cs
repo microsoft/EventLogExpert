@@ -8,6 +8,7 @@ using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Restart;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.DatabaseTools;
@@ -17,6 +18,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using NSubstitute;
+using System.Collections;
 
 namespace EventLogExpert.UI.Tests.Banner;
 
@@ -57,6 +59,25 @@ public sealed class BannerHostTests : BunitContext
         Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
 
         JSInterop.Mode = JSRuntimeMode.Loose;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AllEntries_ResolvesCapturedListsInLinearWork(bool information)
+    {
+        const int count = 64;
+        CountingReadOnlyList<ErrorBannerEntry> errors = new(Enumerable.Range(0, count)
+            .Select(index => BuildError($"Failure {index}", "Detail")).ToArray());
+        CountingReadOnlyList<BannerInfoEntry> infos = new(Enumerable.Range(0, count)
+            .Select(index => BuildInfo($"Notice {index}", "Detail")).ToArray());
+        if (information) { _infoBannerService.InfoBanners.Returns(infos); }
+        else { _errorBannerService.ErrorBanners.Returns(errors); }
+
+        var component = Render<BannerHost>(parameters => parameters.Add(host => host.ShowAllEntries, true));
+
+        Assert.Equal(count, component.FindAll("[data-notification-card]").Count);
+        Assert.InRange(information ? infos.ReadCount : errors.ReadCount, 1, count * 10);
     }
 
     [Fact]
@@ -336,6 +357,21 @@ public sealed class BannerHostTests : BunitContext
     }
 
     [Fact]
+    public void CriticalOnly_NonCriticalMessages_DoNotRenderOverTheWorkspace()
+    {
+        _errorBannerService.ErrorBanners.Returns([BuildError("Error", "Detail")]);
+        _infoBannerService.InfoBanners.Returns([BuildInfo("Empty log", "No events")]);
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("attention.db")]);
+
+        var component = Render<BannerHost>(parameters => parameters.Add(host => host.CriticalOnly, true));
+
+        Assert.Empty(component.FindAll("aside"));
+        _criticalErrorService.CurrentCritical.Returns(new InvalidOperationException("Critical failure."));
+        _criticalErrorService.StateChanged += Raise.Event<Action>();
+        component.WaitForAssertion(() => Assert.Single(component.FindAll("aside.banner-critical[role='alert']")));
+    }
+
+    [Fact]
     public void Dispose_UnsubscribesFromCycleState()
     {
         _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
@@ -460,6 +496,32 @@ public sealed class BannerHostTests : BunitContext
         Assert.Single(component.FindAll("aside.banner-attention"));
     }
 
+    [Fact]
+    public void ShowAllEntries_RendersEveryMessageWithoutCarouselPagination()
+    {
+        _errorBannerService.ErrorBanners.Returns([BuildError("Error", "Detail")]);
+        _infoBannerService.InfoBanners.Returns([BuildInfo("Empty log", "No events"), BuildInfo("Exported", "Finished")]);
+        _progressBannerService.BackgroundProgress.Returns(new BannerProgressEntry(
+            new UpgradeBatchId(new Guid("9E8B4EB0-2590-4B6A-87CF-136A03CF4BF7")),
+            UpgradeProgressScope.Background,
+            0,
+            1,
+            string.Empty,
+            UpgradePhase.BackingUp,
+            0,
+            () => { }));
+        _exportProgressBannerService.CurrentExport.Returns(new ExportProgressEntry(() => { }));
+
+        var component = Render<BannerHost>(parameters => parameters.Add(host => host.ShowAllEntries, true));
+
+        Assert.Equal(5, component.FindAll("aside").Count);
+        Assert.Empty(component.FindAll("aside[role='alert'], aside[role='status'], aside[aria-live]"));
+        Assert.Equal(5, component.FindAll(".notification-card-severity.visually-hidden").Count);
+        Assert.Contains("[[Notifications_Severity_Error]]", component.Find(".notification-card-severity").TextContent);
+        Assert.Empty(component.FindAll(".banner-pagination"));
+        Assert.Empty(component.FindAll(".banner-cycle-next"));
+    }
+
     private static DatabaseEntry BuildDatabaseEntry(string fileName) =>
         new(fileName, $@"C:\dbs\{fileName}", false, DatabaseStatus.UpgradeRequired);
 
@@ -473,4 +535,20 @@ public sealed class BannerHostTests : BunitContext
         message is Preformatted preformatted &&
         preformatted.Title == title &&
         preformatted.Message == text;
+
+    private sealed class CountingReadOnlyList<T>(T[] entries) : IReadOnlyList<T>
+    {
+        public int Count => entries.Length;
+
+        public int ReadCount { get; private set; }
+
+        public T this[int index] { get { ReadCount++; return entries[index]; } }
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            foreach (T entry in entries) { ReadCount++; yield return entry; }
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
 }

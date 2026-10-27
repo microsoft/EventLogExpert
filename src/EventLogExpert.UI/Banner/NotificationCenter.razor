@@ -1,0 +1,190 @@
+@{
+    IReadOnlyList<ErrorBannerEntry> errors = ErrorBannerService.ErrorBanners;
+    IReadOnlyList<BannerInfoEntry> infos = InfoBannerService.InfoBanners;
+    IReadOnlyList<DatabaseEntry> attentionEntries = AttentionBannerService.AttentionEntries;
+    BannerProgressEntry? backgroundProgress = ProgressBannerService.BackgroundProgress;
+    ExportProgressEntry? exportProgress = ExportProgressBannerService.CurrentExport;
+    int activeCount = GetActiveCount();
+    ErrorBannerEntry? newestFailure = errors.Reverse().MaxBy(entry => entry.CreatedUtc);
+
+    BannerInfoEntry? newestWarning = infos
+        .Where(entry => entry.Severity == BannerSeverity.Warning)
+        .Reverse()
+        .MaxBy(entry => entry.CreatedUtc);
+
+    BannerInfoEntry? newestInfo = infos
+        .Where(entry => entry.Severity == BannerSeverity.Info)
+        .Reverse()
+        .MaxBy(entry => entry.CreatedUtc);
+
+    bool hasAttentionWarning = attentionEntries.Count > 0 && !AttentionBannerService.AttentionDismissed;
+    bool attentionSuppressed = hasAttentionWarning && Location == BannerHostLocation.InsideModal && CycleState.Items.All(item => item.View != BannerView.Attention);
+    int dismissibleCount = errors.Count + infos.Count + (hasAttentionWarning && !attentionSuppressed ? 1 : 0);
+    bool hasProgress = backgroundProgress is not null || exportProgress is not null;
+
+    NotificationSeverity? highestSeverity = newestFailure is not null ? NotificationSeverity.Error :
+        newestWarning is not null || hasAttentionWarning ? NotificationSeverity.Warning :
+        infos.Count > 0 ? NotificationSeverity.Info : null;
+
+    bool attentionIsNewer = hasAttentionWarning &&
+        (newestWarning is null || AttentionBannerService.AttentionCreatedUtc > newestWarning.CreatedUtc);
+
+    BannerContentText? priorityContent = newestFailure is not null ? BannerContentLocalizer.Resolve(Localizer, newestFailure.Content) :
+        attentionIsNewer ? BannerContentLocalizer.Resolve(Localizer, new DatabaseAttention(attentionEntries.Count)) :
+        newestWarning is not null ? BannerContentLocalizer.Resolve(Localizer, newestWarning.Content) : null;
+
+    BannerContentText? informationContent = newestInfo is not null ?
+        BannerContentLocalizer.Resolve(Localizer, newestInfo.Content) :
+        null;
+
+    string informationSummary = informationContent is not null ?
+        Localizer["Notifications_NoticeSummary", informationContent.Title, informationContent.Message].Value : string.Empty;
+
+    string accessibleSummary = priorityContent is not null ?
+        Localizer["Notifications_NoticeSummary", priorityContent.Title, priorityContent.Message].Value :
+        informationContent is not null ?
+            (hasProgress ?
+                Localizer["Notifications_SummaryWithProgress", informationSummary.TrimEnd('.', ' '), Localizer["Notifications_InProgress"].Value].Value :
+                informationSummary) :
+            hasProgress ? Localizer["Notifications_InProgress"].Value : Localizer["Notifications_Title"].Value;
+
+    string severityText = highestSeverity switch
+    {
+        NotificationSeverity.Error => Localizer["Notifications_Severity_Error"].Value,
+        NotificationSeverity.Warning => Localizer["Notifications_Severity_Warning"].Value,
+        NotificationSeverity.Info => Localizer["Notifications_Severity_Info"].Value,
+        _ when hasProgress => Localizer["Notifications_Severity_Progress"].Value,
+        _ => Localizer["Notifications_Severity_None"].Value
+    };
+
+    string triggerAccessibleName = Localizer["Notifications_TriggerAria", activeCount, severityText, accessibleSummary].Value;
+    string triggerTooltip = triggerAccessibleName;
+    string countBadge = activeCount > 99 ? Localizer["Notifications_CountBadgeOverflow", 99].Value : activeCount.ToString("N0");
+
+    string iconClass = highestSeverity switch
+    {
+        NotificationSeverity.Error => "bi bi-exclamation-circle",
+        NotificationSeverity.Warning => "bi bi-exclamation-triangle",
+        NotificationSeverity.Info => "bi bi-info-circle",
+        _ when backgroundProgress is not null || exportProgress is not null => "bi bi-arrow-repeat loader-spin",
+        _ => "bi bi-bell"
+    };
+
+    string triggerSeverityClass = highestSeverity switch
+    {
+        NotificationSeverity.Error => "notification-trigger-error",
+        NotificationSeverity.Warning => "notification-trigger-warning",
+        NotificationSeverity.Info => "notification-trigger-info",
+        _ when backgroundProgress is not null || exportProgress is not null => "notification-trigger-progress",
+        _ => "notification-trigger-idle"
+    };
+
+    bool triggerVisible = ShowNotifications && _triggerShown;
+    NotificationToast? toast = Location == BannerHostLocation.MainLayout ? AnnouncementState.GetToast(_hostIdentity) : null;
+
+    string toastIconClass = toast?.Severity switch
+    {
+        NotificationSeverity.Error => "bi bi-exclamation-circle",
+        NotificationSeverity.Warning => "bi bi-exclamation-triangle",
+        NotificationSeverity.Info => "bi bi-info-circle",
+        _ => string.Empty
+    };
+
+    string toastSeverityClass = toast?.Severity switch
+    {
+        NotificationSeverity.Error => "notification-toast-error",
+        NotificationSeverity.Warning => "notification-toast-warning",
+        NotificationSeverity.Info => "notification-toast-info",
+        _ => string.Empty
+    };
+
+    (string? politeAnnouncement, string? assertiveAnnouncement) = AnnouncementState.GetAnnouncements(_hostIdentity);
+}
+
+<div class="notification-center @(Location == BannerHostLocation.MainLayout ? "status-bar-notifications notification-center-statusbar" : "notification-center-compact")"
+    data-trigger-shown="@(triggerVisible ? "true" : "false")">
+    @if (ShowNotifications)
+    {
+        <button aria-controls="@_panelId"
+            aria-hidden="@(triggerVisible ? null : "true")"
+            aria-label="@triggerAccessibleName"
+            class="notification-trigger @triggerSeverityClass @(triggerVisible ? string.Empty : "notification-trigger-hidden")"
+            data-notification-trigger
+            data-tooltip="@triggerTooltip"
+            disabled="@IsUnavailable"
+            id="@_triggerId"
+            popovertarget="@_panelId"
+            @ref="_trigger"
+            tabindex="@(triggerVisible ? "0" : "-1")"
+            type="button">
+            <i aria-hidden="true" class="@iconClass"></i>
+            <span aria-hidden="true" class="notification-count">@countBadge</span>
+        </button>
+    }
+    <span aria-atomic="true"
+        aria-live="polite"
+        class="visually-hidden"
+        role="status">
+        @(IsActiveHost ? politeAnnouncement : null)
+    </span>
+    <span aria-atomic="true"
+        aria-live="assertive"
+        class="visually-hidden"
+        role="alert">
+        @(IsActiveHost ? assertiveAnnouncement : null)
+    </span>
+
+    <section aria-label="@Localizer["Notifications_Title"]"
+        class="notification-panel"
+        data-notification-panel
+        id="@_panelId"
+        popover="auto"
+        @ref="_panel"
+        tabindex="-1">
+        @if (attentionSuppressed)
+        {
+            <p class="notification-contextual-omission">@Localizer["Notifications_ContextualAttentionOmitted"]</p>
+        }
+        <div class="notification-active-list">
+            <BannerHost BeforeAction="PrepareModalActionAsync"
+                Location="Location"
+                NotificationReturnTriggerId="@_triggerId"
+                ShowAllEntries="true" />
+        </div>
+        @if (dismissibleCount >= 2)
+        {
+            <footer class="notification-panel-footer">
+                <Button Disabled="@_clearInProgress"
+                    OnClick="ClearAllAsync"
+                    aria-describedby="@_clearAllDescriptionId"
+                    aria-label="@Localizer["Notifications_ClearAllAria"]"
+                    data-notification-clear-all
+                    data-tooltip="@Localizer["Notifications_ClearAllDescription"]">
+                    @Localizer["Notifications_ClearAll"]
+                </Button>
+                <span hidden id="@_clearAllDescriptionId">@Localizer["Notifications_ClearAllDescription"]</span>
+            </footer>
+        }
+    </section>
+
+    @if (Location == BannerHostLocation.MainLayout)
+    {
+        <div aria-hidden="true"
+            class="notification-toast @toastSeverityClass"
+            data-notification-toast
+            data-toast-visible="@(toast is null ? "false" : "true")"
+            @ref="_toastElement">
+            @if (toast is not null)
+            {
+                <i aria-hidden="true" class="@toastIconClass"></i>
+                <strong class="notification-toast-title">@toast.Title</strong>
+                <span class="notification-toast-message">@toast.Message</span>
+
+                @if (toast.ArrivalCount > 1)
+                {
+                    <span class="notification-toast-more">@Localizer["Notifications_ToastMore", toast.ArrivalCount - 1]</span>
+                }
+            }
+        </div>
+    }
+</div>

@@ -18,11 +18,13 @@ using EventLogExpert.Runtime.StatusBar;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using Fluxor;
+using Fluxor.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
 using CloseLogAction = EventLogExpert.Runtime.EventLog.CloseLogAction;
 using Reducers = EventLogExpert.Runtime.EventLog.Reducers;
+using StatusBarReducers = EventLogExpert.Runtime.StatusBar.Reducers;
 
 namespace EventLogExpert.Runtime.Tests.EventLog;
 
@@ -976,6 +978,166 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleOpenLog_CloseAllBetweenFeatureReductions_IgnoresTheCancelledLoadsFailures()
+    {
+        var featureServices = new ServiceCollection();
+        featureServices.AddFluxor(options => options.RegisterStateLibrary());
+        using ServiceProvider featureProvider = featureServices.BuildServiceProvider();
+        var features = featureServices
+            .Where(service => service.ServiceType.IsGenericType && service.ServiceType.GetGenericTypeDefinition() == typeof(IFeature<>))
+            .Select(service => (IFeature)featureProvider.GetRequiredService(service.ServiceType))
+            .ToArray();
+        var statusBarFeature = featureProvider.GetRequiredService<IFeature<StatusBarState>>();
+        var eventLogFeature = featureProvider.GetRequiredService<IFeature<EventLogState>>();
+        Assert.True(Array.IndexOf(features, statusBarFeature) < Array.IndexOf(features, eventLogFeature));
+
+        statusBarFeature.MaximumStateChangedNotificationsPerSecond = 0;
+        statusBarFeature.RestoreState(new StatusBarState
+        {
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int, long?)>.Empty
+                .Add(StatusActivityId.Create(), (100, 3, null))
+        });
+
+        var dispatcher = new Dispatcher();
+        var classificationCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var databaseService = Substitute.For<IDatabaseService>();
+        databaseService.InitialClassificationTask.Returns(classificationCompletion.Task);
+        using var loadCleared = new ManualResetEventSlim(false);
+        var serviceScope = Substitute.For<IServiceScope>();
+        serviceScope.When(scope => scope.Dispose()).Do(_ => loadCleared.Set());
+        var serviceProvider = Substitute.For<IServiceProvider>();
+        var resolver = Substitute.For<IEventResolver>();
+        resolver.ResolveEvent(Arg.Any<EventRecord>()).Returns<ResolvedEvent>(_ => throw new InvalidOperationException("Simulated resolution failure."));
+        serviceProvider.GetService(typeof(IEventResolver)).Returns(resolver);
+        serviceScope.ServiceProvider.Returns(serviceProvider);
+        var serviceScopeFactory = Substitute.For<IServiceScopeFactory>();
+        serviceScopeFactory.CreateScope().Returns(serviceScope);
+        var watcher = Substitute.For<ILogWatcherService>();
+        watcher.RemoveAllAsync().Returns(Task.CompletedTask);
+        var readerFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(60, batchSize: 30), newestBookmark: null));
+        var effects = new OpenLogEffects(
+            featureProvider.GetRequiredService<IState<EventLogState>>(),
+            featureProvider.GetRequiredService<IState<StatusBarState>>(),
+            Substitute.For<ITraceLogger>(),
+            watcher,
+            Substitute.For<IEventResolverCache>(),
+            Substitute.For<IEventXmlResolver>(),
+            serviceScopeFactory,
+            databaseService,
+            Substitute.For<ICriticalErrorService>(),
+            new LogCloseCoordinator(),
+            new EventLogConcurrencyState(),
+            new LiveTailIngestCoordinator(dispatcher, Timeout.InfiniteTimeSpan),
+            readerFactory);
+        using ServiceProvider effectProvider = new ServiceCollection()
+            .AddFluxor(options => options.ScanTypes(typeof(OpenLogEffects)))
+            .AddSingleton(effects)
+            .AddSingleton<IDispatcher>(dispatcher)
+            .BuildServiceProvider();
+        var store = effectProvider.GetRequiredService<IStore>();
+
+        foreach (var feature in features)
+        {
+            store.AddFeature(feature);
+        }
+
+        await store.InitializeAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var starts = new List<StartEventsLoadingAction>();
+        var clears = new List<ClearStatusAction>();
+        store.SubscribeToAction<StartEventsLoadingAction>(this, starts.Add);
+        store.SubscribeToAction<ClearStatusAction>(this, clears.Add);
+        statusBarFeature.StateChanged += (_, _) =>
+        {
+            if (classificationCompletion.Task.IsCompleted) { return; }
+
+            Assert.Equal(1, statusBarFeature.State.LoadGeneration);
+            Assert.True(eventLogFeature.State.IsLogOpen(Constants.LogNameApplication));
+            classificationCompletion.SetResult();
+            Assert.True(loadCleared.Wait(s_testTimeout, cancellationToken));
+        };
+
+        dispatcher.Dispatch(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel));
+        Assert.False(classificationCompletion.Task.IsCompleted);
+        serviceProvider.DidNotReceive().GetService(typeof(IEventResolver));
+
+        dispatcher.Dispatch(new CloseAllLogsAction());
+
+        Assert.Equal(60, Assert.Single(clears).FinalFailedCount);
+        Assert.Empty(statusBarFeature.State.EventsLoading);
+        Assert.Equal(1, statusBarFeature.State.FailedEpisodeCompletionCount);
+        Assert.Equal(3, statusBarFeature.State.LastCompletedEpisodeFailedTotal);
+        Assert.Equal(0, Assert.Single(starts).LoadGeneration);
+        Assert.Empty(eventLogFeature.State.OpenLogs);
+        await watcher.Received(1).RemoveAllAsync();
+    }
+
+    [Fact]
+    public async Task HandleOpenLog_CloseAllDuringClassificationAwait_StartsLoadingWithTheOriginalGeneration()
+    {
+        var logData = new EventLogData(Constants.LogNameApplication, LogPathType.Channel);
+        var mockEventLogState = Substitute.For<IState<EventLogState>>();
+
+        mockEventLogState.Value.Returns(new EventLogState
+        {
+            OpenLogs = ImmutableDictionary<string, OpenLogInfo>.Empty.Add(Constants.LogNameApplication, new OpenLogInfo(logData.Id, LogPathType.Channel)),
+            AppliedFilter = new Filter(null, [])
+        });
+
+        var statusBarState = CreateStatusBarState(loadGeneration: 5);
+        var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
+        var mockServiceScope = Substitute.For<IServiceScope>();
+        var mockServiceProvider = Substitute.For<IServiceProvider>();
+
+        mockServiceScopeFactory.CreateScope().Returns(mockServiceScope);
+        mockServiceScope.ServiceProvider.Returns(mockServiceProvider);
+
+        mockServiceProvider.GetService(typeof(IEventResolver)).Returns(Substitute.For<IEventResolver>());
+
+        var classificationCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var mockDatabaseService = Substitute.For<IDatabaseService>();
+        mockDatabaseService.InitialClassificationTask.Returns(classificationCompletion.Task);
+
+        var effects = BuildHarness(
+            mockEventLogState,
+            EmptyRawStore(),
+            Substitute.For<IFilterService>(),
+            Substitute.For<ITraceLogger>(),
+            Substitute.For<ILogWatcherService>(),
+            Substitute.For<IEventResolverCache>(),
+            Substitute.For<IEventXmlResolver>(),
+            mockServiceScopeFactory,
+            mockDatabaseService,
+            Substitute.For<ICriticalErrorService>(),
+            Substitute.For<IDispatcher>(),
+            statusBarState: statusBarState);
+
+        var mockDispatcher = Substitute.For<IDispatcher>();
+
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        var openTask = effects.HandleOpenLog(
+            new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel, cts.Token),
+            mockDispatcher);
+
+        Assert.False(openTask.IsCompleted);
+        mockServiceProvider.DidNotReceive().GetService(typeof(IEventResolver));
+        var closedStatusBarState = StatusBarReducers.ReduceCloseAll(statusBarState.Value);
+        statusBarState.Value.Returns(closedStatusBarState);
+        classificationCompletion.SetResult();
+        await openTask.WaitAsync(s_testTimeout, TestContext.Current.CancellationToken);
+
+        var start = Assert.Single(mockDispatcher.ReceivedCalls()
+            .Select(call => call.GetArguments()[0])
+            .OfType<StartEventsLoadingAction>());
+
+        Assert.Equal(5, start.LoadGeneration);
+        Assert.Same(closedStatusBarState, StatusBarReducers.ReduceStartEventsLoading(closedStatusBarState, start));
+    }
+
+    [Fact]
     public async Task HandleOpenLog_LogClosedDuringClassificationAwait_DoesNotDispatchAddTable()
     {
         var logData = new EventLogData(Constants.LogNameApplication, LogPathType.Channel);
@@ -1436,6 +1598,23 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleOpenLog_WhenRecordsFail_ClearsTheActivityWithTheFinalFailedCount()
+    {
+        var fakeFactory = new FakeEventLogReaderFactory(
+            new FakeEventLogReader(BuildReverseBatches(60, batchSize: 30), newestBookmark: "NEWEST"));
+        var (openLog, dispatcher, _) = CreateEagerLoadEffects(fakeFactory, throwOnResolve: recordId => recordId is 10 or 30);
+
+        await openLog.HandleOpenLog(new OpenLogAction(Constants.LogNameApplication, LogPathType.Channel), dispatcher);
+
+        var clear = dispatcher.ReceivedCalls()
+            .Select(call => call.GetArguments()[0])
+            .OfType<ClearStatusAction>()
+            .Single();
+
+        Assert.Equal(2, clear.FinalFailedCount);
+    }
+
+    [Fact]
     public async Task HandleOpenLog_WhenResolveThrows_ExcludesThrownRecordFromLoadedViaTheFailedPath()
     {
         const int total = 60;
@@ -1706,7 +1885,8 @@ public sealed class EffectsTests
         IDatabaseService databaseService,
         ICriticalErrorService criticalErrorService,
         IDispatcher dispatcher,
-        LogTableState? logTableStateValue = null)
+        LogTableState? logTableStateValue = null,
+        IState<StatusBarState>? statusBarState = null)
     {
         var closeCoordinator = new LogCloseCoordinator();
         var concurrencyState = new EventLogConcurrencyState();
@@ -1730,6 +1910,7 @@ public sealed class EffectsTests
 
         var openLog = new OpenLogEffects(
             eventLogState,
+            statusBarState ?? CreateStatusBarState(),
             logger,
             logWatcherService,
             resolverCache,
@@ -1868,6 +2049,7 @@ public sealed class EffectsTests
 
         var openLog = new OpenLogEffects(
             eventLogState,
+            CreateStatusBarState(),
             Substitute.For<ITraceLogger>(),
             watcher,
             Substitute.For<IEventResolverCache>(),
@@ -2129,6 +2311,14 @@ public sealed class EffectsTests
             mockDispatcher);
 
         return (effects, mockDispatcher, mockLogWatcherService, mockResolverCache, mockFilterService);
+    }
+
+    private static IState<StatusBarState> CreateStatusBarState(int loadGeneration = 0)
+    {
+        var statusBarState = Substitute.For<IState<StatusBarState>>();
+        statusBarState.Value.Returns(new StatusBarState { LoadGeneration = loadGeneration });
+
+        return statusBarState;
     }
 
     private static Task DrainDispatchQueueAsync(

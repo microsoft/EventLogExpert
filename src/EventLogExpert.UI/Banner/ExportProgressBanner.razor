@@ -1,12 +1,24 @@
-<aside class="banner banner-export-progress" role="status">
-    <i aria-hidden="true" class="banner-spinner bi bi-arrow-repeat loader-spin"></i>
-
-    <span class="banner-message">@Localizer["Banner_Export_Progress"]</span>
+<aside class="banner banner-export-progress" role="@(StaticPresentation ? null : "status")">
+    @if (StaticPresentation)
+    {
+        <i aria-hidden="true"
+            class="bi bi-arrow-repeat loader-spin notification-card-icon"
+            data-tooltip="@Localizer["Notifications_Severity_Progress"]">
+        </i>
+        <strong class="notification-card-title" id="@_titleId">@Localizer["Banner_Export_Title"]</strong>
+        <span class="notification-card-message">@Localizer["Banner_Export_Progress"]</span>
+    }
+    else
+    {
+        <i aria-hidden="true" class="banner-spinner bi bi-arrow-repeat loader-spin"></i>
+        <span class="banner-message">@Localizer["Banner_Export_Progress"]</span>
+    }
 
     @CycleNav
 
     <Button CssClass="banner-action"
-        OnClick="() => OnCancelExportClickedAsync(Export)">
+        OnClick="() => OnCancelExportClickedAsync(Export)"
+        aria-describedby="@(StaticPresentation ? _titleId : null)">
         @Localizer["Modal_Cancel"]
     </Button>
 </aside>

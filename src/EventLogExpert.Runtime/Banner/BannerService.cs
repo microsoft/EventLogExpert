@@ -14,14 +14,18 @@ internal sealed class BannerService
         IProgressBannerService,
         ICriticalErrorService,
         IErrorBannerService,
-        IInfoBannerService
+        IInfoBannerService,
+        INotificationBulkDismissService
 {
     private readonly IDatabaseService _databaseService;
     private readonly Lock _stateLock = new();
+    private readonly TimeProvider _timeProvider;
     private readonly ITraceLogger _traceLogger;
 
+    private DateTime _attentionCreatedUtc;
     private bool _attentionDismissed;
     private ImmutableList<DatabaseEntry> _attentionEntries = ImmutableList<DatabaseEntry>.Empty;
+    private long _attentionVersion;
     private BannerProgressEntry? _backgroundProgress;
     private Exception? _currentCritical;
     private ImmutableHashSet<string> _dismissedAttentionFileNames = ImmutableHashSet<string>.Empty;
@@ -31,13 +35,14 @@ internal sealed class BannerService
     private Func<Task>? _recoveryCallback;
     private object? _recoveryToken;
 
-    public BannerService(IDatabaseService databaseService, ITraceLogger traceLogger)
+    public BannerService(IDatabaseService databaseService, ITraceLogger traceLogger, TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(databaseService);
         ArgumentNullException.ThrowIfNull(traceLogger);
 
         _databaseService = databaseService;
         _traceLogger = traceLogger;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _databaseService.UpgradeBatchStarted += OnUpgradeBatchStarted;
         _databaseService.UpgradeBatchProgress += OnUpgradeBatchProgress;
         _databaseService.UpgradeBatchCompleted += OnUpgradeBatchCompleted;
@@ -45,15 +50,7 @@ internal sealed class BannerService
         OnEntriesChanged(this, EventArgs.Empty);
     }
 
-    // The five explicit-interface event accessors below are an unavoidable
-    // 5× duplication: C# does not allow an explicit-interface event accessor
-    // to delegate its add/remove implementation to another helper. The
-    // duplication is intentional and necessary to preserve five distinct
-    // invocation lists on the shared backing-store BannerService instance.
-    // Each accessor synchronizes through `_stateLock` to preserve the
-    // thread-safe add/remove guarantee the compiler-synthesized field-like
-    // event used to provide.
-
+    // Explicit accessors keep five separate facet invocation lists; locking preserves thread-safe subscriptions.
     event Action IAttentionBannerService.StateChanged
     {
         add { lock (_stateLock) { AttentionStateChanged += value; } }
@@ -84,11 +81,6 @@ internal sealed class BannerService
         remove { lock (_stateLock) { ProgressStateChanged -= value; } }
     }
 
-    // Five separate backing delegate fields — one per facet. Each interface's
-    // `event Action StateChanged` is wired through an explicit-interface accessor
-    // below; this guarantees five distinct invocation lists rather than one
-    // shared multicast (which a single `public event Action? StateChanged;`
-    // would silently produce).
     private event Action? AttentionStateChanged;
 
     private event Action? CriticalStateChanged;
@@ -98,6 +90,11 @@ internal sealed class BannerService
     private event Action? InfoStateChanged;
 
     private event Action? ProgressStateChanged;
+
+    public DateTime AttentionCreatedUtc
+    {
+        get { lock (_stateLock) { return _attentionCreatedUtc; } }
+    }
 
     public bool AttentionDismissed
     {
@@ -134,6 +131,17 @@ internal sealed class BannerService
         get { lock (_stateLock) { return _manageDatabasesProgress; } }
     }
 
+    public NotificationDismissSnapshot CaptureDismissSnapshot(bool includeAttention)
+    {
+        lock (_stateLock)
+        {
+            return new NotificationDismissSnapshot(
+                [.. _errorBanners],
+                [.. _infoBanners],
+                includeAttention && !_attentionDismissed && !_attentionEntries.IsEmpty ? _attentionVersion : null);
+        }
+    }
+
     public void ClearCritical()
     {
         lock (_stateLock)
@@ -154,9 +162,11 @@ internal sealed class BannerService
             if (changed)
             {
                 _attentionDismissed = true;
-                _dismissedAttentionFileNames = _attentionEntries
-                    .Select(entry => entry.FileName)
-                    .ToImmutableHashSet();
+                _dismissedAttentionFileNames =
+                [
+                    .. _attentionEntries
+                        .Select(entry => entry.FileName)
+                ];
             }
         }
 
@@ -200,6 +210,44 @@ internal sealed class BannerService
         }
     }
 
+    public int DismissSnapshot(NotificationDismissSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        bool errorsChanged;
+        bool infosChanged;
+        bool attentionChanged;
+        int removedCount;
+
+        lock (_stateLock)
+        {
+            HashSet<BannerId> errorIds = [.. snapshot.Errors.Select(entry => entry.Id)];
+            HashSet<BannerId> infoIds = [.. snapshot.Infos.Select(entry => entry.Id)];
+            ImmutableList<ErrorBannerEntry> remainingErrors = _errorBanners.RemoveAll(entry => errorIds.Contains(entry.Id));
+            ImmutableList<BannerInfoEntry> remainingInfos = _infoBanners.RemoveAll(entry => infoIds.Contains(entry.Id));
+            errorsChanged = remainingErrors.Count != _errorBanners.Count;
+            infosChanged = remainingInfos.Count != _infoBanners.Count;
+            attentionChanged = snapshot.AttentionVersion == _attentionVersion
+                && !_attentionDismissed && !_attentionEntries.IsEmpty;
+            removedCount = _errorBanners.Count - remainingErrors.Count + _infoBanners.Count - remainingInfos.Count
+                + (attentionChanged ? 1 : 0);
+            _errorBanners = remainingErrors;
+            _infoBanners = remainingInfos;
+            if (attentionChanged)
+            {
+                _attentionDismissed = true;
+                _dismissedAttentionFileNames = [.. _attentionEntries.Select(entry => entry.FileName)];
+            }
+        }
+
+        if (errorsChanged) { RaiseErrorStateChanged(); }
+
+        if (infosChanged) { RaiseInfoStateChanged(); }
+        
+        if (attentionChanged) { RaiseAttentionStateChanged(); }
+        
+        return removedCount;
+    }
+
     public IDisposable RegisterRecoveryCallback(Func<Task> recover)
     {
         ArgumentNullException.ThrowIfNull(recover);
@@ -240,7 +288,7 @@ internal sealed class BannerService
                 hasAction ? nameof(content) : nameof(action));
         }
 
-        var entry = new ErrorBannerEntry(BannerId.Create(), content, action, DateTime.UtcNow);
+        var entry = new ErrorBannerEntry(BannerId.Create(), content, action, _timeProvider.GetUtcNow().UtcDateTime);
 
         lock (_stateLock)
         {
@@ -248,6 +296,7 @@ internal sealed class BannerService
         }
 
         RaiseErrorStateChanged();
+
         return entry.Id;
     }
 
@@ -260,7 +309,7 @@ internal sealed class BannerService
             throw new ArgumentException("Info banners cannot contain action content.", nameof(content));
         }
 
-        var entry = new BannerInfoEntry(BannerId.Create(), content, severity, DateTime.UtcNow);
+        var entry = new BannerInfoEntry(BannerId.Create(), content, severity, _timeProvider.GetUtcNow().UtcDateTime);
 
         lock (_stateLock)
         {
@@ -330,16 +379,20 @@ internal sealed class BannerService
 
         lock (_stateLock)
         {
-            ImmutableList<DatabaseEntry> newAttention = _databaseService.Entries
-                .Where(entry => entry.Status is DatabaseStatus.UpgradeRequired
-                    or DatabaseStatus.UpgradeFailed
-                    or DatabaseStatus.UnrecognizedSchema
-                    or DatabaseStatus.ObsoleteSchema
-                    or DatabaseStatus.ClassificationFailed)
-                .ToImmutableList();
+            ImmutableList<DatabaseEntry> newAttention =
+            [
+                .. _databaseService.Entries
+                    .Where(entry => entry.Status is DatabaseStatus.UpgradeRequired
+                        or DatabaseStatus.UpgradeFailed
+                        or DatabaseStatus.UnrecognizedSchema
+                        or DatabaseStatus.ObsoleteSchema
+                        or DatabaseStatus.ClassificationFailed)
+            ];
 
+            bool hadAttention = !_attentionEntries.IsEmpty;
             stateChanged = !_attentionEntries.SequenceEqual(newAttention);
             _attentionEntries = newAttention;
+            bool attentionResumed = false;
 
             if (_attentionDismissed)
             {
@@ -351,10 +404,22 @@ internal sealed class BannerService
                     }
 
                     _attentionDismissed = false;
+                    attentionResumed = true;
                     _dismissedAttentionFileNames = ImmutableHashSet<string>.Empty;
                     stateChanged = true;
                     break;
                 }
+            }
+
+            if (stateChanged) { _attentionVersion++; }
+
+            if (newAttention.IsEmpty)
+            {
+                _attentionCreatedUtc = default;
+            }
+            else if (!hadAttention || attentionResumed)
+            {
+                _attentionCreatedUtc = _timeProvider.GetUtcNow().UtcDateTime;
             }
         }
 
@@ -453,10 +518,7 @@ internal sealed class BannerService
         RaiseProgressStateChanged();
     }
 
-    // Per-facet raisers — single-line delegations to RaiseSafely. String literals
-    // (not nameof) on the eventName argument so each facet's warning log is
-    // distinguishable: nameof(IXyz.StateChanged) collapses to "StateChanged"
-    // for all five, defeating the diagnostic intent of the split.
+    // Literal facet-qualified names distinguish logs; nameof on any facet event yields only "StateChanged".
     private void RaiseAttentionStateChanged() =>
         RaiseSafely(AttentionStateChanged, "IAttentionBannerService.StateChanged");
 

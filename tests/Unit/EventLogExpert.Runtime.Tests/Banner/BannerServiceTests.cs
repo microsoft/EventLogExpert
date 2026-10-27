@@ -37,6 +37,35 @@ public sealed class BannerServiceTests
     }
 
     [Fact]
+    public void AttentionEpisode_RecordsItsStartTimeAndKeepsItUntilTheEpisodeEnds()
+    {
+        DateTimeOffset episodeStart = new(2025, 4, 5, 6, 7, 8, TimeSpan.Zero);
+        FixedTimeProvider timeProvider = new(episodeStart);
+        IDatabaseService databases = Substitute.For<IDatabaseService>();
+        DatabaseEntry first = new("first.db", "first.db", true, DatabaseStatus.UpgradeRequired);
+        databases.Entries.Returns([first]);
+        BannerService service = new(databases, Substitute.For<ITraceLogger>(), timeProvider);
+
+        Assert.Equal(episodeStart.UtcDateTime, service.AttentionCreatedUtc);
+
+        databases.Entries.Returns([first, new DatabaseEntry("second.db", "second.db", true, DatabaseStatus.UpgradeRequired)]);
+        databases.EntriesChanged += Raise.EventWith(databases, EventArgs.Empty);
+
+        Assert.Equal(episodeStart.UtcDateTime, service.AttentionCreatedUtc);
+        service.DismissAttention();
+        databases.Entries.Returns([]);
+        databases.EntriesChanged += Raise.EventWith(databases, EventArgs.Empty);
+        Assert.Equal(default, service.AttentionCreatedUtc);
+
+        DateTimeOffset nextEpisodeStart = episodeStart.AddMinutes(5);
+        timeProvider.SetUtcNow(nextEpisodeStart);
+        databases.Entries.Returns([first]);
+        databases.EntriesChanged += Raise.EventWith(databases, EventArgs.Empty);
+
+        Assert.Equal(nextEpisodeStart.UtcDateTime, service.AttentionCreatedUtc);
+    }
+
+    [Fact]
     public void BannerProgressEntry_Cancel_InvokesUnderlyingEventArgsCancel()
     {
         // Arrange — cancel button on the banner card must propagate to the in-flight batch's CTS via
@@ -341,6 +370,146 @@ public sealed class BannerServiceTests
         // Assert
         Assert.Single(sut.InfoBanners);
         Assert.Equal(0, stateChangedCount);
+    }
+
+    [Fact]
+    public void DismissSnapshot_ClearsOnlyCapturedNoticesAndReturnsTheActualCount()
+    {
+        IDatabaseService databases = Substitute.For<IDatabaseService>();
+        BannerService service = new(databases, Substitute.For<ITraceLogger>());
+        BannerId alreadyGone = service.ReportError(new ExportFailed("First"));
+        service.ReportError(new ExportFailed("Second"));
+        service.ReportInfoBanner(new ExportFailed("Information"), BannerSeverity.Info);
+        service.ReportInfoBanner(new ExportFailed("Warning"), BannerSeverity.Warning);
+        NotificationDismissSnapshot snapshot = service.CaptureDismissSnapshot(true);
+        Assert.Equal(4, snapshot.Count);
+        service.DismissError(alreadyGone);
+        BannerId newError = service.ReportError(new ExportFailed("New error"));
+        service.ReportInfoBanner(new ExportFailed("New information"), BannerSeverity.Info);
+        BannerId newInfo = service.InfoBanners[^1].Id;
+
+        Assert.Equal(3, service.DismissSnapshot(snapshot));
+        Assert.Equal(newError, Assert.Single(service.ErrorBanners).Id);
+        Assert.Equal(newInfo, Assert.Single(service.InfoBanners).Id);
+        Assert.Equal(0, service.DismissSnapshot(snapshot));
+    }
+
+    [Fact]
+    public void DismissSnapshot_ExcludesOmittedAttentionAndKeepsCriticalAndProgressUntouched()
+    {
+        IDatabaseService databases = Substitute.For<IDatabaseService>();
+        databases.Entries.Returns([new DatabaseEntry("attention.db", "attention.db", true, DatabaseStatus.UpgradeRequired)]);
+        BannerService service = new(databases, Substitute.For<ITraceLogger>());
+        using CancellationTokenSource cancellation = new();
+        databases.UpgradeBatchStarted += Raise.EventWith(databases,
+            new UpgradeBatchStartedEventArgs(UpgradeBatchId.Create(), UpgradeProgressScope.Background, 1, cancellation));
+        Exception critical = new InvalidOperationException("Critical");
+        service.ReportCritical(critical);
+        service.ReportError(new ExportFailed("Dismissible"));
+        BannerProgressEntry? progress = service.BackgroundProgress;
+        NotificationDismissSnapshot snapshot = service.CaptureDismissSnapshot(false);
+
+        Assert.Equal(1, service.DismissSnapshot(snapshot));
+        Assert.False(service.AttentionDismissed);
+        Assert.Same(critical, service.CurrentCritical);
+        Assert.Same(progress, service.BackgroundProgress);
+        Assert.False(cancellation.IsCancellationRequested);
+    }
+
+    [Fact]
+    public void DismissSnapshot_IsolatesFaultingSubscribersAcrossAndWithinFacets()
+    {
+        IDatabaseService databases = Substitute.For<IDatabaseService>();
+        databases.Entries.Returns([new DatabaseEntry("attention.db", "attention.db", true, DatabaseStatus.UpgradeRequired)]);
+        BannerService service = new(databases, Substitute.For<ITraceLogger>());
+        service.ReportError(new ExportFailed("Failure"));
+        service.ReportInfoBanner(new ExportFailed("Information"), BannerSeverity.Info);
+        NotificationDismissSnapshot snapshot = service.CaptureDismissSnapshot(true);
+        int deliveredCount = 0;
+        ((IErrorBannerService)service).StateChanged += () => throw new InvalidOperationException("Subscriber fault");
+        ((IErrorBannerService)service).StateChanged += () => deliveredCount++;
+        ((IInfoBannerService)service).StateChanged += () => throw new InvalidOperationException("Subscriber fault");
+        ((IInfoBannerService)service).StateChanged += () => deliveredCount++;
+        ((IAttentionBannerService)service).StateChanged += () => deliveredCount++;
+
+        Assert.Equal(3, service.DismissSnapshot(snapshot));
+        Assert.Equal(3, deliveredCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DismissSnapshot_NeverSuppressesLaterAttentionMaterialOrEpisodes(bool restartEpisode)
+    {
+        IDatabaseService databases = Substitute.For<IDatabaseService>();
+        DatabaseEntry original = new("attention.db", "attention.db", true, DatabaseStatus.UpgradeRequired);
+        databases.Entries.Returns([original]);
+        FixedTimeProvider timeProvider = new(new DateTimeOffset(2025, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        BannerService service = new(databases, Substitute.For<ITraceLogger>(), timeProvider);
+        NotificationDismissSnapshot snapshot = service.CaptureDismissSnapshot(true);
+        if (restartEpisode)
+        {
+            databases.Entries.Returns([]);
+            databases.EntriesChanged += Raise.EventWith(databases, EventArgs.Empty);
+            databases.Entries.Returns([original]);
+        }
+        else
+        {
+            databases.Entries.Returns([original with { Status = DatabaseStatus.UpgradeFailed }]);
+        }
+        databases.EntriesChanged += Raise.EventWith(databases, EventArgs.Empty);
+
+        Assert.Equal(0, service.DismissSnapshot(snapshot));
+        Assert.False(service.AttentionDismissed);
+        Assert.Single(service.AttentionEntries);
+    }
+
+    [Fact]
+    public void DismissSnapshot_PublishesEachChangedFacetOnceAfterTheWholeBatchAndOutsideTheLock()
+    {
+        IDatabaseService databases = Substitute.For<IDatabaseService>();
+        databases.Entries.Returns([new DatabaseEntry("attention.db", "attention.db", true, DatabaseStatus.UpgradeRequired)]);
+        BannerService service = new(databases, Substitute.For<ITraceLogger>());
+        service.ReportError(new ExportFailed("First"));
+        service.ReportError(new ExportFailed("Second"));
+        service.ReportInfoBanner(new ExportFailed("First info"), BannerSeverity.Info);
+        service.ReportInfoBanner(new ExportFailed("Second info"), BannerSeverity.Warning);
+        NotificationDismissSnapshot snapshot = service.CaptureDismissSnapshot(true);
+        List<string> observedFacets = [];
+        bool subscribersObservedCommittedState = true;
+        bool subscribersRanOutsideLock = true;
+        void Observe(string facet)
+        {
+            observedFacets.Add(facet);
+            Task<NotificationDismissSnapshot> read = Task.Run(() => service.CaptureDismissSnapshot(true));
+            bool completed = read.Wait(TimeSpan.FromSeconds(2));
+            subscribersRanOutsideLock &= completed;
+            subscribersObservedCommittedState &= completed && read.Result.Count == 0;
+        }
+        ((IErrorBannerService)service).StateChanged += () => Observe("errors");
+        ((IInfoBannerService)service).StateChanged += () => Observe("infos");
+        ((IAttentionBannerService)service).StateChanged += () => Observe("attention");
+
+        Assert.Equal(5, service.DismissSnapshot(snapshot));
+        Assert.Equal(["errors", "infos", "attention"], observedFacets);
+        Assert.True(subscribersObservedCommittedState);
+        Assert.True(subscribersRanOutsideLock);
+        service.DismissSnapshot(snapshot);
+        Assert.Equal(3, observedFacets.Count);
+    }
+
+    [Fact]
+    public void DismissSnapshot_SuppressesTheCapturedAttentionForTheSession()
+    {
+        IDatabaseService databases = Substitute.For<IDatabaseService>();
+        DatabaseEntry entry = new("attention.db", "attention.db", true, DatabaseStatus.UpgradeRequired);
+        databases.Entries.Returns([entry]);
+        BannerService service = new(databases, Substitute.For<ITraceLogger>());
+
+        Assert.Equal(1, service.DismissSnapshot(service.CaptureDismissSnapshot(true)));
+        databases.EntriesChanged += Raise.EventWith(databases, EventArgs.Empty);
+        Assert.True(service.AttentionDismissed);
+        Assert.Equal(0, service.CaptureDismissSnapshot(true).Count);
     }
 
     [Fact]
@@ -781,6 +950,21 @@ public sealed class BannerServiceTests
     }
 
     [Fact]
+    public void ReportNotices_UsesTheInjectedClockForEachArrival()
+    {
+        DateTimeOffset initialTime = new(2025, 4, 5, 6, 7, 8, TimeSpan.Zero);
+        FixedTimeProvider clock = new(initialTime);
+        BannerService service = new(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>(), clock);
+
+        service.ReportError(new EmptyLogs(["failed.evtx"]));
+        clock.SetUtcNow(initialTime.AddMinutes(1));
+        service.ReportInfoBanner(new EmptyLogs(["empty.evtx"]), BannerSeverity.Info);
+
+        Assert.Equal(initialTime.UtcDateTime, Assert.Single(service.ErrorBanners).CreatedUtc);
+        Assert.Equal(initialTime.AddMinutes(1).UtcDateTime, Assert.Single(service.InfoBanners).CreatedUtc);
+    }
+
+    [Fact]
     public async Task TryRecoverAsync_InvokesRegisteredCallback_ThenClearsCritical()
     {
         // Arrange
@@ -1122,6 +1306,15 @@ public sealed class BannerServiceTests
         Assert.NotNull(sut.ManageDatabasesProgress);
         Assert.Equal(batchId, sut.ManageDatabasesProgress.BatchId);
         Assert.Equal(UpgradeProgressScope.ManageDatabasesTriggered, sut.ManageDatabasesProgress.Scope);
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        private DateTimeOffset _utcNow = utcNow;
+
+        public override DateTimeOffset GetUtcNow() => _utcNow;
+
+        public void SetUtcNow(DateTimeOffset utcNow) => _utcNow = utcNow;
     }
 
     private sealed record ActionRequiredContent : BannerMessage

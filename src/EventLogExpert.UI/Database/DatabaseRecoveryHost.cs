@@ -167,7 +167,7 @@ public sealed class DatabaseRecoveryHost : IDisposable
             new Preformatted(
                 _localizer["Banner_Recovery_Needed_Title"],
                 PluralText.Format(_localizer, "Banner_Recovery_Needed", ("count", count)),
-                _localizer["Banner_Recovery_Resolve"]),
+                _localizer["Banner_Recovery_Resolve"]) { IsRecoveryReminder = true },
             OpenRecoveryDialogAsync);
     }
 

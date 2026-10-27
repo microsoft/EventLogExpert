@@ -24,6 +24,7 @@ using NSubstitute;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
+using TestContext = Xunit.TestContext;
 
 namespace EventLogExpert.UI.Tests.StatusBar;
 
@@ -45,6 +46,7 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
 
     public StatusBarTests()
     {
+        Services.AddBannerHostDependencies();
         JSInterop.Mode = JSRuntimeMode.Loose;
 
         CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
@@ -193,6 +195,19 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void CompactCountsFromAViewStillBeingBuilt_ShowOnlyTheActiveTabTotal()
+    {
+        SetActiveLog(total: 1500, shown: 200, filter: Filtered, selected: 0);
+        _viewSource.Current.Returns(new OrderedViewPresentation(
+            LogTableState.EmptyView, _activeLogId, default, PresentationState.Updating, Revision: 2));
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Contains("[[StatusBar_Counts_ShortTotal(1,500)]]", cut.Find("[data-variant='counts-shown-total']").TextContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("200", cut.Find("[data-variant='counts-shown-total']").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ContinuouslyUpdating_RendersNoNewEventsButton()
     {
         SetChannelStatus(newEventCount: 5, continuous: true);
@@ -201,6 +216,29 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
 
         Assert.Empty(cut.FindAll("button.status-bar-newevents"));
         Assert.Contains("[[StatusBar_Activity_ContinuouslyUpdating]]", cut.Find(".status-bar-live").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CountsButton_RendersPreselectedAccessibleNameVariantsAndHiddenDescriptionsOutsideTheButton()
+    {
+        SetActiveLog(total: 1500, shown: 300, filter: Filtered, selected: 2);
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        var countsButton = cut.Find("button[data-statusbar-counts]");
+        var variants = countsButton.QuerySelectorAll("[data-variant]");
+
+        Assert.Equal(["counts-full", "counts-shown-total", "counts-total"],
+            variants.Select(variant => variant.GetAttribute("data-variant")));
+        var selectedVariant = Assert.Single(variants, variant => variant.HasAttribute("data-active"));
+        Assert.Equal("counts-full", selectedVariant.GetAttribute("data-variant"));
+        Assert.Contains("[[StatusBar_Counts_ShownOfTotalSelected(300|1,500|2)]]", selectedVariant.TextContent, StringComparison.Ordinal);
+        Assert.False(countsButton.HasAttribute("aria-label"));
+        Assert.Equal("statusbar-stats-hint", countsButton.GetAttribute("aria-describedby"));
+        Assert.NotSame(countsButton, cut.Find("#statusbar-hidden-label").ParentElement);
+        Assert.True(cut.Find("#statusbar-hidden-label").HasAttribute("hidden"));
+        Assert.True(cut.Find("#statusbar-hidden-counts").HasAttribute("hidden"));
+        Assert.Equal("true", cut.Find(".status-bar-font-sentinel-wrapper").GetAttribute("aria-hidden"));
+        Assert.Equal("0123456789 MB", cut.Find(".status-bar-font-sentinel").TextContent);
     }
 
     [Fact]
@@ -247,6 +285,27 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public async Task Disposal_StatusChangesDoNotReadTheSourceOrRender()
+    {
+        var component = Render<UI.StatusBar.StatusBar>();
+        await component.Instance.DisposeAsync();
+        int renderCount = component.RenderCount;
+        _statusBarSource.ClearReceivedCalls();
+        _status = new StatusBarPresentation
+        {
+            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
+                .Add(StatusActivityId.Create(), new LoadingProgress(100, 3))
+        };
+
+        _statusBarSource.Changed += Raise.Event<Action>();
+        _status = _status with { LoadingActivities = _status.LoadingActivities.Clear() };
+        _statusBarSource.Changed += Raise.Event<Action>();
+
+        _ = _statusBarSource.DidNotReceive().Current;
+        Assert.Equal(renderCount, component.RenderCount);
+    }
+
+    [Fact]
     public async Task Disposal_UnsubscribesFromTheSource()
     {
         SetActiveLog(total: 500, shown: 500, filter: Unfiltered, selected: 0);
@@ -256,9 +315,195 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         await cut.Instance.DisposeAsync();
 
         _viewSource.Received(1).Updated -= Arg.Any<Action<OrderedViewPresentation>>();
-        _statusBarSource.Received(1).Changed -= Arg.Any<Action>();
+        _statusBarSource.Received(2).Changed -= Arg.Any<Action>();
         _filterApplied.Received(1).Changed -= Arg.Any<Action>();
         _lensSource.Received(1).Changed -= Arg.Any<Action>();
+    }
+
+    [Fact]
+    public void EmptyNotificationSlot_CollapsesWhileItsPanelAndLiveRegionsRemainRendered()
+    {
+        var cut = Render<UI.StatusBar.StatusBar>();
+        var slot = cut.Find(".status-bar-notifications");
+
+        Assert.Equal("false", slot.GetAttribute("data-trigger-shown"));
+        Assert.NotNull(slot.QuerySelector(".notification-trigger.notification-trigger-hidden"));
+        Assert.NotNull(slot.QuerySelector("[data-notification-panel]"));
+        Assert.NotNull(slot.QuerySelector("[data-notification-toast]"));
+    }
+
+    [Fact]
+    public void EveryHideableItemsVisuallyHiddenCompanion_IsTaggedSoItHidesWithItsItem()
+    {
+        SetChannelStatus(newEventCount: 5, bufferFull: true, continuous: false);
+        _status = _status with
+        {
+            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
+                .Add(new StatusActivityId(Guid.NewGuid()), new LoadingProgress(100, 1234))
+        };
+
+        var cut = Render<UI.StatusBar.StatusBar>();
+        var hideableItems = cut.FindAll("[data-statusbar-item]")
+            .Select(item => item.GetAttribute("data-statusbar-item"))
+            .ToHashSet(StringComparer.Ordinal);
+        var untaggedCompanions = cut.FindAll(".status-bar-content .visually-hidden")
+            .Where(span => !span.HasAttribute("data-statusbar-companion")
+                && span.Id != "statusbar-stats-hint"
+                && !span.ClassList.Contains("status-bar-announce"));
+
+        Assert.Empty(untaggedCompanions);
+        Assert.Contains("new-events", hideableItems);
+        Assert.Equal("[[StatusBar_Loading_Failed(1,234)]]", cut.Find("[data-statusbar-companion='failed']").TextContent);
+        Assert.Equal("[[StatusBar_Activity_BufferFull]]", cut.Find("[data-statusbar-companion='buffer']").TextContent);
+        Assert.True(cut.Find("[data-statusbar-companion='failed']").HasAttribute("hidden"));
+        Assert.Equal("failed-compact", cut.Find("[data-statusbar-companion='failed']").GetAttribute("data-statusbar-companion-variant"));
+        Assert.True(cut.Find("[data-statusbar-companion='buffer']").HasAttribute("hidden"));
+        Assert.Equal("buffer-compact", cut.Find("[data-statusbar-companion='buffer']").GetAttribute("data-statusbar-companion-variant"));
+        Assert.Equal("new-events", cut.Find("#statusbar-newevents-hint").GetAttribute("data-statusbar-companion"));
+        Assert.Equal("coverage", cut.Find("#statusbar-coverage-hint").GetAttribute("data-statusbar-companion"));
+    }
+
+    [Theory]
+    [InlineData(2, "[[StatusBar_Loading_Failed(5)]]")]
+    [InlineData(0, "[[StatusBar_Loading_Failed(3)]]\u200B")]
+    public async Task FailedCountAnnouncement_ConcurrentLoadsFinishSeparately_AnnouncesTheEpisodeTotal(int secondFailedCount, string expectedAnnouncement)
+    {
+        StatusActivityId firstActivity = StatusActivityId.Create();
+        StatusActivityId secondActivity = StatusActivityId.Create();
+        _status = new StatusBarPresentation
+        {
+            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
+                .Add(firstActivity, new LoadingProgress(0, 0))
+                .Add(secondActivity, new LoadingProgress(0, 0))
+        };
+        var component = Render<UI.StatusBar.StatusBar>();
+        _status = _status with { LoadingActivities = _status.LoadingActivities.SetItem(firstActivity, new LoadingProgress(100, 3)) };
+        await component.InvokeAsync(() => _statusBarSource.Changed += Raise.Event<Action>());
+        Assert.Equal("[[StatusBar_Loading_Failed(3)]]", component.Find(".status-bar-failed-announce").TextContent.Trim());
+
+        _status = _status with { LoadingActivities = _status.LoadingActivities.SetItem(secondActivity, new LoadingProgress(200, secondFailedCount)) };
+        await component.InvokeAsync(() => _statusBarSource.Changed += Raise.Event<Action>());
+        _status = _status with { LoadingActivities = _status.LoadingActivities.Remove(firstActivity), EpisodeFailedTotal = 3 };
+        await component.InvokeAsync(() => _statusBarSource.Changed += Raise.Event<Action>());
+        Assert.Equal("[[StatusBar_Loading_Failed(3)]]", component.Find(".status-bar-failed-announce").TextContent.Trim());
+        Assert.Equal(secondFailedCount > 0 ? 1 : 0, component.FindAll("[data-statusbar-item='failed']").Count);
+
+        _status = CompletedEpisode(_status, completedEpisodeCount: 1, failedTotal: 3 + secondFailedCount);
+        await component.InvokeAsync(() => _statusBarSource.Changed += Raise.Event<Action>());
+
+        Assert.Equal(expectedAnnouncement, component.Find(".status-bar-failed-announce").TextContent.Trim());
+        Assert.Empty(component.FindAll("[data-statusbar-item='failed']"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FailedCountAnnouncement_EpisodeBoundaryBeforeTheNextRender_StartsANewTotal(bool reuseActivityId)
+    {
+        StatusActivityId firstActivity = StatusActivityId.Create();
+        StatusActivityId secondActivity = reuseActivityId ? firstActivity : StatusActivityId.Create();
+        _status = new StatusBarPresentation
+        {
+            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
+                .Add(firstActivity, new LoadingProgress(0, 0))
+        };
+        var component = Render<UI.StatusBar.StatusBar>();
+        _status = _status with { LoadingActivities = _status.LoadingActivities.SetItem(firstActivity, new LoadingProgress(100, 3)) };
+        await component.InvokeAsync(() => _statusBarSource.Changed += Raise.Event<Action>());
+        Assert.Equal("[[StatusBar_Loading_Failed(3)]]", component.Find(".status-bar-failed-announce").TextContent);
+
+        var completedEpisode = CompletedEpisode(_status, completedEpisodeCount: 1, failedTotal: 3);
+        var nextEpisode = completedEpisode with
+        {
+            LoadingActivities = completedEpisode.LoadingActivities.Add(secondActivity, new LoadingProgress(200, 2))
+        };
+        await PublishStatusUpdatesBeforeRenderAsync(component, completedEpisode, nextEpisode);
+        string nextEpisodeAnnouncement = component.Find(".status-bar-failed-announce").TextContent;
+        Assert.Equal("[[StatusBar_Loading_Failed(2)]]", component.Find("[data-statusbar-item='failed']").GetAttribute("data-tooltip"));
+
+        _status = CompletedEpisode(nextEpisode, completedEpisodeCount: 2, failedTotal: 2);
+        await component.InvokeAsync(() => _statusBarSource.Changed += Raise.Event<Action>());
+
+        Assert.Equal("[[StatusBar_Loading_Failed(2)]]\u200B", component.Find(".status-bar-failed-announce").TextContent);
+        Assert.Equal("[[StatusBar_Loading_Failed(2)]]", nextEpisodeAnnouncement);
+        Assert.Empty(component.FindAll("[data-statusbar-item='failed']"));
+    }
+
+    [Fact]
+    public void FailedCountAnnouncement_EpisodeCompletingBetweenSeedAndSubscribe_IsAnnounced()
+    {
+        _status = new StatusBarPresentation
+        {
+            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
+                .Add(StatusActivityId.Create(), new LoadingProgress(100, 3))
+        };
+        var completedBeforeSubscribe = CompletedEpisode(_status, completedEpisodeCount: 1, failedTotal: 4);
+        _statusBarSource.When(source => source.Changed += Arg.Any<Action>()).Do(_ => _status = completedBeforeSubscribe);
+
+        var component = Render<UI.StatusBar.StatusBar>();
+
+        Assert.Equal("[[StatusBar_Loading_Failed(4)]]", component.Find(".status-bar-failed-announce").TextContent);
+    }
+
+    [Fact]
+    public async Task FailedCountAnnouncement_RemountAfterCompletedEpisodes_DoesNotReplayThem()
+    {
+        _status = CompletedEpisode(new StatusBarPresentation(), completedEpisodeCount: 3, failedTotal: 5);
+
+        var component = Render<UI.StatusBar.StatusBar>();
+        await component.InvokeAsync(() => _statusBarSource.Changed += Raise.Event<Action>());
+
+        Assert.Equal(string.Empty, component.Find(".status-bar-failed-announce").TextContent.Trim());
+    }
+
+    [Fact]
+    public async Task FailedCountAnnouncement_SeveralEpisodesCompleteBetweenObservations_AnnouncesTheLatestTotal()
+    {
+        StatusActivityId activityId = StatusActivityId.Create();
+        _status = new StatusBarPresentation
+        {
+            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
+                .Add(activityId, new LoadingProgress(0, 0))
+        };
+        var component = Render<UI.StatusBar.StatusBar>();
+
+        _status = CompletedEpisode(_status, completedEpisodeCount: 3, failedTotal: 5);
+        await component.InvokeAsync(() => _statusBarSource.Changed += Raise.Event<Action>());
+
+        Assert.Equal("[[StatusBar_Loading_Failed(5)]]", component.Find(".status-bar-failed-announce").TextContent);
+        Assert.Empty(component.FindAll("[data-statusbar-item='failed']"));
+    }
+
+    [Fact]
+    public async Task FailedCountAnnouncement_SurvivesUnrelatedStatusChangesAndLoadingCompletion()
+    {
+        StatusActivityId activityId = new(Guid.NewGuid());
+        _status = new StatusBarPresentation
+        {
+            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty
+                .Add(activityId, new LoadingProgress(0, 0))
+        };
+        var component = Render<UI.StatusBar.StatusBar>();
+        _status = _status with { LoadingActivities = _status.LoadingActivities.SetItem(activityId, new LoadingProgress(100, 3)) };
+        await component.InvokeAsync(() => _statusBarSource.Changed += Raise.Event<Action>());
+        string firstAnnouncement = component.FindAll("[role='status']").Single(region => region.TextContent.Contains("StatusBar_Loading_Failed(3)")).TextContent;
+        Assert.Equal("[[StatusBar_Loading_Failed(3)]]", firstAnnouncement);
+        Assert.Equal("polite", component.Find(".status-bar-failed-announce").GetAttribute("aria-live"));
+        Assert.Equal("true", component.Find(".status-bar-failed-announce").GetAttribute("aria-atomic"));
+
+        _status = _status with { MemoryUsedMebibytes = 200 };
+        await component.InvokeAsync(() => _statusBarSource.Changed += Raise.Event<Action>());
+        Assert.Contains(firstAnnouncement, component.FindAll("[role='status']").Select(region => region.TextContent));
+        Assert.Equal("[[StatusBar_Activity_Loading]]", component.Find(".status-bar-announce").TextContent);
+        _status = _status with { LoadingActivities = _status.LoadingActivities.SetItem(activityId, new LoadingProgress(200, 5)) };
+        await component.InvokeAsync(() => _statusBarSource.Changed += Raise.Event<Action>());
+        Assert.Contains(firstAnnouncement, component.FindAll("[role='status']").Select(region => region.TextContent));
+        _status = CompletedEpisode(_status, completedEpisodeCount: 1, failedTotal: 5);
+        await component.InvokeAsync(() => _statusBarSource.Changed += Raise.Event<Action>());
+        Assert.Contains("[[StatusBar_Loading_Failed(5)]]", component.FindAll("[role='status']").Select(region => region.TextContent));
+        _status = _status with { MemoryUsedMebibytes = 300 };
+        await component.InvokeAsync(() => _statusBarSource.Changed += Raise.Event<Action>());
+        Assert.Contains("[[StatusBar_Loading_Failed(5)]]", component.FindAll("[role='status']").Select(region => region.TextContent));
     }
 
     [Fact]
@@ -583,6 +828,75 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void InitialMarkup_PreservesWrapGroupsAndAnAriaHiddenSizingSentinel()
+    {
+        var component = Render<UI.StatusBar.StatusBar>();
+
+        var content = component.Find(".status-bar-content");
+        Assert.False(content.HasAttribute("data-layout"));
+        Assert.NotNull(content.QuerySelector(":scope > .status-bar-left"));
+        Assert.NotNull(content.QuerySelector(":scope > .status-bar-right"));
+        var sentinel = Assert.Single(content.QuerySelectorAll(":scope > .status-bar-sizing-sentinel"));
+        Assert.Equal("true", sentinel.GetAttribute("aria-hidden"));
+        Assert.Empty(sentinel.TextContent);
+        Assert.NotNull(component.Find(".status-bar-notifications"));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task LayoutAttachInterop_ToleratesDisposalFailuresOnlyAfterDisposal(bool objectDisposed, bool dispose)
+    {
+        var component = Render<UI.StatusBar.StatusBar>();
+        var module = JSInterop.SetupModule("./_content/EventLogExpert.UI/StatusBar/StatusBar.razor.js");
+        module.Mode = JSRuntimeMode.Loose;
+        var pendingAttachment = module.SetupVoid("attach", _ => true);
+        MethodInfo attach = typeof(UI.StatusBar.StatusBar).GetMethod("AttachLayoutAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Task action = (Task)attach.Invoke(component.Instance, null)!;
+        Assert.Single(pendingAttachment.Invocations);
+        if (dispose) { await component.Instance.DisposeAsync(); }
+        Exception failure = objectDisposed ? new ObjectDisposedException("statusbar-module") : new JSException("Interop failed.");
+
+        pendingAttachment.SetException(failure);
+
+        if (dispose) { await action; }
+        else { Assert.Same(failure, await Assert.ThrowsAnyAsync<Exception>(() => action)); }
+    }
+
+    [Fact]
+    public async Task LayoutModule_AttachesOnceAcrossStatusUpdatesAndDetachesTheSameContentOnDisposal()
+    {
+        var layoutModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/StatusBar/StatusBar.razor.js");
+        var component = Render<UI.StatusBar.StatusBar>();
+        var attachment = layoutModule.VerifyInvoke("attach");
+        ElementReference content = Assert.IsType<ElementReference>(Assert.Single(attachment.Arguments));
+
+        await component.InvokeAsync(() => _statusBarSource.Changed += Raise.Event<Action>());
+
+        layoutModule.VerifyInvoke("attach");
+        await component.Instance.DisposeAsync();
+
+        var detachment = layoutModule.VerifyInvoke("detach");
+        Assert.Equal(content, Assert.IsType<ElementReference>(Assert.Single(detachment.Arguments)));
+    }
+
+    [Fact]
+    public async Task LayoutModule_DisconnectionDuringDetachDoesNotPreventDisposal()
+    {
+        var layoutModule = JSInterop.SetupModule("./_content/EventLogExpert.UI/StatusBar/StatusBar.razor.js");
+        layoutModule.SetupVoid("detach", _ => true)
+            .SetException(new JSDisconnectedException("Circuit disconnected."));
+        var component = Render<UI.StatusBar.StatusBar>();
+
+        await component.Instance.DisposeAsync();
+
+        layoutModule.VerifyInvoke("detach");
+        _statusBarSource.Received(2).Changed -= Arg.Any<Action>();
+    }
+
+    [Fact]
     public void LensOnlyNarrowing_ShowsShown_AndLensTooltip()
     {
         _lensSource.Lenses.Returns(LensSummaries(2));
@@ -750,16 +1064,14 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         var cut = Render<UI.StatusBar.StatusBar>();
 
         var right = cut.Find(".status-bar-right");
-        var chromeChildren = right.Children
-            .Where(child => !child.ClassList.Contains("visually-hidden"))
-            .ToList();
+        var items = right.QuerySelectorAll("[data-statusbar-item]").ToList();
         var memoryChip = right.QuerySelector(".status-bar-memory");
         var newEventsButton = right.QuerySelector("button.status-bar-newevents");
 
         Assert.NotNull(memoryChip);
         Assert.NotNull(newEventsButton);
-        Assert.Equal(chromeChildren.Count - 1, chromeChildren.IndexOf(newEventsButton));
-        Assert.True(chromeChildren.IndexOf(memoryChip) < chromeChildren.IndexOf(newEventsButton));
+        Assert.Equal(items.Count - 1, items.IndexOf(newEventsButton));
+        Assert.True(items.IndexOf(memoryChip) < items.IndexOf(newEventsButton));
     }
 
     [Fact]
@@ -1160,6 +1472,15 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
         Assert.Empty(cut.FindAll(".status-bar-filter"));
     }
 
+    private static StatusBarPresentation CompletedEpisode(StatusBarPresentation status, int completedEpisodeCount, int failedTotal) =>
+        status with
+        {
+            LoadingActivities = ImmutableDictionary<StatusActivityId, LoadingProgress>.Empty,
+            EpisodeFailedTotal = 0,
+            FailedEpisodeCompletionCount = completedEpisodeCount,
+            LastCompletedEpisodeFailedTotal = failedTotal
+        };
+
     private static ImmutableList<FilterLensSummary> LensSummaries(int count) =>
         [.. Enumerable.Range(0, count).Select(_ => new FilterLensSummary(FilterLensId.Create(), new FilterLensLabel.ParentActivity(Guid.NewGuid())))];
 
@@ -1232,6 +1553,41 @@ public sealed class StatusBarTests : CultureSensitiveBunitContext
 
         cut.InvokeAsync(() => _viewSource.Updated += Raise.Event<Action<OrderedViewPresentation>>(presentation))
             .GetAwaiter().GetResult();
+    }
+
+    private async Task PublishStatusUpdatesBeforeRenderAsync(
+        IRenderedComponent<UI.StatusBar.StatusBar> component,
+        params StatusBarPresentation[] snapshots)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var timeout = TimeSpan.FromSeconds(10);
+        TaskCompletionSource rendererBlocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using ManualResetEventSlim releaseRenderer = new(false);
+        Task blockedRender = Task.Run(() => component.InvokeAsync(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            rendererBlocked.SetResult();
+            Assert.True(releaseRenderer.Wait(timeout, cancellationToken));
+        }), cancellationToken);
+
+        try
+        {
+            await rendererBlocked.Task.WaitAsync(timeout, cancellationToken);
+            int renderCount = component.RenderCount;
+            foreach (var snapshot in snapshots)
+            {
+                _status = snapshot;
+                _statusBarSource.Changed += Raise.Event<Action>();
+            }
+            Assert.Equal(renderCount, component.RenderCount);
+        }
+        finally
+        {
+            releaseRenderer.Set();
+            await blockedRender;
+        }
+
+        await component.InvokeAsync(() => { });
     }
 
     private void SetActiveLog(int total, int shown, Filter filter, int selected)

@@ -1,6 +1,5 @@
 @if (RendersContent)
 {
-    BannerCycleItem? selected = CycleState.SelectedItem;
     IReadOnlyList<BannerCycleItem> items = CycleState.Items;
     BannerView view = CycleState.CurrentView;
     int displayedIndex = CycleState.DisplayedIndex;
@@ -8,63 +7,115 @@
     Exception? currentCritical = CriticalErrorService.CurrentCritical;
     IReadOnlyList<ErrorBannerEntry> errors = ErrorBannerService.ErrorBanners;
     IReadOnlyList<BannerInfoEntry> infos = InfoBannerService.InfoBanners;
+    Dictionary<BannerId, ErrorBannerEntry> errorsById = errors.ToDictionary(entry => entry.Id);
+    Dictionary<BannerId, BannerInfoEntry> infosById = infos.ToDictionary(entry => entry.Id);
     IReadOnlyList<DatabaseEntry> attentionEntries = AttentionBannerService.AttentionEntries;
     BannerProgressEntry? backgroundProgress = ProgressBannerService.BackgroundProgress;
     ExportProgressEntry? exportProgress = ExportProgressBannerService.CurrentExport;
 
-    bool showCyclePagination = items.Count > 1 && view != BannerView.Critical;
+    bool showCyclePagination = !ShowAllEntries && !CriticalOnly && items.Count > 1 && view != BannerView.Critical;
+
+    IEnumerable<BannerCycleItem> displayedItems = CriticalOnly ? items.Where(item => item.View == BannerView.Critical) :
+        ShowAllEntries ? items.Where(item => item.View != BannerView.Critical) :
+        CycleState.SelectedItem is { } selectedItem ? [selectedItem] : [];
 
     RenderFragment cycleNav = @<text>
                                    @if (showCyclePagination)
                                    {
                                        <span class="banner-pagination">@Localizer["Banner_Pagination", displayedIndex + 1, items.Count]</span>
 
-                                       <Button aria-label='@Localizer["Banner_Nav_PreviousAria"]'
-                                           CssClass="banner-cycle-prev"
+                                       <Button CssClass="banner-cycle-prev"
                                            Disabled="@(displayedIndex == 0)"
                                            IconClass="bi bi-chevron-left"
-                                           OnClick="CycleState.MovePrev" />
+                                           OnClick="CycleState.MovePrev"
+                                           aria-label='@Localizer["Banner_Nav_PreviousAria"]' />
 
-                                       <Button aria-label='@Localizer["Banner_Nav_NextAria"]'
-                                           CssClass="banner-cycle-next"
+                                       <Button CssClass="banner-cycle-next"
                                            Disabled="@(displayedIndex == items.Count - 1)"
                                            IconClass="bi bi-chevron-right"
-                                           OnClick="CycleState.MoveNext" />
+                                           OnClick="CycleState.MoveNext"
+                                           aria-label='@Localizer["Banner_Nav_NextAria"]' />
                                    }
                                </text>;
 
-    @switch (view)
+    @foreach (BannerCycleItem selected in displayedItems)
     {
-        case BannerView.Critical when currentCritical != null:
-            <CriticalBanner Critical="currentCritical" />
+        ErrorBannerEntry? error = selected.EntryId is { } errorId ? errorsById.GetValueOrDefault(errorId) : null;
+        BannerInfoEntry? info = selected.EntryId is { } infoId ? infosById.GetValueOrDefault(infoId) : null;
 
-            break;
+        string staticSeverityText = selected.View switch
+        {
+            BannerView.Error => Localizer["Notifications_Severity_Error"],
+            BannerView.Attention => Localizer["Notifications_Severity_Warning"],
+            BannerView.UpgradeProgress or BannerView.ExportProgress => Localizer["Notifications_Severity_Progress"],
+            BannerView.Info when info?.Severity == BannerSeverity.Warning =>
+                Localizer["Notifications_Severity_Warning"],
+            BannerView.Info => Localizer["Notifications_Severity_Info"],
+            _ => string.Empty
+        };
 
-        case BannerView.Error when selected != null && selected.IndexWithinSlice < errors.Count:
-            <ErrorBanner CycleNav="cycleNav" Entry="errors[selected.IndexWithinSlice]" />
+        string staticSeverityClass = selected.View switch
+        {
+            BannerView.Error => "notification-card-error",
+            BannerView.Attention => "notification-card-warning",
+            BannerView.UpgradeProgress or BannerView.ExportProgress => "notification-card-progress",
+            BannerView.Info when info?.Severity == BannerSeverity.Warning =>
+                "notification-card-warning",
+            BannerView.Info => "notification-card-info",
+            _ => string.Empty
+        };
 
-            break;
+        <article class="banner-entry @(ShowAllEntries ? staticSeverityClass : string.Empty)" data-notification-card="@(ShowAllEntries ? string.Empty : null)" data-notification-return-trigger="@(ShowAllEntries ? NotificationReturnTriggerId : null)" @key="((object?)selected.EntryId ?? selected.View)" tabindex="@(ShowAllEntries ? "-1" : null)">
+            @if (ShowAllEntries)
+            {
+                <span class="notification-card-severity visually-hidden">@staticSeverityText</span>
+            }
+            @switch (selected.View)
+            {
+                case BannerView.Critical when currentCritical != null:
+                    <CriticalBanner Critical="currentCritical" />
 
-        case BannerView.Attention when attentionEntries.Count > 0:
-            <AttentionBanner AttentionCount="attentionEntries.Count"
-                CycleNav="cycleNav"
-                OnFallbackErrorPosted="HandleFallbackErrorPosted" />
+                    break;
 
-            break;
+                case BannerView.Error:
+                    @if (error is not null)
+                    {
+                        <ErrorBanner ActionsDisabled="@(ShowAllEntries && Location == BannerHostLocation.InsideModal)"
+                            BeforeAction="BeforeAction"
+                            CycleNav="cycleNav"
+                            Entry="error" StaticPresentation="ShowAllEntries" />
+                    }
 
-        case BannerView.UpgradeProgress when backgroundProgress != null:
-            <UpgradeProgressBanner CycleNav="cycleNav" Progress="backgroundProgress" />
+                    break;
 
-            break;
+                case BannerView.Attention when attentionEntries.Count > 0:
+                    <AttentionBanner ActionsDisabled="@(ShowAllEntries && Location == BannerHostLocation.InsideModal)"
+                        AttentionCount="attentionEntries.Count"
+                        BeforeAction="BeforeAction"
+                        CycleNav="cycleNav"
+                        OnFallbackErrorPosted="HandleFallbackErrorPosted"
+                        StaticPresentation="ShowAllEntries" />
 
-        case BannerView.ExportProgress when exportProgress != null:
-            <ExportProgressBanner CycleNav="cycleNav" Export="exportProgress" />
+                    break;
 
-            break;
+                case BannerView.UpgradeProgress when backgroundProgress != null:
+                    <UpgradeProgressBanner CycleNav="cycleNav" Progress="backgroundProgress" StaticPresentation="ShowAllEntries" />
 
-        case BannerView.Info when selected != null && selected.IndexWithinSlice < infos.Count:
-            <InfoBanner CycleNav="cycleNav" Entry="infos[selected.IndexWithinSlice]" />
+                    break;
 
-            break;
+                case BannerView.ExportProgress when exportProgress != null:
+                    <ExportProgressBanner CycleNav="cycleNav" Export="exportProgress" StaticPresentation="ShowAllEntries" />
+
+                    break;
+
+                case BannerView.Info:
+                    @if (info is not null)
+                    {
+                        <InfoBanner CycleNav="cycleNav" Entry="info" StaticPresentation="ShowAllEntries" />
+                    }
+
+                    break;
+            }
+        </article>
     }
 }

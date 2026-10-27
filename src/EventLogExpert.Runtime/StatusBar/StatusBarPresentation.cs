@@ -33,6 +33,15 @@ public sealed record StatusBarPresentation
 
     public ResolverStatus ResolverStatus { get; init; } = ResolverStatus.None;
 
+    /// <summary>The failures accumulated by the in-progress loading episode; zero once it completes.</summary>
+    public int EpisodeFailedTotal { get; init; }
+
+    /// <summary>Advances once per loading episode that completed with failures; zero-failure completions never advance it.</summary>
+    public int FailedEpisodeCompletionCount { get; init; }
+
+    /// <summary>The total failures of the most recent loading episode that completed with failures.</summary>
+    public int LastCompletedEpisodeFailedTotal { get; init; }
+
     public ImmutableList<LogView> Tabs { get; init; } = [];
 
     public ImmutableList<LogTabGroup> Groups { get; init; } = [];

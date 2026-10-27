@@ -14,6 +14,9 @@ internal static partial class BannerContentLocalizer
     internal static BannerContentText Resolve(IStringLocalizer<SharedResource> localizer, BannerMessage content) =>
         content switch
         {
+            DatabaseAttention attention => new BannerContentText(
+                localizer["Notifications_DatabaseAttention"],
+                PluralText.Format(localizer, "Notifications_DatabaseAttentionCount", ("count", attention.Count))),
             ExportBlocked exportBlocked => ResolveExportBlocked(localizer, exportBlocked),
             ExportCanceled => new BannerContentText(
                 localizer["Banner_Export_Canceled_Title"],

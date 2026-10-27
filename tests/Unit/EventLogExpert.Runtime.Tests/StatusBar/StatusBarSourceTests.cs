@@ -162,6 +162,28 @@ public sealed class StatusBarSourceTests
     }
 
     [Fact]
+    public void Changed_Fires_WhenOnlyTheLoadingEpisodeChanges_AndProjectsIt()
+    {
+        var harness = new Harness();
+        var raised = 0;
+        harness.Source.Changed += () => raised++;
+
+        harness.StatusBar = harness.StatusBar with
+        {
+            EpisodeFailedTotal = 1,
+            FailedEpisodeCompletionCount = 2,
+            LastCompletedEpisodeFailedTotal = 3
+        };
+        harness.RaiseStatusBar();
+
+        Assert.Equal(1, raised);
+        var current = harness.Source.Current;
+        Assert.Equal(1, current.EpisodeFailedTotal);
+        Assert.Equal(2, current.FailedEpisodeCompletionCount);
+        Assert.Equal(3, current.LastCompletedEpisodeFailedTotal);
+    }
+
+    [Fact]
     public void Changed_Fires_WhenOnlyTotalChanges_AndProjectsTotal()
     {
         var harness = new Harness();

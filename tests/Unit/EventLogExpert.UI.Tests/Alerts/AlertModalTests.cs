@@ -25,6 +25,23 @@ public sealed class AlertModalTests : BunitContext
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
+    [Theory]
+    [InlineData(false, "Clear all")]
+    [InlineData(true, "Cancel")]
+    public void Confirmation_AutofocusUsesTheRequestedDefault(bool defaultToCancel, string expectedLabel)
+    {
+        var component = Render<AlertModal>(parameters => parameters
+            .Add(modal => modal.Title, "Clear notifications?")
+            .Add(modal => modal.AcceptLabel, "Clear all")
+            .Add(modal => modal.CancelLabel, "Cancel")
+            .Add(modal => modal.DefaultToCancel, defaultToCancel));
+
+        var defaultButton = component.Find("button[autofocus]");
+        Assert.Equal(expectedLabel, defaultButton.TextContent.Trim());
+        defaultButton.Click();
+        Services.GetRequiredService<IModalService>().Received(1).Complete(new ModalId(1L), !defaultToCancel);
+    }
+
     [Fact]
     public void Render_DialogUsesFixedWindowsStyleWidth()
     {
@@ -36,5 +53,7 @@ public sealed class AlertModalTests : BunitContext
 
         Assert.Contains("--modal-min-width: min(34rem, calc(100vw - 2rem));", style);
         Assert.Contains("--modal-max-width: min(34rem, calc(100vw - 2rem));", style);
+        Assert.Empty(component.FindAll(".notification-trigger"));
+        Assert.Contains("Alert", component.Find(".dialog-title").TextContent);
     }
 }

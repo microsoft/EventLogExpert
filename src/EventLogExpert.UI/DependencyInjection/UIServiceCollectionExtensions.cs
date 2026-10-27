@@ -3,6 +3,7 @@
 
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Export;
+using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Keyboard;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.LogTable.Find;
@@ -26,6 +27,7 @@ public static class UIServiceCollectionExtensions
             services.AddSingleton<KeyboardShortcutService>();
             services.AddSingleton<IEventCopyText, EventCopyText>();
             services.AddSingleton<IEventTableExportText, EventTableExportText>();
+            services.AddScoped<NotificationAnnouncementState>();
 
             services.TryAddSingleton<IMenuService, MenuService>();
             services.TryAddSingleton<IModalCoordinator, ModalCoordinator>();
