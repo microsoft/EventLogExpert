@@ -208,8 +208,8 @@ public sealed class OrderedViewFaultRecoveryTests
 
         ViewIdentity identity = state.ViewIdentity;
 
-        Assert.NotNull(harness.Issuer.TryIssue(identity));
-        Assert.Null(harness.Issuer.TryIssue(identity));
+        Assert.Equal(IssueKind.Issued, harness.Issuer.Issue(identity));
+        Assert.Equal(IssueKind.Deduped, harness.Issuer.Issue(identity));
 
         await harness.Effects.HandleOrderedViewDisplayFaulted(
             new OrderedViewDisplayFaultedAction(new InvalidOperationException("engine blew up"), identity),
@@ -333,15 +333,15 @@ public sealed class OrderedViewFaultRecoveryTests
         var issuer = new ViewRequestIssuer();
         ViewIdentity identity = StateWith(EventLogId.Create()).ViewIdentity;
 
-        Assert.NotNull(issuer.TryIssue(identity));
-        Assert.Null(issuer.TryIssue(identity));
+        Assert.Equal(IssueKind.Issued, issuer.Issue(identity));
+        Assert.Equal(IssueKind.Deduped, issuer.Issue(identity));
 
         issuer.ArmForce();
 
         // The armed force re-issues the already-issued identity past the de-dup, then clears: the next issue de-dups
         // again. Without the one-shot clear this would force forever (an unbounded rebuild storm).
-        Assert.NotNull(issuer.TryIssue(identity));
-        Assert.Null(issuer.TryIssue(identity));
+        Assert.Equal(IssueKind.Issued, issuer.Issue(identity));
+        Assert.Equal(IssueKind.Deduped, issuer.Issue(identity));
     }
 
     [Fact]
@@ -421,7 +421,7 @@ public sealed class OrderedViewFaultRecoveryTests
 
         // The failed request already issued this identity, so a plain Sync would de-dup it; only the Always force
         // reissues past the de-dup.
-        Assert.NotNull(harness.Issuer.TryIssue(faulted.ViewIdentity));
+        Assert.Equal(IssueKind.Issued, harness.Issuer.Issue(faulted.ViewIdentity));
         harness.Dispatcher.ClearReceivedCalls();
 
         await harness.Effects.HandleXmlFilterMatchReady(harness.Dispatcher);

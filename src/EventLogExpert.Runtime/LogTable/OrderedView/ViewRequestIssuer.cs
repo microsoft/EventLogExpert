@@ -7,14 +7,13 @@ internal sealed class ViewRequestIssuer
 {
     private readonly Lock _gate = new();
 
+    private bool _clearFaultPending;
     private volatile bool _enabled = true;
     private bool _forcePending;
     private Exception? _lastFault;
     private ViewIdentity? _lastIssuedIdentity;
-
     private ViewIdentity? _recoveringIdentity;
     private long _recoveringWatermark;
-
     private long _sequence;
 
     public bool Enabled
@@ -33,6 +32,15 @@ internal sealed class ViewRequestIssuer
         }
     }
 
+    public void ArmRecovery()
+    {
+        lock (_gate)
+        {
+            _forcePending = true;
+            _clearFaultPending = true;
+        }
+    }
+
     public void RecordFault(Exception fault) => Volatile.Write(ref _lastFault, fault);
 
     public long ResetForClear()
@@ -41,6 +49,7 @@ internal sealed class ViewRequestIssuer
         {
             _lastIssuedIdentity = null;
             _forcePending = false;
+            _clearFaultPending = false;
 
             return ++_sequence;
         }
@@ -52,6 +61,7 @@ internal sealed class ViewRequestIssuer
         {
             _lastIssuedIdentity = null;
             _forcePending = false;
+            _clearFaultPending = false;
             _recoveringIdentity = null;
             _recoveringWatermark = 0;
 
@@ -72,21 +82,23 @@ internal sealed class ViewRequestIssuer
         }
     }
 
-    public long? TryIssue(ViewIdentity identity, bool forceReissue = false)
+    public IssueOutcome TryIssue(ViewIdentity expectedIdentity, Func<ViewProbe> probe)
     {
         lock (_gate)
         {
-            if (forceReissue || _forcePending)
-            {
-                _lastIssuedIdentity = null;
-                _forcePending = false;
-            }
+            if (!_forcePending && _lastIssuedIdentity == expectedIdentity) { return IssueOutcome.Deduped; }
 
-            if (_lastIssuedIdentity == identity) { return null; }
+            ViewProbe probed = probe();
 
-            _lastIssuedIdentity = identity;
+            if (probed.LiveIdentity != expectedIdentity) { return IssueOutcome.Stale; }
 
-            return ++_sequence;
+            bool clearFault = _clearFaultPending;
+
+            _lastIssuedIdentity = expectedIdentity;
+            _forcePending = false;
+            _clearFaultPending = false;
+
+            return IssueOutcome.Issued(++_sequence, probed, clearFault);
         }
     }
 }
