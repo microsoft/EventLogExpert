@@ -402,8 +402,6 @@ public sealed partial class MenuRenderer : IAsyncDisposable
         _focusFromKeyboard = true;
         _focusOnNextRender = true;
 
-        StateHasChanged();
-
         await Task.CompletedTask;
     }
 

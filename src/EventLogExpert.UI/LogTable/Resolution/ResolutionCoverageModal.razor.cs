@@ -123,9 +123,12 @@ public sealed partial class ResolutionCoverageModal : ModalBase<bool>
         try
         {
             IEventColumnView view = _view;
+
             // UserInitiated: user opened this modal and is watching its spinner. Do NOT add ConfigureAwait(false) - the
-            // continuation mutates _report and calls StateHasChanged() without InvokeAsync, so it must resume on the Blazor dispatcher.
-            _report = await CpuScheduler.RunAsync(reportToken => CoverageService.Build(view, reportToken), CpuWorkPriority.UserInitiated, _cts.Token);
+            // continuation mutates component state and must resume on the Blazor dispatcher.
+            _report = await CpuScheduler.RunAsync(reportToken => CoverageService.Build(view, reportToken),
+                CpuWorkPriority.UserInitiated,
+                _cts.Token);
         }
         catch (OperationCanceledException) { }
         catch (Exception)
@@ -137,7 +140,6 @@ public sealed partial class ResolutionCoverageModal : ModalBase<bool>
             if (!IsDisposed)
             {
                 _loading = false;
-                StateHasChanged();
             }
         }
     }
@@ -205,7 +207,7 @@ public sealed partial class ResolutionCoverageModal : ModalBase<bool>
         yield return (EventResolutionStatus.NoProvider, _report.Summary.NoProvider);
 
         yield return (EventResolutionStatus.NoMessage, _report.Summary.NoMessage);
-        
+
         yield return (EventResolutionStatus.Failed, _report.Summary.Failed);
     }
 

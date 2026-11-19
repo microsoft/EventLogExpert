@@ -273,8 +273,6 @@ public sealed partial class FilterEditorCore : ComponentBase
 
             if (!accepted)
             {
-                StateHasChanged();
-
                 return;
             }
         }

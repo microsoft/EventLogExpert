@@ -117,7 +117,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
         await JsModuleInterop.DisposeModuleSafelyAsync(
             _dropdownModule,
-            module => module.InvokeVoidAsync("unregisterDropdown", _selectComponent));
+            module => JsModuleInterop.InvokeVoidAsync(module, "unregisterDropdown", _selectComponent));
 
         _dropdownModule = null;
 
@@ -197,11 +197,11 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
         {
             _selfRef = DotNetObjectReference.Create(this);
 
-            _dropdownModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                "import",
+            _dropdownModule = await JsModuleInterop.ImportModuleAsync(
+                JSRuntime,
                 "./_content/EventLogExpert.UI/Inputs/ValueSelect.razor.js");
 
-            await _dropdownModule.InvokeVoidAsync("registerDropdown", _selectComponent, _selfRef);
+            await JsModuleInterop.InvokeVoidAsync(_dropdownModule, "registerDropdown", _selectComponent, _selfRef);
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -292,7 +292,6 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
         _inputFocused = false;
         _rawInput = null;
-        StateHasChanged();
     }
 
     private async Task OnInputChange(ChangeEventArgs args)
@@ -318,7 +317,6 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
         _inputFocused = true;
         _rawInput = $"{Value}";
-        StateHasChanged();
     }
 
     private async Task SelectAdjacentItem(int direction)
@@ -351,7 +349,10 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
             {
                 HighlightedItem = _items[index];
 
-                if (_dropdownModule is not null) { await _dropdownModule.InvokeVoidAsync("scrollToHighlightedItem", _selectComponent); }
+                if (_dropdownModule is not null)
+                {
+                    await JsModuleInterop.InvokeVoidAsync(_dropdownModule, "scrollToHighlightedItem", _selectComponent);
+                }
             }
             else
             {
@@ -360,7 +361,10 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
                 await UpdateValue(_items[index].Value);
 
-                if (_dropdownModule is not null) { await _dropdownModule.InvokeVoidAsync("scrollToSelectedItem", _selectComponent); }
+                if (_dropdownModule is not null)
+                {
+                    await JsModuleInterop.InvokeVoidAsync(_dropdownModule, "scrollToSelectedItem", _selectComponent);
+                }
             }
 
             return;
@@ -375,7 +379,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
         StateHasChanged();
         var jsAction = targetState ? "openDropdown" : "closeDropdown";
 
-        if (_dropdownModule is not null) { await _dropdownModule.InvokeVoidAsync(jsAction, _selectComponent); }
+        if (_dropdownModule is not null) { await JsModuleInterop.InvokeVoidAsync(_dropdownModule, jsAction, _selectComponent); }
     }
 
     private Task ToggleDropDownVisibility() => SetOpenStateAsync(!_isOpen);

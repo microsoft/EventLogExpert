@@ -125,7 +125,7 @@ public sealed partial class StatsPane
 
             await JsModuleInterop.DisposeModuleSafelyAsync(
                 _resizeModule,
-                module => module.InvokeVoidAsync("disposeStatsResize", _resizeSession));
+                module => JsModuleInterop.InvokeVoidAsync(module, "disposeStatsResize", _resizeSession));
 
             _resizeModule = null;
             _selfRef?.Dispose();

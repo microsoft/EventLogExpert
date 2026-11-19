@@ -70,14 +70,14 @@ $rootStore = New-Object System.Security.Cryptography.X509Certificates.X509Store(
 $rootStore.Open("ReadWrite"); $rootStore.Add($cert); $rootStore.Close()
 
 # 3. Build + sign MSIX
-dotnet publish src/EventLogExpert -c Debug `
+dotnet publish src\EventLogExpert -c Debug -f net11.0-windows10.0.19041.0 -r win-x64 `
   /p:GenerateAppxPackageOnBuild=true /p:AppxPackageSigningEnabled=false /p:WindowsPackageType=MSIX
 & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe" `
   sign /fd SHA256 /a /f $pfx /p "elx-dev-cert" `
-  "src/EventLogExpert/bin/Debug/net10.0-windows10.0.19041.0/win-x64/AppPackages/EventLogExpert_0.9.0.0_Debug_Test/EventLogExpert_0.9.0.0_x64_Debug.msix"
+  "src\EventLogExpert\bin\Debug\net11.0-windows10.0.19041.0\win-x64\AppPackages\EventLogExpert_0.9.0.0_Debug_Test\EventLogExpert_0.9.0.0_x64_Debug.msix"
 
 # 4. Install
-Add-AppxPackage -Path "src/EventLogExpert/bin/Debug/.../EventLogExpert_0.9.0.0_x64_Debug.msix"
+Add-AppxPackage -Path "src\EventLogExpert\bin\Debug\net11.0-windows10.0.19041.0\win-x64\AppPackages\EventLogExpert_0.9.0.0_Debug_Test\EventLogExpert_0.9.0.0_x64_Debug.msix"
 ```
 
 ## Smoke recipe

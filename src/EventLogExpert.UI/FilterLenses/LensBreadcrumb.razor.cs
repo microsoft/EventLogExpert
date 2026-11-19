@@ -174,7 +174,7 @@ public sealed partial class LensBreadcrumb
     }
 
     private ValueTask<IJSObjectReference> ImportFocusModuleAsync() =>
-        JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/EventLogExpert.UI/Common/focusGuard.js");
+        JsModuleInterop.ImportModuleAsync(JSRuntime, "./_content/EventLogExpert.UI/Common/focusGuard.js");
 
     // Time-window chip labels are stored in UTC and formatted in the display zone, so re-render on a zone change.
     private void OnTimeZoneChanged(object? sender, TimeZoneInfo timeZone) => RequestGuardedRender(StateHasChanged);

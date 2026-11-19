@@ -573,7 +573,7 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         var entry = LibraryEntries.Current.FirstOrDefault(e => e.Id.Equals(id));
 
         if (entry is not null) { AnnouncementService.Announce(Localizer["FilterLibrary_AppliedAnnouncement", entry.Name]); }
-        
+
         await CompleteAsync(true);
     }
 
@@ -685,7 +685,6 @@ public sealed partial class FilterLibraryModal : ModalBase<bool>
         _selectedTagsByTab[_activeTab] = ImmutableList<string>.Empty;
         _justClearedTags = true;
         AnnouncementService.Announce(Localizer["FilterLibrary_TagFiltersClearedAnnouncement"]);
-        StateHasChanged();
     }
 
     private void HandleTagRenamed((string OldName, string NewName) e)

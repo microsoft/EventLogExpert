@@ -72,9 +72,11 @@ public sealed partial class StatsDetailModal : ModalBase<bool>
         try
         {
             // UserInitiated: user opened this modal and is watching its spinner. Do NOT add ConfigureAwait(false) - the
-            // continuation mutates state and the finally calls StateHasChanged() without InvokeAsync, so it must resume on the Blazor dispatcher.
+            // continuation mutates component state and must resume on the Blazor dispatcher.
             DimensionStats stats = await CpuScheduler.RunAsync(
-                detailToken => StatsService.BuildDimension(View, Dimension, MaxRows, detailToken), CpuWorkPriority.UserInitiated, _cts.Token);
+                detailToken => StatsService.BuildDimension(View, Dimension, MaxRows, detailToken),
+                CpuWorkPriority.UserInitiated,
+                _cts.Token);
 
             _all = stats.Top;
             _distinct = stats.DistinctCount;
@@ -90,7 +92,6 @@ public sealed partial class StatsDetailModal : ModalBase<bool>
             if (!IsDisposed)
             {
                 _loading = false;
-                StateHasChanged();
             }
         }
     }

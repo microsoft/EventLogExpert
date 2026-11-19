@@ -82,13 +82,17 @@ which is destroyed when the container exits. Your host log stays clean.
 
 ## Prerequisites
 
-- Windows 11 Pro / Enterprise / Education (Windows Home cannot run Windows
-  containers because Hyper-V isolation is unavailable on the Home SKU).
+- An x64 Windows 11 Pro / Enterprise / Education host, version 24H2 or later, for
+  the Server 2025 base image. See Microsoft's [Windows container host compatibility
+  guidance](https://learn.microsoft.com/en-us/virtualization/windowscontainers/deploy-containers/version-compatibility).
+  Windows Home cannot run these containers because Hyper-V isolation is unavailable
+  on the Home SKU. The image is `windows/amd64`; this configuration does not support
+  Windows ARM64 hosts.
 - Hyper-V and Virtual Machine Platform Windows features enabled.
 - Docker Desktop for Windows, switched to **Windows containers** mode (right-click
   the Docker tray icon → *Switch to Windows containers...*).
-- First image pull is ~5 GB compressed (~12 GB on disk). Subsequent runs reuse
-  cached layers.
+- The first image pull requires several GB of download and additional disk space
+  for unpacked layers and build outputs. Subsequent runs reuse cached layers.
 
 Docker removes the per-test admin elevation. It does **not** remove first-time
 machine provisioning — enabling Hyper-V / Virtual Machine Platform still needs
@@ -165,13 +169,13 @@ docker compose down -v
 
 ## Image tag drift
 
-`mcr.microsoft.com/dotnet/sdk:10.0-windowsservercore-ltsc2022` is a floating tag
-that tracks the latest 10.x SDK. It satisfies `global.json`'s `version: "10.0.204"
-+ rollForward: "latestFeature"` for any patch ≥ 10.0.204.
+`mcr.microsoft.com/dotnet/sdk:11.0-windowsservercore-ltsc2025` is a floating tag
+that tracks the latest 11.0 SDK. It satisfies `global.json`'s `version: "11.0.100"`
+with `rollForward: "latestFeature"`.
 
 If you hit "A compatible .NET SDK was not found", `docker pull
-mcr.microsoft.com/dotnet/sdk:10.0-windowsservercore-ltsc2022` to refresh, or pin
-to a specific patch tag (e.g. `10.0.204-windowsservercore-ltsc2022`) in
+mcr.microsoft.com/dotnet/sdk:11.0-windowsservercore-ltsc2025` to refresh, or pin
+to a specific SDK tag (e.g. `11.0.100-windowsservercore-ltsc2025`) in
 `compose.yml`.
 
 ## Host fallback (no Docker, last resort)

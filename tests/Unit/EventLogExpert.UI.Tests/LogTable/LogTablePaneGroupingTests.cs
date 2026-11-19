@@ -120,6 +120,14 @@ public sealed class LogTablePaneGroupingTests : CultureSensitiveBunitContext
     }
 
     [Fact]
+    public void GroupedVirtualize_RendersWithThreeRowOverscan()
+    {
+        var component = RenderGrouped(Collapsed(), Event(1, "overscan-group"));
+
+        Assert.Equal(3, component.FindComponent<Virtualize<TableRow>>().Instance.OverscanCount);
+    }
+
+    [Fact]
     public async Task GroupedVirtualize_SetsRowHeightItemSize_SoScrollModelMatchesCss()
     {
         _logTableState.Value.Returns(BuildState(ColumnName.Source, Collapsed(), Event(1, "Alpha")));
@@ -745,6 +753,20 @@ public sealed class LogTablePaneGroupingTests : CultureSensitiveBunitContext
         cut.WaitForState(() => cut.Instance is not null);
 
         Assert.Equal(scrollsAfterTheRowsArrived, _jsModule.Invocations["scrollToRow"].Count);
+    }
+
+    [Fact]
+    public async Task UngroupedVirtualize_RendersWithThreeRowOverscan()
+    {
+        _logTableState.Value.Returns(BuildState(groupBy: null, Collapsed(), Event(1, "Alpha")));
+
+        var cut = Render<LogTablePane>();
+        await cut.InvokeAsync(() => Services.GetRequiredService<IStore>().InitializeAsync());
+        await cut.InvokeAsync(() =>
+            Services.GetRequiredService<IDispatcher>().Dispatch(new SetActiveTableAction(EventLogId.Create())));
+
+        cut.WaitForAssertion(() =>
+            Assert.Equal(3, cut.FindComponent<Virtualize<DisplayRow>>().Instance.OverscanCount));
     }
 
     [Fact]

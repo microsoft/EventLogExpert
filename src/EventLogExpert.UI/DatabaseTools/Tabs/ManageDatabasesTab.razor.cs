@@ -1101,11 +1101,11 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             return;
         }
 
-        bool restored;
+        DatabaseRestoreResult result;
 
         try
         {
-            restored = await DatabaseService.RestoreFromBackupAsync(entry.FileName, CancellationToken.None);
+            result = await DatabaseService.RestoreFromBackupAsync(entry.FileName, CancellationToken.None);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -1118,14 +1118,19 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         if (_disposed) { return; }
 
-        if (restored)
+        switch (result)
         {
-            _restorationOccurred = true;
-            AnnouncementService.Announce(Localizer["Db_Manage_RestoreSucceeded", entry.FileName]);
-        }
-        else
-        {
-            AnnouncementService.Announce(Localizer["Db_Manage_RestoreFailed", entry.FileName]);
+            case DatabaseRestoreResult.Restored:
+                _restorationOccurred = true;
+                AnnouncementService.Announce(Localizer["Db_Manage_RestoreSucceeded", entry.FileName]);
+                break;
+            case DatabaseRestoreResult.RestoredBackupRetained:
+                _restorationOccurred = true;
+                AnnouncementService.Announce(Localizer["Db_Manage_RestoreSucceededBackupRetained", entry.FileName]);
+                break;
+            default:
+                AnnouncementService.Announce(Localizer["Db_Manage_RestoreFailed", entry.FileName]);
+                break;
         }
     }
 

@@ -3,6 +3,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <MauiVersion>11.0.10</MauiVersion>
         <DebugType>embedded</DebugType>
         <!-- CsWinRT1030 fires for List<T> of any public type because IT could theoretically cross the WinRT ABI in AOT/trimmed scenarios. We never marshal these collections across the ABI, so the warning is benign. -->
         <NoWarn>$(NoWarn);CsWinRT1030</NoWarn>
@@ -12,7 +13,7 @@
         <When Condition="'$(UseMaui)' == 'true'">
             <PropertyGroup>
                 <!-- <TargetFrameworks>net8.0-maccatalyst</TargetFrameworks> -->
-                <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+                <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net11.0-windows10.0.19041.0</TargetFrameworks>
                 <!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
                 <!-- <TargetFrameworks>$(TargetFrameworks);net8.0-tizen</TargetFrameworks> -->
 
@@ -34,7 +35,7 @@
 
         <Otherwise>
             <PropertyGroup>
-                <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+                <TargetFramework>net11.0-windows10.0.19041.0</TargetFramework>
             </PropertyGroup>
         </Otherwise>
     </Choose>

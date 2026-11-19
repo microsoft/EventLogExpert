@@ -92,8 +92,8 @@ public sealed partial class MenuHost : IAsyncDisposable
     }
 
     private async ValueTask<IJSObjectReference> GetMenuOverlayAsync() =>
-        _menuOverlayModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/EventLogExpert.UI/Menu/MenuOverlay.js");
+        _menuOverlayModule ??= await JsModuleInterop.ImportModuleAsync(
+            JSRuntime, "./_content/EventLogExpert.UI/Menu/MenuOverlay.js");
 
     private void HandleActivated() => MenuService.Close();
 

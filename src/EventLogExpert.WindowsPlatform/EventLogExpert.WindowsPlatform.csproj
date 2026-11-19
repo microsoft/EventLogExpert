@@ -3,7 +3,7 @@
   <PropertyGroup>
     <RootNamespace>EventLogExpert.WindowsPlatform</RootNamespace>
     <!-- Non-MAUI library — sits outside the UseMaui block in Directory.Build.props so the
-         Otherwise branch sets TargetFramework=net10.0-windows10.0.19041.0. Provides Windows-shell
+         Otherwise branch sets TargetFramework=net11.0-windows10.0.19041.0. Provides Windows-shell
          helpers (folder enumeration, CommandLineToArgvW interop, activation dispatcher) that the
          MAUI head and platform tests consume without dragging the MAUI build pipeline in. -->
     <UseMaui>false</UseMaui>

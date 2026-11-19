@@ -91,7 +91,7 @@ public sealed partial class NotificationCenter : ComponentBase, IAsyncDisposable
 
         await JsModuleInterop.DisposeModuleSafelyAsync(
             _module,
-            module => module.InvokeVoidAsync("detach", _panel));
+            module => JsModuleInterop.InvokeVoidAsync(module, "detach", _panel));
 
         _module = null;
         _dotNetReference?.Dispose();

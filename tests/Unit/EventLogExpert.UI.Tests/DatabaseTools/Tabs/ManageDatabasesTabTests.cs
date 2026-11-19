@@ -1145,7 +1145,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
     public async Task RestoreFromBackup_ServiceReturnsFalse_DoesNotSetRestorationFlag()
     {
         _databaseService.Entries = [Entry("a.db", isEnabled: true, status: DatabaseStatus.UpgradeRequired, backupExists: true)];
-        _databaseService.RestoreFromBackupReturnValue = false;
+        _databaseService.RestoreFromBackupReturnValue = DatabaseRestoreResult.Failed;
         var component = Render<ManageDatabasesTab>();
 
         await component.InvokeAsync(() =>
@@ -1160,10 +1160,29 @@ public sealed class ManageDatabasesTabTests : BunitContext
     }
 
     [Fact]
+    public async Task RestoreFromBackup_ServiceReturnsRestoredBackupRetained_SetsStickyFlag_AndAnnouncesBackupRetained()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: true, status: DatabaseStatus.UpgradeRequired, backupExists: true)];
+        _databaseService.RestoreFromBackupReturnValue = DatabaseRestoreResult.RestoredBackupRetained;
+        var component = Render<ManageDatabasesTab>();
+
+        await component.InvokeAsync(() =>
+            ((Task)component.Instance.GetType()
+                .GetMethod("RestoreFromBackup", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(component.Instance, [_databaseService.Entries[0]])!));
+
+        Assert.Equal(1, _databaseService.RestoreFromBackupCalls);
+        Assert.True(component.Instance.HasDatabaseStateChanged);
+        _announcementService.Received(1).Announce("[[Db_Manage_RestoreSucceededBackupRetained(a.db)]]");
+        _announcementService.DidNotReceive().Announce("[[Db_Manage_RestoreFailed(a.db)]]");
+        _announcementService.DidNotReceive().Announce("[[Db_Manage_RestoreSucceeded(a.db)]]");
+    }
+
+    [Fact]
     public async Task RestoreFromBackup_ServiceReturnsTrue_SetsStickyFlag_AndAnnouncesSuccess()
     {
         _databaseService.Entries = [Entry("a.db", isEnabled: true, status: DatabaseStatus.UpgradeRequired, backupExists: true)];
-        _databaseService.RestoreFromBackupReturnValue = true;
+        _databaseService.RestoreFromBackupReturnValue = DatabaseRestoreResult.Restored;
         var component = Render<ManageDatabasesTab>();
 
         await component.InvokeAsync(() =>

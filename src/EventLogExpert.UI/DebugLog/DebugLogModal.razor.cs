@@ -195,8 +195,6 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         _availableCategories.Clear();
         _hasUncategorized = false;
         _hasLoaded = true;
-
-        StateHasChanged();
     }
 
     private void ClearFilters()
@@ -239,10 +237,6 @@ public sealed partial class DebugLogModal : ModalBase<bool>
             await AlertDialogService.ShowAlert(Localizer["DebugLog_Alert_ExportFailed"].Value, ex.Message, Localizer["Modal_Accept"].Value);
         }
     }
-
-    // An editor mutation (field/operator/value/exclude on the draft copy): re-render only so the Save button's
-    // enabled state tracks completeness. Nothing reaches the projection until the user clicks Save on the row.
-    private void OnEditorChanged() => StateHasChanged();
 
     private void PruneStaleEditorRefs()
     {

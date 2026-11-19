@@ -179,7 +179,7 @@ public class ManifestSchemaTests
 
     // Walks up from the test's runtime directory until finding the directory containing
     // EventLogExpert.slnx, then joins the supplied relative segments. Resilient to test-output
-    // layout differences across runners (net10.0-windows10.0.19041.0/ vs net10.0/, Debug/Release,
+    // layout differences across runners (net11.0-windows10.0.19041.0/ vs net11.0/, Debug/Release,
     // win-x64/ subfolder when publish-style output is in play) where a fixed `..\..\..\` count
     // can drift. Pattern mirrors tests/Unit/EventLogExpert.Filtering.Tests/Persistence/PersistencePolicyTests.cs.
     private static string ResolveRepoRelativePath(params string[] segments)

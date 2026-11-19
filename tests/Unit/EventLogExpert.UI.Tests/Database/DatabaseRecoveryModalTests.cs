@@ -11,6 +11,7 @@ using EventLogExpert.Runtime.Database;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
+using EventLogExpert.UI.Inputs;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components;
@@ -19,11 +20,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using NSubstitute;
 using System.Text.RegularExpressions;
+using TestContext = Xunit.TestContext;
 
 namespace EventLogExpert.UI.Tests.Database;
 
 public sealed class DatabaseRecoveryModalTests : BunitContext
 {
+    private static readonly TimeSpan s_handshakeTimeout = TimeSpan.FromSeconds(10);
+
     private readonly IDatabaseService _databaseService = Substitute.For<IDatabaseService>();
     private readonly IErrorBannerService _errorBannerService = Substitute.For<IErrorBannerService>();
     private readonly IModalCoordinator _modalCoordinator = Substitute.For<IModalCoordinator>();
@@ -67,7 +71,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
         _databaseService.Entries.Returns(entriesBefore);
 
         _databaseService.RestoreFromBackupAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(true));
+            .Returns(Task.FromResult(DatabaseRestoreResult.Restored));
 
         var component = Render<DatabaseRecoveryModal>();
 
@@ -104,38 +108,12 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryModal_ApplyDisablesAllControls_WhilePending()
-    {
-        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
-        var pendingRestore = new TaskCompletionSource<bool>();
-        _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
-            .Returns(pendingRestore.Task);
-
-        var component = Render<DatabaseRecoveryModal>();
-
-        var applyClick = component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
-
-        Assert.True(((IHtmlButtonElement)component.Find("button:contains('[[Modal_Apply]]')")).IsDisabled);
-        Assert.True(((IHtmlButtonElement)component.Find("button:contains('[[Modal_Cancel]]')")).IsDisabled);
-        Assert.True(((IHtmlButtonElement)component.Find("button.button:contains('[[DatabaseRecoveryModal_RestoreAll]]')")).IsDisabled);
-        Assert.True(((IHtmlButtonElement)component.Find("button.button:contains('[[DatabaseRecoveryModal_DeleteAll]]')")).IsDisabled);
-
-        foreach (var radio in component.FindAll("li.recovery-row input[type=radio]"))
-        {
-            Assert.True(((IHtmlInputElement)radio).IsDisabled);
-        }
-
-        pendingRestore.SetResult(true);
-        await applyClick;
-    }
-
-    [Fact]
     public async Task DatabaseRecoveryModal_ApplyMixed_CallsBothMethodsForRespectiveRows()
     {
         _databaseService.Entries.Returns(
             [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(true));
+            .Returns(Task.FromResult(DatabaseRestoreResult.Restored));
         _databaseService.DeleteEntryWithBackupAsync("b.db", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(true));
 
@@ -154,11 +132,214 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryModal_ApplyRestoreReturnsFalse_SurfacesErrorBannerAndMarksRowFailed()
+    public async Task DatabaseRecoveryModal_ApplyPending_BatchButtonCallbacks_LeaveSelectionsUnchanged()
+    {
+        _databaseService.Entries.Returns([BuildEntry("a.db", true), BuildEntry("b.db", true)]);
+        var restoreStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var restoreCompletion = new TaskCompletionSource<DatabaseRestoreResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                restoreStarted.TrySetResult();
+                return restoreCompletion.Task;
+            });
+        _databaseService.DeleteEntryWithBackupAsync("b.db", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+
+        var component = Render<DatabaseRecoveryModal>();
+        await FindDeleteRadio(component, "b.db").ChangeAsync(new ChangeEventArgs { Value = "on" });
+
+        Task applyTask = component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
+        await restoreStarted.Task.WaitAsync(s_handshakeTimeout, TestContext.Current.CancellationToken);
+
+        await component.InvokeAsync(() =>
+            FindBatchButton(component, "DatabaseRecoveryModal_DeleteAll").Instance.OnClick
+                .InvokeAsync(new MouseEventArgs()));
+
+        Assert.True(FindRestoreRadio(component, "a.db").IsChecked);
+        Assert.True(FindDeleteRadio(component, "b.db").IsChecked);
+
+        await component.InvokeAsync(() =>
+            FindBatchButton(component, "DatabaseRecoveryModal_RestoreAll").Instance.OnClick
+                .InvokeAsync(new MouseEventArgs()));
+
+        Assert.True(FindRestoreRadio(component, "a.db").IsChecked);
+        Assert.True(FindDeleteRadio(component, "b.db").IsChecked);
+        Assert.True(((IHtmlButtonElement)component.Find("button.button:contains('[[DatabaseRecoveryModal_RestoreAll]]')")).IsDisabled);
+        Assert.True(((IHtmlButtonElement)component.Find("button.button:contains('[[DatabaseRecoveryModal_DeleteAll]]')")).IsDisabled);
+
+        restoreCompletion.SetResult(DatabaseRestoreResult.Restored);
+        await applyTask;
+    }
+
+    [Fact]
+    public async Task DatabaseRecoveryModal_ApplyPending_DisablesButtonsAndKeepsRadiosEnabled()
+    {
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
+        var pendingRestore = new TaskCompletionSource<DatabaseRestoreResult>();
+        _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
+            .Returns(pendingRestore.Task);
+
+        var component = Render<DatabaseRecoveryModal>();
+
+        var applyClick = component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
+
+        Assert.True(((IHtmlButtonElement)component.Find("button:contains('[[Modal_Apply]]')")).IsDisabled);
+        Assert.True(((IHtmlButtonElement)component.Find("button:contains('[[Modal_Cancel]]')")).IsDisabled);
+        Assert.True(((IHtmlButtonElement)component.Find("button.button:contains('[[DatabaseRecoveryModal_RestoreAll]]')")).IsDisabled);
+        Assert.True(((IHtmlButtonElement)component.Find("button.button:contains('[[DatabaseRecoveryModal_DeleteAll]]')")).IsDisabled);
+
+        foreach (var radio in component.FindAll("li.recovery-row input[type=radio]"))
+        {
+            Assert.False(((IHtmlInputElement)radio).IsDisabled);
+        }
+
+        pendingRestore.SetResult(DatabaseRestoreResult.Restored);
+        await applyClick;
+    }
+
+    [Fact]
+    public async Task DatabaseRecoveryModal_ApplyPending_QueuedRadioChange_AppliesOnNextApply()
+    {
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
+        var restoreStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var restoreCompletion = new TaskCompletionSource<DatabaseRestoreResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                restoreStarted.TrySetResult();
+                return restoreCompletion.Task;
+            });
+        _databaseService.DeleteEntryWithBackupAsync("a.db", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+
+        var component = Render<DatabaseRecoveryModal>();
+
+        Task firstApply = component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
+        await restoreStarted.Task.WaitAsync(s_handshakeTimeout, TestContext.Current.CancellationToken);
+
+        await FindDeleteRadio(component, "a.db").ChangeAsync(new ChangeEventArgs { Value = "on" });
+
+        restoreCompletion.SetResult(DatabaseRestoreResult.Failed);
+        await firstApply;
+
+        await _databaseService.DidNotReceive().DeleteEntryWithBackupAsync("a.db", Arg.Any<CancellationToken>());
+
+        await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
+
+        await _databaseService.Received(1).RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>());
+        await _databaseService.Received(1).DeleteEntryWithBackupAsync("a.db", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DatabaseRecoveryModal_ApplyPending_QueuedSelectionsForChangedRows_AreDroppedAndOthersKept()
+    {
+        DatabaseEntry entryA = BuildEntry("a.db", true);
+        DatabaseEntry entryB = BuildEntry("b.db", true);
+        _databaseService.Entries.Returns([entryA, entryB]);
+
+        var restoreAStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var restoreACompletion = new TaskCompletionSource<DatabaseRestoreResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var restoreBStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var restoreBCompletion = new TaskCompletionSource<DatabaseRestoreResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                restoreAStarted.TrySetResult();
+                return restoreACompletion.Task;
+            });
+        _databaseService.RestoreFromBackupAsync("b.db", Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                restoreBStarted.TrySetResult();
+                return restoreBCompletion.Task;
+            });
+        _databaseService.DeleteEntryWithBackupAsync("b.db", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+
+        var component = Render<DatabaseRecoveryModal>();
+
+        Task firstApply = component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
+        await restoreAStarted.Task.WaitAsync(s_handshakeTimeout, TestContext.Current.CancellationToken);
+
+        await FindDeleteRadio(component, "a.db").ChangeAsync(new ChangeEventArgs { Value = "on" });
+        await FindDeleteRadio(component, "b.db").ChangeAsync(new ChangeEventArgs { Value = "on" });
+
+        _databaseService.Entries.Returns([entryB]);
+        restoreACompletion.SetResult(DatabaseRestoreResult.Restored);
+        await restoreBStarted.Task.WaitAsync(s_handshakeTimeout, TestContext.Current.CancellationToken);
+        restoreBCompletion.SetResult(DatabaseRestoreResult.Failed);
+        await firstApply;
+
+        Assert.Single(component.FindAll("li.recovery-row"));
+        Assert.True(FindDeleteRadio(component, "b.db").IsChecked);
+
+        await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
+
+        await _databaseService.Received(1).RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>());
+        await _databaseService.Received(1).RestoreFromBackupAsync("b.db", Arg.Any<CancellationToken>());
+        await _databaseService.Received(1).DeleteEntryWithBackupAsync("b.db", Arg.Any<CancellationToken>());
+        await _databaseService.DidNotReceive().DeleteEntryWithBackupAsync("a.db", Arg.Any<CancellationToken>());
+
+        _databaseService.Entries.Returns([entryA, entryB]);
+        _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
+        await component.InvokeAsync(() => { });
+
+        Assert.True(FindRestoreRadio(component, "a.db").IsChecked);
+        Assert.False(FindDeleteRadio(component, "a.db").IsChecked);
+    }
+
+    [Fact]
+    public async Task DatabaseRecoveryModal_ApplyPending_ShowsQueuedSelectionNoteLinkedToRadios()
+    {
+        _databaseService.Entries.Returns([BuildEntry("a.db", true), BuildEntry("b.db", true)]);
+        var restoreStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var restoreCompletion = new TaskCompletionSource<DatabaseRestoreResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _databaseService.RestoreFromBackupAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                restoreStarted.TrySetResult();
+                return restoreCompletion.Task;
+            });
+
+        var component = Render<DatabaseRecoveryModal>();
+
+        Assert.Empty(component.Find("#recovery-queued-note").TextContent);
+        Assert.All(
+            component.FindAll("li.recovery-row input[type=radio]"),
+            radio => Assert.False(radio.HasAttribute("aria-describedby")));
+
+        Task applyTask = component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
+        await restoreStarted.Task.WaitAsync(s_handshakeTimeout, TestContext.Current.CancellationToken);
+
+        var note = component.Find("#recovery-queued-note");
+        Assert.Equal("status", note.GetAttribute("role"));
+        Assert.Equal("[[DatabaseRecoveryModal_QueuedSelectionNote]]", note.TextContent.Trim());
+        Assert.Equal(4, component.FindAll("li.recovery-row input[type=radio]").Count);
+        Assert.All(
+            component.FindAll("li.recovery-row input[type=radio]"),
+            radio => Assert.Equal("recovery-queued-note", radio.GetAttribute("aria-describedby")));
+
+        restoreCompletion.SetResult(DatabaseRestoreResult.Restored);
+        await applyTask;
+
+        Assert.Empty(component.Find("#recovery-queued-note").TextContent);
+        Assert.All(
+            component.FindAll("li.recovery-row input[type=radio]"),
+            radio => Assert.False(radio.HasAttribute("aria-describedby")));
+    }
+
+    [Fact]
+    public async Task DatabaseRecoveryModal_ApplyRestoreReturnsFailed_SurfacesErrorBannerAndMarksRowFailed()
     {
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(false));
+            .Returns(Task.FromResult(DatabaseRestoreResult.Failed));
 
         var component = Render<DatabaseRecoveryModal>();
 
@@ -174,11 +355,94 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
     }
 
     [Fact]
+    public async Task DatabaseRecoveryModal_ApplyRestoreReturnsRestoredBackupRetained_DropsQueuedDeleteAndReportsRetainedBanner()
+    {
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
+        var restoreStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var restoreCompletion = new TaskCompletionSource<DatabaseRestoreResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
+            .Returns(
+                _ =>
+                {
+                    restoreStarted.TrySetResult();
+                    return restoreCompletion.Task;
+                },
+                _ => Task.FromResult(DatabaseRestoreResult.Restored));
+        _databaseService.DeleteEntryWithBackupAsync("a.db", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+
+        var component = Render<DatabaseRecoveryModal>();
+
+        Task firstApply = component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
+        await restoreStarted.Task.WaitAsync(s_handshakeTimeout, TestContext.Current.CancellationToken);
+
+        await FindDeleteRadio(component, "a.db").ChangeAsync(new ChangeEventArgs { Value = "on" });
+        Assert.True(FindDeleteRadio(component, "a.db").IsChecked);
+
+        restoreCompletion.SetResult(DatabaseRestoreResult.RestoredBackupRetained);
+        await firstApply;
+
+        _errorBannerService.Received(1).ReportError(Arg.Any<BannerMessage>());
+        _errorBannerService.Received(1).ReportError(
+            Arg.Is<BannerMessage>(message =>
+                IsPreformatted(
+                    message,
+                    "[[Banner_Recovery_BackupRetained_Title]]",
+                    "[[Banner_Recovery_BackupRetained(a.db)]]")));
+        Assert.Contains("recovery-row-failed", component.Find("li.recovery-row").GetAttribute("class") ?? string.Empty);
+        Assert.True(FindRestoreRadio(component, "a.db").IsChecked);
+        Assert.False(FindDeleteRadio(component, "a.db").IsChecked);
+
+        await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
+
+        await _databaseService.DidNotReceive().DeleteEntryWithBackupAsync("a.db", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DatabaseRecoveryModal_ApplyRestoreReturnsRestoredWhileRowStaysListed_DropsQueuedDelete()
+    {
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
+        var restoreStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var restoreCompletion = new TaskCompletionSource<DatabaseRestoreResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
+            .Returns(
+                _ =>
+                {
+                    restoreStarted.TrySetResult();
+                    return restoreCompletion.Task;
+                },
+                _ => Task.FromResult(DatabaseRestoreResult.Restored));
+        _databaseService.DeleteEntryWithBackupAsync("a.db", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+
+        var component = Render<DatabaseRecoveryModal>();
+
+        Task firstApply = component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
+        await restoreStarted.Task.WaitAsync(s_handshakeTimeout, TestContext.Current.CancellationToken);
+
+        await FindDeleteRadio(component, "a.db").ChangeAsync(new ChangeEventArgs { Value = "on" });
+        Assert.True(FindDeleteRadio(component, "a.db").IsChecked);
+
+        restoreCompletion.SetResult(DatabaseRestoreResult.Restored);
+        await firstApply;
+
+        Assert.True(FindRestoreRadio(component, "a.db").IsChecked);
+        Assert.False(FindDeleteRadio(component, "a.db").IsChecked);
+
+        await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
+
+        await _databaseService.DidNotReceive().DeleteEntryWithBackupAsync("a.db", Arg.Any<CancellationToken>());
+        await _databaseService.Received(2).RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task DatabaseRecoveryModal_ApplyThrowsInvalidOperation_TreatsAsBenignSkipNoErrorBanner()
     {
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<bool>(new InvalidOperationException("entry not found")));
+            .Returns(Task.FromException<DatabaseRestoreResult>(new InvalidOperationException("entry not found")));
 
         var component = Render<DatabaseRecoveryModal>();
 
@@ -195,7 +459,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
     {
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<bool>(new IOException("disk gone")));
+            .Returns(Task.FromException<DatabaseRestoreResult>(new IOException("disk gone")));
 
         var component = Render<DatabaseRecoveryModal>();
 
@@ -207,6 +471,49 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         var rowClass = component.Find("li.recovery-row").GetAttribute("class") ?? string.Empty;
         Assert.Contains("recovery-row-failed", rowClass);
+    }
+
+    [Fact]
+    public async Task DatabaseRecoveryModal_ApplyUsesActionsSelectedAtStartWhenEntriesChange()
+    {
+        _databaseService.Entries.Returns(
+            [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
+
+        var restoreStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var restoreCompletion = new TaskCompletionSource<DatabaseRestoreResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                restoreStarted.TrySetResult(true);
+                return restoreCompletion.Task;
+            });
+        _databaseService.DeleteEntryWithBackupAsync("b.db", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+
+        var component = Render<DatabaseRecoveryModal>();
+        var bRow = component.FindAll("li.recovery-row")[1];
+        await bRow.QuerySelectorAll("input[type=radio]")[1]
+            .ChangeAsync(new ChangeEventArgs { Value = "on" });
+
+        Task applyTask = component.Find("button:contains('[[Modal_Apply]]')")
+            .ClickAsync(new MouseEventArgs());
+        await restoreStarted.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
+        _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
+        await component.InvokeAsync(() => Task.CompletedTask);
+
+        _databaseService.Entries.Returns([BuildEntry("a.db", true), BuildEntry("b.db", true)]);
+        _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
+        await component.InvokeAsync(() => Task.CompletedTask);
+
+        restoreCompletion.SetResult(DatabaseRestoreResult.Restored);
+        await applyTask;
+
+        await _databaseService.Received(1).DeleteEntryWithBackupAsync("b.db", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -234,7 +541,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
     {
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(true));
+            .Returns(Task.FromResult(DatabaseRestoreResult.Restored));
 
         var component = Render<DatabaseRecoveryModal>();
 
@@ -367,6 +674,42 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
     }
 
     [Fact]
+    public async Task DatabaseRecoveryModal_EntriesChangedQueuedBeforeDispose_DoesNotReadEntriesOrCompleteAgain()
+    {
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
+
+        var component = Render<DatabaseRecoveryModal>();
+
+        _databaseService.Entries.Returns([]);
+        _databaseService.ClearReceivedCalls();
+        _modalService.ClearReceivedCalls();
+
+        using ManualResetEventSlim eventRaised = new(false);
+        Task? foreignRaise = null;
+
+        await component.InvokeAsync(async () =>
+        {
+            foreignRaise = Task.Run(
+                () =>
+                {
+                    _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
+                    eventRaised.Set();
+                },
+                TestContext.Current.CancellationToken);
+
+            Assert.True(eventRaised.Wait(s_handshakeTimeout, TestContext.Current.CancellationToken));
+
+            await component.Instance.DisposeAsync();
+        });
+
+        await foreignRaise!;
+        await component.InvokeAsync(() => { });
+
+        _ = _databaseService.DidNotReceive().Entries;
+        _modalService.Received(1).Complete(_modalId, Arg.Any<object?>());
+    }
+
+    [Fact]
     public async Task DatabaseRecoveryModal_EntriesChangedSubsetResolved_RemovesResolvedRowsKeepsDialogOpen()
     {
         _databaseService.Entries.Returns(
@@ -403,9 +746,9 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
         _databaseService.Entries.Returns(
             [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(false));
+            .Returns(Task.FromResult(DatabaseRestoreResult.Failed));
         _databaseService.RestoreFromBackupAsync("b.db", Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(false));
+            .Returns(Task.FromResult(DatabaseRestoreResult.Failed));
 
         var component = Render<DatabaseRecoveryModal>();
 
@@ -419,7 +762,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
             FindRowByFileName(component, "b.db").GetAttribute("class") ?? string.Empty);
 
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(true));
+            .Returns(Task.FromResult(DatabaseRestoreResult.Restored));
 
         await component.Find("button:contains('[[Modal_Apply]]')").ClickAsync(new MouseEventArgs());
 
@@ -460,7 +803,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
     public async Task DatabaseRecoveryModal_OnRequestCloseAsync_WhileApplying_ReturnsFalse()
     {
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
-        var pendingRestore = new TaskCompletionSource<bool>();
+        var pendingRestore = new TaskCompletionSource<DatabaseRestoreResult>();
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
             .Returns(pendingRestore.Task);
 
@@ -474,7 +817,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         Assert.False(accepted);
 
-        pendingRestore.SetResult(true);
+        pendingRestore.SetResult(DatabaseRestoreResult.Restored);
         await applyClick;
     }
 
@@ -550,7 +893,7 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
 
         _databaseService.Entries.Returns(entriesBefore);
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(true));
+            .Returns(Task.FromResult(DatabaseRestoreResult.Restored));
 
         var component = Render<DatabaseRecoveryModal>();
 
@@ -595,6 +938,22 @@ public sealed class DatabaseRecoveryModalTests : BunitContext
             false,
             DatabaseStatus.UpgradeRequired,
             backupExists);
+
+    private static IRenderedComponent<Button> FindBatchButton(
+        IRenderedComponent<DatabaseRecoveryModal> component,
+        string labelKey) =>
+        component.FindComponents<Button>().Single(button =>
+            button.Find("button").TextContent.Contains($"[[{labelKey}]]", StringComparison.Ordinal));
+
+    private static IHtmlInputElement FindDeleteRadio(
+        IRenderedComponent<DatabaseRecoveryModal> component,
+        string fileName) =>
+        (IHtmlInputElement)FindRowByFileName(component, fileName).QuerySelectorAll("input[type=radio]")[1];
+
+    private static IHtmlInputElement FindRestoreRadio(
+        IRenderedComponent<DatabaseRecoveryModal> component,
+        string fileName) =>
+        (IHtmlInputElement)FindRowByFileName(component, fileName).QuerySelectorAll("input[type=radio]")[0];
 
     private static IElement FindRowByFileName(
         IRenderedComponent<DatabaseRecoveryModal> component,

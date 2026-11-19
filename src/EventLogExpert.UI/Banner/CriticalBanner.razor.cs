@@ -98,7 +98,6 @@ public sealed partial class CriticalBanner : ComponentBase, IDisposable
         {
             _restartFailed = true;
             _restartFailureMessage = Localizer["Banner_Critical_RestartFailed"];
-            StateHasChanged();
         }
     }
 
@@ -119,8 +118,6 @@ public sealed partial class CriticalBanner : ComponentBase, IDisposable
             _recoveryFailureMessage = Localizer["Banner_Critical_RecoveryFailed", ex.Message];
 
             TraceLogger.Error($"{nameof(CriticalBanner)}.{nameof(OnReloadClickedAsync)}: recovery threw: {ex}");
-
-            StateHasChanged();
         }
     }
 }

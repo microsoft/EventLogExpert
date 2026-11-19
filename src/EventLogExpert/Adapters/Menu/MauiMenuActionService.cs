@@ -144,7 +144,7 @@ public sealed class MauiMenuActionService(
 
         try
         {
-            paths = await _filePickerService.PickMultipleAsync(_localizer["FilePicker_Title_OpenEventLogs"], [".evtx"]);
+            paths = await _filePickerService.PickMultipleAsync(_localizer["FilePicker_Title_OpenEventLogs"], (string[])[".evtx"]);
         }
         catch (InvalidOperationException ex)
         {
@@ -231,7 +231,9 @@ public sealed class MauiMenuActionService(
     public Task OpenIssueAsync() => OpenBrowserAsync("https://github.com/microsoft/EventLogExpert/issues/new");
 
     public Task OpenLiveLogAsync(string logName, bool combineLog) =>
-        OpenLogsBatchCoreAsync([(logName, LogPathType.Channel)], combineLog, showInlineAlerts: true);
+        OpenLogsBatchCoreAsync(((string Path, LogPathType Type)[])[(logName, LogPathType.Channel)],
+            combineLog,
+            showInlineAlerts: true);
 
     public Task<OpenLogsBatchResult> OpenLiveLogsAsync(
         IEnumerable<string> logNames,

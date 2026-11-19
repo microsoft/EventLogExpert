@@ -18,7 +18,7 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     exit 1
 }
 
-$msix = Join-Path $RepoRoot "src\EventLogExpert\bin\$Configuration\net10.0-windows10.0.19041.0\win-x64\AppPackages\EventLogExpert_0.9.0.0_${Configuration}_Test\EventLogExpert_0.9.0.0_x64_${Configuration}.msix"
+$msix = Join-Path $RepoRoot "src\EventLogExpert\bin\$Configuration\net11.0-windows10.0.19041.0\win-x64\AppPackages\EventLogExpert_0.9.0.0_${Configuration}_Test\EventLogExpert_0.9.0.0_x64_${Configuration}.msix"
 $pwd = ConvertTo-SecureString -String $PfxPassword -Force -AsPlainText
 
 if (-not (Test-Path $PfxPath)) {
@@ -26,7 +26,7 @@ if (-not (Test-Path $PfxPath)) {
     exit 1
 }
 if (-not (Test-Path $msix)) {
-    Write-Error "Signed MSIX not found at $msix. Run 'dotnet publish src/EventLogExpert -c $Configuration /p:GenerateAppxPackageOnBuild=true /p:WindowsPackageType=MSIX' + signtool sign first."
+    Write-Error "Signed MSIX not found at $msix. Run 'dotnet publish src\EventLogExpert -c $Configuration -f net11.0-windows10.0.19041.0 -r win-x64 /p:GenerateAppxPackageOnBuild=true /p:AppxPackageSigningEnabled=false /p:WindowsPackageType=MSIX' + signtool sign first."
     exit 1
 }
 

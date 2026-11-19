@@ -32,6 +32,7 @@ public sealed partial class LogTablePane
 {
     private const int DefaultPageSize = 20;
     private const float EventRowHeightPixels = 22f;
+    private const int EventVirtualizationOverscanCount = 3;
     private const int MenuValueMaxLength = 40;
 
     private static readonly IEventColumnView s_emptyView = LogTableState.EmptyView;
@@ -170,7 +171,7 @@ public sealed partial class LogTablePane
 
             await JsModuleInterop.DisposeModuleSafelyAsync(
                 _tableModule,
-                static module => module.InvokeVoidAsync("disposeTableEvents"));
+                static module => JsModuleInterop.InvokeVoidAsync(module, "disposeTableEvents"));
 
             _tableModule = null;
 
@@ -1035,11 +1036,11 @@ public sealed partial class LogTablePane
         _dotNetRef?.Dispose();
         _dotNetRef = DotNetObjectReference.Create(this);
 
-        _tableModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import",
+        _tableModule ??= await JsModuleInterop.ImportModuleAsync(
+            JSRuntime,
             "./_content/EventLogExpert.UI/LogTable/LogTablePane.razor.js");
 
-        await _tableModule.InvokeVoidAsync("initializeTableEvents", _dotNetRef);
+        await JsModuleInterop.InvokeVoidAsync(_tableModule, "initializeTableEvents", _dotNetRef);
     }
 
     private void InvokeCellContextMenu(MouseEventArgs args, DisplayRow row, ColumnName? column)
@@ -1310,7 +1311,8 @@ public sealed partial class LogTablePane
         }
     }
 
-    private void ReleaseBusyHeldForRefresh()    {
+    private void ReleaseBusyHeldForRefresh()
+    {
         if (!_busyHeldForRefresh) { return; }
 
         _busyHeldForRefresh = false;
@@ -1377,7 +1379,10 @@ public sealed partial class LogTablePane
 
         int targetRow = _rowView?.VisibleRowForEvent(index) ?? index;
 
-        if (_tableModule is not null) { await _tableModule.InvokeVoidAsync("scrollToRow", targetRow, GetAriaRowCount()); }
+        if (_tableModule is not null)
+        {
+            await JsModuleInterop.InvokeVoidAsync(_tableModule, "scrollToRow", targetRow, GetAriaRowCount());
+        }
     }
 
     private void SelectEvent(MouseEventArgs args, DisplayRow row)
@@ -1703,7 +1708,7 @@ public sealed partial class LogTablePane
         if (_tableModule is null) { return false; }
 
         int targetRow = _rowView?.VisibleRowForEvent(index) ?? index;
-        await _tableModule.InvokeVoidAsync("scrollToRow", targetRow, GetAriaRowCount());
+        await JsModuleInterop.InvokeVoidAsync(_tableModule, "scrollToRow", targetRow, GetAriaRowCount());
 
         return true;
     }

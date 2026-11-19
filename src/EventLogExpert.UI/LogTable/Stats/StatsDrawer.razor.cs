@@ -49,7 +49,7 @@ public sealed partial class StatsDrawer : AppStateComponentBase
 
             await JsModuleInterop.DisposeModuleSafelyAsync(
                 _module,
-                static module => module.InvokeVoidAsync("disposeStatsDrawerResizer"));
+                static module => JsModuleInterop.InvokeVoidAsync(module, "disposeStatsDrawerResizer"));
 
             _module = null;
             _dotNetRef?.Dispose();

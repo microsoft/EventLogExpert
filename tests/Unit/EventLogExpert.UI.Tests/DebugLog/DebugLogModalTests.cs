@@ -16,6 +16,8 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using System.Threading.Channels;
+using TestContext = Xunit.TestContext;
 
 namespace EventLogExpert.UI.Tests.DebugLog;
 
@@ -765,6 +767,63 @@ public sealed class DebugLogModalTests : BunitContext
         await component.Find("input[aria-label='Filter value']").ChangeAsync(new ChangeEventArgs { Value = "foo" });
 
         Assert.False(component.Find("button[aria-label='Save filter']").HasAttribute("disabled"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DebugLogModal_StreamingLoad_RendersLaterBatchesBeforeCompletion(bool refresh)
+    {
+        var lines = Channel.CreateUnbounded<string>();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var firstBatch = Enumerable.Range(0, 100)
+            .Select(index => DebugLogUtils.BuildLine(LogLevel.Information, $"streamed entry {index}"))
+            .ToArray();
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(invocation =>
+            refresh ? DebugLogUtils.ToAsyncEnumerable([]) : lines.Reader.ReadAllAsync(invocation.Arg<CancellationToken>()));
+        var component = Render<DebugLogModal>();
+        _debugLogReader.LoadAsync(Arg.Any<CancellationToken>()).Returns(invocation =>
+            lines.Reader.ReadAllAsync(invocation.Arg<CancellationToken>()));
+        var refreshTask = refresh ? FindButton(component, "Refresh").ClickAsync(new MouseEventArgs()) : Task.CompletedTask;
+
+        try
+        {
+            await component.WaitForAssertionAsync(() =>
+            {
+                Assert.Equal("true", component.Find(".debug-log-viewport").GetAttribute("aria-busy"));
+                Assert.StartsWith("0 of 0", component.Find(".debug-log-footer-counter").TextContent.Trim(), StringComparison.Ordinal);
+            });
+
+            foreach (var line in firstBatch) { await lines.Writer.WriteAsync(line, cancellationToken); }
+
+            await component.WaitForAssertionAsync(() =>
+            {
+                Assert.Equal("true", component.Find(".debug-log-viewport").GetAttribute("aria-busy"));
+                Assert.StartsWith($"{firstBatch.Length} of {firstBatch.Length}",
+                    component.Find(".debug-log-footer-counter").TextContent.Trim(), StringComparison.Ordinal);
+                Assert.Contains(component.FindAll(".debug-log-row"), row => row.TextContent == firstBatch[0]);
+            });
+
+            foreach (var line in firstBatch) { await lines.Writer.WriteAsync(line, cancellationToken); }
+
+            await component.WaitForAssertionAsync(() =>
+            {
+                Assert.Equal("true", component.Find(".debug-log-viewport").GetAttribute("aria-busy"));
+                Assert.StartsWith($"{firstBatch.Length * 2} of {firstBatch.Length * 2}",
+                    component.Find(".debug-log-footer-counter").TextContent.Trim(), StringComparison.Ordinal);
+            });
+        }
+        finally
+        {
+            lines.Writer.Complete();
+            await lines.Reader.Completion.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            await refreshTask.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            await component.WaitForAssertionAsync(() =>
+                Assert.Equal("false", component.Find(".debug-log-viewport").GetAttribute("aria-busy")));
+        }
+
+        Assert.StartsWith($"{firstBatch.Length * 2} of {firstBatch.Length * 2}",
+            component.Find(".debug-log-footer-counter").TextContent.Trim(), StringComparison.Ordinal);
     }
 
     [Fact]
