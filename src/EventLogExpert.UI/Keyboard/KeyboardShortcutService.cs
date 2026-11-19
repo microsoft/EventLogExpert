@@ -7,6 +7,7 @@ using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.LogTable.Find;
 using EventLogExpert.UI.Modal;
 using Microsoft.JSInterop;
+using System.Runtime.ExceptionServices;
 
 namespace EventLogExpert.UI.Keyboard;
 
@@ -18,60 +19,80 @@ public sealed class KeyboardShortcutService(
 {
     private readonly IMenuActionService _actions = actions;
     private readonly IFindCoordinator _findCoordinator = findCoordinator;
+    private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly IModalCoordinator _modalCoordinator = modalCoordinator;
     private readonly ISettingsService _settings = settings;
 
-    private IJSObjectReference? _keyboardModule;
-    private DotNetObjectReference<KeyboardShortcutService>? _selfRef;
+    private AttachedRegistration? _current;
+    private bool _disposed;
+    private long _leaseSequence;
+
+    public KeyboardShortcutLease CreateLease() => new(Interlocked.Increment(ref _leaseSequence));
 
     public async ValueTask DisposeAsync()
     {
-        await UnregisterAsync();
+        List<Exception> failures = [];
 
-        if (_keyboardModule is not null)
-        {
-            await JsModuleInterop.DisposeModuleSafelyAsync(_keyboardModule);
-
-            _keyboardModule = null;
-        }
-    }
-
-    public async Task EnsureRegisteredAsync(IJSRuntime jsRuntime)
-    {
-        var previousSelfRef = _selfRef;
-        var previousModule = _keyboardModule;
-        var newSelfRef = DotNetObjectReference.Create(this);
-        IJSObjectReference? newModule = null;
+        await _gate.WaitAsync();
 
         try
         {
-            newModule = await jsRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/EventLogExpert.UI/Keyboard/Keyboard.js");
-            await newModule.InvokeVoidAsync("registerKeyboardShortcuts", newSelfRef);
-        }
-        catch (Exception ex) when (ex is JSDisconnectedException or JSException or TaskCanceledException)
-        {
-            newSelfRef.Dispose();
+            _disposed = true;
 
-            if (newModule is not null)
+            var current = _current;
+            _current = null;
+
+            if (current is not null)
             {
-                await JsModuleInterop.DisposeModuleSafelyAsync(newModule);
+                await DetachAsync(current, failures);
             }
+        }
+        finally
+        {
+            _gate.Release();
+        }
 
+        ThrowIfFailed(failures);
+    }
+
+    public async Task EnsureRegisteredAsync(KeyboardShortcutLease lease, IJSRuntime jsRuntime)
+    {
+        IJSObjectReference module;
+
+        try
+        {
+            module = await jsRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/EventLogExpert.UI/Keyboard/Keyboard.js");
+        }
+        catch (Exception ex) when (IsExpectedJavaScriptFailure(ex))
+        {
             return;
         }
 
-        _selfRef = newSelfRef;
-        _keyboardModule = newModule;
+        List<Exception> failures = [];
+        bool declined;
 
-        if (previousSelfRef is not null && !ReferenceEquals(previousSelfRef, newSelfRef))
+        await _gate.WaitAsync();
+
+        try
         {
-            previousSelfRef.Dispose();
+            declined = _disposed || lease.IsReleased || lease.Sequence < Volatile.Read(ref _leaseSequence);
+
+            if (!declined)
+            {
+                await RegisterAsync(lease, module, failures);
+            }
+        }
+        finally
+        {
+            _gate.Release();
         }
 
-        if (previousModule is not null && !ReferenceEquals(previousModule, newModule))
+        if (declined)
         {
-            await JsModuleInterop.DisposeModuleSafelyAsync(previousModule);
+            await DisposeModuleAsync(module, failures);
         }
+
+        ThrowIfFailed(failures);
     }
 
     [JSInvokable]
@@ -101,22 +122,139 @@ public sealed class KeyboardShortcutService(
         }
     }
 
-    public async ValueTask UnregisterAsync()
+    public async ValueTask UnregisterAsync(KeyboardShortcutLease lease)
     {
-        if (_selfRef is null) { return; }
+        lease.Release();
 
-        if (_keyboardModule is not null)
+        List<Exception> failures = [];
+
+        await _gate.WaitAsync();
+
+        try
         {
-            try
+            if (_current is { } current && ReferenceEquals(current.Lease, lease))
             {
-                await _keyboardModule.InvokeVoidAsync("unregisterKeyboardShortcuts");
+                _current = null;
+
+                await DetachAsync(current, failures);
             }
-            catch (JSDisconnectedException) { /* Circuit gone - listener already detached. */ }
-            catch (TaskCanceledException) { /* Teardown cancellation; nothing to do. */ }
-            catch (ObjectDisposedException) { }
+        }
+        finally
+        {
+            _gate.Release();
         }
 
-        _selfRef.Dispose();
-        _selfRef = null;
+        ThrowIfFailed(failures);
     }
+
+    private static async ValueTask DetachAsync(AttachedRegistration registration, List<Exception> failures)
+    {
+        try
+        {
+            await registration.Module.InvokeVoidAsync("unregisterKeyboardShortcuts");
+        }
+        catch (Exception ex)
+        {
+            RecordTeardownFailure(failures, ex);
+        }
+
+        await RetireAsync(registration, failures);
+    }
+
+    private static async ValueTask DisposeModuleAsync(IJSObjectReference module, List<Exception> failures)
+    {
+        try
+        {
+            await JsModuleInterop.DisposeModuleStrictAsync(module);
+        }
+        catch (Exception ex)
+        {
+            failures.Add(ex);
+        }
+    }
+
+    private static bool IsExpectedJavaScriptFailure(Exception exception) =>
+        exception is JSDisconnectedException or JSException or OperationCanceledException;
+
+    private static void RecordTeardownFailure(List<Exception> failures, Exception exception)
+    {
+        if (exception is not (JSDisconnectedException or OperationCanceledException or ObjectDisposedException))
+        {
+            failures.Add(exception);
+        }
+    }
+
+    private static async ValueTask RetireAsync(AttachedRegistration registration, List<Exception> failures)
+    {
+        try
+        {
+            registration.Reference.Dispose();
+        }
+        catch (Exception ex)
+        {
+            RecordTeardownFailure(failures, ex);
+        }
+
+        await DisposeModuleAsync(registration.Module, failures);
+    }
+
+    private static void ThrowIfFailed(List<Exception> failures)
+    {
+        if (failures.Count == 0) { return; }
+
+        if (failures.Count == 1)
+        {
+            ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        }
+
+        throw new AggregateException(failures);
+    }
+
+    private async ValueTask RegisterAsync(KeyboardShortcutLease lease, IJSObjectReference module, List<Exception> failures)
+    {
+        AttachedRegistration candidate = new(module, DotNetObjectReference.Create(this), lease);
+        Exception? registerFailure = null;
+
+        try
+        {
+            await module.InvokeVoidAsync("registerKeyboardShortcuts", candidate.Reference);
+        }
+        catch (Exception ex)
+        {
+            registerFailure = ex;
+        }
+
+        var previous = _current;
+
+        if (registerFailure is not null || lease.IsReleased)
+        {
+            _current = null;
+
+            if (registerFailure is not null && !IsExpectedJavaScriptFailure(registerFailure))
+            {
+                failures.Add(registerFailure);
+            }
+
+            await DetachAsync(candidate, failures);
+
+            if (previous is not null)
+            {
+                await RetireAsync(previous, failures);
+            }
+
+            return;
+        }
+
+        _current = candidate;
+
+        if (previous is not null)
+        {
+            await RetireAsync(previous, failures);
+        }
+    }
+
+    private sealed record AttachedRegistration(
+        IJSObjectReference Module,
+        DotNetObjectReference<KeyboardShortcutService> Reference,
+        KeyboardShortcutLease Lease);
 }

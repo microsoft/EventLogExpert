@@ -20,7 +20,7 @@
                     AvailableCategories="CategoryFilterOptions()"
                     Draft="row.Editing"
                     OnCancel="@(() => CancelEditing(row))"
-                    OnChanged="OnEditorChanged"
+                    OnChanged="StateHasChanged"
                     OnEdit="@(() => StartEditing(row))"
                     OnEnableToggled="@(() => ToggleEnable(row))"
                     OnExcludeToggled="@(() => ToggleExclude(row))"
@@ -95,7 +95,7 @@
                 @FooterCounterText
             </span>
             <div class="debug-log-footer-actions debug-log-footer-right">
-                <Button OnClick="Refresh">@Localizer["DebugLog_Refresh"]</Button>
+                <Button OnClick="() => Refresh()">@Localizer["DebugLog_Refresh"]</Button>
                 <Button OnClick="ClearDebugLogFileAsync">@Localizer["DebugLog_ClearLog"]</Button>
             </div>
         </div>

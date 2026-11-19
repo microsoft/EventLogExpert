@@ -4,7 +4,7 @@
     flex-wrap: nowrap;
     align-items: center;
     gap: 0;
-    padding: 2px 8px;
+    padding: 0 8px;
     background-color: var(--clr-statusbar);
     color: var(--clr-white);
     overflow: clip;
@@ -20,7 +20,7 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
-    min-block-size: max(26px, calc(1lh + 2px));
+    min-block-size: max(24px, calc(1lh + 2px));
     overflow: clip;
     overflow-clip-margin: 3px;
 }
@@ -82,9 +82,12 @@
 }
 
 .status-bar-source:focus-visible,
-.status-bar-order-label:focus-visible,
 .status-bar-resolver:focus-visible {
-    outline-offset: 1px;
+    outline-offset: 0;
+}
+
+.status-bar-order-label:focus-visible {
+    outline-offset: -1px;
 }
 
 .status-bar-counts,
@@ -105,7 +108,7 @@
 .status-bar-order-chip {
     --status-bar-order-button-width: 24px;
     --status-bar-order-gap: 2px;
-    --status-bar-order-border-width: 1px;
+    --status-bar-order-outline-width: 1px;
     box-sizing: border-box;
     display: inline-flex;
     flex: 0 1 auto;
@@ -114,9 +117,12 @@
     min-width: calc(
         2 * var(--status-bar-order-button-width) +
         2 * var(--status-bar-order-gap) +
-        2 * var(--status-bar-order-border-width));
-    border: var(--status-bar-order-border-width) solid transparent;
+        2 * var(--status-bar-order-outline-width));
+    padding: 0 var(--status-bar-order-outline-width);
+    border: none;
     border-radius: 2px;
+    outline: var(--status-bar-order-outline-width) solid transparent;
+    outline-offset: -1px;
     white-space: nowrap;
 }
 
@@ -144,8 +150,8 @@
     cursor: pointer;
 }
 
-.status-bar-order-dir:hover:not([aria-disabled="true"]),
-.status-bar-order-remove:hover {
+.status-bar-order-dir:hover:not([aria-disabled="true"]):not(:focus-visible),
+.status-bar-order-remove:hover:not(:focus-visible) {
     background: color-mix(in srgb, var(--clr-white) 18%, transparent);
 }
 
@@ -157,12 +163,33 @@
 .status-bar-order-dir:focus-visible,
 .status-bar-order-remove:focus-visible {
     outline: 1px solid var(--clr-white);
-    outline-offset: 1px;
+    outline-offset: -1px;
 }
 
 @media (forced-colors: active) {
     .status-bar-order-chip {
-        border-color: CanvasText;
+        outline-color: CanvasText;
+    }
+
+    .status-bar-order-chip:has(:focus-visible) {
+        outline: none;
+    }
+
+    .status-bar-order-label:focus-visible,
+    .status-bar-order-dir:focus-visible,
+    .status-bar-order-remove:focus-visible {
+        forced-color-adjust: none;
+        background-color: Highlight;
+        color: HighlightText;
+        outline: none;
+    }
+
+    .status-bar-order-dir[aria-disabled="true"]:focus-visible {
+        opacity: 1;
+        background-color: Canvas;
+        color: GrayText;
+        outline: 1px solid Highlight;
+        outline-offset: -1px;
     }
 }
 

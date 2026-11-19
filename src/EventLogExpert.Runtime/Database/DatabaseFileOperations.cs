@@ -36,7 +36,13 @@ internal static class DatabaseFileOperations
             TryDeleteFile(mainPath, traceLogger, callerName);
     }
 
-    public static bool RestoreFilesCore(DatabaseEntry entry, ITraceLogger traceLogger, string callerName)
+    public static bool RestoreFilesCore(DatabaseEntry entry, ITraceLogger traceLogger, string callerName) =>
+        RestoreFilesWithResult(entry, traceLogger, callerName) == DatabaseRestoreResult.Restored;
+
+    public static DatabaseRestoreResult RestoreFilesWithResult(
+        DatabaseEntry entry,
+        ITraceLogger traceLogger,
+        string callerName)
     {
         var mainPath = entry.FullPath;
         var backupPath = mainPath + UpgradeBackupSuffix;
@@ -44,16 +50,14 @@ internal static class DatabaseFileOperations
         if (!File.Exists(backupPath))
         {
             SafeLog(() => traceLogger.Warning(
-                $"{nameof(DatabaseFileOperations)}.{nameof(RestoreFilesCore)}: '{backupPath}' missing; nothing to restore."));
+                $"{nameof(DatabaseFileOperations)}.{nameof(RestoreFilesWithResult)}: '{backupPath}' missing; nothing to restore."));
 
-            return false;
+            return DatabaseRestoreResult.Failed;
         }
 
-        if (!TryDeleteFile(mainPath + "-journal", traceLogger, callerName)) { return false; }
-
-        if (!TryDeleteFile(mainPath + "-wal", traceLogger, callerName)) { return false; }
-
-        if (!TryDeleteFile(mainPath + "-shm", traceLogger, callerName)) { return false; }
+        if (!TryDeleteFile(mainPath + "-journal", traceLogger, callerName) ||
+            !TryDeleteFile(mainPath + "-wal", traceLogger, callerName) ||
+            !TryDeleteFile(mainPath + "-shm", traceLogger, callerName)) { return DatabaseRestoreResult.Failed; }
 
         try
         {
@@ -62,12 +66,14 @@ internal static class DatabaseFileOperations
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             SafeLog(() => traceLogger.Warning(
-                $"{nameof(DatabaseFileOperations)}.{nameof(RestoreFilesCore)}: copy from '{backupPath}' to '{mainPath}' failed: {ex}"));
+                $"{nameof(DatabaseFileOperations)}.{nameof(RestoreFilesWithResult)}: copy from '{backupPath}' to '{mainPath}' failed: {ex}"));
 
-            return false;
+            return DatabaseRestoreResult.Failed;
         }
 
-        return TryDeleteFile(backupPath, traceLogger, callerName);
+        return TryDeleteFile(backupPath, traceLogger, callerName) ?
+            DatabaseRestoreResult.Restored :
+            DatabaseRestoreResult.RestoredBackupRetained;
     }
 
     public static bool TryDeleteFile(string path, ITraceLogger traceLogger, string callerName)

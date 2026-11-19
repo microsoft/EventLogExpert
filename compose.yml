@@ -1,5 +1,5 @@
 x-base: &base
-  image: mcr.microsoft.com/dotnet/sdk:10.0-windowsservercore-ltsc2022
+  image: mcr.microsoft.com/dotnet/sdk:11.0-windowsservercore-ltsc2025
   user: ContainerAdministrator
   isolation: hyperv
   working_dir: C:/src

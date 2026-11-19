@@ -53,7 +53,7 @@ public sealed partial class LogTabBar
         {
             await JsModuleInterop.DisposeModuleSafelyAsync(
                 _scrollSuppressorModule,
-                module => module.InvokeVoidAsync("release", _logTabBarRootRef));
+                module => JsModuleInterop.InvokeVoidAsync(module, "release", _logTabBarRootRef));
 
             await JsModuleInterop.DisposeModuleSafelyAsync(_logTabBarModule);
 

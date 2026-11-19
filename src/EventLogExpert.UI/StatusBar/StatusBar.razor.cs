@@ -78,7 +78,7 @@ public sealed partial class StatusBar
         }
 
         await JsModuleInterop.DisposeModuleSafelyAsync(
-            _layoutModule, module => module.InvokeVoidAsync("detach", _content));
+            _layoutModule, module => JsModuleInterop.InvokeVoidAsync(module, "detach", _content));
         _layoutModule = null;
 
         await JsModuleInterop.DisposeModuleSafelyAsync(_focusModule);

@@ -611,7 +611,7 @@
   </data>
   <data name="DatabaseRecoveryModal_Description" xml:space="preserve"><value>{count, plural, one {The following database had its upgrade interrupted.} other {The following databases had their upgrade interrupted.}}</value></data>
   <data name="DatabaseRecoveryModal_Explanation" xml:space="preserve">
-    <value>Restore from backup keeps the V3 data; Delete removes both the partial entry and its backup.</value>
+    <value>Restore from backup keeps the V3 data; Delete removes the database entry and its backup.</value>
     <comment>Recovery modal explanation. V3 is a provider database schema name; keep V3 literal.</comment>
   </data>
   <data name="DatabaseRecoveryModal_RestoreAll" xml:space="preserve">
@@ -629,6 +629,10 @@
   <data name="DatabaseRecoveryModal_Delete" xml:space="preserve">
     <value>Delete</value>
     <comment>Recovery modal delete radio label.</comment>
+  </data>
+  <data name="DatabaseRecoveryModal_QueuedSelectionNote" xml:space="preserve">
+    <value>Recovery is in progress. Selections you change now apply the next time you choose Apply, for entries that are still listed and were not restored or deleted in this pass.</value>
+    <comment>Recovery modal status note shown while Apply is running and the radio buttons stay enabled. Apply is the label of the modal's accept button.</comment>
   </data>
   <data name="Db_Picker_ImportPrompt" xml:space="preserve">
     <value>Please select database files to import</value>
@@ -822,6 +826,14 @@
   <data name="Banner_Recovery_Failed_Delete" xml:space="preserve">
     <value>Failed to delete '{0}'.</value>
     <comment>Recovery delete failure. {0} is the database file name.</comment>
+  </data>
+  <data name="Banner_Recovery_BackupRetained_Title" xml:space="preserve">
+    <value>Database restored; backup not deleted</value>
+    <comment>Title for the banner shown when a recovery restore replaced the database but the backup file could not be deleted.</comment>
+  </data>
+  <data name="Banner_Recovery_BackupRetained" xml:space="preserve">
+    <value>Restored '{0}' from backup, but the backup file could not be deleted.</value>
+    <comment>Recovery restore succeeded but the backup file remains. {0} is the database file name.</comment>
   </data>
   <!-- Dashboard (empty-state welcome screen): masthead + Quick Launch. -->
   <data name="Dashboard_Lead" xml:space="preserve">
@@ -4903,6 +4915,10 @@
   </data>
   <data name="Db_Manage_RestoreSucceeded" xml:space="preserve">
     <value>Restored {0} from backup.</value>
+    <comment>Database tools UI text.</comment>
+  </data>
+  <data name="Db_Manage_RestoreSucceededBackupRetained" xml:space="preserve">
+    <value>Restored {0} from backup, but the backup file could not be deleted.</value>
     <comment>Database tools UI text.</comment>
   </data>
   <data name="Db_Manage_SelectionCleared" xml:space="preserve">

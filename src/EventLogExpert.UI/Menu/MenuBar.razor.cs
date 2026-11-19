@@ -80,7 +80,7 @@ public sealed partial class MenuBar
 
             await JsModuleInterop.DisposeModuleSafelyAsync(
                 _scrollSuppressorModule,
-                module => module.InvokeVoidAsync("release", _menuBarRootRef));
+                module => JsModuleInterop.InvokeVoidAsync(module, "release", _menuBarRootRef));
 
             await JsModuleInterop.DisposeModuleSafelyAsync(_menuAnchorModule);
 
@@ -491,13 +491,14 @@ public sealed partial class MenuBar
     {
         var requestId = Interlocked.Increment(ref _openRequestId);
 
-        _menuAnchorModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import",
+        _menuAnchorModule ??= await JsModuleInterop.ImportModuleAsync(
+            JSRuntime,
             "./_content/EventLogExpert.UI/Menu/MenuAnchor.js");
 
         if (_barElements[index] is not { } barButton) { return; }
 
-        var rect = await _menuAnchorModule.InvokeAsync<MenuAnchorRect>(
+        var rect = await JsModuleInterop.InvokeAsync<MenuAnchorRect>(
+            _menuAnchorModule,
             "getMenuElementRect",
             barButton.Element);
 

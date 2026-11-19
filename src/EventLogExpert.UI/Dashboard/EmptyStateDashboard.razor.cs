@@ -214,7 +214,6 @@ public sealed partial class EmptyStateDashboard : AppStateComponentBase
         _pendingTabFocus = false;
         _pendingScanEndFocus = true;
         _folderLaunchCts.Cancel();
-        StateHasChanged();
     }
 
     private void ClearFilter() => FilterCommands.ClearAllFilters();

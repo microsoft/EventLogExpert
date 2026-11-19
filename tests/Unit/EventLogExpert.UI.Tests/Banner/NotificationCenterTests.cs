@@ -23,6 +23,7 @@ using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using Microsoft.JSInterop.Infrastructure;
 using NSubstitute;
+using NSubstitute.Extensions;
 using System.Reflection;
 
 namespace EventLogExpert.UI.Tests.Banner;
@@ -38,7 +39,7 @@ public sealed class NotificationCenterTests : BunitContext
         Services.AddSingleton<INotificationBulkDismissService>(_service);
         Services.AddSingleton<IInfoBannerService>(_service);
         Services.AddSingleton<ICriticalErrorService>(_service);
-        Services.AddSingleton<ITraceLogger>(Substitute.For<ITraceLogger>());
+        Services.AddSingleton(Substitute.For<ITraceLogger>());
         Services.AddSingleton<IStringLocalizer<SharedResource>>(new MarkerLocalizer());
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
@@ -53,8 +54,8 @@ public sealed class NotificationCenterTests : BunitContext
         var component = Render<NotificationCenter>();
         IJSObjectReference module = Substitute.For<IJSObjectReference>();
         TaskCompletionSource<IJSVoidResult> pendingInterop = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        module.InvokeAsync<IJSVoidResult>("prepareModalAction", Arg.Any<object?[]>())
-            .Returns(_ => new ValueTask<IJSVoidResult>(pendingInterop.Task));
+        module.ReturnsForAll<ValueTask<IJSVoidResult>>(invocation =>
+            invocation.ArgAt<string>(0) == "prepareModalAction" ? new ValueTask<IJSVoidResult>(pendingInterop.Task) : default);
         typeof(NotificationCenter).GetField("_module", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(component.Instance, module);
         MethodInfo prepare = typeof(NotificationCenter).GetMethod("PrepareModalActionAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
         Task action = (Task)prepare.Invoke(component.Instance, null)!;
@@ -126,12 +127,14 @@ public sealed class NotificationCenterTests : BunitContext
         var component = Render<NotificationCenter>();
         IJSObjectReference module = Substitute.For<IJSObjectReference>();
         TaskCompletionSource<IJSVoidResult> pendingInterop = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        module.InvokeAsync<IJSVoidResult>(identifier, Arg.Any<object?[]>())
-            .Returns(_ => new ValueTask<IJSVoidResult>(pendingInterop.Task));
+        module.ReturnsForAll<ValueTask<IJSVoidResult>>(invocation =>
+            invocation.ArgAt<string>(0) == identifier ? new ValueTask<IJSVoidResult>(pendingInterop.Task) : default);
         typeof(NotificationCenter).GetField("_module", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(component.Instance, module);
         MethodInfo clearAll = typeof(NotificationCenter).GetMethod("ClearAllAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
         Task action = await component.InvokeAsync(() => Task.FromResult((Task)clearAll.Invoke(component.Instance, null)!));
-        await module.Received(1).InvokeAsync<IJSVoidResult>(identifier, Arg.Any<object?[]>());
+        Assert.Single(module.ReceivedCalls(), invocation =>
+            invocation.GetMethodInfo().Name == nameof(IJSObjectReference.InvokeAsync) &&
+            Equals(invocation.GetArguments()[0], identifier));
         if (dispose) { await component.Instance.DisposeAsync(); }
         Exception failure = objectDisposed ? new ObjectDisposedException("notification-module") : new JSException("Interop failed.");
 
@@ -781,8 +784,8 @@ public sealed class NotificationCenterTests : BunitContext
         var component = Render<NotificationCenter>();
         IJSObjectReference module = Substitute.For<IJSObjectReference>();
         TaskCompletionSource<IJSVoidResult> retirement = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        module.InvokeAsync<IJSVoidResult>("retireFocusBeforeHide", Arg.Any<object?[]>())
-            .Returns(new ValueTask<IJSVoidResult>(retirement.Task));
+        module.ReturnsForAll<ValueTask<IJSVoidResult>>(invocation =>
+            invocation.ArgAt<string>(0) == "retireFocusBeforeHide" ? new ValueTask<IJSVoidResult>(retirement.Task) : default);
         FieldInfo? moduleField = typeof(NotificationCenter).GetField(
             "_module",
             BindingFlags.Instance | BindingFlags.NonPublic);
@@ -791,8 +794,9 @@ public sealed class NotificationCenterTests : BunitContext
         BannerId firstFailure = Assert.Single(_service.ErrorBanners).Id;
 
         _service.DismissError(firstFailure);
-        component.WaitForAssertion(() => module.Received(1)
-            .InvokeAsync<IJSVoidResult>("retireFocusBeforeHide", Arg.Any<object?[]>()));
+        component.WaitForAssertion(() => Assert.Single(module.ReceivedCalls(), invocation =>
+            invocation.GetMethodInfo().Name == nameof(IJSObjectReference.InvokeAsync) &&
+            Equals(invocation.GetArguments()[0], "retireFocusBeforeHide")));
         component.Render();
         Assert.DoesNotContain("notification-trigger-hidden", component.Find(".notification-trigger").GetAttribute("class"));
 

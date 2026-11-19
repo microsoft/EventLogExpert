@@ -45,7 +45,7 @@ public interface IDatabaseService : IAsyncDisposable
         Func<CancellationToken, Task>? prepareForDeletionAsync = null,
         CancellationToken cancellationToken = default);
 
-    Task<bool> RestoreFromBackupAsync(string fileName, CancellationToken cancellationToken = default);
+    Task<DatabaseRestoreResult> RestoreFromBackupAsync(string fileName, CancellationToken cancellationToken = default);
 
     Task RetryClassificationAsync(string fileName, CancellationToken cancellationToken = default);
 

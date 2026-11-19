@@ -90,7 +90,7 @@ public sealed partial class DetailsPane
 
             await JsModuleInterop.DisposeModuleSafelyAsync(
                 _detailsPaneModule,
-                static module => module.InvokeVoidAsync("disposeDetailsPaneResizer"));
+                static module => JsModuleInterop.InvokeVoidAsync(module, "disposeDetailsPaneResizer"));
 
             _detailsPaneModule = null;
 
@@ -106,11 +106,12 @@ public sealed partial class DetailsPane
         {
             _dotNetRef = DotNetObjectReference.Create(this);
 
-            _detailsPaneModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                "import",
+            _detailsPaneModule = await JsModuleInterop.ImportModuleAsync(
+                JSRuntime,
                 "./_content/EventLogExpert.UI/DetailsPane/DetailsPane.razor.js");
 
-            await _detailsPaneModule.InvokeVoidAsync(
+            await JsModuleInterop.InvokeVoidAsync(
+                _detailsPaneModule,
                 "enableDetailsPaneResizer",
                 _dotNetRef,
                 PreferencesProvider.DetailsPaneHeightPreference);

@@ -349,7 +349,7 @@ public sealed partial class FilterPane
                 .First()
                 .Id :
             default;
-        
+
         _isFilterListVisible = true;
     }
 
@@ -442,7 +442,7 @@ public sealed partial class FilterPane
         {
             await JsModuleInterop.DisposeModuleSafelyAsync(
                 _scrollSuppressorModule,
-                module => module.InvokeVoidAsync("release", _filterPaneRootRef));
+                module => JsModuleInterop.InvokeVoidAsync(module, "release", _filterPaneRootRef));
 
             await JsModuleInterop.DisposeModuleSafelyAsync(_menuAnchorModule);
 
@@ -978,10 +978,12 @@ public sealed partial class FilterPane
     {
         if (_addFilterChevron is not { } chevronButton) { return; }
 
-        _menuAnchorModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/EventLogExpert.UI/Menu/MenuAnchor.js");
+        _menuAnchorModule ??= await JsModuleInterop.ImportModuleAsync(
+            JSRuntime, "./_content/EventLogExpert.UI/Menu/MenuAnchor.js");
 
-        var rect = await _menuAnchorModule.InvokeAsync<MenuAnchorRect>("getMenuElementRect", chevronButton.Element);
+        var rect = await JsModuleInterop.InvokeAsync<MenuAnchorRect>(_menuAnchorModule,
+            "getMenuElementRect",
+            chevronButton.Element);
         MenuService.OpenAt(rect.Left, rect.Bottom, BuildAddFilterMenu(), focusFirst, openedByKeyboard: openedByKeyboard);
         _addFilterMenuId = MenuService.ActiveMenuId;
         StateHasChanged();

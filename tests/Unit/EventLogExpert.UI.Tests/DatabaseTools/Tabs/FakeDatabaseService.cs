@@ -25,7 +25,7 @@ internal sealed class FakeDatabaseService : IDatabaseService
 
     public int RestoreFromBackupCalls { get; private set; }
 
-    public bool RestoreFromBackupReturnValue { get; set; } = true;
+    public DatabaseRestoreResult RestoreFromBackupReturnValue { get; set; } = DatabaseRestoreResult.Restored;
 
     public int RetryClassificationCalls { get; private set; }
 
@@ -79,7 +79,9 @@ internal sealed class FakeDatabaseService : IDatabaseService
         CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
 
-    public Task<bool> RestoreFromBackupAsync(string fileName, CancellationToken cancellationToken = default)
+    public Task<DatabaseRestoreResult> RestoreFromBackupAsync(
+        string fileName,
+        CancellationToken cancellationToken = default)
     {
         RestoreFromBackupCalls++;
         return Task.FromResult(RestoreFromBackupReturnValue);

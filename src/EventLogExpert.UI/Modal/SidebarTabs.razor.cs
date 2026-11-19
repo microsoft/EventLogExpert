@@ -42,7 +42,7 @@ public sealed partial class SidebarTabs<TTab> : ComponentBase, IAsyncDisposable
     {
         await JsModuleInterop.DisposeModuleSafelyAsync(
             _tabKeyModule,
-            module => module.InvokeVoidAsync("detach", _tablistRef));
+            module => JsModuleInterop.InvokeVoidAsync(module, "detach", _tablistRef));
 
         _tabKeyModule = null;
     }

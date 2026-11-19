@@ -120,7 +120,9 @@ internal sealed class DatabaseRecoveryService(
         _registry.TryRemoveAndPersist(fileName);
     }
 
-    public async Task<bool> RestoreFromBackupAsync(string fileName, CancellationToken cancellationToken = default)
+    public async Task<DatabaseRestoreResult> RestoreFromBackupAsync(
+        string fileName,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -128,11 +130,14 @@ internal sealed class DatabaseRecoveryService(
 
         var entry = _registry.LookupEntryOrThrow(fileName, nameof(RestoreFromBackupAsync));
 
-        var success = await Task
-            .Run(() => DatabaseFileOperations.RestoreFilesCore(entry, _traceLogger, nameof(RestoreFromBackupAsync)))
+        var result = await Task
+            .Run(() => DatabaseFileOperations.RestoreFilesWithResult(
+                entry,
+                _traceLogger,
+                nameof(RestoreFromBackupAsync)))
             .ConfigureAwait(false);
 
-        if (!success) { return false; }
+        if (result == DatabaseRestoreResult.Failed) { return result; }
 
         try
         {
@@ -144,6 +149,6 @@ internal sealed class DatabaseRecoveryService(
                 $"{nameof(DatabaseRecoveryService)}.{nameof(RestoreFromBackupAsync)} post-restore classification failed: {ex}"));
         }
 
-        return true;
+        return result;
     }
 }

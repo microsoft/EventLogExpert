@@ -246,7 +246,7 @@ public sealed partial class HistogramPane
 
             await JsModuleInterop.DisposeModuleSafelyAsync(
                 _module,
-                static module => module.InvokeVoidAsync("disposeHistogram"));
+                static module => JsModuleInterop.InvokeVoidAsync(module, "disposeHistogram"));
 
             _module = null;
 
@@ -262,11 +262,11 @@ public sealed partial class HistogramPane
         {
             _dotNetRef = DotNetObjectReference.Create(this);
 
-            _module = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                "import",
+            _module = await JsModuleInterop.ImportModuleAsync(
+                JSRuntime,
                 "./_content/EventLogExpert.UI/LogTable/Histogram/HistogramPane.razor.js");
 
-            await _module.InvokeVoidAsync("initHistogram", _dotNetRef);
+            await JsModuleInterop.InvokeVoidAsync(_module, "initHistogram", _dotNetRef);
         }
 
         if (_pendingViewStartFraction is { } startFraction && _module is not null)
@@ -434,7 +434,7 @@ public sealed partial class HistogramPane
         int newBins = (int)Math.Round(currentBins * factor);
 
         if (factor < 1 && newBins >= currentBins) { newBins = currentBins - 1; }
-        
+
         if (factor > 1 && newBins <= currentBins) { newBins = currentBins + 1; }
 
         newBins = Math.Clamp(newBins, minBins, totalBins);

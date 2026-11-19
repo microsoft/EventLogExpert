@@ -28,10 +28,12 @@ public sealed partial class ScenarioBrowserPanel : IAsyncDisposable
 
     [Parameter] public bool CanEnableChannels { get; set; }
 
-    [Parameter][EditorRequired]
+    [Parameter]
+    [EditorRequired]
     public Func<ScenarioDefinition, IReadOnlyList<ChannelReadiness>> GetChannelReadiness { get; set; } = static _ => [];
 
-    [Parameter][EditorRequired]
+    [Parameter]
+    [EditorRequired]
     public Func<ScenarioDefinition, IReadOnlyList<ChannelReadiness>> GetOptionalChannelReadiness { get; set; } = static _ => [];
 
     [Parameter] public bool IsBusy { get; set; }
@@ -64,7 +66,7 @@ public sealed partial class ScenarioBrowserPanel : IAsyncDisposable
     {
         await JsModuleInterop.DisposeModuleSafelyAsync(
             _scrollSuppressorModule,
-            module => module.InvokeVoidAsync("release", _scenarioBrowserRootRef));
+            module => JsModuleInterop.InvokeVoidAsync(module, "release", _scenarioBrowserRootRef));
 
         _scrollSuppressorModule = null;
     }

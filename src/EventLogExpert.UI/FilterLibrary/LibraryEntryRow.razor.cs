@@ -441,7 +441,6 @@ public sealed partial class LibraryEntryRow : ComponentBase, IAsyncDisposable
             MenuService.OpenAt(rect.Left, rect.Bottom, BuildMoreMenu(), focusFirst: true,
                 openedByKeyboard: MenuButtonActivation.WasKeyboardTriggered(args));
             _moreMenuId = MenuService.ActiveMenuId;
-            StateHasChanged();
         }
         catch (JSDisconnectedException) { }
         catch (JSException) { }

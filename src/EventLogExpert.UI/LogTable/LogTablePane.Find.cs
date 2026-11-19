@@ -6,10 +6,10 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.Concurrency;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.UI.Common;
+using EventLogExpert.UI.Common.Interop;
 using EventLogExpert.UI.LogTable.Find;
 using EventLogExpert.UI.LogTable.Grouping;
 using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.LogTable;
 
@@ -545,7 +545,7 @@ public sealed partial class LogTablePane
 
         if (_tableModule is not null)
         {
-            await _tableModule.InvokeVoidAsync("scrollToRow", targetRow, GetAriaRowCount());
+            await JsModuleInterop.InvokeVoidAsync(_tableModule, "scrollToRow", targetRow, GetAriaRowCount());
         }
     }
 

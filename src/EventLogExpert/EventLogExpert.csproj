@@ -67,7 +67,6 @@
     <ItemGroup>
         <PackageReference Include="Fluxor.Blazor.Web" />
         <PackageReference Include="Microsoft.Maui.Controls" />
-        <PackageReference Include="Microsoft.Maui.Controls.Compatibility" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" />
         <PackageReference Include="Microsoft.WindowsAppSDK" />
     </ItemGroup>

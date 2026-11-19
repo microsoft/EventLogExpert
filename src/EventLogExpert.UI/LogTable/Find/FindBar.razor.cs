@@ -98,7 +98,7 @@ public sealed partial class FindBar : IAsyncDisposable
     {
         await JsModuleInterop.DisposeModuleSafelyAsync(
             _module,
-            static module => module.InvokeVoidAsync("detachNativeFindSuppression"));
+            static module => JsModuleInterop.InvokeVoidAsync(module, "detachNativeFindSuppression"));
 
         _module = null;
     }

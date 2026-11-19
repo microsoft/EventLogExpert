@@ -1648,7 +1648,49 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task RestoreFromBackupAsync_BackupMissing_ReturnsFalseAndDoesNotMutate()
+    public void RestoreFilesCore_WhenBackupDeleteFails_ReturnsFalse()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        var bakPath = dbPath + DatabaseService.UpgradeBackupSuffix;
+        File.WriteAllText(dbPath, "current");
+        File.WriteAllText(bakPath, "backup");
+        var entry = new DatabaseEntry(Constants.TestDb1, dbPath, true, DatabaseStatus.UpgradeRequired, true);
+
+        using var backupHandle = new FileStream(bakPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        var restored = DatabaseFileOperations.RestoreFilesCore(
+            entry,
+            Substitute.For<ITraceLogger>(),
+            nameof(RestoreFilesCore_WhenBackupDeleteFails_ReturnsFalse));
+
+        Assert.False(restored);
+        Assert.True(File.Exists(bakPath));
+        Assert.Equal("backup", File.ReadAllText(dbPath));
+    }
+
+    [Fact]
+    public void RestoreFilesCore_WhenFullRestoreSucceeds_ReturnsTrueAndRemovesBackup()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        var bakPath = dbPath + DatabaseService.UpgradeBackupSuffix;
+        File.WriteAllText(dbPath, "current");
+        File.WriteAllText(bakPath, "backup");
+        var entry = new DatabaseEntry(Constants.TestDb1, dbPath, true, DatabaseStatus.UpgradeRequired, true);
+
+        var restored = DatabaseFileOperations.RestoreFilesCore(
+            entry,
+            Substitute.For<ITraceLogger>(),
+            nameof(RestoreFilesCore_WhenFullRestoreSucceeds_ReturnsTrueAndRemovesBackup));
+
+        Assert.True(restored);
+        Assert.False(File.Exists(bakPath));
+        Assert.Equal("backup", File.ReadAllText(dbPath));
+    }
+
+    [Fact]
+    public async Task RestoreFromBackupAsync_BackupMissing_ReturnsFailedAndDoesNotMutate()
     {
         var databasePath = CreateDatabaseDirectory();
         var dbPath = Path.Combine(databasePath, Constants.TestDb1);
@@ -1659,7 +1701,7 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var result = await service.RestoreFromBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken);
 
-        Assert.False(result);
+        Assert.Equal(DatabaseRestoreResult.Failed, result);
         Assert.True(File.Exists(dbPath));
         var entryAfter = Assert.Single(service.Entries);
         Assert.Equal(entryBefore.Status, entryAfter.Status);
@@ -1754,6 +1796,38 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RestoreFromBackupAsync_WhenBackupDeleteFails_ReturnsRestoredBackupRetainedAndReclassifies()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+
+        DatabaseSeedUtils.SeedV4Schema(dbPath);
+
+        var service = CreateDatabaseService();
+
+        var bakPath = dbPath + DatabaseService.UpgradeBackupSuffix;
+        DatabaseSeedUtils.SeedV3Schema(bakPath);
+
+        var backupBytes = File.ReadAllBytes(bakPath);
+
+        var raisedCount = 0;
+        service.EntriesChanged += (_, _) => Interlocked.Increment(ref raisedCount);
+
+        using var deleteBlockingBackupHandle = new FileStream(bakPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        var result = await service.RestoreFromBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken);
+
+        Assert.Equal(DatabaseRestoreResult.RestoredBackupRetained, result);
+        Assert.True(File.Exists(bakPath));
+        Assert.Equal(backupBytes, File.ReadAllBytes(dbPath));
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
+        Assert.True(entry.BackupExists);
+        Assert.Equal(1, raisedCount);
+    }
+
+    [Fact]
     public async Task
         RestoreFromBackupAsync_WhenMainIsV4AndBackupIsV3_RestoresMainDeletesSidecarsAndBackup_StatusBecomesUpgradeRequired()
     {
@@ -1776,7 +1850,7 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var result = await service.RestoreFromBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken);
 
-        Assert.True(result);
+        Assert.Equal(DatabaseRestoreResult.Restored, result);
         Assert.True(File.Exists(dbPath));
         Assert.False(File.Exists(journalPath));
         Assert.False(File.Exists(walPath));
@@ -1789,7 +1863,7 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task RestoreFromBackupAsync_WhenSidecarDeleteFails_PreservesBackupAndReturnsFalse()
+    public async Task RestoreFromBackupAsync_WhenSidecarDeleteFails_PreservesBackupAndReturnsFailed()
     {
         var databasePath = CreateDatabaseDirectory();
         var dbPath = Path.Combine(databasePath, Constants.TestDb1);
@@ -1810,7 +1884,7 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var result = await service.RestoreFromBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken);
 
-        Assert.False(result);
+        Assert.Equal(DatabaseRestoreResult.Failed, result);
         Assert.True(File.Exists(bakPath));
         Assert.Equal(mainBytesBefore, File.ReadAllBytes(dbPath));
     }

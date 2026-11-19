@@ -17,7 +17,6 @@ public sealed partial class DatabaseRecoveryModal : ModalBase<bool>
     private readonly HashSet<string> _failedFileNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, RecoveryAction> _selectedActions = new(StringComparer.OrdinalIgnoreCase);
 
-    private bool _disposed;
     private IReadOnlyList<DatabaseEntry> _entries = [];
     private bool _isApplying;
 
@@ -41,7 +40,6 @@ public sealed partial class DatabaseRecoveryModal : ModalBase<bool>
     {
         if (disposing)
         {
-            _disposed = true;
             DatabaseService.EntriesChanged -= OnEntriesChanged;
         }
 
@@ -85,17 +83,23 @@ public sealed partial class DatabaseRecoveryModal : ModalBase<bool>
         if (_isApplying) { return; }
 
         _isApplying = true;
-        StateHasChanged();
 
-        var rowsToProcess = _entries.ToArray();
+        var rowsToProcess = new List<(DatabaseEntry Entry, RecoveryAction Action)>();
+        var changedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var entry in _entries)
+        {
+            if (_selectedActions.TryGetValue(entry.FileName, out var action))
+            {
+                rowsToProcess.Add((entry, action));
+            }
+        }
 
         try
         {
-            foreach (var rowEntry in rowsToProcess)
+            foreach (var (rowEntry, action) in rowsToProcess)
             {
                 var fileName = rowEntry.FileName;
-
-                if (!_selectedActions.TryGetValue(fileName, out var action)) { continue; }
 
                 var liveEntry = DatabaseService.Entries.FirstOrDefault(entry =>
                     string.Equals(entry.FileName, fileName, StringComparison.OrdinalIgnoreCase) &&
@@ -106,15 +110,27 @@ public sealed partial class DatabaseRecoveryModal : ModalBase<bool>
                 _failedFileNames.Remove(fileName);
 
                 bool success;
+                bool backupRetained = false;
 
                 try
                 {
-                    success = action switch
+                    switch (action)
                     {
-                        RecoveryAction.Restore => await DatabaseService.RestoreFromBackupAsync(fileName),
-                        RecoveryAction.Delete => await DatabaseService.DeleteEntryWithBackupAsync(fileName),
-                        _ => false
-                    };
+                        case RecoveryAction.Restore:
+                            var restoreResult = await DatabaseService.RestoreFromBackupAsync(fileName);
+                            success = restoreResult == DatabaseRestoreResult.Restored;
+                            backupRetained = restoreResult == DatabaseRestoreResult.RestoredBackupRetained;
+
+                            break;
+                        case RecoveryAction.Delete:
+                            success = await DatabaseService.DeleteEntryWithBackupAsync(fileName);
+
+                            break;
+                        default:
+                            success = false;
+
+                            break;
+                    }
                 }
                 catch (InvalidOperationException invalidOperation)
                 {
@@ -129,7 +145,20 @@ public sealed partial class DatabaseRecoveryModal : ModalBase<bool>
                     success = false;
                 }
 
-                if (!success)
+                if (success || backupRetained)
+                {
+                    changedFileNames.Add(fileName);
+                }
+
+                if (backupRetained)
+                {
+                    _failedFileNames.Add(fileName);
+
+                    ErrorBannerService.ReportError(new Preformatted(
+                        Localizer["Banner_Recovery_BackupRetained_Title"],
+                        Localizer["Banner_Recovery_BackupRetained", fileName]));
+                }
+                else if (!success)
                 {
                     _failedFileNames.Add(fileName);
 
@@ -145,12 +174,19 @@ public sealed partial class DatabaseRecoveryModal : ModalBase<bool>
         {
             _isApplying = false;
 
-            if (!_disposed) { StateHasChanged(); }
+            foreach (var changedFileName in changedFileNames)
+            {
+                _selectedActions.Remove(changedFileName);
+            }
+
+            await HandleEntriesChangedAsync();
         }
     }
 
     private void DeleteAll()
     {
+        if (_isApplying) { return; }
+
         foreach (var entry in _entries)
         {
             _selectedActions[entry.FileName] = RecoveryAction.Delete;
@@ -159,6 +195,8 @@ public sealed partial class DatabaseRecoveryModal : ModalBase<bool>
 
     private async Task HandleEntriesChangedAsync()
     {
+        if (_isApplying || IsDisposed) { return; }
+
         try
         {
             RefreshEntriesFromService();
@@ -179,8 +217,12 @@ public sealed partial class DatabaseRecoveryModal : ModalBase<bool>
         }
     }
 
-    private void OnEntriesChanged(object? sender, EventArgs e) =>
+    private void OnEntriesChanged(object? sender, EventArgs e)
+    {
+        if (IsDisposed) { return; }
+
         _ = InvokeAsync(HandleEntriesChangedAsync);
+    }
 
     private void RefreshEntriesFromService()
     {
@@ -213,12 +255,13 @@ public sealed partial class DatabaseRecoveryModal : ModalBase<bool>
 
     private void RestoreAll()
     {
+        if (_isApplying) { return; }
+
         foreach (var entry in _entries)
         {
             _selectedActions[entry.FileName] = RecoveryAction.Restore;
         }
     }
 
-    private void SelectAction(string fileName, RecoveryAction action) =>
-        _selectedActions[fileName] = action;
+    private void SelectAction(string fileName, RecoveryAction action) => _selectedActions[fileName] = action;
 }

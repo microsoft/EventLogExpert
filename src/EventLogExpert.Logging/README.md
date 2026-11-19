@@ -1,8 +1,9 @@
 # EventLogExpert.Logging
 
-A small, dependency-light structured logging library. Its only package reference is
-`Microsoft.Extensions.Logging.Abstractions` (for `LogLevel`), so it can be copied into another solution and
-used on its own.
+A small, dependency-light structured logging library that can be used on its own. On .NET 11,
+`Microsoft.Extensions.Logging.Abstractions` (for `LogLevel`) is supplied by the framework, so no direct
+package reference is needed. Older .NET targets need the appropriate package reference and are not
+validated by this project.
 
 It provides a simple write API (`ITraceLogger`), a set of destinations (`ILogSink`), and category-aware
 level routing. Application-specific concerns (where the log file lives, reading the file back, wiring to a

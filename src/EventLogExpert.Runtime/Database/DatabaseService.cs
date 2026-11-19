@@ -94,7 +94,9 @@ internal sealed class DatabaseService(
         CancellationToken cancellationToken = default) =>
         _recoveryService.RemoveAsync(fileName, prepareForDeletionAsync, cancellationToken);
 
-    public Task<bool> RestoreFromBackupAsync(string fileName, CancellationToken cancellationToken = default) =>
+    public Task<DatabaseRestoreResult> RestoreFromBackupAsync(
+        string fileName,
+        CancellationToken cancellationToken = default) =>
         _recoveryService.RestoreFromBackupAsync(fileName, cancellationToken);
 
     public Task RetryClassificationAsync(string fileName, CancellationToken cancellationToken = default) =>

@@ -4,7 +4,7 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <!-- Match the Windows TFM the MAUI head uses so Microsoft.Windows.SDK types referenced by
-         the helpers under test resolve correctly. Inherits net10.0-windows10.0.19041.0 from
+         the helpers under test resolve correctly. Inherits net11.0-windows10.0.19041.0 from
          Directory.Build.props' Otherwise branch (UseMaui is false here). -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
